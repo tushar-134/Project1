@@ -1,0 +1,21 @@
+{
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "latest",
+    "@vitejs/plugin-react": "latest",
+    "axios": "^1.16.0",
+    "date-fns": "^4.1.0",
+    "lucide-react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "react-hot-toast": "^2.6.0",
+    "react-router-dom": "latest",
+    "tailwindcss": "latest",
+    "vite": "latest",
+    "xlsx": "^0.18.5"
+  }
+}

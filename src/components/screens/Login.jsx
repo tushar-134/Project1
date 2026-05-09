@@ -1,0 +1,45 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
+import Button from "../ui/Button";
+import Card from "../ui/Card";
+import { useAuth } from "../../context/AuthContext";
+
+export default function Login() {
+  const navigate = useNavigate();
+  const { login } = useAuth();
+  const [form, setForm] = useState({ email: "admin@filingbuddy.ae", password: "Admin@123" });
+  const [loading, setLoading] = useState(false);
+
+  async function submit(event) {
+    event.preventDefault();
+    // Login is kept minimal here because AuthContext owns token persistence and session bootstrap.
+    setLoading(true);
+    try {
+      await login(form.email, form.password);
+      navigate("/dashboard");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Invalid credentials");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="grid min-h-screen place-items-center bg-[#f1f5f9] p-6">
+      <Card className="w-full max-w-sm p-6">
+        <div className="mb-6 text-center">
+          <div className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-xl bg-[#eab308] text-lg font-black text-white">FB</div>
+          <h1 className="text-[20px] font-extrabold text-slate-900">Filing Buddy</h1>
+          <p className="mt-1 text-[12px] font-semibold text-slate-500">Filing Buddy Accounting LLC</p>
+        </div>
+        <form onSubmit={submit} className="space-y-3">
+          <label><span className="field-label">Email</span><input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
+          <label><span className="field-label">Password</span><input className="input" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></label>
+          <Button className="w-full" disabled={loading}>{loading ? "Signing in..." : "Sign In"}</Button>
+          <button type="button" className="w-full text-center text-[12px] font-bold text-[#1e3a8a]">Forgot password?</button>
+        </form>
+      </Card>
+    </div>
+  );
+}
