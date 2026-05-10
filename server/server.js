@@ -70,6 +70,7 @@ cron.schedule("0 4 * * *", dailyTaskNotifications, { timezone: "UTC" });
 
 const port = process.env.PORT || 5000;
 // Boot is intentionally fail-fast: if Mongo is unavailable, we do not start a half-alive API.
+// Keeping startup explicit here helps hosted platforms surface environment issues quickly in logs.
 connectDB().then(() => app.listen(port, () => console.log(`API running on ${port}`))).catch((error) => {
   console.error(error);
   process.exit(1);
