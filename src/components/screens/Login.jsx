@@ -19,7 +19,11 @@ export default function Login() {
       await login(form.email, form.password);
       navigate("/dashboard");
     } catch (error) {
-      toast.error(error.response?.data?.message || "Invalid credentials");
+      const message = error.response?.data?.message
+        || (error.request ? "Unable to reach the server. Please check that the API is running." : null)
+        || error.message
+        || "Sign in failed";
+      toast.error(message);
     } finally {
       setLoading(false);
     }

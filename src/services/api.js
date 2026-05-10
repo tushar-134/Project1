@@ -1,7 +1,23 @@
 import axios from "axios";
 
+function resolveApiBaseUrl() {
+  const configured = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+  try {
+    const url = new URL(configured);
+    const appHost = window.location.hostname;
+    // When the app is opened on 127.0.0.1 but env points at localhost (or the reverse),
+    // we normalize both sides to the active host so browser CORS/origin behavior stays predictable.
+    if ([ "localhost", "127.0.0.1" ].includes(url.hostname) && [ "localhost", "127.0.0.1" ].includes(appHost)) {
+      url.hostname = appHost;
+    }
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return configured;
+  }
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
+  baseURL: resolveApiBaseUrl(),
 });
 
 api.interceptors.request.use((config) => {
