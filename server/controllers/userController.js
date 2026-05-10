@@ -28,10 +28,20 @@ exports.updateUser = async (req, res, next) => {
   try { res.json(await User.findByIdAndUpdate(req.params.id, req.body, { new: true }).select("-password")); } catch (error) { next(error); }
 };
 exports.updateRole = async (req, res, next) => {
-  try { res.json(await User.findByIdAndUpdate(req.params.id, { role: req.body.role }, { new: true }).select("-password")); } catch (error) { next(error); }
+  try {
+    if (String(req.params.id) === String(req.user._id)) {
+      return res.status(400).json({ message: "You cannot change your own role." });
+    }
+    res.json(await User.findByIdAndUpdate(req.params.id, { role: req.body.role }, { new: true }).select("-password"));
+  } catch (error) { next(error); }
 };
 exports.updateStatus = async (req, res, next) => {
-  try { res.json(await User.findByIdAndUpdate(req.params.id, { isActive: req.body.isActive }, { new: true }).select("-password")); } catch (error) { next(error); }
+  try {
+    if (String(req.params.id) === String(req.user._id) && req.body.isActive === false) {
+      return res.status(400).json({ message: "You cannot deactivate your own account." });
+    }
+    res.json(await User.findByIdAndUpdate(req.params.id, { isActive: req.body.isActive }, { new: true }).select("-password"));
+  } catch (error) { next(error); }
 };
 exports.deleteUser = async (req, res, next) => {
   try {

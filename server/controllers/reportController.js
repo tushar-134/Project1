@@ -25,7 +25,7 @@ exports.dashboardStats = async (req, res, next) => {
       Task.countDocuments({ ...taskScope, dueDate: { ...(dueDate || {}), $lt: new Date() }, status: { $ne: "completed" } }),
       Task.countDocuments({ isAwaitingFta: true, ftaStatus: { $ne: "approved" } }),
       Category.find({ isActive: true }),
-      ActivityLog.find().populate("task").populate("user", "name").sort({ createdAt: -1 }).limit(10),
+      ActivityLog.find().populate({ path: "task", populate: { path: "client", select: "legalName" } }).populate("user", "name").sort({ createdAt: -1 }).limit(10),
     ]);
     const categoryBreakdown = await Promise.all(categories.map(async (cat) => ({
       category: cat.name,
