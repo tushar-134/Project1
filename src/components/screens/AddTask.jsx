@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Check, Send } from "lucide-react";
+import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
 import { useClients } from "../../hooks/useClients";
 import { useUsers } from "../../hooks/useUsers";
@@ -39,20 +40,34 @@ export default function AddTask() {
     setStep(2);
   }
   async function submit() {
-    await createTask({
-      category: category.name,
-      taskType: type,
-      client: details.client,
-      assignedTo: details.assigned || undefined,
-      dueDate: details.dueDate,
-      period: details.period,
-      description: details.description,
-      isRecurring: recurring,
-      recurringConfig: recurring ? { frequency: details.frequency, nextDueDate: details.nextDue, endDate: details.endDate } : undefined,
-      isAwaitingFta: fta,
-      status: fta ? "submitted_to_fta" : "not_started",
-    });
-    navigate("/tasks/list");
+    if (!details.client) {
+      toast.error("Please select a client before submitting the task.");
+      return;
+    }
+    if (!details.dueDate) {
+      toast.error("Please choose a due date before submitting the task.");
+      return;
+    }
+    try {
+      await createTask({
+        category: category.name,
+        taskType: type,
+        client: details.client,
+        assignedTo: details.assigned || undefined,
+        dueDate: details.dueDate,
+        period: details.period,
+        description: details.description,
+        isRecurring: recurring,
+        recurringConfig: recurring ? { frequency: details.frequency, nextDueDate: details.nextDue, endDate: details.endDate || undefined } : undefined,
+        isAwaitingFta: fta,
+        status: fta ? "submitted_to_fta" : "not_started",
+      });
+      toast.success("Task created successfully.");
+      navigate("/tasks/list");
+    } catch (error) {
+      const message = error?.response?.data?.errors?.[0]?.msg || error?.response?.data?.message || "Unable to create task right now.";
+      toast.error(message);
+    }
   }
 
   return (
