@@ -1,5 +1,5 @@
 [build]
-buildCommand = "npm ci"
+buildCommand = "npm ci --omit=dev"
 watchPatterns = ["**"]
 
 [deploy]
