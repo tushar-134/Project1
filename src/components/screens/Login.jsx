@@ -38,8 +38,8 @@ export default function Login() {
           <p className="mt-1 text-[12px] font-semibold text-slate-500">Filing Buddy Accounting LLC</p>
         </div>
         <form onSubmit={submit} className="space-y-3">
-          <label><span className="field-label">Email</span><input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
-          <label><span className="field-label">Password</span><input className="input" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></label>
+            <label htmlFor="login-email"><span className="field-label">Email</span><input id="login-email" name="email" className="input" type="email" autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
+            <label htmlFor="login-password"><span className="field-label">Password</span><input id="login-password" name="password" className="input" type="password" autoComplete="current-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></label>
           <Button className="w-full" disabled={loading}>{loading ? "Signing in..." : "Sign In"}</Button>
           <button type="button" className="w-full text-center text-[12px] font-bold text-[#1e3a8a]">Forgot password?</button>
         </form>

@@ -1,0 +1,193 @@
+# Project Error Audit Report
+
+Full review of `project1` — React frontend + Express 5 / Mongoose backend.
+
+---
+
+## 🔴 Critical Bugs
+
+### 1. Race Condition in ID Generation — [autoId.js](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/utils/autoId.js)
+**File:** [autoId.js](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/utils/autoId.js#L4-L16)
+
+Both [nextClientFileNo()](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/utils/autoId.js#4-10) and [nextTaskId()](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/utils/autoId.js#11-17) read the last record and compute `n + 1` without any atomic lock. Under concurrent requests two tasks/clients can get the **same ID**, then one save fails with a `MongoServerError: E11000 duplicate key` because `taskId` and `fileNo` have a `unique` index.
+
+**Fix:** Use `findOneAndUpdate` with `$inc` on a dedicated counters collection, or add a retry loop with a unique-violation catch.
+
+---
+
+### 2. `res.attachment()` Does Not Exist in Express 5
+**Files:**
+- [taskController.js L127](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/taskController.js#L127)
+- [clientController.js L105](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/clientController.js#L105)
+
+The project uses **Express 5** (`"express": "^5.2.1"`). `res.attachment()` was removed in Express 5 — calling it throws `TypeError: res.attachment is not a function`, crashing both CSV export endpoints.
+
+```js
+// ❌ Express 4 only
+res.header("Content-Type", "text/csv").attachment("tasks.csv").send(csv);
+
+// ✅ Express 5 fix
+res.setHeader("Content-Disposition", 'attachment; filename="tasks.csv"')
+   .setHeader("Content-Type", "text/csv")
+   .send(csv);
+```
+
+---
+
+### 3. Operator Precedence Bug — [sendEmail.js](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/utils/sendEmail.js)
+**File:** [sendEmail.js L5](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/utils/sendEmail.js#L5)
+
+```js
+// ❌ Current — && binds tighter than ||, so the last condition is wrong
+normalized === "smtp.gmail.com" && !process.env.EMAIL_PASS;
+
+// ✅ Should be parenthesized
+(normalized === "smtp.gmail.com" && !process.env.EMAIL_PASS)
+```
+
+Without the parentheses the last condition only evaluates when `normalized` is `"smtp.gmail.com"`, but when `normalized` is something else it is silently skipped and [isPlaceholder](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/utils/sendEmail.js#3-7) may return `false` even when `EMAIL_HOST` is a placeholder. Emails are then attempted with wrong credentials.
+
+---
+
+## 🟠 Security Issues
+
+### 4. Mass-Assignment in [updateTask](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/taskController.js#62-72) / [updateClient](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/clientController.js#55-64) — No Validation
+**Files:**
+- [taskController.js L66](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/taskController.js#L62-L70)
+- [clientController.js L59](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/clientController.js#L55-L63)
+
+`Object.assign(task, req.body)` copies **every** field from the request body onto the document — including `taskId`, `createdBy`, `fileNo`, `isActive`, etc. An authenticated `manager` could overwrite the auto-generated `taskId` or escalate privileges by patching `createdBy`.
+
+**Fix:** Whitelist allowed fields explicitly or use a `pick()` helper before assigning.
+
+---
+
+### 5. Attachment Upload Route Missing Role Guard — [clientRoutes.js](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/routes/clientRoutes.js)
+**File:** [clientRoutes.js L18](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/routes/clientRoutes.js#L18)
+
+```js
+// ❌ Any authenticated user (including task_only) can upload attachments
+router.post("/:id/attachments", upload.single("file"), ctrl.uploadAttachment);
+```
+
+All other write routes in this file require `adminManager`. Add it here too.
+
+---
+
+### 6. Portal Password Encrypt-Check Is Fragile — [Client.js](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/models/Client.js)
+**File:** [Client.js L76](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/models/Client.js#L76)
+
+```js
+if (portal.password && !String(portal.password).includes(":"))
+```
+
+Any legitimate password containing a colon (e.g. `"p:assword"`) is skipped and stored plaintext. Use a proper flag like `portal._passwordEncrypted` instead.
+
+---
+
+## 🟡 Logic / Data Bugs
+
+### 7. Overdue Query Overwrites Month Filter — [taskController.js](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/taskController.js)
+**File:** [taskController.js L21-L22](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/taskController.js#L21-L22)
+
+```js
+if (month)    query.dueDate = { $gte: ..., $lt: ... };
+if (overdue === "true") query.dueDate = { ...(query.dueDate || {}), $lt: new Date() };
+if (overdue === "true") query.status  = { $ne: "completed" };
+```
+
+When both [month](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/reportController.js#7-12) and `overdue=true` are sent, the spread `...(query.dueDate)` merges `$gte` from month + `$lt` from overdue, but the new `$lt` (today) **replaces** the month's `$lt` (end of month). Combined with month's `$gte` this now means "tasks that started after month start AND due before today" — which is correct behaviour by accident only in some months. This also runs a status filter that silently overwrites any earlier status filter.
+
+**Consequence:** The export and list endpoints can return inconsistent results depending on query combos.
+
+---
+
+### 8. [updateUser](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/userController.js#27-30) Has No Null-Check — [userController.js](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/userController.js)
+**File:** [userController.js L28](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/userController.js#L28)
+
+```js
+exports.updateUser = async (req, res, next) => {
+  try { res.json(await User.findByIdAndUpdate(...).select("-password")); }
+  catch (error) { next(error); }
+};
+```
+
+If the id doesn't exist `findByIdAndUpdate` returns `null` and `res.json(null)` sends a `200 null` to the client. Should check for null and return 404.
+
+---
+
+### 9. [changePassword](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/authController.js#28-37) Has No Null-Check — [authController.js](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/authController.js)
+**File:** [authController.js L30](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/authController.js#L30)
+
+```js
+const user = await User.findById(req.user._id).select("+password");
+if (!(await user.comparePassword(...)))   // crashes if user is null
+```
+
+Although `req.user` is set by [authMiddleware](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/middleware/authMiddleware.js#4-19), the user could be deleted between the auth check and this query. Without a null-guard `user.comparePassword` throws a 500 instead of a clean 404.
+
+---
+
+### 10. N+1 Query Performance — [reportController.js](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/reportController.js)
+**File:** [reportController.js L30-L34](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/reportController.js#L30-L34) and [L50-L63](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/reportController.js#L50-L63)
+
+`categoryBreakdown` fires **2 separate Mongo queries per category** (pending + overdue count). With 10 categories = 20 queries + the initial batch. Same pattern repeats in [clientWise](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/reportController.js#47-57) and [userWise](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/reportController.js#58-68).
+
+**Fix:** Use `$group` aggregation pipelines to get all counts in one query.
+
+---
+
+## 🔵 Minor / Configuration Issues
+
+### 11. Frontend [package.json](file:///c:/Users/ritik/OneDrive/Desktop/project1/package.json) Missing `name` Field
+**File:** [package.json](file:///c:/Users/ritik/OneDrive/Desktop/project1/package.json)
+
+No `"name"` key. This isn't fatal but can cause issues with some tooling and `npm publish`.
+
+---
+
+### 12. Dashboard Uses Hardcoded Fallback Data
+**File:** [Dashboard.jsx L10-L14](file:///c:/Users/ritik/OneDrive/Desktop/project1/src/components/screens/Dashboard.jsx#L10-L14)
+
+```js
+const serviceTiles = [
+  ["VAT", 7, 2, "vat"], ["Corporate Tax", 4, 0, "ct"], ...
+];
+```
+
+If the API call fails the dashboard shows **fake numbers** (7 VAT tasks, 4 CT tasks, etc.) to the user with no error state. These placeholder counts could be mistaken for real data.
+
+---
+
+### 13. [vite.log](file:///c:/Users/ritik/OneDrive/Desktop/project1/vite.log) Committed to Repo
+**File:** [vite.log](file:///c:/Users/ritik/OneDrive/Desktop/project1/vite.log) — 34 KB of local dev output. Should be in [.gitignore](file:///c:/Users/ritik/OneDrive/Desktop/project1/.gitignore).
+
+---
+
+### 14. `multer-storage-cloudinary` Version Mismatch
+**File:** [server/package.json L27](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/package.json#L27)
+
+`multer-storage-cloudinary@4.0.0` is compatible with `multer@1.x`. The project depends on **`multer@^2.1.1`** (v2 breaking API). This will throw at runtime when file uploads are attempted.
+
+**Fix:** Upgrade to `multer-storage-cloudinary@5.x` which supports multer v2, or pin `multer` to `^1.4.5-lts.1`.
+
+---
+
+## Summary Table
+
+| # | Severity | File | Issue |
+|---|----------|------|-------|
+| 1 | 🔴 Critical | [autoId.js](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/utils/autoId.js) | Race condition → duplicate IDs |
+| 2 | 🔴 Critical | [taskController.js](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/taskController.js), [clientController.js](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/clientController.js) | `res.attachment()` removed in Express 5 |
+| 3 | 🔴 Critical | [sendEmail.js](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/utils/sendEmail.js) | Operator precedence bug in [isPlaceholder](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/utils/sendEmail.js#3-7) |
+| 4 | 🟠 Security | [taskController.js](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/taskController.js), [clientController.js](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/clientController.js) | Mass-assignment via `Object.assign` |
+| 5 | 🟠 Security | [clientRoutes.js](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/routes/clientRoutes.js) | Attachment upload missing role guard |
+| 6 | 🟠 Security | [Client.js](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/models/Client.js) | Portal password colon-check allows plaintext storage |
+| 7 | 🟡 Logic | [taskController.js](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/taskController.js) | Overdue filter overwrites month filter |
+| 8 | 🟡 Logic | [userController.js](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/userController.js) | [updateUser](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/userController.js#27-30) returns 200 null for missing user |
+| 9 | 🟡 Logic | [authController.js](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/authController.js) | [changePassword](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/authController.js#28-37) unguarded null dereference |
+| 10 | 🟡 Perf | [reportController.js](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/controllers/reportController.js) | N+1 query pattern in 3 endpoints |
+| 11 | 🔵 Minor | [package.json](file:///c:/Users/ritik/OneDrive/Desktop/project1/package.json) | Missing `name` field |
+| 12 | 🔵 Minor | [Dashboard.jsx](file:///c:/Users/ritik/OneDrive/Desktop/project1/src/components/screens/Dashboard.jsx) | Fake fallback data shown on API failure |
+| 13 | 🔵 Minor | [vite.log](file:///c:/Users/ritik/OneDrive/Desktop/project1/vite.log) | Dev log file committed to repo |
+| 14 | 🔴 Critical | [server/package.json](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/package.json) | `multer-storage-cloudinary@4` incompatible with `multer@2` |

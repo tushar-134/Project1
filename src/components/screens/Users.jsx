@@ -123,6 +123,8 @@ export default function Users() {
                 <td>{u.mobile}</td>
                 <td>
                   <select
+                    id={`user-role-${u.id}`}
+                    name={`userRole${u.id}`}
                     className="input h-8 w-36"
                     value={u.role}
                     disabled={currentUser?.id === u._id}

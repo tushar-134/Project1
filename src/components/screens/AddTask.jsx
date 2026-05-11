@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Check, Send } from "lucide-react";
 import toast from "react-hot-toast";
@@ -79,14 +79,14 @@ export default function AddTask() {
       {step === 3 && (
         <Card className="p-4">
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Client*"><select className="input" value={details.client} onChange={(e) => setDetails({ ...details, client: e.target.value })}><option value="">Select client</option>{state.clients.map((c) => <option key={c.id} value={c._id}>{c.name}</option>)}</select></Field>
-            <Field label="Assign To"><select className="input" value={details.assigned} onChange={(e) => setDetails({ ...details, assigned: e.target.value })}><option value="">Unassigned</option>{state.users.map((u) => <option key={u.id} value={u._id}>{u.name}</option>)}</select></Field>
-            <Field label="Due Date*"><input className="input" type="date" value={details.dueDate} onChange={(e) => setDetails({ ...details, dueDate: e.target.value })} /></Field>
-            <Field label="Period"><input className="input" value={details.period} onChange={(e) => setDetails({ ...details, period: e.target.value })} /></Field>
-            <Field label="Description / Notes"><textarea className="input textarea" value={details.description} onChange={(e) => setDetails({ ...details, description: e.target.value })} /></Field>
+            <Field label="Client*" field="taskClient"><select className="input" value={details.client} onChange={(e) => setDetails({ ...details, client: e.target.value })}><option value="">Select client</option>{state.clients.map((c) => <option key={c.id} value={c._id}>{c.name}</option>)}</select></Field>
+            <Field label="Assign To" field="taskAssignedTo"><select className="input" value={details.assigned} onChange={(e) => setDetails({ ...details, assigned: e.target.value })}><option value="">Unassigned</option>{state.users.map((u) => <option key={u.id} value={u._id}>{u.name}</option>)}</select></Field>
+            <Field label="Due Date*" field="taskDueDate"><input className="input" type="date" value={details.dueDate} onChange={(e) => setDetails({ ...details, dueDate: e.target.value })} /></Field>
+            <Field label="Period" field="taskPeriod"><input className="input" value={details.period} onChange={(e) => setDetails({ ...details, period: e.target.value })} /></Field>
+            <Field label="Description / Notes" field="taskDescription"><textarea className="input textarea" value={details.description} onChange={(e) => setDetails({ ...details, description: e.target.value })} /></Field>
           </div>
           <ToggleRow label="Recurring Task" checked={recurring} onChange={setRecurring} />
-          <div className={`smooth-panel overflow-hidden ${recurring ? "max-h-44 opacity-100" : "max-h-0 opacity-0"}`}><div className="mt-3 grid gap-3 rounded-xl bg-slate-50 p-3 md:grid-cols-3"><Field label="Frequency"><select className="input" value={details.frequency} onChange={(e) => setDetails({ ...details, frequency: e.target.value })}><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="annual">Annually</option></select></Field><Field label="Next Due Date"><input className="input" type="date" value={details.nextDue} onChange={(e) => setDetails({ ...details, nextDue: e.target.value })} /></Field><Field label="End Date"><input className="input" type="date" value={details.endDate} onChange={(e) => setDetails({ ...details, endDate: e.target.value })} /></Field></div></div>
+          <div className={`smooth-panel overflow-hidden ${recurring ? "max-h-44 opacity-100" : "max-h-0 opacity-0"}`}><div className="mt-3 grid gap-3 rounded-xl bg-slate-50 p-3 md:grid-cols-3"><Field label="Frequency" field="taskRecurringFrequency"><select className="input" value={details.frequency} onChange={(e) => setDetails({ ...details, frequency: e.target.value })}><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="annual">Annually</option></select></Field><Field label="Next Due Date" field="taskNextDueDate"><input className="input" type="date" value={details.nextDue} onChange={(e) => setDetails({ ...details, nextDue: e.target.value })} /></Field><Field label="End Date" field="taskRecurringEndDate"><input className="input" type="date" value={details.endDate} onChange={(e) => setDetails({ ...details, endDate: e.target.value })} /></Field></div></div>
           <ToggleRow label="Awaiting FTA Response" checked={fta} onChange={setFta} />
           <div className={`smooth-panel overflow-hidden ${fta ? "max-h-20 opacity-100" : "max-h-0 opacity-0"}`}><div className="mt-3 rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-[12px] font-semibold text-yellow-800">This task will be routed to FTA Tracker when submitted.</div></div>
           <div className="mt-5 flex gap-2"><Button variant="ghost" onClick={() => setStep(2)}>Back</Button><Button onClick={submit}><Send size={16} />Submit Task</Button></div>
@@ -96,5 +96,13 @@ export default function AddTask() {
   );
 }
 function Step({ n, label, active }) { return <div className={`flex items-center gap-3 rounded-xl border p-3 ${active ? "border-[#1e3a8a] bg-white" : "border-[#e2e8f0] bg-white/60"}`}><div className={`grid h-7 w-7 place-items-center rounded-full text-[12px] font-black ${active ? "bg-[#1e3a8a] text-white" : "bg-slate-200 text-slate-500"}`}>{active ? <Check size={15} /> : n}</div><div className="font-extrabold">{label}</div></div>; }
-function Field({ label, children }) { return <label><span className="field-label">{label}</span>{children}</label>; }
+function Field({ label, field, children }) {
+  const control = isValidElement(children)
+    ? cloneElement(children, {
+        id: children.props.id || field,
+        name: children.props.name || field,
+      })
+    : children;
+  return <label htmlFor={field}><span className="field-label">{label}</span>{control}</label>;
+}
 function ToggleRow({ label, checked, onChange }) { return <div className="mt-4 flex items-center justify-between rounded-xl border border-[#e2e8f0] p-3"><span className="font-extrabold">{label}</span><Toggle checked={checked} onChange={onChange} /></div>; }
