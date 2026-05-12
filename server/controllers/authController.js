@@ -28,6 +28,9 @@ exports.me = (req, res) => res.json({ user: publicUser(req.user) });
 exports.changePassword = async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id).select("+password");
+    // Bug #9 Fix: guard against the edge case where the user was deleted between
+    // the auth middleware check and this query; avoids a 500 null-dereference.
+    if (!user) return res.status(404).json({ message: "User not found" });
     if (!(await user.comparePassword(req.body.currentPassword))) return res.status(400).json({ message: "Current password is incorrect" });
     user.password = req.body.newPassword;
     await user.save();

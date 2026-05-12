@@ -56,7 +56,9 @@ exports.updateClient = async (req, res, next) => {
   try {
     const client = await Client.findById(req.params.id);
     if (!client || !client.isActive) return res.status(404).json({ message: "Client not found" });
-    Object.assign(client, req.body);
+    // Bug #4 Fix: whitelist editable fields to prevent mass-assignment of fileNo, createdBy, isActive, etc.
+    const ALLOWED = ["legalName", "tradeName", "clientType", "jurisdiction", "financialYearEnd", "assignedUser", "group", "registeredAddress", "correspondenceAddress", "tradeLicences", "contactPersons", "vatDetails", "ctDetails", "portalLogins", "customFields"];
+    ALLOWED.forEach((key) => { if (key in req.body) client[key] = req.body[key]; });
     await client.save();
     res.json(client);
   } catch (error) { next(error); }
@@ -102,7 +104,10 @@ exports.exportClients = async (req, res, next) => {
   try {
     const clients = await Client.find({ isActive: true }).populate("group", "name");
     const csv = ["File No,Name,Jurisdiction,Group,VAT TRN"].concat(clients.map((c) => [c.fileNo, c.legalName, c.jurisdiction, c.group?.name || "", c.vatDetails?.trn || ""].map((v) => `"${String(v).replaceAll('"', '""')}"`).join(","))).join("\n");
-    res.header("Content-Type", "text/csv").attachment("clients.csv").send(csv);
+    // Bug #2 Fix: res.attachment() was removed in Express 5; use setHeader instead.
+    res.setHeader("Content-Disposition", 'attachment; filename="clients.csv"')
+       .setHeader("Content-Type", "text/csv")
+       .send(csv);
   } catch (error) { next(error); }
 };
 

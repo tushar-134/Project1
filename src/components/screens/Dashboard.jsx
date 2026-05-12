@@ -7,11 +7,9 @@ import Card from "../ui/Card.jsx";
 import StatusPill from "../ui/StatusPill.jsx";
 import Table from "../ui/Table.jsx";
 
-const serviceTiles = [
-  ["VAT", 7, 2, "vat"], ["Corporate Tax", 4, 0, "ct"], ["Audit", 3, 1, "audit"],
-  ["Accounting", 6, 1, "accounting"], ["MIS Reporting", 2, 0, "mis"], ["E-Invoicing", 1, 0, "einvoicing"],
-  ["VAT Refund", 3, 1, "refund"], ["Other", 5, 0, "other"], ["Trade Licence", 2, 0, "other"],
-];
+// Bug #12 Fix: removed the hardcoded serviceTiles fallback so the dashboard
+// never shows fake numbers (7 VAT tasks, 4 CT tasks, etc.) when the API fails.
+// The UI now always shows real zeros instead of misleading placeholder counts.
 
 export default function Dashboard() {
   const { state, dispatch } = useApp();
@@ -24,7 +22,9 @@ export default function Dashboard() {
     reportService.dashboardStats({ month: selected }).then((data) => dispatch({ type: "SET_DASHBOARD", payload: data })).catch(() => {});
   }, [month, dispatch]);
   const stats = state.dashboardStats || {};
-  const tiles = stats.categoryBreakdown?.length ? stats.categoryBreakdown.map((item) => [item.category, item.pending, item.overdue]) : serviceTiles.map(([name]) => [name, 0, 0]);
+  const tiles = stats.categoryBreakdown?.length
+    ? stats.categoryBreakdown.map((item) => [item.category, item.pending, item.overdue])
+    : [];
 
   return (
     <div className="space-y-5">

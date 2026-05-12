@@ -71,7 +71,74 @@ cron.schedule("0 4 * * *", dailyTaskNotifications, { timezone: "UTC" });
 const port = process.env.PORT || 5000;
 // Boot is intentionally fail-fast: if Mongo is unavailable, we do not start a half-alive API.
 // Keeping startup explicit here helps hosted platforms surface environment issues quickly in logs.
-connectDB().then(() => app.listen(port, () => console.log(`API running on ${port}`))).catch((error) => {
+connectDB().then(async () => {
+  // Auto-seed when using the in-memory dev MongoDB so the app has usable data immediately.
+  const User = require("./models/User");
+  const userCount = await User.countDocuments();
+  if (userCount === 0) {
+    console.log("🌱 Empty database detected — running seed for local dev...");
+    try {
+      const Category = require("./models/Category");
+      const ClientGroup = require("./models/ClientGroup");
+      const Client = require("./models/Client");
+      const Task = require("./models/Task");
+      const ActivityLog = require("./models/ActivityLog");
+      const Notification = require("./models/Notification");
+
+      const categories = [
+        ["VAT", "Receipt", "#1e3a8a", ["VAT Return", "VAT Refund Application", "VAT Registration", "VAT Deregistration", "VAT Amendment"]],
+        ["CT", "Landmark", "#7c3aed", ["CT Return", "CT Registration", "CT Deregistration", "Transfer Pricing", "Pillar Two Reporting"]],
+        ["Audit", "ClipboardCheck", "#dc2626", ["Statutory Audit", "Internal Audit", "Due Diligence", "Special Purpose Audit"]],
+        ["Accounting", "Calculator", "#059669", ["Monthly Accounting", "Quarterly Accounts", "Year-end Financials", "Bookkeeping", "Payroll Accounting"]],
+        ["MIS", "BarChart3", "#0891b2", ["Monthly MIS", "Quarterly MIS", "Annual MIS", "Dashboard Preparation"]],
+        ["EInv", "FileDigit", "#ea580c", ["E-Invoicing Setup", "Portal Updation", "E-Invoicing Compliance"]],
+        ["Refund", "RefreshCw", "#0ea5e9", ["VAT Refund Application", "VAT Refund Follow-up"]],
+        ["Other", "Boxes", "#475569", ["ESR Notification", "UBO Registration", "Trade Licence Renewal", "MOA Amendment", "Custom Task"]],
+      ];
+
+      const admin = await User.create({ name: "Hamad Siddiqui", email: "admin@filingbuddy.ae", password: "Admin@123", role: "admin" });
+      const sara  = await User.create({ name: "Sara Mahmoud",   email: "sara@filingbuddy.ae",  password: "Sara@123",  role: "manager" });
+      const omar  = await User.create({ name: "Omar Khalid",    email: "omar@filingbuddy.ae",  password: "Omar@123",  role: "task_only" });
+
+      for (const [name, icon, color, taskTypes] of categories) {
+        await Category.create({ name, icon, color, isDefault: true, taskTypes: taskTypes.map((t) => ({ name: t })) });
+      }
+
+      const cipriani = await ClientGroup.create({ name: "Cipriani Group", createdBy: admin._id });
+      const maritime = await ClientGroup.create({ name: "Gulf Maritime Group", createdBy: admin._id });
+
+      const mkClient = (d) => Client.create({ ...d, createdBy: admin._id });
+      const alBaraka = await mkClient({ fileNo: "FB-CLIENT-0001", clientType: "legal", legalName: "Al Baraka Trading LLC",   jurisdiction: "mainland",  registeredAddress: { country: "UAE", emirate: "Dubai" },    vatDetails: { trn: "1004821550003", status: "registered", filingFrequency: "quarterly" }, group: cipriani._id });
+      const zenith   = await mkClient({ fileNo: "FB-CLIENT-0002", clientType: "legal", legalName: "Zenith Digital FZ LLC",   jurisdiction: "freezone",  registeredAddress: { country: "UAE", emirate: "DMCC" },     group: cipriani._id });
+      const petra    = await mkClient({ fileNo: "FB-CLIENT-0003", clientType: "legal", legalName: "Petra Construction Co.",  jurisdiction: "mainland",  registeredAddress: { country: "UAE", emirate: "Abu Dhabi" } });
+      const gulf     = await mkClient({ fileNo: "FB-CLIENT-0004", clientType: "legal", legalName: "Gulf Star Logistics",     jurisdiction: "mainland",  registeredAddress: { country: "UAE", emirate: "Sharjah" },  group: maritime._id });
+      const nova     = await mkClient({ fileNo: "FB-CLIENT-0005", clientType: "legal", legalName: "Nova Tech DMCC",          jurisdiction: "freezone",  registeredAddress: { country: "UAE", emirate: "Dubai" } });
+      await mkClient({ fileNo: "FB-CLIENT-0006", clientType: "natural", legalName: "Mr. Khalid Al Rashidi", jurisdiction: "mainland", registeredAddress: { country: "UAE", emirate: "Dubai" } });
+
+      cipriani.clients = [alBaraka._id, zenith._id]; await cipriani.save();
+      maritime.clients = [gulf._id];                  await maritime.save();
+
+      const seedTasks = [
+        ["FB/2026/T001", alBaraka, "VAT",        "VAT Return",             "2026-04-28", sara, "wip",            false, null,       false],
+        ["FB/2026/T002", zenith,   "CT",         "CT Return",              "2026-05-31", omar, "not_started",    false, null,       false],
+        ["FB/2026/T003", petra,    "VAT",        "VAT Registration",       "2026-05-15", sara, "submitted_to_fta",false,null,      true, "in_review"],
+        ["FB/2026/T004", gulf,     "Accounting", "Monthly Accounting",     "2026-05-31", null, "not_started",    false, null,       false],
+        ["FB/2026/T007", petra,    "VAT",        "VAT Registration",       "2026-05-10", sara, "submitted_to_fta",false,null,      true, "in_review"],
+        ["FB/2026/T008", nova,     "CT",         "CT Registration",        "2026-05-10", omar, "submitted_to_fta",false,null,      true, "in_review"],
+        ["FB/2026/T009", alBaraka, "VAT",        "VAT Refund Application", "2026-05-10", sara, "submitted_to_fta",false,null,      true, "additional_query"],
+      ];
+      for (const [taskId, client, category, taskType, dueDate, assignedTo, status, isRecurring, frequency, isAwaitingFta, ftaStatus] of seedTasks) {
+        const task = await Task.create({ taskId, client: client._id, category, taskType, dueDate, assignedTo: assignedTo?._id, status, isRecurring, recurringConfig: frequency ? { frequency } : undefined, isAwaitingFta, ftaStatus, ftaSubmittedDate: isAwaitingFta ? new Date("2026-05-01") : undefined, createdBy: admin._id });
+        await ActivityLog.create({ task: task._id, user: admin._id, action: "Created", newStatus: status });
+      }
+      await Notification.create({ recipient: sara._id, title: "FTA query received", message: "FB/2026/T009 has an additional FTA query.", type: "fta_query" });
+      console.log("✅ Seed complete! Login: admin@filingbuddy.ae / Admin@123");
+    } catch (seedErr) {
+      console.error("Seed error:", seedErr.message);
+    }
+  }
+  app.listen(port, () => console.log(`API running on ${port}`));
+}).catch((error) => {
   console.error(error);
   process.exit(1);
 });

@@ -14,12 +14,25 @@ function taskQuery(req) {
   if (status && status !== "All") query.status = status;
   if (assignedTo) query.assignedTo = assignedTo;
   if (req.user.role === "task_only") query.assignedTo = req.user._id;
+  // Bug #7 Fix: Build the dueDate filter carefully so overdue never silently
+  // clobber the month's $lt boundary. We now apply the month window first, then
+  // tighten $lt to today only when no month is selected (overdue standalone).
   if (month) {
     const [y, m] = month.split("-").map(Number);
     query.dueDate = { $gte: new Date(Date.UTC(y, m - 1, 1)), $lt: new Date(Date.UTC(y, m, 1)) };
   }
-  if (overdue === "true") query.dueDate = { ...(query.dueDate || {}), $lt: new Date() };
-  if (overdue === "true") query.status = { $ne: "completed" };
+  if (overdue === "true") {
+    if (query.dueDate) {
+      // Month window is already set — just tighten the upper boundary to today
+      // if today is earlier than the month's end.
+      const today = new Date();
+      if (today < query.dueDate.$lt) query.dueDate.$lt = today;
+    } else {
+      query.dueDate = { $lt: new Date() };
+    }
+    // Bug #7 Fix: use a dedicated guard so we don't overwrite an earlier status filter.
+    if (!query.status) query.status = { $ne: "completed" };
+  }
   return query;
 }
 
@@ -63,7 +76,9 @@ exports.updateTask = async (req, res, next) => {
   try {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: "Task not found" });
-    Object.assign(task, req.body);
+    // Bug #4 Fix: whitelist editable fields to block mass-assignment of taskId, createdBy, etc.
+    const ALLOWED = ["category", "taskType", "client", "assignedTo", "dueDate", "status", "notes", "isAwaitingFta", "ftaStatus", "period"];
+    ALLOWED.forEach((key) => { if (key in req.body) task[key] = req.body[key]; });
     await task.save();
     await auditLogger({ task: task._id, user: req.user._id, action: "Updated", newStatus: task.status });
     res.json(await task.populate(populateTask));
@@ -124,6 +139,9 @@ exports.exportTasks = async (req, res, next) => {
   try {
     const tasks = await Task.find(taskQuery(req)).populate(populateTask);
     const csv = ["Task ID,Client,Category,Task Type,Due Date,Assigned,Status"].concat(tasks.map((t) => [t.taskId, t.client?.legalName || "", t.category, t.taskType, t.dueDate?.toISOString().slice(0, 10), t.assignedTo?.name || "", t.status].map((v) => `"${String(v).replaceAll('"', '""')}"`).join(","))).join("\n");
-    res.header("Content-Type", "text/csv").attachment("tasks.csv").send(csv);
+    // Bug #2 Fix: res.attachment() was removed in Express 5; use setHeader instead.
+    res.setHeader("Content-Disposition", 'attachment; filename="tasks.csv"')
+       .setHeader("Content-Type", "text/csv")
+       .send(csv);
   } catch (error) { next(error); }
 };

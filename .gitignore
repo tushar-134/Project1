@@ -2,7 +2,9 @@ node_modules/
 dist/
 .env
 .env.local
+# Bug #13 Fix: explicitly ignore vite.log and any other dev log files
 vite.log
+*.log
 
 server/node_modules/
 server/.env

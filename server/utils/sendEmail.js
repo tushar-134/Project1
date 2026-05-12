@@ -2,7 +2,8 @@ const nodemailer = require("nodemailer");
 
 function isPlaceholder(value = "") {
   const normalized = String(value).trim().toLowerCase();
-  return !normalized || normalized.includes("your@") || normalized.includes("your_") || normalized.includes("your ") || normalized === "smtp.gmail.com" && !process.env.EMAIL_PASS;
+  // Bug #3 Fix: parenthesise the compound condition so && binds correctly inside ||
+  return !normalized || normalized.includes("your@") || normalized.includes("your_") || normalized.includes("your ") || (normalized === "smtp.gmail.com" && !process.env.EMAIL_PASS);
 }
 
 async function sendEmail({ to, subject, text, html }) {

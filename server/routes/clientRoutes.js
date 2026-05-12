@@ -15,7 +15,8 @@ router.post("/bulk-upload", adminManager, ctrl.bulkUpload);
 router.get("/:id", ctrl.getClient);
 router.put("/:id", adminManager, ctrl.updateClient);
 router.delete("/:id", adminOnly, ctrl.deleteClient);
-router.post("/:id/attachments", upload.single("file"), ctrl.uploadAttachment);
+// Bug #5 Fix: add adminManager guard so task_only users cannot upload attachments.
+router.post("/:id/attachments", adminManager, upload.single("file"), ctrl.uploadAttachment);
 router.delete("/:id/attachments/:attachId", adminManager, ctrl.deleteAttachment);
 
 module.exports = router;

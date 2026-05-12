@@ -25,7 +25,12 @@ exports.createUser = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 exports.updateUser = async (req, res, next) => {
-  try { res.json(await User.findByIdAndUpdate(req.params.id, req.body, { new: true }).select("-password")); } catch (error) { next(error); }
+  try {
+    // Bug #8 Fix: findByIdAndUpdate returns null for a missing id; return 404 instead of 200 null.
+    const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true }).select("-password");
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json(user);
+  } catch (error) { next(error); }
 };
 exports.updateRole = async (req, res, next) => {
   try {

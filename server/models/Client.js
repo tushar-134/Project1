@@ -55,7 +55,9 @@ const clientSchema = new mongoose.Schema({
     financialYearEnd: String,
   },
   group: { type: mongoose.Schema.Types.ObjectId, ref: "ClientGroup" },
-  portalLogins: [{ portalName: String, portalUrl: String, username: String, password: String, notes: String }],
+  // Bug #6 Fix: added _passwordEncrypted flag so we never use a colon-sniff heuristic
+  // that breaks legitimate passwords containing a colon character (e.g. "p:assword").
+  portalLogins: [{ portalName: String, portalUrl: String, username: String, password: String, _passwordEncrypted: { type: Boolean, default: false }, notes: String }],
   customFields: { qrmpPreference: String, auditFirmName: String, bankName: String, iban: String },
   attachments: [{
     name: String,
@@ -73,7 +75,12 @@ const clientSchema = new mongoose.Schema({
 clientSchema.pre("save", function encryptPortalPasswords() {
   if (this.isModified("portalLogins")) {
     this.portalLogins.forEach((portal) => {
-      if (portal.password && !String(portal.password).includes(":")) portal.password = encrypt(portal.password);
+      // Bug #6 Fix: use an explicit _passwordEncrypted flag instead of checking
+      // for a colon, which would break any password that legitimately contains ":".
+      if (portal.password && !portal._passwordEncrypted) {
+        portal.password = encrypt(portal.password);
+        portal._passwordEncrypted = true;
+      }
     });
   }
 });
