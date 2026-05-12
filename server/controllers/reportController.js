@@ -19,19 +19,25 @@ exports.dashboardStats = async (req, res, next) => {
   try {
     const dueDate = monthRange(req.query.month);
     const taskScope = dueDate ? { dueDate } : {};
-    const [totalClients, pendingTasks, overdueTasks, ftaPending, categories, recentActivity] = await Promise.all([
+    const [totalClients, pendingTasks, overdueTasks, ftaPending, recentActivity] = await Promise.all([
       Client.countDocuments({ isActive: true }),
       Task.countDocuments({ ...taskScope, status: { $ne: "completed" } }),
       Task.countDocuments({ ...taskScope, dueDate: { ...(dueDate || {}), $lt: new Date() }, status: { $ne: "completed" } }),
       Task.countDocuments({ isAwaitingFta: true, ftaStatus: { $ne: "approved" } }),
-      Category.find({ isActive: true }),
       ActivityLog.find().populate({ path: "task", populate: { path: "client", select: "legalName" } }).populate("user", "name").sort({ createdAt: -1 }).limit(10),
     ]);
-    const categoryBreakdown = await Promise.all(categories.map(async (cat) => ({
-      category: cat.name,
-      pending: await Task.countDocuments({ ...taskScope, category: cat.name, status: { $ne: "completed" } }),
-      overdue: await Task.countDocuments({ ...taskScope, category: cat.name, dueDate: { ...(dueDate || {}), $lt: new Date() }, status: { $ne: "completed" } }),
-    })));
+    // Bug #10 Fix: use $group aggregation to get all category counts in one query
+    // instead of firing 2 Mongo queries per category (N+1 pattern).
+    const matchStage = { status: { $ne: "completed" }, ...(dueDate ? { dueDate } : {}) };
+    const catAgg = await Task.aggregate([
+      { $match: matchStage },
+      { $group: {
+        _id: "$category",
+        pending: { $sum: 1 },
+        overdue: { $sum: { $cond: [{ $lt: ["$dueDate", new Date()] }, 1, 0] } },
+      }},
+    ]);
+    const categoryBreakdown = catAgg.map((c) => ({ category: c._id, pending: c.pending, overdue: c.overdue }));
     res.json({ totalClients, pendingTasks, overdueTasks, ftaPending, categoryBreakdown, recentActivity });
   } catch (error) { next(error); }
 };
@@ -46,23 +52,42 @@ exports.taskActivity = async (req, res, next) => {
 
 exports.clientWise = async (req, res, next) => {
   try {
-    const clients = await Client.find({ isActive: true }).select("legalName fileNo");
-    const rows = await Promise.all(clients.map(async (client) => {
-      const tasks = await Task.find({ client: client._id }).select("status");
-      return { client, total: tasks.length, not_started: tasks.filter((t) => t.status === "not_started").length, wip: tasks.filter((t) => t.status === "wip").length, completed: tasks.filter((t) => t.status === "completed").length, submitted_to_fta: tasks.filter((t) => t.status === "submitted_to_fta").length };
-    }));
-    res.json(rows);
+    // Bug #10 Fix: single aggregation instead of one query per client.
+    const agg = await Task.aggregate([
+      { $group: {
+        _id: "$client",
+        total: { $sum: 1 },
+        not_started: { $sum: { $cond: [{ $eq: ["$status", "not_started"] }, 1, 0] } },
+        wip: { $sum: { $cond: [{ $eq: ["$status", "wip"] }, 1, 0] } },
+        completed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
+        submitted_to_fta: { $sum: { $cond: [{ $eq: ["$status", "submitted_to_fta"] }, 1, 0] } },
+      }},
+      { $lookup: { from: "clients", localField: "_id", foreignField: "_id", as: "client" } },
+      { $unwind: { path: "$client", preserveNullAndEmptyArrays: true } },
+      { $match: { "client.isActive": true } },
+      { $project: { client: { _id: "$client._id", legalName: "$client.legalName", fileNo: "$client.fileNo" }, total: 1, not_started: 1, wip: 1, completed: 1, submitted_to_fta: 1 } },
+    ]);
+    res.json(agg);
   } catch (error) { next(error); }
 };
 
 exports.userWise = async (req, res, next) => {
   try {
-    const users = await User.find().select("name email role");
-    const rows = await Promise.all(users.map(async (user) => {
-      const tasks = await Task.find({ assignedTo: user._id }).select("status");
-      return { user, total: tasks.length, not_started: tasks.filter((t) => t.status === "not_started").length, wip: tasks.filter((t) => t.status === "wip").length, completed: tasks.filter((t) => t.status === "completed").length, submitted_to_fta: tasks.filter((t) => t.status === "submitted_to_fta").length };
-    }));
-    res.json(rows);
+    // Bug #10 Fix: single aggregation instead of one query per user.
+    const agg = await Task.aggregate([
+      { $group: {
+        _id: "$assignedTo",
+        total: { $sum: 1 },
+        not_started: { $sum: { $cond: [{ $eq: ["$status", "not_started"] }, 1, 0] } },
+        wip: { $sum: { $cond: [{ $eq: ["$status", "wip"] }, 1, 0] } },
+        completed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
+        submitted_to_fta: { $sum: { $cond: [{ $eq: ["$status", "submitted_to_fta"] }, 1, 0] } },
+      }},
+      { $lookup: { from: "users", localField: "_id", foreignField: "_id", as: "user" } },
+      { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+      { $project: { user: { _id: "$user._id", name: "$user.name", email: "$user.email", role: "$user.role" }, total: 1, not_started: 1, wip: 1, completed: 1, submitted_to_fta: 1 } },
+    ]);
+    res.json(agg);
   } catch (error) { next(error); }
 };
 
