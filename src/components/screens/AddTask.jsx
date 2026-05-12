@@ -1,5 +1,5 @@
 import { cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Check, Send } from "lucide-react";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
@@ -15,15 +15,18 @@ import Toggle from "../ui/Toggle.jsx";
 export default function AddTask() {
   const { state, dispatch } = useApp();
   const navigate = useNavigate();
+  const { id } = useParams();
+  const isEditMode = Boolean(id);
   const { fetchClients } = useClients();
   const { fetchUsers } = useUsers();
-  const { createTask } = useTasks();
+  const { createTask, getTask, updateTask } = useTasks();
   const [step, setStep] = useState(1);
   const [categoryId, setCategoryId] = useState("vat");
   const category = state.categories.find((cat) => cat.id === categoryId);
   const [type, setType] = useState("VAT Return");
   const [recurring, setRecurring] = useState(false);
   const [fta, setFta] = useState(false);
+  const [savedStatus, setSavedStatus] = useState("not_started");
   const [details, setDetails] = useState({ client: "", assigned: "", dueDate: "2026-05-31", period: "Q2 2026", description: "", frequency: "monthly", nextDue: "2026-06-30", endDate: "" });
   const chips = useMemo(() => category?.taskTypes || [], [category]);
   useEffect(() => {
@@ -32,6 +35,44 @@ export default function AddTask() {
     fetchUsers().catch(() => {});
     categoryService.list().then((data) => dispatch({ type: "SET_RESOURCE", resource: "categories", payload: data.map(mapCategory) })).catch(() => {});
   }, []);
+  useEffect(() => {
+    if (!isEditMode) return;
+    getTask(id).then((task) => {
+      const categoryMap = {
+        VAT: "vat",
+        CT: "ct",
+        "Corporate Tax": "ct",
+        Audit: "audit",
+        Accounting: "accounting",
+        MIS: "mis",
+        "MIS Reporting": "mis",
+        EInv: "einv",
+        "E-Invoicing": "einv",
+        Refund: "refund",
+        "VAT Refund": "refund",
+        Other: "other",
+      };
+      const nextCategoryId = categoryMap[task.category] || String(task.category || "").toLowerCase();
+      setCategoryId(nextCategoryId);
+      setType(task.taskType || "");
+      setRecurring(Boolean(task.isRecurring));
+      setFta(Boolean(task.isAwaitingFta));
+      setSavedStatus(task.status || "not_started");
+      setDetails({
+        client: task.client?._id || task.client || "",
+        assigned: task.assignedTo?._id || task.assignedTo || "",
+        dueDate: task.dueDate?.slice?.(0, 10) || "",
+        period: task.period || "",
+        description: task.description || "",
+        frequency: task.recurringConfig?.frequency || "monthly",
+        nextDue: task.recurringConfig?.nextDueDate?.slice?.(0, 10) || "",
+        endDate: task.recurringConfig?.endDate?.slice?.(0, 10) || "",
+      });
+    }).catch(() => {
+      toast.error("Unable to load this task for editing.");
+      navigate("/tasks/list");
+    });
+  }, [id, isEditMode]);
 
   function selectCategory(id) {
     const next = state.categories.find((cat) => cat.id === id);
@@ -49,7 +90,7 @@ export default function AddTask() {
       return;
     }
     try {
-      await createTask({
+      const payload = {
         category: category.name,
         taskType: type,
         client: details.client,
@@ -60,9 +101,14 @@ export default function AddTask() {
         isRecurring: recurring,
         recurringConfig: recurring ? { frequency: details.frequency, nextDueDate: details.nextDue, endDate: details.endDate || undefined } : undefined,
         isAwaitingFta: fta,
-        status: fta ? "submitted_to_fta" : "not_started",
-      });
-      toast.success("Task created successfully.");
+        status: fta ? "submitted_to_fta" : savedStatus,
+      };
+      if (isEditMode) {
+        await updateTask(id, payload);
+      } else {
+        await createTask({ ...payload, status: fta ? "submitted_to_fta" : "not_started" });
+      }
+      toast.success(isEditMode ? "Task updated successfully." : "Task created successfully.");
       navigate("/tasks/list");
     } catch (error) {
       const message = error?.response?.data?.errors?.[0]?.msg || error?.response?.data?.message || "Unable to create task right now.";
@@ -72,7 +118,7 @@ export default function AddTask() {
 
   return (
     <div className="space-y-5">
-      <div><div className="page-kicker">Task Workflow</div><h2 className="screen-title">Add Task</h2></div>
+      <div><div className="page-kicker">Task Workflow</div><h2 className="screen-title">{isEditMode ? "Edit Task" : "Add Task"}</h2></div>
       <div className="grid gap-3 md:grid-cols-3">{["Select Category", "Select Task Type", "Task Details"].map((label, i) => <Step key={label} n={i + 1} active={step >= i + 1} label={label} />)}</div>
       {step === 1 && <Card className="p-4"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{state.categories.map((cat) => <button key={cat.id} onClick={() => selectCategory(cat.id)} className="rounded-xl border border-[#e2e8f0] bg-white p-4 text-left transition hover:border-[#1e3a8a] hover:shadow"><div className="mb-3 h-2 w-10 rounded-full" style={{ background: cat.color }} /><div className="font-extrabold">{cat.name}</div><div className="mt-1 text-[12px] text-slate-500">{cat.taskTypes.length} task types</div></button>)}</div></Card>}
       {step === 2 && <Card className="p-4"><div className="mb-3 text-[14px] font-extrabold">Task types for {category.name}</div><div className="flex flex-wrap gap-2">{chips.map((chip) => <button key={chip} onClick={() => setType(chip)} className={`rounded-full px-3 py-2 text-[12px] font-extrabold ${type === chip ? "bg-[#1e3a8a] text-white" : "bg-slate-100 text-slate-600"}`}>{chip}</button>)}</div><div className="mt-5 flex gap-2"><Button variant="ghost" onClick={() => setStep(1)}>Back</Button><Button onClick={() => setStep(3)}>Continue</Button></div></Card>}
@@ -89,7 +135,7 @@ export default function AddTask() {
           <div className={`smooth-panel overflow-hidden ${recurring ? "max-h-44 opacity-100" : "max-h-0 opacity-0"}`}><div className="mt-3 grid gap-3 rounded-xl bg-slate-50 p-3 md:grid-cols-3"><Field label="Frequency" field="taskRecurringFrequency"><select className="input" value={details.frequency} onChange={(e) => setDetails({ ...details, frequency: e.target.value })}><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="annual">Annually</option></select></Field><Field label="Next Due Date" field="taskNextDueDate"><input className="input" type="date" value={details.nextDue} onChange={(e) => setDetails({ ...details, nextDue: e.target.value })} /></Field><Field label="End Date" field="taskRecurringEndDate"><input className="input" type="date" value={details.endDate} onChange={(e) => setDetails({ ...details, endDate: e.target.value })} /></Field></div></div>
           <ToggleRow label="Awaiting FTA Response" checked={fta} onChange={setFta} />
           <div className={`smooth-panel overflow-hidden ${fta ? "max-h-20 opacity-100" : "max-h-0 opacity-0"}`}><div className="mt-3 rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-[12px] font-semibold text-yellow-800">This task will be routed to FTA Tracker when submitted.</div></div>
-          <div className="mt-5 flex gap-2"><Button variant="ghost" onClick={() => setStep(2)}>Back</Button><Button onClick={submit}><Send size={16} />Submit Task</Button></div>
+          <div className="mt-5 flex gap-2"><Button variant="ghost" onClick={() => setStep(2)}>Back</Button><Button onClick={submit}><Send size={16} />{isEditMode ? "Save Task" : "Submit Task"}</Button></div>
         </Card>
       )}
     </div>

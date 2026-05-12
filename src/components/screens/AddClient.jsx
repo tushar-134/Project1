@@ -1,6 +1,7 @@
 import { cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { Plus, Trash2, UploadCloud } from "lucide-react";
+import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
 import { useClients } from "../../hooks/useClients";
 import { useUsers } from "../../hooks/useUsers";
@@ -14,7 +15,9 @@ const countryCodes = ["AF","AX","AL","DZ","AS","AD","AO","AI","AQ","AG","AR","AM
 export default function AddClient() {
   const { state, dispatch } = useApp();
   const navigate = useNavigate();
-  const { createClient } = useClients();
+  const { id } = useParams();
+  const isEditMode = Boolean(id);
+  const { createClient, getClient, updateClient } = useClients();
   const { fetchUsers } = useUsers();
   const [tab, setTab] = useState(0);
   const countries = useMemo(() => {
@@ -43,13 +46,97 @@ export default function AddClient() {
     fetchUsers().catch(() => {});
     groupService.list().then((groups) => dispatch({ type: "SET_RESOURCE", resource: "groups", payload: groups.map((g) => ({ ...g, id: g._id, clients: g.clients?.map((c) => c.legalName) || [] })) })).catch(() => {});
   }, []);
+  useEffect(() => {
+    if (!isEditMode) return;
+    getClient(id).then((client) => {
+      const jurisdictionLabels = {
+        mainland: "Mainland",
+        freezone: "Free Zone",
+        designated_zone: "Designated Zone",
+        offshore: "Offshore",
+      };
+      const primaryContact = client.contactPersons?.find((person) => person.isPrimary) || client.contactPersons?.[0] || {};
+      setForm({
+        clientType: client.clientType === "natural" ? "Natural Person" : "Legal Person",
+        fileNo: client.fileNo || "",
+        legalName: client.legalName || "",
+        tradeName: client.tradeName || "",
+        fye: client.financialYearEnd || client.ctDetails?.financialYearEnd || "",
+        jurisdiction: jurisdictionLabels[client.jurisdiction] || "Mainland",
+        assigned: client.assignedUser?.name || "",
+        country: client.registeredAddress?.country || "United Arab Emirates",
+        emirate: client.registeredAddress?.emirate || "",
+        street: client.registeredAddress?.street || "",
+        poBox: client.registeredAddress?.poBox || "",
+        postalCode: client.registeredAddress?.postalCode || "",
+        differentAddress: Boolean(client.correspondenceAddress?.street || client.correspondenceAddress?.country || client.correspondenceAddress?.emirate),
+        correspondence: client.correspondenceAddress?.street || "",
+        vatTrn: client.vatDetails?.trn || "",
+        vatStatus: client.vatDetails?.status === "registered" ? "Registered" : client.vatDetails?.status === "applying" ? "Pending" : "Not Registered",
+        vatDate: client.vatDetails?.registrationDate?.slice?.(0, 10) || "",
+        vatFreq: client.vatDetails?.filingFrequency ? `${client.vatDetails.filingFrequency[0].toUpperCase()}${client.vatDetails.filingFrequency.slice(1)}` : "Quarterly",
+        ctTin: client.ctDetails?.tin || "",
+        ctStatus: client.ctDetails?.status === "registered" ? "Registered" : client.ctDetails?.status === "applying" ? "Pending" : "Not Registered",
+        ctDate: client.ctDetails?.registrationDate?.slice?.(0, 10) || "",
+        group: client.group?._id || client.group || "",
+        newGroup: "",
+        qrmp: client.customFields?.qrmpPreference || "Email",
+        auditFirm: client.customFields?.auditFirmName || "",
+        bank: client.customFields?.bankName || "",
+        iban: client.customFields?.iban || "",
+      });
+      setLicences((client.tradeLicences || []).length ? client.tradeLicences.map((licence) => ({
+        number: licence.licenceNumber || "",
+        issue: licence.issueDate?.slice?.(0, 10) || "",
+        expiry: licence.expiryDate?.slice?.(0, 10) || "",
+        authority: licence.issuingAuthority || "",
+        type: licence.licenceType ? `${licence.licenceType[0].toUpperCase()}${licence.licenceType.slice(1)}` : "",
+        email: licence.officialEmail || "",
+      })) : [{ number: "", issue: "", expiry: "", authority: "Dubai Economy", type: "Commercial", email: "" }]);
+      setContacts((client.contactPersons || []).length ? client.contactPersons.map((person) => ({
+        name: person.fullName || "",
+        designation: person.designation || "",
+        email: person.email || "",
+        code: person.mobile?.countryCode || "+971",
+        mobile: person.mobile?.number || "",
+        whatsapp: person.whatsapp || "",
+        alternate: person.alternateEmail || "",
+        primary: Boolean(person.isPrimary),
+        eid: person.emiratesId?.number || "",
+        passport: person.passport?.number || "",
+        issuingCountry: person.passport?.issuingCountry || primaryContact.passport?.issuingCountry || "United Arab Emirates",
+      })) : [{ name: "", designation: "", email: "", code: "+971", mobile: "", whatsapp: "", alternate: "", primary: true, eid: "", passport: "", issuingCountry: "United Arab Emirates" }]);
+      setPortals((client.portalLogins || []).length ? client.portalLogins.map((portal) => ({
+        name: portal.portalName || "",
+        url: portal.portalUrl || "",
+        username: portal.username || "",
+        password: "",
+        notes: portal.notes || "",
+      })) : [{ name: "EmaraTax", url: "https://tax.gov.ae", username: "", password: "", notes: "" }]);
+      setAttachments((client.attachments || []).map((attachment) => ({
+        name: attachment.name,
+        size: attachment.size,
+        type: attachment.fileType,
+        description: attachment.description,
+        uploadedOn: attachment.uploadedAt?.slice?.(0, 10) || "",
+        uploadedBy: attachment.uploadedBy?.name || "",
+      })));
+    }).catch(() => {
+      toast.error("Unable to load this client for editing.");
+      navigate("/clients/list");
+    });
+  }, [id, isEditMode]);
 
   async function saveClient() {
-    if (!form.legalName) return;
+    if (!form.legalName) {
+      toast.error("Please enter the client legal name.");
+      return;
+    }
     // The screen state is intentionally tab-oriented and user-friendly; this transform is
     // where we fold it back into the nested API contract expected by the Mongo model.
-    await createClient({
+    const payload = {
       clientType: form.clientType === "Natural Person" ? "natural" : "legal",
+      fileNo: form.fileNo || undefined,
       legalName: form.legalName,
       tradeName: form.tradeName,
       financialYearEnd: form.fye,
@@ -64,13 +151,20 @@ export default function AddClient() {
       group: form.group || undefined,
       portalLogins: portals.map((p) => ({ portalName: p.name, portalUrl: p.url, username: p.username, password: p.password, notes: p.notes })),
       customFields: { qrmpPreference: form.qrmp, auditFirmName: form.auditFirm, bankName: form.bank, iban: form.iban },
-    });
+    };
+    if (isEditMode) {
+      await updateClient(id, payload);
+      toast.success("Client updated successfully.");
+    } else {
+      await createClient(payload);
+      toast.success("Client created successfully.");
+    }
     navigate("/clients/list");
   }
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3"><div><div className="page-kicker">Client Master</div><h2 className="screen-title">Add Client</h2></div><Button onClick={saveClient}>Save Client</Button></div>
+      <div className="flex flex-wrap items-center justify-between gap-3"><div><div className="page-kicker">Client Master</div><h2 className="screen-title">{isEditMode ? "Edit Client" : "Add Client"}</h2></div><Button onClick={saveClient}>Save Client</Button></div>
       <Card className="overflow-hidden">
         <div className="flex overflow-x-auto border-b border-[#e2e8f0] bg-slate-50 p-2">{tabs.map((t, i) => <button key={t} onClick={() => setTab(i)} className={`mr-1 whitespace-nowrap rounded-lg px-3 py-2 text-[12px] font-extrabold ${tab === i ? "bg-[#1e3a8a] text-white" : "text-slate-600 hover:bg-white"}`}>{t}</button>)}</div>
         <div className="p-4">

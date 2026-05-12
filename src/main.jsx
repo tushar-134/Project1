@@ -34,9 +34,11 @@ createRoot(document.getElementById("root")).render(
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/clients/add" element={<AddClient />} />
+              <Route path="/clients/edit/:id" element={<AddClient />} />
               <Route path="/clients/list" element={<ClientList />} />
               <Route path="/clients/bulk-upload" element={<BulkUpload />} />
               <Route path="/tasks/add" element={<AddTask />} />
+              <Route path="/tasks/edit/:id" element={<AddTask />} />
               <Route path="/tasks/list" element={<TaskList />} />
               <Route path="/tasks/fta-tracker" element={<FtaTracker />} />
               <Route path="/tasks/categories" element={<Categories />} />

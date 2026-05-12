@@ -26,5 +26,5 @@ export function useTasks() {
     dispatch({ type: "UPDATE_FTA_STATUS", id, status: ftaStatusToApi[label], displayStatus: label });
     return taskService.updateFtaStatus(id, ftaStatusToApi[label] || label);
   }
-  return { fetchTasks, fetchFtaTracker, createTask: taskService.create, updateTask: taskService.update, updateStatus, updateFtaStatus, exportTasks: taskService.export };
+  return { fetchTasks, fetchFtaTracker, getTask: taskService.get, createTask: taskService.create, updateTask: taskService.update, updateStatus, updateFtaStatus, exportTasks: taskService.export };
 }
