@@ -162,9 +162,17 @@ export default function AddClient() {
     navigate("/clients/list");
   }
 
+  const goPrevious = () => setTab((current) => Math.max(current - 1, 0));
+  const goNext = () => setTab((current) => Math.min(current + 1, tabs.length - 1));
+  const isFirstTab = tab === 0;
+  const isLastTab = tab === tabs.length - 1;
+
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3"><div><div className="page-kicker">Client Master</div><h2 className="screen-title">{isEditMode ? "Edit Client" : "Add Client"}</h2></div><Button onClick={saveClient}>Save Client</Button></div>
+      <div>
+        <div className="page-kicker">Client Master</div>
+        <h2 className="screen-title">{isEditMode ? "Edit Client" : "Add Client"}</h2>
+      </div>
       <Card className="overflow-hidden">
         <div className="flex overflow-x-auto border-b border-[#e2e8f0] bg-slate-50 p-2">{tabs.map((t, i) => <button key={t} onClick={() => setTab(i)} className={`mr-1 whitespace-nowrap rounded-lg px-3 py-2 text-[12px] font-extrabold ${tab === i ? "bg-[#1e3a8a] text-white" : "text-slate-600 hover:bg-white"}`}>{t}</button>)}</div>
         <div className="p-4">
@@ -176,6 +184,13 @@ export default function AddClient() {
           {tab === 5 && <Repeat title="Portal" items={portals} setItems={setPortals} blank={{ name: "", url: "", username: "", password: "", notes: "" }} render={(p, i, patch) => <div className="grid gap-3 md:grid-cols-2"><Field label="Portal Name" field={`portal-name-${i}`}><input className="input" value={p.name} onChange={(e) => patch(i, { name: e.target.value })} /></Field><Field label="URL" field={`portal-url-${i}`}><input className="input" value={p.url} onChange={(e) => patch(i, { url: e.target.value })} /></Field><Field label="Username/TRN" field={`portal-username-${i}`}><input className="input" value={p.username} onChange={(e) => patch(i, { username: e.target.value })} /></Field><Field label="Password" field={`portal-password-${i}`}><input className="input" type="password" value={p.password} onChange={(e) => patch(i, { password: e.target.value })} /></Field><Field label="Notes" field={`portal-notes-${i}`}><textarea className="input textarea" value={p.notes} onChange={(e) => patch(i, { notes: e.target.value })} /></Field></div>} />}
           {tab === 6 && <div className="grid gap-3 md:grid-cols-2"><Field label="QRMP Preference" field="client-qrmp"><input className="input" value={form.qrmp} onChange={(e) => update("qrmp", e.target.value)} /></Field><Field label="Audit Firm Name" field="client-audit-firm"><input className="input" value={form.auditFirm} onChange={(e) => update("auditFirm", e.target.value)} /></Field><Field label="Bank Name" field="client-bank"><input className="input" value={form.bank} onChange={(e) => update("bank", e.target.value)} /></Field><Field label="IBAN" field="client-iban"><input className="input" value={form.iban} onChange={(e) => update("iban", e.target.value)} /></Field><div className="rounded-xl bg-slate-50 p-3 text-[12px] font-semibold text-slate-500 md:col-span-2">You can add custom fields from Settings</div></div>}
           {tab === 7 && <div className="space-y-3"><div className="upload-zone"><UploadCloud />Upload button + drag-and-drop zone</div><table className="table"><thead><tr><th>Name</th><th>Size</th><th>Type</th><th>Description</th><th>Uploaded On</th><th>Uploaded By</th><th>Actions</th></tr></thead><tbody>{attachments.map((a) => <tr key={a.name}><td>{a.name}</td><td>{a.size}</td><td>{a.type}</td><td>{a.description}</td><td>{a.uploadedOn}</td><td>{a.uploadedBy}</td><td><Button size="sm" variant="ghost">Download</Button> <Button size="sm" variant="danger" onClick={() => setAttachments(attachments.filter((x) => x.name !== a.name))}>Delete</Button></td></tr>)}</tbody></table></div>}
+        </div>
+        <div className="flex flex-col gap-3 border-t border-[#e2e8f0] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+          <Button variant="ghost" onClick={goPrevious} disabled={isFirstTab}>Previous</Button>
+          <div className="flex justify-end gap-2">
+            {!isLastTab && <Button onClick={goNext}>Next</Button>}
+            {isLastTab && <Button onClick={saveClient}>Save Details</Button>}
+          </div>
         </div>
       </Card>
     </div>

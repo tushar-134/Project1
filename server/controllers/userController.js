@@ -3,6 +3,31 @@ const { validationResult } = require("express-validator");
 const User = require("../models/User");
 const sendEmail = require("../utils/sendEmail");
 
+function normalize(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function normalizeMobile(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
+async function findUserDuplicate({ email, mobile, excludeId }) {
+  const normalizedEmail = normalize(email);
+  const normalizedMobile = normalizeMobile(mobile);
+  const query = {
+    ...(excludeId ? { _id: { $ne: excludeId } } : {}),
+    $or: [
+      { email: normalizedEmail },
+      ...(normalizedMobile ? [{ mobile: { $exists: true } }] : []),
+    ],
+  };
+  const users = await User.find(query).select("email mobile");
+  return users.find((user) =>
+    normalize(user.email) === normalizedEmail ||
+    (normalizedMobile && normalizeMobile(user.mobile) === normalizedMobile)
+  );
+}
+
 exports.listUsers = async (req, res, next) => {
   try { res.json(await User.find().select("-password").sort({ name: 1 })); } catch (error) { next(error); }
 };
@@ -17,6 +42,9 @@ exports.createUser = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+    if (await findUserDuplicate({ email: req.body.email, mobile: req.body.mobile })) {
+      return res.status(409).json({ message: "User already added with this email or phone number." });
+    }
     // New users are seeded with a temporary password because invite email and first login are separate concerns.
     const tempPassword = crypto.randomBytes(6).toString("base64url");
     const user = await User.create({ ...req.body, password: tempPassword });
@@ -26,6 +54,9 @@ exports.createUser = async (req, res, next) => {
 };
 exports.updateUser = async (req, res, next) => {
   try {
+    if (await findUserDuplicate({ email: req.body.email, mobile: req.body.mobile, excludeId: req.params.id })) {
+      return res.status(409).json({ message: "User already added with this email or phone number." });
+    }
     // Bug #8 Fix: findByIdAndUpdate returns null for a missing id; return 404 instead of 200 null.
     const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true }).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });

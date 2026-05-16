@@ -8,6 +8,14 @@ import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import Table from "../ui/Table.jsx";
 
+function normalizeUserField(value) {
+  return String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function normalizeMobile(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
 export default function Users() {
   const { state } = useApp();
   const { currentUser } = useAuth();
@@ -46,6 +54,17 @@ export default function Users() {
   async function saveUser() {
     if (!form.name.trim() || !form.email.trim()) {
       toast.error("Name and email are required.");
+      return;
+    }
+    const duplicateUser = state.users.find((user) =>
+      user._id !== editingUser?._id &&
+      (
+        normalizeUserField(user.email) === normalizeUserField(form.email) ||
+        (normalizeMobile(form.mobile) && normalizeMobile(user.mobile) === normalizeMobile(form.mobile))
+      )
+    );
+    if (duplicateUser) {
+      toast.error("User already added with this email or phone number.");
       return;
     }
     try {
