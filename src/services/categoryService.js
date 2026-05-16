@@ -7,5 +7,6 @@ export const categoryService = {
   update: (id, payload) => api.put(`/categories/${id}`, payload).then((res) => res.data),
   remove: (id) => api.delete(`/categories/${id}`).then((res) => res.data),
   addTaskType: (id, name) => api.post(`/categories/${id}/task-types`, { name }).then((res) => res.data),
+  updateTaskTypeStatus: (id, typeId, isActive) => api.patch(`/categories/${id}/task-types/${typeId}/status`, { isActive }).then((res) => res.data),
   removeTaskType: (id, typeId) => api.delete(`/categories/${id}/task-types/${typeId}`).then((res) => res.data),
 };

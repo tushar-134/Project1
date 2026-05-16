@@ -31,3 +31,14 @@ exports.deleteTaskType = async (req, res, next) => {
     res.json(category);
   } catch (error) { next(error); }
 };
+exports.updateTaskTypeStatus = async (req, res, next) => {
+  try {
+    const category = await Category.findById(req.params.id);
+    if (!category) return res.status(404).json({ message: "Category not found" });
+    const taskType = category.taskTypes.id(req.params.typeId);
+    if (!taskType) return res.status(404).json({ message: "Task type not found" });
+    taskType.isActive = req.body.isActive;
+    await category.save();
+    res.json(category);
+  } catch (error) { next(error); }
+};
