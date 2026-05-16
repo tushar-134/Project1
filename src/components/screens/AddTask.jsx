@@ -124,6 +124,13 @@ export default function AddTask() {
       {step === 2 && <Card className="p-4"><div className="mb-3 text-[14px] font-extrabold">Task types for {category.name}</div><div className="flex flex-wrap gap-2">{chips.map((chip) => <button key={chip} onClick={() => setType(chip)} className={`rounded-full px-3 py-2 text-[12px] font-extrabold ${type === chip ? "bg-[#1e3a8a] text-white" : "bg-slate-100 text-slate-600"}`}>{chip}</button>)}</div><div className="mt-5 flex gap-2"><Button variant="ghost" onClick={() => setStep(1)}>Back</Button><Button onClick={() => setStep(3)}>Continue</Button></div></Card>}
       {step === 3 && (
         <Card className="p-4">
+          <div className="mb-4 rounded-xl border border-[#dbeafe] bg-blue-50 p-3">
+            <div className="text-[11px] font-extrabold uppercase tracking-[.08em] text-[#1e3a8a]">Selected Task</div>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-white px-2.5 py-1 text-[12px] font-extrabold text-[#1e3a8a]">{category?.name || "Category"}</span>
+              <span className="text-[14px] font-extrabold text-slate-900">{type || "Select a task type"}</span>
+            </div>
+          </div>
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Client*" field="taskClient"><select className="input" value={details.client} onChange={(e) => setDetails({ ...details, client: e.target.value })}><option value="">Select client</option>{state.clients.map((c) => <option key={c.id} value={c._id}>{c.name}</option>)}</select></Field>
             <Field label="Assign To" field="taskAssignedTo"><select className="input" value={details.assigned} onChange={(e) => setDetails({ ...details, assigned: e.target.value })}><option value="">Unassigned</option>{state.users.map((u) => <option key={u.id} value={u._id}>{u.name}</option>)}</select></Field>
