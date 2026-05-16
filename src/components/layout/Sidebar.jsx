@@ -1,6 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { useEffect } from "react";
-import { X, Boxes, ClipboardList, FilePlus2, Files, LayoutDashboard, Upload, Users, UserRoundPlus, Folders, PieChart, Landmark } from "lucide-react";
+import { X, Boxes, ClipboardList, ContactRound, FilePlus2, Files, LayoutDashboard, Upload, Users, UserRoundPlus, Folders, PieChart, Landmark } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useApp } from "../../context/AppContext";
 import { useTasks } from "../../hooks/useTasks";
@@ -11,6 +11,9 @@ export const navItems = [
     { label: "Add Client", to: "/clients/add", icon: UserRoundPlus },
     { label: "Client List", to: "/clients/list", icon: Files },
     { label: "Bulk Upload", to: "/clients/bulk-upload", icon: Upload },
+  ]},
+  { section: "Contacts", links: [
+    { label: "Contact Directory", to: "/contacts", icon: ContactRound },
   ]},
   { section: "Tasks", links: [
     { label: "Add Task", to: "/tasks/add", icon: FilePlus2 },

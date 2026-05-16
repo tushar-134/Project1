@@ -12,6 +12,7 @@ import Dashboard from "./components/screens/Dashboard.jsx";
 import AddClient from "./components/screens/AddClient.jsx";
 import ClientList from "./components/screens/ClientList.jsx";
 import BulkUpload from "./components/screens/BulkUpload.jsx";
+import Contacts from "./components/screens/Contacts.jsx";
 import AddTask from "./components/screens/AddTask.jsx";
 import TaskList from "./components/screens/TaskList.jsx";
 import FtaTracker from "./components/screens/FtaTracker.jsx";
@@ -37,6 +38,7 @@ createRoot(document.getElementById("root")).render(
               <Route path="/clients/edit/:id" element={<AddClient />} />
               <Route path="/clients/list" element={<ClientList />} />
               <Route path="/clients/bulk-upload" element={<BulkUpload />} />
+              <Route path="/contacts" element={<Contacts />} />
               <Route path="/tasks/add" element={<AddTask />} />
               <Route path="/tasks/edit/:id" element={<AddTask />} />
               <Route path="/tasks/list" element={<TaskList />} />
