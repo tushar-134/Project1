@@ -1,5 +1,6 @@
 import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
 import { reportService } from "../../services/reportService";
 import Badge from "../ui/Badge.jsx";
@@ -13,9 +14,16 @@ const serviceTiles = [
   ["VAT Refund", 3, 1, "refund"], ["Other", 5, 0, "other"], ["Trade Licence", 2, 0, "other"],
 ];
 
+const categoryLabels = {
+  CT: "Corporate Tax",
+  MIS: "MIS Reporting",
+  EInv: "E-Invoicing",
+  Refund: "VAT Refund",
+};
 
 export default function Dashboard() {
   const { state, dispatch } = useApp();
+  const navigate = useNavigate();
   const [month, setMonth] = useState(new Date(2026, 4, 1));
   const monthText = month.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
   const moveMonth = (delta) => setMonth(new Date(month.getFullYear(), month.getMonth() + delta, 1));
@@ -25,7 +33,14 @@ export default function Dashboard() {
     reportService.dashboardStats({ month: selected }).then((data) => dispatch({ type: "SET_DASHBOARD", payload: data })).catch(() => {});
   }, [month, dispatch]);
   const stats = state.dashboardStats || {};
-  const tiles = stats.categoryBreakdown?.length ? stats.categoryBreakdown.map((item) => [item.category, item.pending, item.overdue]) : serviceTiles.map(([name]) => [name, 0, 0]);
+  const selectedMonth = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
+  const tiles = stats.categoryBreakdown?.length
+    ? stats.categoryBreakdown.map((item) => [categoryLabels[item.category] || item.category, item.pending, item.overdue])
+    : serviceTiles.map(([name]) => [name, 0, 0]);
+  const openTasks = (category) => {
+    const params = new URLSearchParams({ category, month: selectedMonth });
+    navigate(`/tasks/list?${params.toString()}`);
+  };
 
   return (
     <div className="space-y-5">
@@ -46,7 +61,7 @@ export default function Dashboard() {
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {tiles.map(([name, pending, overdue]) => (
-          <Card key={name} className="cursor-pointer p-4 transition hover:-translate-y-0.5 hover:shadow-md">
+          <Card key={name} className="cursor-pointer p-4 transition hover:-translate-y-0.5 hover:shadow-md" onClick={() => openTasks(name)}>
             <div className="mb-3 h-1 w-10 rounded-full bg-[#eab308]" />
             <div className="flex items-start justify-between gap-3">
               <div>

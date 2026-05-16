@@ -2,11 +2,26 @@ import { useApp } from "../context/AppContext";
 import { taskService } from "../services/taskService";
 import { ftaStatusToApi, mapFtaTask, mapTask, statusFromApi, statusToApi } from "../utils/adapterUtils";
 
+const categoryToApi = {
+  "Corporate Tax": "CT",
+  "MIS Reporting": "MIS",
+  "E-Invoicing": "EInv",
+  "VAT Refund": "Refund",
+};
+
+function normalizeTaskParams(params = {}) {
+  return {
+    ...params,
+    category: categoryToApi[params.category] || params.category,
+    status: statusToApi[params.status] || params.status,
+  };
+}
+
 export function useTasks() {
   const { dispatch } = useApp();
   async function fetchTasks(params) {
     dispatch({ type: "SET_LOADING", resource: "tasks", value: true });
-    const tasks = (await taskService.list(params)).map(mapTask);
+    const tasks = (await taskService.list(normalizeTaskParams(params))).map(mapTask);
     dispatch({ type: "SET_RESOURCE", resource: "tasks", payload: tasks });
     return tasks;
   }
@@ -26,5 +41,5 @@ export function useTasks() {
     dispatch({ type: "UPDATE_FTA_STATUS", id, status: ftaStatusToApi[label], displayStatus: label });
     return taskService.updateFtaStatus(id, ftaStatusToApi[label] || label);
   }
-  return { fetchTasks, fetchFtaTracker, getTask: taskService.get, createTask: taskService.create, updateTask: taskService.update, updateStatus, updateFtaStatus, exportTasks: taskService.export };
+  return { fetchTasks, fetchFtaTracker, getTask: taskService.get, createTask: taskService.create, updateTask: taskService.update, updateStatus, updateFtaStatus, exportTasks: (params) => taskService.export(normalizeTaskParams(params)) };
 }

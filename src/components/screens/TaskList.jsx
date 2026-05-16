@@ -1,6 +1,6 @@
 import { Download } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
 import { useTasks } from "../../hooks/useTasks";
 import { downloadBlob } from "../../utils/adapterUtils";
@@ -10,16 +10,17 @@ import Card from "../ui/Card.jsx";
 import Table from "../ui/Table.jsx";
 
 const statuses = ["All", "Not Yet Started", "WIP", "Completed", "Submitted to FTA"];
-const cats = ["All", "VAT", "Corporate Tax", "Audit", "Accounting", "MIS Reporting", "E-Invoicing", "Other"];
+const cats = ["All", "VAT", "Corporate Tax", "Audit", "Accounting", "MIS Reporting", "E-Invoicing", "VAT Refund", "Other"];
 
 export default function TaskList() {
   const { state } = useApp();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { fetchTasks, updateStatus, exportTasks } = useTasks();
-  const [cat, setCat] = useState("All");
+  const [cat, setCat] = useState(searchParams.get("category") || "All");
   const [status, setStatus] = useState("All");
   const [scope, setScope] = useState("By Month");
-  const [month, setMonth] = useState("2026-05");
+  const [month, setMonth] = useState(searchParams.get("month") || "2026-05");
   useEffect(() => {
     // Filters are translated directly into API query params so server-side role rules still apply.
     fetchTasks({ category: cat, status, month: scope === "By Month" ? month : undefined, overdue: scope === "Overdue" ? "true" : undefined }).catch(() => {});
