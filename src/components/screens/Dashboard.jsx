@@ -1,10 +1,8 @@
 import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
 import { reportService } from "../../services/reportService";
 import Badge from "../ui/Badge.jsx";
-import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import StatusPill from "../ui/StatusPill.jsx";
 import Table from "../ui/Table.jsx";
@@ -18,18 +16,13 @@ const serviceTiles = [
 
 export default function Dashboard() {
   const { state, dispatch } = useApp();
-  const navigate = useNavigate();
   const [month, setMonth] = useState(new Date(2026, 4, 1));
-  const [overdueAlerts, setOverdueAlerts] = useState([]);
   const monthText = month.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
   const moveMonth = (delta) => setMonth(new Date(month.getFullYear(), month.getMonth() + delta, 1));
   useEffect(() => {
     // Dashboard stats are month-sensitive, so the page refetches whenever the picker changes.
     const selected = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
     reportService.dashboardStats({ month: selected }).then((data) => dispatch({ type: "SET_DASHBOARD", payload: data })).catch(() => {});
-    reportService.overdue().then((tasks) => {
-      setOverdueAlerts(tasks.filter((task) => task.dueDate?.slice?.(0, 7) === selected));
-    }).catch(() => setOverdueAlerts([]));
   }, [month, dispatch]);
   const stats = state.dashboardStats || {};
   const tiles = stats.categoryBreakdown?.length ? stats.categoryBreakdown.map((item) => [item.category, item.pending, item.overdue]) : serviceTiles.map(([name]) => [name, 0, 0]);
@@ -50,40 +43,6 @@ export default function Dashboard() {
         <Stat icon={<Clock size={18} />} label="Pending Tasks" value={stats.pendingTasks || 0} color="text-[#eab308]" />
         <Stat icon={<AlertTriangle size={18} />} label="Overdue" value={stats.overdueTasks || 0} color="text-[#dc2626]" />
       </div>
-
-      {(stats.overdueTasks || overdueAlerts.length) > 0 && (
-        <Card className="overflow-hidden border-red-100">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-red-100 bg-red-50 px-4 py-3">
-            <div className="flex items-center gap-3">
-              <div className="grid h-9 w-9 place-items-center rounded-lg bg-white text-[#dc2626]">
-                <AlertTriangle size={18} />
-              </div>
-              <div>
-                <div className="text-[14px] font-extrabold text-[#991b1b]">Overdue Alerts</div>
-                <div className="text-[12px] font-semibold text-red-700">{stats.overdueTasks || overdueAlerts.length} task{(stats.overdueTasks || overdueAlerts.length) === 1 ? "" : "s"} need attention in {monthText}</div>
-              </div>
-            </div>
-            <Button size="sm" variant="danger" onClick={() => navigate("/tasks/list")}>View Tasks</Button>
-          </div>
-          <div className="divide-y divide-red-100">
-            {overdueAlerts.slice(0, 5).map((task) => (
-              <button key={task._id} onClick={() => navigate(`/tasks/edit/${task._id}`)} className="flex w-full flex-col gap-2 px-4 py-3 text-left hover:bg-red-50/60 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-extrabold text-[#1e3a8a]">{task.taskId}</span>
-                    <Badge>{task.category || "Other"}</Badge>
-                    <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-extrabold text-[#dc2626]">{task.daysOverdue}d overdue</span>
-                  </div>
-                  <div className="mt-1 font-semibold text-slate-900">{task.taskType}</div>
-                  <div className="mt-0.5 text-[12px] font-semibold text-slate-500">{task.client?.legalName || "No client"} | Due {task.dueDate?.slice?.(0, 10)} | {task.assignedTo?.name || "Unassigned"}</div>
-                </div>
-              </button>
-            ))}
-            {overdueAlerts.length === 0 && <div className="px-4 py-3 text-[13px] font-semibold text-red-700">Overdue tasks were found for this month. Open the task list to review them.</div>}
-            {overdueAlerts.length > 5 && <div className="px-4 py-3 text-[12px] font-bold text-slate-500">{overdueAlerts.length - 5} more overdue task{overdueAlerts.length - 5 === 1 ? "" : "s"} hidden</div>}
-          </div>
-        </Card>
-      )}
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {tiles.map(([name, pending, overdue]) => (
