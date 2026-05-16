@@ -8,7 +8,7 @@ import { useAuth } from "../../context/AuthContext";
 export default function Login() {
   const navigate = useNavigate();
   const { login } = useAuth();
-  const [form, setForm] = useState({ email: "admin@filingbuddy.ae", password: "Admin@123" });
+  const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
 
   async function submit(event) {
@@ -38,12 +38,15 @@ export default function Login() {
           <p className="mt-1 text-[12px] font-semibold text-slate-500">Filing Buddy Accounting LLC</p>
         </div>
         <form onSubmit={submit} className="space-y-3">
-            <label htmlFor="login-email"><span className="field-label">Email</span><input id="login-email" name="email" className="input" type="email" autoComplete="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
-            <label htmlFor="login-password"><span className="field-label">Password</span><input id="login-password" name="password" className="input" type="password" autoComplete="current-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></label>
+          <label htmlFor="login-email"><span className="field-label">Email</span><input id="login-email" name="email" className="input" type="email" autoComplete="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
+          <label htmlFor="login-password"><span className="field-label">Password</span><input id="login-password" name="password" className="input" type="password" autoComplete="current-password" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></label>
           <Button className="w-full" disabled={loading}>{loading ? "Signing in..." : "Sign In"}</Button>
-          <button type="button" className="w-full text-center text-[12px] font-bold text-[#1e3a8a]">Forgot password?</button>
+          {/* ya space dena hai */}
+          <button type="button" disabled className="w-full text-center text-[12px] font-bold text-slate-400 cursor-not-allowed">Forgot password? (coming soon)</button>
         </form>
       </Card>
-    </div>
+    </div >
   );
 }
+
+

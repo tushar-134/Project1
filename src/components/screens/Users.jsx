@@ -24,12 +24,14 @@ export default function Users() {
   const [editingUser, setEditingUser] = useState(null);
   const [form, setForm] = useState({ name: "", email: "", mobile: "", role: "Task Only" });
   const [mobileError, setMobileError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetchUsers().catch(() => {});
+    fetchUsers().catch(() => { });
   }, []);
 
   function closeModal() {
+    if (saving) return;
     setModalOpen(false);
     setEditingUser(null);
     setForm({ name: "", email: "", mobile: "", role: "Task Only" });
@@ -56,11 +58,13 @@ export default function Users() {
   }
 
   async function saveUser() {
+    if (saving) return;
     if (!form.name.trim() || !form.email.trim()) {
       toast.error("Name and email are required.");
       return;
     }
-    if (normalizeMobile(form.mobile).length !== 10) {
+    const mobile = normalizeMobile(form.mobile);
+    if (mobile.length !== 10) {
       setMobileError("Phone number is invalid.");
       return;
     }
@@ -69,25 +73,28 @@ export default function Users() {
       user._id !== editingUser?._id &&
       (
         normalizeUserField(user.email) === normalizeUserField(form.email) ||
-        (normalizeMobile(form.mobile) && normalizeMobile(user.mobile) === normalizeMobile(form.mobile))
+        (mobile && normalizeMobile(user.mobile) === mobile)
       )
     );
     if (duplicateUser) {
       toast.error("User already added with this email or phone number.");
       return;
     }
+    setSaving(true);
     try {
       if (editingUser) {
-        await updateUser(editingUser._id, { name: form.name.trim(), email: form.email.trim(), mobile: form.mobile.trim() });
+        await updateUser(editingUser._id, { name: form.name.trim(), email: form.email.trim(), mobile });
         toast.success("User updated successfully.");
       } else {
-        await createUser({ name: form.name.trim(), email: form.email.trim(), mobile: form.mobile.trim(), role: form.role || "Task Only" });
+        await createUser({ name: form.name.trim(), email: form.email.trim(), mobile, role: form.role || "Task Only" });
         toast.success("User created successfully.");
       }
       closeModal();
       await fetchUsers();
     } catch (error) {
       toast.error(error?.response?.data?.message || error?.response?.data?.errors?.[0]?.msg || (editingUser ? "Unable to update user." : "Unable to create user."));
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -126,6 +133,9 @@ export default function Users() {
       toast.error(error?.response?.data?.message || "Unable to delete user.");
     }
   }
+
+
+
 
   return (
     <div className="space-y-5">
@@ -215,13 +225,13 @@ export default function Users() {
           <Card className="w-full max-w-lg p-4">
             <div className="mb-4 flex items-center justify-between">
               <div className="text-[16px] font-extrabold">{editingUser ? "Edit User" : "Add User"}</div>
-              <button onClick={closeModal} className="text-slate-500 hover:text-slate-700">Close</button>
+              <button onClick={closeModal} disabled={saving} className="text-slate-500 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">Close</button>
             </div>
             <div className="grid gap-3">
               <Field label="Name" field="user-form-name"><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
               <Field label="Email" field="user-form-email"><input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
               <Field label="Mobile" field="user-form-mobile">
-                <input className={`input ${mobileError ? "border-[#dc2626]" : ""}`} value={form.mobile} onChange={(e) => { setForm({ ...form, mobile: e.target.value }); setMobileError(""); }} />
+                <input className={`input ${mobileError ? "border-[#dc2626]" : ""}`} type="tel" autoComplete="tel" inputMode="numeric" maxLength={10} placeholder="9876543210" value={form.mobile} onChange={(e) => { setForm({ ...form, mobile: e.target.value.replace(/\D+/g, "").slice(0, 10) }); setMobileError(""); }} />
                 {mobileError && <div className="mt-1 text-[12px] font-bold text-[#dc2626]">{mobileError}</div>}
               </Field>
               {!editingUser && (
@@ -235,8 +245,8 @@ export default function Users() {
               )}
             </div>
             <div className="mt-4 flex justify-end gap-2">
-              <Button variant="ghost" onClick={closeModal}>Cancel</Button>
-              <Button onClick={saveUser}>{editingUser ? "Save Changes" : "Create User"}</Button>
+              <Button variant="ghost" onClick={closeModal} disabled={saving}>Cancel</Button>
+              <Button onClick={saveUser} disabled={saving}>{saving ? (editingUser ? "Saving..." : "Creating...") : (editingUser ? "Save Changes" : "Create User")}</Button>
             </div>
           </Card>
         </div>
@@ -257,9 +267,9 @@ function Role({ title, text }) {
 function Field({ label, field, children }) {
   const control = isValidElement(children)
     ? cloneElement(children, {
-        id: children.props.id || field,
-        name: children.props.name || field,
-      })
+      id: children.props.id || field,
+      name: children.props.name || field,
+    })
     : children;
   return <label htmlFor={field}><span className="field-label">{label}</span>{control}</label>;
 }

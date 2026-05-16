@@ -9,9 +9,12 @@ import Card from "../ui/Card.jsx";
 import StatusPill from "../ui/StatusPill.jsx";
 import Table from "../ui/Table.jsx";
 
-// Bug #12 Fix: removed the hardcoded serviceTiles fallback so the dashboard
-// never shows fake numbers (7 VAT tasks, 4 CT tasks, etc.) when the API fails.
-// The UI now always shows real zeros instead of misleading placeholder counts.
+const serviceTiles = [
+  ["VAT", 7, 2, "vat"], ["Corporate Tax", 4, 0, "ct"], ["Audit", 3, 1, "audit"],
+  ["Accounting", 6, 1, "accounting"], ["MIS Reporting", 2, 0, "mis"], ["E-Invoicing", 1, 0, "einvoicing"],
+  ["VAT Refund", 3, 1, "refund"], ["Other", 5, 0, "other"], ["Trade Licence", 2, 0, "other"],
+];
+
 
 export default function Dashboard() {
   const { state, dispatch } = useApp();
@@ -29,9 +32,7 @@ export default function Dashboard() {
     }).catch(() => setOverdueAlerts([]));
   }, [month, dispatch]);
   const stats = state.dashboardStats || {};
-  const tiles = stats.categoryBreakdown?.length
-    ? stats.categoryBreakdown.map((item) => [item.category, item.pending, item.overdue])
-    : [];
+  const tiles = stats.categoryBreakdown?.length ? stats.categoryBreakdown.map((item) => [item.category, item.pending, item.overdue]) : serviceTiles.map(([name]) => [name, 0, 0]);
 
   return (
     <div className="space-y-5">
@@ -114,10 +115,11 @@ export default function Dashboard() {
             {(state.activity || []).map((item) => {
               const task = item.task || item;
               return (
-              <tr key={item._id || item.taskId}>
-                <td className="font-extrabold text-[#1e3a8a]">{task.taskId || item.taskId}</td><td>{task.client?.legalName || item.client || "—"}</td><td><Badge>{task.category || item.category || "Other"}</Badge></td><td>{task.taskType || item.task}</td><td>{task.dueDate?.slice?.(0, 10) || item.createdAt?.slice?.(0, 10)}</td><td>{item.user?.name || item.user || "—"}</td><td><StatusPill status={item.newStatus || item.action} /></td>
-              </tr>
-            );})}
+                <tr key={item._id || item.taskId}>
+                  <td className="font-extrabold text-[#1e3a8a]">{task.taskId || item.taskId}</td><td>{task.client?.legalName || item.client || "—"}</td><td><Badge>{task.category || item.category || "Other"}</Badge></td><td>{task.taskType || item.task}</td><td>{task.dueDate?.slice?.(0, 10) || item.createdAt?.slice?.(0, 10)}</td><td>{item.user?.name || item.user || "—"}</td><td><StatusPill status={item.newStatus || item.action} /></td>
+                </tr>
+              );
+            })}
           </tbody>
         </Table>
       </Card>

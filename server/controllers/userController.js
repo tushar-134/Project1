@@ -35,6 +35,8 @@ async function findUserDuplicate({ email, mobile, excludeId }) {
 exports.listUsers = async (req, res, next) => {
   try { res.json(await User.find().select("-password").sort({ name: 1 })); } catch (error) { next(error); }
 };
+
+
 exports.getUser = async (req, res, next) => {
   try {
     const user = await User.findById(req.params.id).select("-password");
@@ -42,10 +44,14 @@ exports.getUser = async (req, res, next) => {
     res.json(user);
   } catch (error) { next(error); }
 };
+
+
 exports.createUser = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+    const email = normalize(req.body.email);
+    const mobile = normalizeMobile(req.body.mobile);
     if (!hasValidMobile(req.body.mobile)) {
       return res.status(400).json({ message: "Phone number is invalid." });
     }
@@ -54,11 +60,18 @@ exports.createUser = async (req, res, next) => {
     }
     // New users are seeded with a temporary password because invite email and first login are separate concerns.
     const tempPassword = crypto.randomBytes(6).toString("base64url");
-    const user = await User.create({ ...req.body, password: tempPassword });
+    const user = await User.create({ ...req.body, email, mobile, password: tempPassword });
     await sendEmail({ to: user.email, subject: "Filing Buddy invite", text: `Your temporary password is ${tempPassword}` });
     res.status(201).json(await User.findById(user._id).select("-password"));
-  } catch (error) { next(error); }
+  } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(409).json({ message: "User already added with this email or phone number." });
+    }
+    next(error);
+  }
 };
+
+
 exports.updateUser = async (req, res, next) => {
   try {
     if (!hasValidMobile(req.body.mobile)) {
@@ -68,11 +81,21 @@ exports.updateUser = async (req, res, next) => {
       return res.status(409).json({ message: "User already added with this email or phone number." });
     }
     // Bug #8 Fix: findByIdAndUpdate returns null for a missing id; return 404 instead of 200 null.
-    const user = await User.findByIdAndUpdate(req.params.id, req.body, { new: true }).select("-password");
+    const payload = { ...req.body };
+    if ("email" in payload) payload.email = String(payload.email || "").trim().toLowerCase();
+    if ("mobile" in payload) payload.mobile = normalizeMobile(payload.mobile);
+    const user = await User.findByIdAndUpdate(req.params.id, payload, { new: true }).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
     res.json(user);
-  } catch (error) { next(error); }
+  } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(409).json({ message: "User already added with this email or phone number." });
+    }
+    next(error);
+  }
 };
+
+
 exports.updateRole = async (req, res, next) => {
   try {
     if (String(req.params.id) === String(req.user._id)) {
@@ -81,6 +104,7 @@ exports.updateRole = async (req, res, next) => {
     res.json(await User.findByIdAndUpdate(req.params.id, { role: req.body.role }, { new: true }).select("-password"));
   } catch (error) { next(error); }
 };
+
 exports.updateStatus = async (req, res, next) => {
   try {
     if (String(req.params.id) === String(req.user._id) && req.body.isActive === false) {
@@ -89,6 +113,7 @@ exports.updateStatus = async (req, res, next) => {
     res.json(await User.findByIdAndUpdate(req.params.id, { isActive: req.body.isActive }, { new: true }).select("-password"));
   } catch (error) { next(error); }
 };
+
 exports.deleteUser = async (req, res, next) => {
   try {
     if (String(req.params.id) === String(req.user._id)) return res.status(400).json({ message: "Cannot delete self" });
