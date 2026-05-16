@@ -1,5 +1,5 @@
 import { Plus } from "lucide-react";
-import { cloneElement, isValidElement, useEffect, useState } from "react";
+import { cloneElement, isValidElement, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -25,6 +25,7 @@ export default function Users() {
   const [form, setForm] = useState({ name: "", email: "", mobile: "", role: "Task Only" });
   const [mobileError, setMobileError] = useState("");
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
 
   useEffect(() => {
     fetchUsers().catch(() => { });
@@ -58,7 +59,7 @@ export default function Users() {
   }
 
   async function saveUser() {
-    if (saving) return;
+    if (savingRef.current) return;
     if (!form.name.trim() || !form.email.trim()) {
       toast.error("Name and email are required.");
       return;
@@ -80,6 +81,7 @@ export default function Users() {
       toast.error("User already added with this email or phone number.");
       return;
     }
+    savingRef.current = true;
     setSaving(true);
     try {
       if (editingUser) {
@@ -94,6 +96,7 @@ export default function Users() {
     } catch (error) {
       toast.error(error?.response?.data?.message || error?.response?.data?.errors?.[0]?.msg || (editingUser ? "Unable to update user." : "Unable to create user."));
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
