@@ -13,7 +13,7 @@ export default function NotificationPanel({ open }) {
   }, []);
   useEffect(() => { if (open) fetchNotifications().catch(() => {}); }, [open]);
   return (
-    <div className={`absolute right-5 top-[52px] z-30 w-[320px] overflow-hidden rounded-b-xl border border-t-0 border-[#e2e8f0] bg-white shadow-xl transition duration-200 ${open ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-5 opacity-0"}`}>
+    <div className={`absolute right-0 top-[46px] z-30 w-[calc(100vw-24px)] max-w-[320px] overflow-hidden rounded-b-xl border border-t-0 border-[#e2e8f0] bg-white shadow-xl transition duration-200 sm:right-5 sm:top-[52px] ${open ? "translate-x-0 opacity-100" : "pointer-events-none translate-x-5 opacity-0"}`}>
       <div className="border-b border-[#e2e8f0] px-4 py-3">
         <div className="flex items-center justify-between"><div className="text-[13px] font-extrabold">Notifications</div><button onClick={markAllRead} className="text-[11px] font-bold text-[#1e3a8a]">Mark all read</button></div>
         <div className="text-[11px] font-semibold text-slate-500">Practice alerts and task updates</div>

@@ -7,6 +7,6 @@ export default function Button({ children, variant = "primary", size = "md", cla
     danger: "bg-[#dc2626] text-white hover:brightness-95",
     success: "bg-[#059669] text-white hover:brightness-95",
   };
-  const sizes = { sm: "h-8 px-3 text-[12px]", md: "h-9 px-4 text-[13px]", lg: "h-10 px-5 text-[14px]" };
-  return <button className={`inline-flex items-center justify-center gap-2 rounded-lg font-bold transition ${variants[variant]} ${sizes[size]} ${className}`} {...props}>{children}</button>;
+  const sizes = { sm: "min-h-8 px-3 text-[12px]", md: "min-h-9 px-4 text-[13px]", lg: "min-h-10 px-5 text-[14px]" };
+  return <button className={`inline-flex items-center justify-center gap-2 rounded-lg py-1.5 font-bold leading-tight transition disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${sizes[size]} ${className}`} {...props}>{children}</button>;
 }
