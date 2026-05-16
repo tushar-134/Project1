@@ -68,6 +68,7 @@ export default function AddTask() {
         nextDue: task.recurringConfig?.nextDueDate?.slice?.(0, 10) || "",
         endDate: task.recurringConfig?.endDate?.slice?.(0, 10) || "",
       });
+      setStep(3);
     }).catch(() => {
       toast.error("Unable to load this task for editing.");
       navigate("/tasks/list");
