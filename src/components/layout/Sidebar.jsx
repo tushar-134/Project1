@@ -1,6 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { useEffect } from "react";
-import { X, Boxes, ClipboardList, ContactRound, FilePlus2, Files, LayoutDashboard, Upload, Users, UserRoundPlus, Folders, PieChart, Landmark } from "lucide-react";
+import { X, Boxes, ClipboardList, ContactRound, FilePlus2, Files, LayoutDashboard, LogOut, Upload, Users, UserRoundPlus, Folders, PieChart, Landmark } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useApp } from "../../context/AppContext";
 import { useTasks } from "../../hooks/useTasks";
@@ -29,7 +29,7 @@ export const navItems = [
 ];
 
 export default function Sidebar({ open = false, onClose = () => {}, mobile = false }) {
-  const { currentUser } = useAuth();
+  const { currentUser, logout } = useAuth();
   const { state } = useApp();
   const { fetchFtaTracker } = useTasks();
   // Sidebar badges are driven from live task state so they stay accurate after status changes.
@@ -79,6 +79,10 @@ export default function Sidebar({ open = false, onClose = () => {}, mobile = fal
             <div className="text-[10px] font-bold text-white/60">{currentUser?.role}</div>
           </div>
         </div>
+        <button onClick={logout} className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/10 text-[12px] font-extrabold text-white/85 transition hover:bg-white/20 hover:text-white">
+          <LogOut size={15} />
+          Logout
+        </button>
       </div>
     </aside>
   );
