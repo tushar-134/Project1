@@ -12,9 +12,6 @@ export const navItems = [
     { label: "Client List", to: "/clients/list", icon: Files },
     { label: "Bulk Upload", to: "/clients/bulk-upload", icon: Upload },
   ]},
-  { section: "Contacts", links: [
-    { label: "Contact Directory", to: "/contacts", icon: ContactRound },
-  ]},
   { section: "Tasks", links: [
     { label: "Add Task", to: "/tasks/add", icon: FilePlus2 },
     { label: "Task List", to: "/tasks/list", icon: ClipboardList },
@@ -25,6 +22,9 @@ export const navItems = [
     { label: "Users", to: "/settings/users", icon: Users },
     { label: "Client Groups", to: "/settings/groups", icon: Folders },
     { label: "Reports", to: "/reports", icon: PieChart },
+  ]},
+  { section: "Contacts", links: [
+    { label: "Contact Directory", to: "/contacts", icon: ContactRound },
   ]},
 ];
 
