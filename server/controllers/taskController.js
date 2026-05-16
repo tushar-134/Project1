@@ -6,6 +6,108 @@ const ActivityLog = require("../models/ActivityLog");
 const auditLogger = require("../utils/auditLogger");
 const { nextTaskId } = require("../utils/autoId");
 
+function asDate(value) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function addFrequency(dateValue, frequency) {
+  const date = asDate(dateValue);
+  if (!date || !frequency) return null;
+  const next = new Date(date);
+  switch (frequency) {
+    case "weekly":
+      next.setUTCDate(next.getUTCDate() + 7);
+      return next;
+    case "monthly":
+      next.setUTCMonth(next.getUTCMonth() + 1);
+      return next;
+    case "quarterly":
+      next.setUTCMonth(next.getUTCMonth() + 3);
+      return next;
+    case "semi_annual":
+      next.setUTCMonth(next.getUTCMonth() + 6);
+      return next;
+    case "annual":
+      next.setUTCFullYear(next.getUTCFullYear() + 1);
+      return next;
+    default:
+      return null;
+  }
+}
+
+function normalizeRecurringFields(body, fallbackDueDate) {
+  if (!body.isRecurring) return { isRecurring: false, recurringConfig: undefined };
+  const frequency = body.recurringConfig?.frequency;
+  const dueDate = asDate(body.dueDate || fallbackDueDate);
+  const providedNextDueDate = asDate(body.recurringConfig?.nextDueDate);
+  const calculatedNextDueDate = addFrequency(dueDate, frequency);
+  const nextDueDate = providedNextDueDate && (!dueDate || providedNextDueDate > dueDate)
+    ? providedNextDueDate
+    : (providedNextDueDate || calculatedNextDueDate);
+  const endDate = asDate(body.recurringConfig?.endDate);
+  return {
+    isRecurring: true,
+    recurringConfig: {
+      frequency,
+      nextDueDate: nextDueDate || undefined,
+      endDate: endDate || undefined,
+    },
+  };
+}
+
+async function maybeGenerateNextRecurringTask(task, userId) {
+  if (!task?.isRecurring || task.recurringGeneratedTask) return null;
+  const frequency = task.recurringConfig?.frequency;
+  const nextDueDate = asDate(task.recurringConfig?.nextDueDate) || addFrequency(task.dueDate, frequency);
+  if (!nextDueDate) return null;
+  const endDate = asDate(task.recurringConfig?.endDate);
+  if (endDate && nextDueDate > endDate) return null;
+  const followingDueDate = addFrequency(nextDueDate, frequency);
+  const nextTask = await Task.create({
+    category: task.category,
+    taskType: task.taskType,
+    client: task.client,
+    assignedTo: task.assignedTo,
+    dueDate: nextDueDate,
+    period: task.period,
+    description: task.description,
+    status: "not_started",
+    isRecurring: true,
+    recurringConfig: {
+      frequency,
+      nextDueDate: followingDueDate || undefined,
+      endDate: endDate || undefined,
+    },
+    isAwaitingFta: task.isAwaitingFta,
+    ftaStatus: "in_review",
+    ftaSubmittedDate: undefined,
+    createdBy: userId || task.createdBy,
+    taskId: await nextTaskId(nextDueDate.getUTCFullYear()),
+  });
+
+  task.recurringGeneratedTask = nextTask._id;
+  await task.save();
+  await auditLogger({
+    task: nextTask._id,
+    user: userId || task.createdBy,
+    action: "Generated Recurrence",
+    newStatus: nextTask.status,
+    notes: `Generated from ${task.taskId}`,
+  });
+  if (nextTask.assignedTo) {
+    await Notification.create({
+      recipient: nextTask.assignedTo,
+      title: "Recurring task generated",
+      message: `${nextTask.taskId} ${nextTask.taskType}`,
+      type: "task_update",
+      relatedTask: nextTask._id,
+    });
+  }
+  return nextTask;
+}
+
 function taskQuery(req) {
   // Query shaping happens once here so list and export stay aligned with the same role and filter logic.
   const { category, status, assignedTo, month, overdue } = req.query;
@@ -59,8 +161,10 @@ exports.createTask = async (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
     const status = req.body.status || (req.body.isAwaitingFta ? "submitted_to_fta" : "not_started");
+    const recurringFields = normalizeRecurringFields(req.body, req.body.dueDate);
     const task = await Task.create({
       ...req.body,
+      ...recurringFields,
       status,
       taskId: await nextTaskId(new Date(req.body.dueDate).getUTCFullYear()),
       ftaSubmittedDate: req.body.isAwaitingFta || status === "submitted_to_fta" ? new Date() : undefined,
@@ -75,11 +179,28 @@ exports.createTask = async (req, res, next) => {
 exports.updateTask = async (req, res, next) => {
   try {
     const task = await Task.findById(req.params.id);
-    if (!task) return res.status(404).json({ message: "Task not found" });
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+    const previousStatus = task.status;
     // Bug #4 Fix: whitelist editable fields to block mass-assignment of taskId, createdBy, etc.
-    const ALLOWED = ["category", "taskType", "client", "assignedTo", "dueDate", "status", "description", "isAwaitingFta", "ftaStatus", "period", "isRecurring", "recurringConfig"];
+    const ALLOWED = ["category", "taskType", "client", "assignedTo", "dueDate", "status", "description", "isAwaitingFta", "ftaStatus", "period"];
     ALLOWED.forEach((key) => { if (key in req.body) task[key] = req.body[key]; });
-    if ("isRecurring" in req.body && !req.body.isRecurring) task.recurringConfig = undefined;
+
+    if ("isRecurring" in req.body || "recurringConfig" in req.body || "dueDate" in req.body) {
+      const recurringFields = normalizeRecurringFields(
+        {
+          isRecurring: "isRecurring" in req.body ? req.body.isRecurring : task.isRecurring,
+          recurringConfig: req.body.recurringConfig || task.recurringConfig,
+          dueDate: req.body.dueDate || task.dueDate,
+        },
+        task.dueDate
+      );
+      task.isRecurring = recurringFields.isRecurring;
+      task.recurringConfig = recurringFields.recurringConfig;
+      if (!task.isRecurring) task.recurringGeneratedTask = undefined;
+    }
+
     if ("status" in req.body && req.body.status === "submitted_to_fta" && task.isAwaitingFta && !task.ftaSubmittedDate) {
       task.ftaSubmittedDate = new Date();
     }
@@ -88,6 +209,9 @@ exports.updateTask = async (req, res, next) => {
       task.ftaSubmittedDate = undefined;
     }
     await task.save();
+    if (previousStatus !== "completed" && task.status === "completed") {
+      await maybeGenerateNextRecurringTask(task, req.user._id);
+    }
     await auditLogger({ task: task._id, user: req.user._id, action: "Updated", newStatus: task.status });
     res.json(await task.populate(populateTask));
   } catch (error) { next(error); }
@@ -111,6 +235,9 @@ exports.updateStatus = async (req, res, next) => {
     task.status = req.body.status;
     if (task.status === "submitted_to_fta" && task.isAwaitingFta && !task.ftaSubmittedDate) task.ftaSubmittedDate = new Date();
     await task.save();
+    if (previousStatus !== "completed" && task.status === "completed") {
+      await maybeGenerateNextRecurringTask(task, req.user._id);
+    }
     await auditLogger({ task: task._id, user: req.user._id, action: "Status Changed", previousStatus, newStatus: task.status });
     if (task.assignedTo) await Notification.create({ recipient: task.assignedTo, title: "Task status changed", message: `${task.taskId} moved to ${task.status}`, type: "task_update", relatedTask: task._id });
     res.json(await task.populate(populateTask));
@@ -149,7 +276,7 @@ exports.exportTasks = async (req, res, next) => {
     const csv = ["Task ID,Client,Category,Task Type,Due Date,Assigned,Status"].concat(tasks.map((t) => [t.taskId, t.client?.legalName || "", t.category, t.taskType, t.dueDate?.toISOString().slice(0, 10), t.assignedTo?.name || "", t.status].map((v) => `"${String(v).replaceAll('"', '""')}"`).join(","))).join("\n");
     // Bug #2 Fix: res.attachment() was removed in Express 5; use setHeader instead.
     res.setHeader("Content-Disposition", 'attachment; filename="tasks.csv"')
-       .setHeader("Content-Type", "text/csv")
-       .send(csv);
+      .setHeader("Content-Type", "text/csv")
+      .send(csv);
   } catch (error) { next(error); }
 };

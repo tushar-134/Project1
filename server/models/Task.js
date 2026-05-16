@@ -17,6 +17,7 @@ const taskSchema = new mongoose.Schema({
     nextDueDate: Date,
     endDate: Date,
   },
+  recurringGeneratedTask: { type: mongoose.Schema.Types.ObjectId, ref: "Task" },
   isAwaitingFta: { type: Boolean, default: false },
   ftaStatus: { type: String, enum: ["in_review", "additional_query", "approved"], default: "in_review" },
   ftaSubmittedDate: Date,
