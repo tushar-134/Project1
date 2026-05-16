@@ -23,6 +23,7 @@ export default function Users() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [form, setForm] = useState({ name: "", email: "", mobile: "", role: "Task Only" });
+  const [mobileError, setMobileError] = useState("");
 
   useEffect(() => {
     fetchUsers().catch(() => {});
@@ -32,11 +33,13 @@ export default function Users() {
     setModalOpen(false);
     setEditingUser(null);
     setForm({ name: "", email: "", mobile: "", role: "Task Only" });
+    setMobileError("");
   }
 
   function handleAddUser() {
     setEditingUser(null);
-    setForm({ name: "", email: "", mobile: "+971 ", role: "Task Only" });
+    setForm({ name: "", email: "", mobile: "", role: "Task Only" });
+    setMobileError("");
     setModalOpen(true);
   }
 
@@ -48,6 +51,7 @@ export default function Users() {
       mobile: user.mobile || "",
       role: user.role || "Task Only",
     });
+    setMobileError("");
     setModalOpen(true);
   }
 
@@ -56,6 +60,11 @@ export default function Users() {
       toast.error("Name and email are required.");
       return;
     }
+    if (normalizeMobile(form.mobile).length !== 10) {
+      setMobileError("Phone number is invalid.");
+      return;
+    }
+    setMobileError("");
     const duplicateUser = state.users.find((user) =>
       user._id !== editingUser?._id &&
       (
@@ -211,7 +220,10 @@ export default function Users() {
             <div className="grid gap-3">
               <Field label="Name" field="user-form-name"><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
               <Field label="Email" field="user-form-email"><input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
-              <Field label="Mobile" field="user-form-mobile"><input className="input" value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} /></Field>
+              <Field label="Mobile" field="user-form-mobile">
+                <input className={`input ${mobileError ? "border-[#dc2626]" : ""}`} value={form.mobile} onChange={(e) => { setForm({ ...form, mobile: e.target.value }); setMobileError(""); }} />
+                {mobileError && <div className="mt-1 text-[12px] font-bold text-[#dc2626]">{mobileError}</div>}
+              </Field>
               {!editingUser && (
                 <Field label="Role" field="user-form-role">
                   <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>

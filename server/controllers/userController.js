@@ -11,6 +11,10 @@ function normalizeMobile(value) {
   return String(value || "").replace(/\D/g, "");
 }
 
+function hasValidMobile(value) {
+  return normalizeMobile(value).length === 10;
+}
+
 async function findUserDuplicate({ email, mobile, excludeId }) {
   const normalizedEmail = normalize(email);
   const normalizedMobile = normalizeMobile(mobile);
@@ -42,6 +46,9 @@ exports.createUser = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+    if (!hasValidMobile(req.body.mobile)) {
+      return res.status(400).json({ message: "Phone number is invalid." });
+    }
     if (await findUserDuplicate({ email: req.body.email, mobile: req.body.mobile })) {
       return res.status(409).json({ message: "User already added with this email or phone number." });
     }
@@ -54,6 +61,9 @@ exports.createUser = async (req, res, next) => {
 };
 exports.updateUser = async (req, res, next) => {
   try {
+    if (!hasValidMobile(req.body.mobile)) {
+      return res.status(400).json({ message: "Phone number is invalid." });
+    }
     if (await findUserDuplicate({ email: req.body.email, mobile: req.body.mobile, excludeId: req.params.id })) {
       return res.status(409).json({ message: "User already added with this email or phone number." });
     }
