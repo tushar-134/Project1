@@ -1,6 +1,9 @@
 const { validationResult } = require("express-validator");
 const Client = require("../models/Client");
 const User = require("../models/User");
+const Task = require("../models/Task");
+const Contact = require("../models/Contact");
+const ClientGroup = require("../models/ClientGroup");
 const Notification = require("../models/Notification");
 const ActivityLog = require("../models/ActivityLog");
 const { nextClientFileNo } = require("../utils/autoId");
@@ -142,9 +145,28 @@ exports.updateClient = async (req, res, next) => {
 
 exports.deleteClient = async (req, res, next) => {
   try {
-    const client = await Client.findByIdAndUpdate(req.params.id, { isActive: false }, { new: true });
+    const client = await Client.findById(req.params.id);
     if (!client) return res.status(404).json({ message: "Client not found" });
-    res.json({ message: "Client deleted" });
+
+    const taskIds = await Task.find({ client: client._id }).distinct("_id");
+    if (taskIds.length) {
+      await ActivityLog.deleteMany({ task: { $in: taskIds } });
+      await Notification.deleteMany({
+        $or: [
+          { relatedTask: { $in: taskIds } },
+          { relatedClient: client._id },
+        ],
+      });
+      await Task.deleteMany({ client: client._id });
+    } else {
+      await Notification.deleteMany({ relatedClient: client._id });
+    }
+
+    await Contact.deleteMany({ client: client._id });
+    await ClientGroup.updateMany({ clients: client._id }, { $pull: { clients: client._id } });
+    await client.deleteOne();
+
+    res.json({ message: "Client deleted permanently" });
   } catch (error) { next(error); }
 };
 
