@@ -77,8 +77,16 @@ exports.updateTask = async (req, res, next) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: "Task not found" });
     // Bug #4 Fix: whitelist editable fields to block mass-assignment of taskId, createdBy, etc.
-    const ALLOWED = ["category", "taskType", "client", "assignedTo", "dueDate", "status", "notes", "isAwaitingFta", "ftaStatus", "period"];
+    const ALLOWED = ["category", "taskType", "client", "assignedTo", "dueDate", "status", "description", "isAwaitingFta", "ftaStatus", "period", "isRecurring", "recurringConfig"];
     ALLOWED.forEach((key) => { if (key in req.body) task[key] = req.body[key]; });
+    if ("isRecurring" in req.body && !req.body.isRecurring) task.recurringConfig = undefined;
+    if ("status" in req.body && req.body.status === "submitted_to_fta" && task.isAwaitingFta && !task.ftaSubmittedDate) {
+      task.ftaSubmittedDate = new Date();
+    }
+    if ("isAwaitingFta" in req.body && !req.body.isAwaitingFta) {
+      task.ftaStatus = undefined;
+      task.ftaSubmittedDate = undefined;
+    }
     await task.save();
     await auditLogger({ task: task._id, user: req.user._id, action: "Updated", newStatus: task.status });
     res.json(await task.populate(populateTask));

@@ -6,6 +6,61 @@ const ActivityLog = require("../models/ActivityLog");
 const { nextClientFileNo } = require("../utils/autoId");
 
 const populateClient = [{ path: "assignedUser", select: "name" }, { path: "group", select: "name" }, { path: "createdBy", select: "name" }];
+
+function escapeRegex(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function buildDuplicateClauses(data) {
+  const clauses = [];
+  const legalName = data.legalName?.trim();
+  const vatTrn = data.vatDetails?.trn?.trim();
+  const licenceNumbers = (data.tradeLicences || [])
+    .map((licence) => licence?.licenceNumber?.trim())
+    .filter(Boolean);
+
+  if (legalName) clauses.push({ legalName: new RegExp(`^${escapeRegex(legalName)}$`, "i") });
+  if (vatTrn) clauses.push({ "vatDetails.trn": vatTrn });
+  licenceNumbers.forEach((licenceNumber) => clauses.push({ "tradeLicences.licenceNumber": licenceNumber }));
+
+  return clauses;
+}
+
+async function findDuplicateClient(data, excludeId) {
+  const clauses = buildDuplicateClauses(data);
+  if (!clauses.length) return null;
+
+  const query = {
+    isActive: true,
+    $or: clauses,
+  };
+  if (excludeId) query._id = { $ne: excludeId };
+
+  return Client.findOne(query);
+}
+
+function duplicateMessage(client, payload) {
+  const legalName = payload.legalName?.trim();
+  const vatTrn = payload.vatDetails?.trn?.trim();
+  const licenceNumbers = new Set(
+    (payload.tradeLicences || [])
+      .map((licence) => licence?.licenceNumber?.trim())
+      .filter(Boolean),
+  );
+
+  if (legalName && client.legalName?.trim().toLowerCase() === legalName.toLowerCase()) {
+    return `A client with legal name "${legalName}" already exists.`;
+  }
+  if (vatTrn && client.vatDetails?.trn === vatTrn) {
+    return `A client with VAT TRN "${vatTrn}" already exists.`;
+  }
+  const matchingLicence = client.tradeLicences?.find((licence) => licenceNumbers.has(licence.licenceNumber));
+  if (matchingLicence?.licenceNumber) {
+    return `A client with trade licence "${matchingLicence.licenceNumber}" already exists.`;
+  }
+  return "A matching client already exists.";
+}
+
 function buildUploadedFile(req) {
   if (!req.file) return null;
   const url = req.file.path?.startsWith?.("http")
@@ -55,6 +110,8 @@ exports.createClient = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+    const duplicate = await findDuplicateClient(req.body);
+    if (duplicate) return res.status(409).json({ message: duplicateMessage(duplicate, req.body) });
     const client = await Client.create({ ...req.body, fileNo: await nextClientFileNo(), createdBy: req.user._id });
     const admins = await User.find({ role: "admin", isActive: true });
     await Notification.insertMany(admins.map((admin) => ({
@@ -68,6 +125,13 @@ exports.updateClient = async (req, res, next) => {
   try {
     const client = await Client.findById(req.params.id);
     if (!client || !client.isActive) return res.status(404).json({ message: "Client not found" });
+    const candidate = {
+      legalName: "legalName" in req.body ? req.body.legalName : client.legalName,
+      vatDetails: "vatDetails" in req.body ? req.body.vatDetails : client.vatDetails,
+      tradeLicences: "tradeLicences" in req.body ? req.body.tradeLicences : client.tradeLicences,
+    };
+    const duplicate = await findDuplicateClient(candidate, client._id);
+    if (duplicate) return res.status(409).json({ message: duplicateMessage(duplicate, candidate) });
     // Bug #4 Fix: whitelist editable fields to prevent mass-assignment of fileNo, createdBy, isActive, etc.
     const ALLOWED = ["legalName", "tradeName", "clientType", "jurisdiction", "financialYearEnd", "assignedUser", "group", "registeredAddress", "correspondenceAddress", "tradeLicences", "contactPersons", "vatDetails", "ctDetails", "portalLogins", "customFields"];
     ALLOWED.forEach((key) => { if (key in req.body) client[key] = req.body[key]; });
@@ -94,7 +158,11 @@ exports.bulkUpload = async (req, res, next) => {
       try {
         const trn = row.vatTrn || row.trn || row["VAT TRN"];
         const licence = row.licenceNumber || row.licence || row["Trade Licence No."];
-        const exists = await Client.findOne({ $or: [{ "vatDetails.trn": trn }, { "tradeLicences.licenceNumber": licence }].filter((q) => Object.values(q)[0]) });
+        const exists = await findDuplicateClient({
+          legalName: row.legalName || row.name,
+          vatDetails: { trn },
+          tradeLicences: licence ? [{ licenceNumber: licence }] : [],
+        });
         if (exists) { skipped += 1; continue; }
         await Client.create({
           fileNo: await nextClientFileNo(),

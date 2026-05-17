@@ -112,7 +112,8 @@ export default function AddTask() {
       toast.success(isEditMode ? "Task updated successfully." : "Task created successfully.");
       navigate("/tasks/list");
     } catch (error) {
-      const message = error?.response?.data?.errors?.[0]?.msg || error?.response?.data?.message || "Unable to create task right now.";
+      const fallback = isEditMode ? "Unable to save task right now." : "Unable to create task right now.";
+      const message = error?.response?.data?.errors?.[0]?.msg || error?.response?.data?.message || fallback;
       toast.error(message);
     }
   }

@@ -249,56 +249,60 @@ export default function AddClient() {
       toast.error("Please enter the client legal name.");
       return;
     }
-    // The screen state is intentionally tab-oriented and user-friendly; this transform is
-    // where we fold it back into the nested API contract expected by the Mongo model.
-    const payload = {
-      clientType: form.clientType === "Natural Person" ? "natural" : "legal",
-      fileNo: form.fileNo || undefined,
-      legalName: form.legalName,
-      tradeName: form.tradeName,
-      financialYearEnd: form.fye,
-      jurisdiction: form.jurisdiction === "Free Zone" ? "freezone" : form.jurisdiction === "Designated Zone" ? "designated_zone" : form.jurisdiction.toLowerCase(),
-      assignedUser: state.users.find((u) => u.name === form.assigned)?._id,
-      registeredAddress: { country: form.country, emirate: form.emirate, street: form.street, poBox: form.poBox, postalCode: form.postalCode },
-      correspondenceAddress: form.differentAddress ? { street: form.correspondence } : undefined,
-      tradeLicences: licences.map((l) => ({ licenceNumber: l.number, issueDate: l.issue, expiryDate: l.expiry, issuingAuthority: l.authority, licenceType: l.type?.toLowerCase() || "commercial", officialEmail: l.email })),
-      contactPersons: contacts.map((c) => ({ fullName: c.name, designation: c.designation, email: c.email, mobile: { countryCode: c.code, number: c.mobile }, whatsapp: c.whatsapp, alternateEmail: c.alternate, isPrimary: c.primary, emiratesId: { number: c.eid }, passport: { number: c.passport, issuingCountry: c.issuingCountry } })),
-      vatDetails: { trn: form.vatTrn, status: form.vatStatus === "Registered" ? "registered" : form.vatStatus === "Pending" ? "applying" : "not_registered", registrationDate: form.vatDate, filingFrequency: form.vatFreq.toLowerCase() },
-      ctDetails: { tin: form.ctTin, status: form.ctStatus === "Registered" ? "registered" : form.ctStatus === "Pending" ? "applying" : "not_registered", registrationDate: form.ctDate, financialYearEnd: form.fye },
-      group: form.group || undefined,
-      portalLogins: portals.map((p) => ({ portalName: p.name, portalUrl: p.url, username: p.username, password: p.password, notes: p.notes })),
-      customFields: { qrmpPreference: form.qrmp, auditFirmName: form.auditFirm, bankName: form.bank, iban: form.iban },
-    };
-    const pendingAttachments = attachments.filter((attachment) => !attachment.saved && attachment.file);
-    const pendingLicenceDocuments = licences
-      .map((licence, index) => ({ index, file: licence.documentFile }))
-      .filter((item) => item.file);
-    if (isEditMode) {
-      await updateClient(id, payload);
-      if (pendingLicenceDocuments.length) {
-        for (const licenceDocument of pendingLicenceDocuments) {
-          await uploadTradeLicenceFile(id, licenceDocument.index, licenceDocument.file);
+    try {
+      // The screen state is intentionally tab-oriented and user-friendly; this transform is
+      // where we fold it back into the nested API contract expected by the Mongo model.
+      const payload = {
+        clientType: form.clientType === "Natural Person" ? "natural" : "legal",
+        fileNo: form.fileNo || undefined,
+        legalName: form.legalName,
+        tradeName: form.tradeName,
+        financialYearEnd: form.fye,
+        jurisdiction: form.jurisdiction === "Free Zone" ? "freezone" : form.jurisdiction === "Designated Zone" ? "designated_zone" : form.jurisdiction.toLowerCase(),
+        assignedUser: state.users.find((u) => u.name === form.assigned)?._id,
+        registeredAddress: { country: form.country, emirate: form.emirate, street: form.street, poBox: form.poBox, postalCode: form.postalCode },
+        correspondenceAddress: form.differentAddress ? { street: form.correspondence } : undefined,
+        tradeLicences: licences.map((l) => ({ licenceNumber: l.number, issueDate: l.issue, expiryDate: l.expiry, issuingAuthority: l.authority, licenceType: l.type?.toLowerCase() || "commercial", officialEmail: l.email })),
+        contactPersons: contacts.map((c) => ({ fullName: c.name, designation: c.designation, email: c.email, mobile: { countryCode: c.code, number: c.mobile }, whatsapp: c.whatsapp, alternateEmail: c.alternate, isPrimary: c.primary, emiratesId: { number: c.eid }, passport: { number: c.passport, issuingCountry: c.issuingCountry } })),
+        vatDetails: { trn: form.vatTrn, status: form.vatStatus === "Registered" ? "registered" : form.vatStatus === "Pending" ? "applying" : "not_registered", registrationDate: form.vatDate, filingFrequency: form.vatFreq.toLowerCase() },
+        ctDetails: { tin: form.ctTin, status: form.ctStatus === "Registered" ? "registered" : form.ctStatus === "Pending" ? "applying" : "not_registered", registrationDate: form.ctDate, financialYearEnd: form.fye },
+        group: form.group || undefined,
+        portalLogins: portals.map((p) => ({ portalName: p.name, portalUrl: p.url, username: p.username, password: p.password, notes: p.notes })),
+        customFields: { qrmpPreference: form.qrmp, auditFirmName: form.auditFirm, bankName: form.bank, iban: form.iban },
+      };
+      const pendingAttachments = attachments.filter((attachment) => !attachment.saved && attachment.file);
+      const pendingLicenceDocuments = licences
+        .map((licence, index) => ({ index, file: licence.documentFile }))
+        .filter((item) => item.file);
+      if (isEditMode) {
+        await updateClient(id, payload);
+        if (pendingLicenceDocuments.length) {
+          for (const licenceDocument of pendingLicenceDocuments) {
+            await uploadTradeLicenceFile(id, licenceDocument.index, licenceDocument.file);
+          }
         }
-      }
-      toast.success("Client updated successfully.");
-    } else {
-      const created = await createClient(payload);
-      if (pendingLicenceDocuments.length) {
-        for (const licenceDocument of pendingLicenceDocuments) {
-          await uploadTradeLicenceFile(created._id, licenceDocument.index, licenceDocument.file);
+        toast.success("Client updated successfully.");
+      } else {
+        const created = await createClient(payload);
+        if (pendingLicenceDocuments.length) {
+          for (const licenceDocument of pendingLicenceDocuments) {
+            await uploadTradeLicenceFile(created._id, licenceDocument.index, licenceDocument.file);
+          }
         }
-      }
-      if (pendingAttachments.length) {
-        for (const attachment of pendingAttachments) {
-          const formData = new FormData();
-          formData.append("file", attachment.file);
-          formData.append("description", attachment.description || "");
-          await uploadAttachment(created._id, formData);
+        if (pendingAttachments.length) {
+          for (const attachment of pendingAttachments) {
+            const formData = new FormData();
+            formData.append("file", attachment.file);
+            formData.append("description", attachment.description || "");
+            await uploadAttachment(created._id, formData);
+          }
         }
+        toast.success(pendingAttachments.length || pendingLicenceDocuments.length ? "Client created and documents uploaded." : "Client created successfully.");
       }
-      toast.success(pendingAttachments.length || pendingLicenceDocuments.length ? "Client created and documents uploaded." : "Client created successfully.");
+      navigate("/clients/list");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Unable to save client.");
     }
-    navigate("/clients/list");
   }
 
   const goPrevious = () => setTab((current) => Math.max(current - 1, 0));
