@@ -4,11 +4,27 @@ const fs = require("fs");
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const cloudinary = require("../config/cloudinary");
 
-const hasCloudinaryConfig = Boolean(
-  process.env.CLOUDINARY_CLOUD_NAME &&
-  process.env.CLOUDINARY_API_KEY &&
-  process.env.CLOUDINARY_API_SECRET,
-);
+function isConfiguredValue(value) {
+  if (!value) return false;
+  const normalized = String(value).trim().toLowerCase();
+  return normalized !== "your_cloud_name"
+    && normalized !== "your_api_key"
+    && normalized !== "your_api_secret"
+    && normalized !== "test"
+    && normalized !== "demo"
+    && normalized !== "undefined"
+    && normalized !== "null";
+}
+
+const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+const apiKey = process.env.CLOUDINARY_API_KEY;
+const apiSecret = process.env.CLOUDINARY_API_SECRET;
+
+const hasCloudinaryConfig = isConfiguredValue(cloudName)
+  && isConfiguredValue(apiKey)
+  && isConfiguredValue(apiSecret)
+  && /^\d+$/.test(String(apiKey).trim())
+  && String(apiSecret).trim().length >= 8;
 
 const storage = hasCloudinaryConfig
   ? new CloudinaryStorage({
