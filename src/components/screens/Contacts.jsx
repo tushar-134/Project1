@@ -30,6 +30,13 @@ const DIAL_CODE_OPTIONS = [
 
 const blankContact = { name: "", clientId: "", role: "", countryCode: "", mobile: "", email: "", type: "Client Contact", city: "" };
 
+function getApiErrorMessage(error) {
+  const data = error?.response?.data;
+  if (data?.message) return data.message;
+  if (Array.isArray(data?.errors) && data.errors[0]?.msg) return data.errors[0].msg;
+  return "";
+}
+
 function toContactRows(contacts) {
   return (contacts || []).map((contact) => ({
     id: contact._id,
@@ -93,6 +100,11 @@ export default function Contacts() {
       toast.error("Client, name, country code and mobile are required.");
       return;
     }
+    const digits = form.mobile.replace(/\D+/g, "");
+    if (digits.length !== 10) {
+      toast.error("Mobile number must be exactly 10 digits.");
+      return;
+    }
     const client = state.clients.find((item) => item._id === form.clientId || item.id === form.clientId);
     if (!client) {
       toast.error("Please select a valid client.");
@@ -107,7 +119,7 @@ export default function Contacts() {
         email: form.email.trim(),
         mobile: {
           countryCode: form.countryCode.trim(),
-          number: form.mobile.trim().replace(/\D+/g, ""),
+          number: digits,
         },
         type: form.type,
         city: form.city.trim() || client.registeredAddress?.emirate || "",
@@ -117,7 +129,7 @@ export default function Contacts() {
       toast.success("Contact saved to directory.");
       closeModal();
     } catch (error) {
-      toast.error(error?.response?.data?.message || "Unable to save contact.");
+      toast.error(getApiErrorMessage(error) || "Unable to save contact.");
     } finally {
       setSaving(false);
     }
@@ -222,8 +234,10 @@ export default function Contacts() {
                   <input
                     className="input"
                     value={form.mobile}
-                    onChange={(e) => setForm({ ...form, mobile: e.target.value.replace(/[^\d+\s-]/g, "") })}
-                    placeholder="Phone number"
+                    onChange={(e) => setForm({ ...form, mobile: e.target.value.replace(/[^\d]/g, "").slice(0, 10) })}
+                    placeholder="10-digit number"
+                    inputMode="numeric"
+                    maxLength={10}
                   />
                 </div>
               </Field>
