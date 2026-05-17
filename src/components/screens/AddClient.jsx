@@ -17,7 +17,7 @@ export default function AddClient() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditMode = Boolean(id);
-  const { createClient, getClient, updateClient } = useClients();
+  const { createClient, getClient, updateClient, uploadAttachment, deleteAttachment } = useClients();
   const { fetchUsers } = useUsers();
   const [tab, setTab] = useState(0);
   const countries = useMemo(() => {
@@ -40,7 +40,8 @@ export default function AddClient() {
   const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "Dubai Economy", type: "Commercial", email: "" }]);
   const [contacts, setContacts] = useState([{ name: "", designation: "", email: "", code: "+971", mobile: "", whatsapp: "", alternate: "", primary: true, eid: "", passport: "", issuingCountry: "United Arab Emirates" }]);
   const [portals, setPortals] = useState([{ name: "EmaraTax", url: "https://tax.gov.ae", username: "", password: "", notes: "" }]);
-  const [attachments, setAttachments] = useState([{ name: "Trade Licence.pdf", size: "1.2 MB", type: "PDF", description: "Current licence", uploadedOn: "09 May 2026", uploadedBy: "Hamad" }]);
+  const [attachments, setAttachments] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
   const update = (key, value) => setForm((f) => ({ ...f, [key]: value }));
   useEffect(() => {
     fetchUsers().catch(() => {});
@@ -114,18 +115,91 @@ export default function AddClient() {
         notes: portal.notes || "",
       })) : [{ name: "EmaraTax", url: "https://tax.gov.ae", username: "", password: "", notes: "" }]);
       setAttachments((client.attachments || []).map((attachment) => ({
+        id: attachment._id,
         name: attachment.name,
         size: attachment.size,
         type: attachment.fileType,
         description: attachment.description,
         uploadedOn: attachment.uploadedAt?.slice?.(0, 10) || "",
         uploadedBy: attachment.uploadedBy?.name || "",
+        url: attachment.url,
+        saved: true,
       })));
     }).catch(() => {
       toast.error("Unable to load this client for editing.");
       navigate("/clients/list");
     });
   }, [id, isEditMode]);
+
+  const formatFileSize = (size) => {
+    if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const mapSavedAttachments = (items) => items.map((attachment) => ({
+    id: attachment._id,
+    name: attachment.name,
+    size: attachment.size,
+    type: attachment.fileType,
+    description: attachment.description || "",
+    uploadedOn: attachment.uploadedAt?.slice?.(0, 10) || new Date().toISOString().slice(0, 10),
+    uploadedBy: attachment.uploadedBy?.name || "You",
+    url: attachment.url,
+    saved: true,
+  }));
+
+  async function uploadFiles(files) {
+    const selected = Array.from(files || []);
+    if (!selected.length) return;
+    if (!isEditMode) {
+      setAttachments((current) => [
+        ...current,
+        ...selected.map((file) => ({
+          id: `${file.name}-${file.lastModified}-${file.size}`,
+          name: file.name,
+          size: formatFileSize(file.size),
+          type: file.type || file.name.split(".").pop()?.toUpperCase() || "File",
+          description: "",
+          uploadedOn: "Pending save",
+          uploadedBy: "You",
+          file,
+          saved: false,
+        })),
+      ]);
+      toast.success("File added. Save the client to upload it.");
+      return;
+    }
+    setIsUploading(true);
+    try {
+      let uploaded = [];
+      for (const file of selected) {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("description", "");
+        uploaded = await uploadAttachment(id, formData);
+      }
+      setAttachments(mapSavedAttachments(uploaded));
+      toast.success(selected.length === 1 ? "Attachment uploaded." : "Attachments uploaded.");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Attachment upload failed.");
+    } finally {
+      setIsUploading(false);
+    }
+  }
+
+  async function removeAttachment(attachment) {
+    if (!attachment.saved) {
+      setAttachments((current) => current.filter((item) => item.id !== attachment.id));
+      return;
+    }
+    try {
+      const remaining = await deleteAttachment(id, attachment.id);
+      setAttachments(mapSavedAttachments(remaining));
+      toast.success("Attachment deleted.");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Unable to delete attachment.");
+    }
+  }
 
   async function saveClient() {
     if (!form.legalName) {
@@ -152,12 +226,21 @@ export default function AddClient() {
       portalLogins: portals.map((p) => ({ portalName: p.name, portalUrl: p.url, username: p.username, password: p.password, notes: p.notes })),
       customFields: { qrmpPreference: form.qrmp, auditFirmName: form.auditFirm, bankName: form.bank, iban: form.iban },
     };
+    const pendingAttachments = attachments.filter((attachment) => !attachment.saved && attachment.file);
     if (isEditMode) {
       await updateClient(id, payload);
       toast.success("Client updated successfully.");
     } else {
-      await createClient(payload);
-      toast.success("Client created successfully.");
+      const created = await createClient(payload);
+      if (pendingAttachments.length) {
+        for (const attachment of pendingAttachments) {
+          const formData = new FormData();
+          formData.append("file", attachment.file);
+          formData.append("description", attachment.description || "");
+          await uploadAttachment(created._id, formData);
+        }
+      }
+      toast.success(pendingAttachments.length ? "Client created and attachments uploaded." : "Client created successfully.");
     }
     navigate("/clients/list");
   }
@@ -183,7 +266,7 @@ export default function AddClient() {
           {tab === 4 && <div className="grid gap-4 md:grid-cols-2"><Field label="Select existing group" field="client-group"><select className="input" value={form.group} onChange={(e) => update("group", e.target.value)}><option value="">No group</option>{state.groups.map((g) => <option key={g.id} value={g._id}>{g.name}</option>)}</select></Field><Field label="Create new group"><div className="flex gap-2"><input id="client-new-group" name="clientNewGroup" className="input" value={form.newGroup} onChange={(e) => update("newGroup", e.target.value)} /><Button onClick={async () => { if (form.newGroup) { const g = await groupService.create({ name: form.newGroup }); dispatch({ type: "SET_RESOURCE", resource: "groups", payload: [...state.groups, { ...g, id: g._id }] }); update("group", g._id); } }}>Create</Button></div></Field><div className="rounded-xl bg-purple-50 p-4 font-bold text-[#7c3aed] md:col-span-2">Current group: {state.groups.find((g) => g._id === form.group)?.name || "Ungrouped"} {form.group && <button onClick={() => update("group", "")} className="ml-3 text-[#dc2626]">Ungroup</button>}</div></div>}
           {tab === 5 && <Repeat title="Portal" items={portals} setItems={setPortals} blank={{ name: "", url: "", username: "", password: "", notes: "" }} render={(p, i, patch) => <div className="grid gap-3 md:grid-cols-2"><Field label="Portal Name" field={`portal-name-${i}`}><input className="input" value={p.name} onChange={(e) => patch(i, { name: e.target.value })} /></Field><Field label="URL" field={`portal-url-${i}`}><input className="input" value={p.url} onChange={(e) => patch(i, { url: e.target.value })} /></Field><Field label="Username/TRN" field={`portal-username-${i}`}><input className="input" value={p.username} onChange={(e) => patch(i, { username: e.target.value })} /></Field><Field label="Password" field={`portal-password-${i}`}><input className="input" type="password" value={p.password} onChange={(e) => patch(i, { password: e.target.value })} /></Field><Field label="Notes" field={`portal-notes-${i}`}><textarea className="input textarea" value={p.notes} onChange={(e) => patch(i, { notes: e.target.value })} /></Field></div>} />}
           {tab === 6 && <div className="grid gap-3 md:grid-cols-2"><Field label="QRMP Preference" field="client-qrmp"><input className="input" value={form.qrmp} onChange={(e) => update("qrmp", e.target.value)} /></Field><Field label="Audit Firm Name" field="client-audit-firm"><input className="input" value={form.auditFirm} onChange={(e) => update("auditFirm", e.target.value)} /></Field><Field label="Bank Name" field="client-bank"><input className="input" value={form.bank} onChange={(e) => update("bank", e.target.value)} /></Field><Field label="IBAN" field="client-iban"><input className="input" value={form.iban} onChange={(e) => update("iban", e.target.value)} /></Field><div className="rounded-xl bg-slate-50 p-3 text-[12px] font-semibold text-slate-500 md:col-span-2">You can add custom fields from Settings</div></div>}
-          {tab === 7 && <div className="space-y-3"><div className="upload-zone"><UploadCloud />Upload button + drag-and-drop zone</div><div className="overflow-x-auto"><table className="table min-w-max"><thead><tr><th>Name</th><th>Size</th><th>Type</th><th>Description</th><th>Uploaded On</th><th>Uploaded By</th><th>Actions</th></tr></thead><tbody>{attachments.map((a) => <tr key={a.name}><td>{a.name}</td><td>{a.size}</td><td>{a.type}</td><td>{a.description}</td><td>{a.uploadedOn}</td><td>{a.uploadedBy}</td><td><Button size="sm" variant="ghost">Download</Button> <Button size="sm" variant="danger" onClick={() => setAttachments(attachments.filter((x) => x.name !== a.name))}>Delete</Button></td></tr>)}</tbody></table></div></div>}
+          {tab === 7 && <div className="space-y-3"><AttachmentUploadZone onFiles={uploadFiles} isUploading={isUploading} /><div className="overflow-x-auto"><table className="table min-w-max"><thead><tr><th>Name</th><th>Size</th><th>Type</th><th>Description</th><th>Uploaded On</th><th>Uploaded By</th><th>Actions</th></tr></thead><tbody>{attachments.length === 0 && <tr><td colSpan={7} className="text-center text-slate-500">No attachments uploaded yet.</td></tr>}{attachments.map((a) => <tr key={a.id || a.name}><td>{a.name}</td><td>{a.size}</td><td>{a.type}</td><td>{a.description || "-"}</td><td>{a.uploadedOn}</td><td>{a.uploadedBy}</td><td><Button size="sm" variant="ghost" disabled={!a.url} onClick={() => a.url && window.open(a.url, "_blank", "noopener,noreferrer")}>Download</Button> <Button size="sm" variant="danger" onClick={() => removeAttachment(a)}>Delete</Button></td></tr>)}</tbody></table></div></div>}
         </div>
         <div className="flex flex-col gap-3 border-t border-[#e2e8f0] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
           <Button variant="ghost" onClick={goPrevious} disabled={isFirstTab}>Previous</Button>
@@ -194,6 +277,38 @@ export default function AddClient() {
         </div>
       </Card>
     </div>
+  );
+}
+
+function AttachmentUploadZone({ onFiles, isUploading }) {
+  const inputId = "client-attachment-upload";
+  const handleDrop = (event) => {
+    event.preventDefault();
+    onFiles(event.dataTransfer.files);
+  };
+  return (
+    <label
+      className={`upload-zone cursor-pointer transition hover:bg-slate-100 ${isUploading ? "pointer-events-none opacity-70" : ""}`}
+      htmlFor={inputId}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={handleDrop}
+    >
+      <UploadCloud className="mb-2 text-[#1e3a8a]" size={28} />
+      <div className="text-[15px] font-extrabold text-slate-800">{isUploading ? "Uploading..." : "Upload attachments"}</div>
+      <div className="mt-1 text-[12px] font-semibold text-slate-500">Browse or drag and drop PDF, JPG, PNG, DOCX, or XLSX files</div>
+      <input
+        id={inputId}
+        name="clientAttachmentUpload"
+        className="hidden"
+        type="file"
+        multiple
+        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+        onChange={(event) => {
+          onFiles(event.target.files);
+          event.target.value = "";
+        }}
+      />
+    </label>
   );
 }
 
