@@ -1,33 +1,61 @@
 import { Mail, Phone, Search, UserRoundPlus } from "lucide-react";
-import { cloneElement, isValidElement, useMemo, useState } from "react";
+import { cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import { useApp } from "../../context/AppContext.jsx";
+import { useClients } from "../../hooks/useClients";
+import { contactService } from "../../services/contactService";
 import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import Table from "../ui/Table.jsx";
 
-const dummyContacts = [
-  { id: "C001", name: "Ayesha Khan", client: "Petra Construction Co.", role: "Finance Manager", mobile: "0501234567", email: "ayesha@petra.example", type: "Client Contact", city: "Dubai" },
-  { id: "C002", name: "Rahul Mehta", client: "Nova Tech DMCC", role: "Director", mobile: "0559876543", email: "rahul@novatech.example", type: "Owner", city: "Dubai" },
-  { id: "C003", name: "Maryam Al Nuaimi", client: "Gulf Star Logistics", role: "Accounts Lead", mobile: "0524567890", email: "maryam@gulfstar.example", type: "Client Contact", city: "Sharjah" },
-  { id: "C004", name: "Omar Siddiqui", client: "Zenith Digital FZ LLC", role: "Tax Coordinator", mobile: "0581122334", email: "omar@zenith.example", type: "Tax Contact", city: "Abu Dhabi" },
-  { id: "C005", name: "Neha Thomas", client: "Al Baraka Trading LLC", role: "Operations Head", mobile: "0567788990", email: "neha@albaraka.example", type: "Authorized Person", city: "Dubai" },
-  { id: "C006", name: "Hamad Al Farsi", client: "Internal", role: "FTA Liaison", mobile: "0543344556", email: "hamad@filingbuddy.example", type: "Internal", city: "Dubai" },
-];
+const blankContact = { name: "", clientId: "", role: "", mobile: "", email: "", type: "Client Contact", city: "" };
 
-const blankContact = { name: "", client: "", role: "", mobile: "", email: "", type: "Client Contact", city: "" };
+function toContactRows(contacts) {
+  return (contacts || []).map((contact) => ({
+    id: contact._id,
+    clientId: contact.client?._id || contact.client,
+    client: contact.client?.legalName || "Unknown Client",
+    name: contact.fullName || "Unnamed Contact",
+    role: contact.designation || "Contact",
+    mobile: [contact.mobile?.countryCode, contact.mobile?.number].filter(Boolean).join(" ").trim(),
+    email: contact.email || "",
+    type: contact.isPrimary ? "Primary Contact" : (contact.type || "Client Contact"),
+    city: contact.city || contact.client?.registeredAddress?.emirate || "-",
+  }));
+}
 
 export default function Contacts() {
+  const { state } = useApp();
+  const { fetchClients } = useClients();
   const [query, setQuery] = useState("");
-  const [contactList, setContactList] = useState(dummyContacts);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(blankContact);
+  const [saving, setSaving] = useState(false);
+  const [contactsData, setContactsData] = useState([]);
+
+  useEffect(() => {
+    fetchClients({ limit: 100 }).catch(() => {
+      toast.error("Unable to load contact directory.");
+    });
+    loadContacts();
+  }, []);
+
+  async function loadContacts() {
+    try {
+      setContactsData(await contactService.list());
+    } catch {
+      toast.error("Unable to load contact directory.");
+    }
+  }
+
+  const contactList = useMemo(() => toContactRows(contactsData), [contactsData]);
   const contacts = useMemo(() => {
     const term = query.trim().toLowerCase();
     if (!term) return contactList;
     return contactList.filter((contact) =>
       [contact.name, contact.client, contact.role, contact.mobile, contact.email, contact.type, contact.city].some((value) =>
-        value.toLowerCase().includes(term)
+        String(value || "").toLowerCase().includes(term)
       )
     );
   }, [contactList, query]);
@@ -35,28 +63,45 @@ export default function Contacts() {
   const internalContacts = contacts.filter((contact) => contact.client === "Internal").length;
 
   function closeModal() {
+    if (saving) return;
     setModalOpen(false);
     setForm(blankContact);
   }
 
-  function saveContact() {
-    if (!form.name.trim() || !form.mobile.trim()) {
-      toast.error("Name and mobile are required.");
+  async function saveContact() {
+    if (saving) return;
+    if (!form.name.trim() || !form.mobile.trim() || !form.clientId) {
+      toast.error("Client, name and mobile are required.");
       return;
     }
-    const contact = {
-      ...form,
-      id: `C${String(contactList.length + 1).padStart(3, "0")}`,
-      name: form.name.trim(),
-      client: form.client.trim() || "Individual",
-      role: form.role.trim() || "Contact",
-      mobile: form.mobile.trim(),
-      email: form.email.trim(),
-      city: form.city.trim() || "-",
-    };
-    setContactList((current) => [contact, ...current]);
-    toast.success("Contact added.");
-    closeModal();
+    const client = state.clients.find((item) => item._id === form.clientId || item.id === form.clientId);
+    if (!client) {
+      toast.error("Please select a valid client.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await contactService.create({
+        fullName: form.name.trim(),
+        client: client._id || client.id,
+        designation: form.role.trim(),
+        email: form.email.trim(),
+        mobile: {
+          countryCode: "+971",
+          number: form.mobile.trim().replace(/\D+/g, ""),
+        },
+        type: form.type,
+        city: form.city.trim() || client.registeredAddress?.emirate || "",
+        isPrimary: form.type === "Primary Contact",
+      });
+      await loadContacts();
+      toast.success("Contact saved to directory.");
+      closeModal();
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Unable to save contact.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -112,11 +157,16 @@ export default function Contacts() {
                 <td>{contact.client}</td>
                 <td>{contact.role}</td>
                 <td><Badge color={contact.type === "Internal" ? "bg-blue-50 text-[#1e3a8a]" : "bg-emerald-50 text-[#059669]"}>{contact.type}</Badge></td>
-                <td><span className="inline-flex items-center gap-1"><Phone size={13} />{contact.mobile}</span></td>
-                <td><span className="inline-flex items-center gap-1"><Mail size={13} />{contact.email}</span></td>
+                <td><span className="inline-flex items-center gap-1"><Phone size={13} />{contact.mobile || "-"}</span></td>
+                <td><span className="inline-flex items-center gap-1"><Mail size={13} />{contact.email || "-"}</span></td>
                 <td>{contact.city}</td>
               </tr>
             ))}
+            {contacts.length === 0 && (
+              <tr>
+                <td colSpan="7" className="py-8 text-center text-[13px] font-semibold text-slate-500">No stored contacts found yet.</td>
+              </tr>
+            )}
           </tbody>
         </Table>
       </Card>
@@ -126,28 +176,32 @@ export default function Contacts() {
           <Card className="w-full max-w-lg p-4">
             <div className="mb-4 flex items-center justify-between">
               <div className="text-[16px] font-extrabold">Add Contact</div>
-              <button onClick={closeModal} className="text-slate-500 hover:text-slate-700">Close</button>
+              <button onClick={closeModal} disabled={saving} className="text-slate-500 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">Close</button>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
+              <Field label="Client / Company*" field="contact-client">
+                <select className="input" value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })}>
+                  <option value="">Select client</option>
+                  {state.clients.map((client) => (
+                    <option key={client._id || client.id} value={client._id || client.id}>{client.legalName || client.name}</option>
+                  ))}
+                </select>
+              </Field>
               <Field label="Name*" field="contact-name"><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-              <Field label="Mobile*" field="contact-mobile"><input className="input" value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value })} /></Field>
-              <Field label="Client / Company" field="contact-client"><input className="input" value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} /></Field>
+              <Field label="Mobile*" field="contact-mobile"><input className="input" value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value.replace(/[^\d+\s-]/g, "") })} /></Field>
               <Field label="Role" field="contact-role"><input className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} /></Field>
               <Field label="Email" field="contact-email"><input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
               <Field label="Location" field="contact-city"><input className="input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></Field>
               <Field label="Type" field="contact-type">
                 <select className="input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
                   <option>Client Contact</option>
-                  <option>Owner</option>
-                  <option>Tax Contact</option>
-                  <option>Authorized Person</option>
-                  <option>Internal</option>
+                  <option>Primary Contact</option>
                 </select>
               </Field>
             </div>
             <div className="mt-4 flex justify-end gap-2">
-              <Button variant="ghost" onClick={closeModal}>Cancel</Button>
-              <Button onClick={saveContact}>Save Contact</Button>
+              <Button variant="ghost" onClick={closeModal} disabled={saving}>Cancel</Button>
+              <Button onClick={saveContact} disabled={saving}>{saving ? "Saving..." : "Save Contact"}</Button>
             </div>
           </Card>
         </div>
