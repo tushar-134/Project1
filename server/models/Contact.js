@@ -6,7 +6,7 @@ const contactSchema = new mongoose.Schema({
   designation: { type: String, trim: true },
   email: { type: String, trim: true, lowercase: true },
   mobile: {
-    countryCode: { type: String, default: "+971" },
+    countryCode: { type: String, required: true, trim: true },
     number: { type: String, required: true, trim: true },
   },
   type: { type: String, default: "Client Contact" },

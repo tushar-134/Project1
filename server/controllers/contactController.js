@@ -3,6 +3,14 @@ const Contact = require("../models/Contact");
 
 const populateContact = [{ path: "client", select: "legalName registeredAddress" }, { path: "createdBy", select: "name" }];
 
+function normalizeCountryCode(value) {
+  const trimmed = String(value || "").trim();
+  if (!trimmed) return "";
+  const withPlus = trimmed.startsWith("+") ? trimmed : `+${trimmed}`;
+  const cleaned = `+${withPlus.replace(/[^\d]/g, "")}`;
+  return cleaned === "+" ? "" : cleaned;
+}
+
 exports.listContacts = async (req, res, next) => {
   try {
     const { search, client } = req.query;
@@ -31,7 +39,7 @@ exports.createContact = async (req, res, next) => {
       ...req.body,
       email: String(req.body.email || "").trim().toLowerCase(),
       mobile: {
-        countryCode: req.body.mobile?.countryCode || "+971",
+        countryCode: normalizeCountryCode(req.body.mobile?.countryCode),
         number: String(req.body.mobile?.number || "").replace(/\D+/g, ""),
       },
       createdBy: req.user._id,
@@ -47,8 +55,9 @@ exports.updateContact = async (req, res, next) => {
     const ALLOWED = ["fullName", "client", "designation", "email", "type", "city", "isPrimary"];
     ALLOWED.forEach((key) => { if (key in req.body) contact[key] = req.body[key]; });
     if ("mobile" in req.body) {
+      const nextCountryCode = normalizeCountryCode(req.body.mobile?.countryCode);
       contact.mobile = {
-        countryCode: req.body.mobile?.countryCode || "+971",
+        countryCode: nextCountryCode || contact.mobile?.countryCode || "",
         number: String(req.body.mobile?.number || "").replace(/\D+/g, ""),
       };
     }

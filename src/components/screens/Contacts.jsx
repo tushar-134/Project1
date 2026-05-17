@@ -9,7 +9,26 @@ import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import Table from "../ui/Table.jsx";
 
-const blankContact = { name: "", clientId: "", role: "", mobile: "", email: "", type: "Client Contact", city: "" };
+const DIAL_CODE_OPTIONS = [
+  { label: "United Arab Emirates (+971)", value: "+971" },
+  { label: "India (+91)", value: "+91" },
+  { label: "United States / Canada (+1)", value: "+1" },
+  { label: "United Kingdom (+44)", value: "+44" },
+  { label: "Saudi Arabia (+966)", value: "+966" },
+  { label: "Qatar (+974)", value: "+974" },
+  { label: "Oman (+968)", value: "+968" },
+  { label: "Kuwait (+965)", value: "+965" },
+  { label: "Bahrain (+973)", value: "+973" },
+  { label: "Pakistan (+92)", value: "+92" },
+  { label: "Bangladesh (+880)", value: "+880" },
+  { label: "Sri Lanka (+94)", value: "+94" },
+  { label: "Philippines (+63)", value: "+63" },
+  { label: "Singapore (+65)", value: "+65" },
+  { label: "Australia (+61)", value: "+61" },
+  { label: "South Africa (+27)", value: "+27" },
+];
+
+const blankContact = { name: "", clientId: "", role: "", countryCode: "", mobile: "", email: "", type: "Client Contact", city: "" };
 
 function toContactRows(contacts) {
   return (contacts || []).map((contact) => ({
@@ -70,8 +89,8 @@ export default function Contacts() {
 
   async function saveContact() {
     if (saving) return;
-    if (!form.name.trim() || !form.mobile.trim() || !form.clientId) {
-      toast.error("Client, name and mobile are required.");
+    if (!form.name.trim() || !form.mobile.trim() || !form.clientId || !form.countryCode.trim()) {
+      toast.error("Client, name, country code and mobile are required.");
       return;
     }
     const client = state.clients.find((item) => item._id === form.clientId || item.id === form.clientId);
@@ -87,7 +106,7 @@ export default function Contacts() {
         designation: form.role.trim(),
         email: form.email.trim(),
         mobile: {
-          countryCode: "+971",
+          countryCode: form.countryCode.trim(),
           number: form.mobile.trim().replace(/\D+/g, ""),
         },
         type: form.type,
@@ -188,7 +207,26 @@ export default function Contacts() {
                 </select>
               </Field>
               <Field label="Name*" field="contact-name"><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-              <Field label="Mobile*" field="contact-mobile"><input className="input" value={form.mobile} onChange={(e) => setForm({ ...form, mobile: e.target.value.replace(/[^\d+\s-]/g, "") })} /></Field>
+              <Field label="Mobile*" field="contact-mobile">
+                <div className="flex gap-2">
+                  <select
+                    className="input w-44"
+                    value={form.countryCode}
+                    onChange={(e) => setForm({ ...form, countryCode: e.target.value })}
+                  >
+                    <option value="">Code</option>
+                    {DIAL_CODE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                  <input
+                    className="input"
+                    value={form.mobile}
+                    onChange={(e) => setForm({ ...form, mobile: e.target.value.replace(/[^\d+\s-]/g, "") })}
+                    placeholder="Phone number"
+                  />
+                </div>
+              </Field>
               <Field label="Role" field="contact-role"><input className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} /></Field>
               <Field label="Email" field="contact-email"><input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
               <Field label="Location" field="contact-city"><input className="input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></Field>

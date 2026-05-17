@@ -6,6 +6,8 @@ dist/
 vite.log
 *.log
 
+.npm-cache/
+
 server/node_modules/
 server/.env
 server/server.log

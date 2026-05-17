@@ -13,6 +13,7 @@ router.post(
   adminManager,
   body("fullName").notEmpty(),
   body("client").notEmpty(),
+  body("mobile.countryCode").notEmpty(),
   body("mobile.number").notEmpty(),
   ctrl.createContact
 );
