@@ -22,6 +22,7 @@ export default function AddTask() {
   const { createTask, getTask, updateTask } = useTasks();
   const [step, setStep] = useState(1);
   const [categoryId, setCategoryId] = useState("vat");
+  const [categoryName, setCategoryName] = useState("VAT");
   const category = state.categories.find((cat) => cat.id === categoryId);
   const [type, setType] = useState("VAT Return");
   const [recurring, setRecurring] = useState(false);
@@ -54,6 +55,7 @@ export default function AddTask() {
       };
       const nextCategoryId = categoryMap[task.category] || String(task.category || "").toLowerCase();
       setCategoryId(nextCategoryId);
+      setCategoryName(task.category || "VAT");
       setType(task.taskType || "");
       setRecurring(Boolean(task.isRecurring));
       setFta(Boolean(task.isAwaitingFta));
@@ -75,9 +77,17 @@ export default function AddTask() {
     });
   }, [id, isEditMode]);
 
+  useEffect(() => {
+    if (!state.categories.length || !categoryName) return;
+    const resolved = state.categories.find((cat) => cat.id === categoryId)
+      || state.categories.find((cat) => cat.name === categoryName);
+    if (resolved && resolved.id !== categoryId) setCategoryId(resolved.id);
+  }, [state.categories, categoryId, categoryName]);
+
   function selectCategory(id) {
     const next = state.categories.find((cat) => cat.id === id);
     setCategoryId(id);
+    setCategoryName(next?.name || categoryName);
     setType(next.taskTypes[0] || "");
     setStep(2);
   }
@@ -91,8 +101,15 @@ export default function AddTask() {
       return;
     }
     try {
+      const resolvedCategory = state.categories.find((cat) => cat.id === categoryId)
+        || state.categories.find((cat) => cat.name === categoryName);
+      if (!resolvedCategory) {
+        toast.error("Please choose the task category again before saving.");
+        setStep(1);
+        return;
+      }
       const payload = {
-        category: category.name,
+        category: resolvedCategory.name,
         taskType: type,
         client: details.client,
         assignedTo: details.assigned || undefined,
@@ -113,7 +130,7 @@ export default function AddTask() {
       navigate("/tasks/list");
     } catch (error) {
       const fallback = isEditMode ? "Unable to save task right now." : "Unable to create task right now.";
-      const message = error?.response?.data?.errors?.[0]?.msg || error?.response?.data?.message || fallback;
+      const message = error?.response?.data?.errors?.[0]?.msg || error?.response?.data?.message || error?.message || fallback;
       toast.error(message);
     }
   }
