@@ -115,12 +115,16 @@ exports.uploadAttachment = async (req, res, next) => {
   try {
     const client = await Client.findById(req.params.id);
     if (!client) return res.status(404).json({ message: "Client not found" });
+    if (!req.file) return res.status(400).json({ message: "Please choose a file to upload" });
+    const fileUrl = req.file.path?.startsWith?.("http")
+      ? req.file.path
+      : `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
     client.attachments.push({
       name: req.file.originalname,
       size: `${Math.round(req.file.size / 1024)} KB`,
       fileType: req.file.mimetype,
       description: req.body.description,
-      url: req.file.path,
+      url: fileUrl,
       uploadedBy: req.user._id,
     });
     await client.save();

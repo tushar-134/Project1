@@ -10,6 +10,7 @@ server/node_modules/
 server/.env
 server/server.log
 server/*.log
+server/uploads/
 
 .DS_Store
 Thumbs.db
