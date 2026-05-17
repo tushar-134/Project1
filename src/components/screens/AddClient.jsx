@@ -17,7 +17,7 @@ export default function AddClient() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditMode = Boolean(id);
-  const { createClient, getClient, updateClient, uploadAttachment, deleteAttachment } = useClients();
+  const { createClient, getClient, updateClient, uploadAttachment, uploadDocument, deleteAttachment } = useClients();
   const { fetchUsers } = useUsers();
   const [tab, setTab] = useState(0);
   const countries = useMemo(() => {
@@ -37,7 +37,7 @@ export default function AddClient() {
     vatTrn: "", vatStatus: "Registered", vatDate: "", vatFreq: "Quarterly", ctTin: "", ctStatus: "Not Registered", ctDate: "", group: "", newGroup: "",
     qrmp: "Email", auditFirm: "", bank: "", iban: "",
   });
-  const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "Dubai Economy", type: "Commercial", email: "" }]);
+  const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "Dubai Economy", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null }]);
   const [contacts, setContacts] = useState([{ name: "", designation: "", email: "", code: "+971", mobile: "", whatsapp: "", alternate: "", primary: true, eid: "", passport: "", issuingCountry: "United Arab Emirates" }]);
   const [portals, setPortals] = useState([{ name: "EmaraTax", url: "https://tax.gov.ae", username: "", password: "", notes: "" }]);
   const [attachments, setAttachments] = useState([]);
@@ -93,7 +93,10 @@ export default function AddClient() {
         authority: licence.issuingAuthority || "",
         type: licence.licenceType ? `${licence.licenceType[0].toUpperCase()}${licence.licenceType.slice(1)}` : "",
         email: licence.officialEmail || "",
-      })) : [{ number: "", issue: "", expiry: "", authority: "Dubai Economy", type: "Commercial", email: "" }]);
+        documentUrl: licence.documentUrl || "",
+        documentName: licence.documentUrl ? licence.documentUrl.split("/").pop() : "",
+        documentFile: null,
+      })) : [{ number: "", issue: "", expiry: "", authority: "Dubai Economy", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null }]);
       setContacts((client.contactPersons || []).length ? client.contactPersons.map((person) => ({
         name: person.fullName || "",
         designation: person.designation || "",
@@ -147,6 +150,46 @@ export default function AddClient() {
     url: attachment.url,
     saved: true,
   }));
+
+  const patchLicence = (index, values) => {
+    setLicences((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...values } : item));
+  };
+
+  async function uploadTradeLicenceFile(clientId, licenceIndex, file) {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("section", "tradeLicences");
+    formData.append("index", String(licenceIndex));
+    formData.append("description", `Trade Licence ${licenceIndex + 1} document`);
+    const updatedClient = await uploadDocument(clientId, formData);
+    const uploadedLicence = updatedClient.tradeLicences?.[licenceIndex];
+    patchLicence(licenceIndex, {
+      documentUrl: uploadedLicence?.documentUrl || "",
+      documentName: file.name,
+      documentFile: null,
+    });
+    if (updatedClient.attachments) setAttachments(mapSavedAttachments(updatedClient.attachments));
+  }
+
+  async function handleTradeLicenceFile(licenceIndex, files) {
+    const file = files?.[0];
+    if (!file) return;
+    patchLicence(licenceIndex, { documentName: file.name, documentFile: isEditMode ? null : file });
+    if (!isEditMode) {
+      toast.success("Trade licence file added. Save the client to upload it.");
+      return;
+    }
+    setIsUploading(true);
+    try {
+      await uploadTradeLicenceFile(id, licenceIndex, file);
+      toast.success("Trade licence document uploaded.");
+    } catch (error) {
+      patchLicence(licenceIndex, { documentFile: null });
+      toast.error(error.response?.data?.message || "Trade licence upload failed.");
+    } finally {
+      setIsUploading(false);
+    }
+  }
 
   async function uploadFiles(files) {
     const selected = Array.from(files || []);
@@ -227,11 +270,24 @@ export default function AddClient() {
       customFields: { qrmpPreference: form.qrmp, auditFirmName: form.auditFirm, bankName: form.bank, iban: form.iban },
     };
     const pendingAttachments = attachments.filter((attachment) => !attachment.saved && attachment.file);
+    const pendingLicenceDocuments = licences
+      .map((licence, index) => ({ index, file: licence.documentFile }))
+      .filter((item) => item.file);
     if (isEditMode) {
       await updateClient(id, payload);
+      if (pendingLicenceDocuments.length) {
+        for (const licenceDocument of pendingLicenceDocuments) {
+          await uploadTradeLicenceFile(id, licenceDocument.index, licenceDocument.file);
+        }
+      }
       toast.success("Client updated successfully.");
     } else {
       const created = await createClient(payload);
+      if (pendingLicenceDocuments.length) {
+        for (const licenceDocument of pendingLicenceDocuments) {
+          await uploadTradeLicenceFile(created._id, licenceDocument.index, licenceDocument.file);
+        }
+      }
       if (pendingAttachments.length) {
         for (const attachment of pendingAttachments) {
           const formData = new FormData();
@@ -240,7 +296,7 @@ export default function AddClient() {
           await uploadAttachment(created._id, formData);
         }
       }
-      toast.success(pendingAttachments.length ? "Client created and attachments uploaded." : "Client created successfully.");
+      toast.success(pendingAttachments.length || pendingLicenceDocuments.length ? "Client created and documents uploaded." : "Client created successfully.");
     }
     navigate("/clients/list");
   }
@@ -260,7 +316,7 @@ export default function AddClient() {
         <div className="flex overflow-x-auto border-b border-[#e2e8f0] bg-slate-50 p-2">{tabs.map((t, i) => <button key={t} onClick={() => setTab(i)} className={`mr-1 whitespace-nowrap rounded-lg px-3 py-2 text-[12px] font-extrabold ${tab === i ? "bg-[#1e3a8a] text-white" : "text-slate-600 hover:bg-white"}`}>{t}</button>)}</div>
         <div className="p-4">
           {tab === 0 && <Basic form={form} update={update} countries={countries} />}
-          {tab === 1 && <Repeat title="Trade Licence" items={licences} setItems={setLicences} blank={{ number: "", issue: "", expiry: "", authority: "", type: "", email: "" }} render={(lic, i, patch) => <div className="grid gap-3 md:grid-cols-3"><Field label="Licence Number*" field={`licence-number-${i}`}><input className="input" value={lic.number} onChange={(e) => patch(i, { number: e.target.value })} /></Field><Field label="Issue Date" field={`licence-issue-${i}`}><input className="input" type="date" value={lic.issue} onChange={(e) => patch(i, { issue: e.target.value })} /></Field><Field label="Expiry Date" field={`licence-expiry-${i}`}><input className="input" type="date" value={lic.expiry} onChange={(e) => patch(i, { expiry: e.target.value })} /></Field><Field label="Issuing Authority" field={`licence-authority-${i}`}><input className="input" value={lic.authority} onChange={(e) => patch(i, { authority: e.target.value })} /></Field><Field label="Licence Type" field={`licence-type-${i}`}><input className="input" value={lic.type} onChange={(e) => patch(i, { type: e.target.value })} /></Field><Field label="Official Email" field={`licence-email-${i}`}><input className="input" value={lic.email} onChange={(e) => patch(i, { email: e.target.value })} /></Field><div className="upload-zone md:col-span-3"><UploadCloud />PDF/JPG/PNG upload area</div></div>} />}
+          {tab === 1 && <Repeat title="Trade Licence" items={licences} setItems={setLicences} blank={{ number: "", issue: "", expiry: "", authority: "", type: "", email: "", documentUrl: "", documentName: "", documentFile: null }} render={(lic, i, patch) => <div className="grid gap-3 md:grid-cols-3"><Field label="Licence Number*" field={`licence-number-${i}`}><input className="input" value={lic.number} onChange={(e) => patch(i, { number: e.target.value })} /></Field><Field label="Issue Date" field={`licence-issue-${i}`}><input className="input" type="date" value={lic.issue} onChange={(e) => patch(i, { issue: e.target.value })} /></Field><Field label="Expiry Date" field={`licence-expiry-${i}`}><input className="input" type="date" value={lic.expiry} onChange={(e) => patch(i, { expiry: e.target.value })} /></Field><Field label="Issuing Authority" field={`licence-authority-${i}`}><input className="input" value={lic.authority} onChange={(e) => patch(i, { authority: e.target.value })} /></Field><Field label="Licence Type" field={`licence-type-${i}`}><input className="input" value={lic.type} onChange={(e) => patch(i, { type: e.target.value })} /></Field><Field label="Official Email" field={`licence-email-${i}`}><input className="input" value={lic.email} onChange={(e) => patch(i, { email: e.target.value })} /></Field><div className="md:col-span-3"><DocumentUploadZone id={`trade-licence-upload-${i}`} title="Upload trade licence" subtitle="PDF, JPG, PNG, DOCX, XLSX" fileName={lic.documentName} documentUrl={lic.documentUrl} isUploading={isUploading} onFiles={(files) => handleTradeLicenceFile(i, files)} /></div></div>} />}
           {tab === 2 && <Repeat title="Contact Person" items={contacts} setItems={setContacts} blank={{ name: "", designation: "", email: "", code: "+971", mobile: "", whatsapp: "", alternate: "", primary: false, eid: "", passport: "", issuingCountry: "United Arab Emirates" }} render={(c, i, patch) => <div className="grid gap-3 md:grid-cols-3"><Field label="Full Name*" field={`contact-name-${i}`}><input className="input" value={c.name} onChange={(e) => patch(i, { name: e.target.value })} /></Field><Field label="Designation" field={`contact-designation-${i}`}><input className="input" value={c.designation} onChange={(e) => patch(i, { designation: e.target.value })} /></Field><Field label="Email" field={`contact-email-${i}`}><input className="input" value={c.email} onChange={(e) => patch(i, { email: e.target.value })} /></Field><Field label="Mobile"><div className="flex gap-2"><input id={`contact-code-${i}`} name={`contactCode${i}`} className="input w-20" value={c.code} onChange={(e) => patch(i, { code: e.target.value })} /><input id={`contact-mobile-${i}`} name={`contactMobile${i}`} className="input" value={c.mobile} onChange={(e) => patch(i, { mobile: e.target.value })} /></div></Field><Field label="WhatsApp" field={`contact-whatsapp-${i}`}><input className="input" value={c.whatsapp} onChange={(e) => patch(i, { whatsapp: e.target.value })} /></Field><Field label="Alternate Email" field={`contact-alternate-${i}`}><input className="input" value={c.alternate} onChange={(e) => patch(i, { alternate: e.target.value })} /></Field><label className="flex items-center gap-2 font-bold" htmlFor={`contact-primary-${i}`}><input id={`contact-primary-${i}`} name={`contactPrimary${i}`} type="checkbox" checked={c.primary} onChange={(e) => patch(i, { primary: e.target.checked })} /> Primary Contact</label><Field label="Emirates ID Number" field={`contact-eid-${i}`}><input className="input" value={c.eid} onChange={(e) => patch(i, { eid: e.target.value })} /></Field><Field label="Passport Number" field={`contact-passport-${i}`}><input className="input" value={c.passport} onChange={(e) => patch(i, { passport: e.target.value })} /></Field><div className="upload-zone md:col-span-3">Emirates ID front/back and passport upload</div></div>} />}
           {tab === 3 && <div className="grid gap-3 md:grid-cols-2"><Field label="VAT Registration Status" field="client-vat-status"><select className="input" value={form.vatStatus} onChange={(e) => update("vatStatus", e.target.value)}><option>Registered</option><option>Not Registered</option><option>Pending</option></select></Field><Field label="VAT TRN" field="client-vat-trn"><input className="input" value={form.vatTrn} onChange={(e) => update("vatTrn", e.target.value)} /></Field><Field label="VAT Registration Date" field="client-vat-date"><input className="input" type="date" value={form.vatDate} onChange={(e) => update("vatDate", e.target.value)} /></Field><Field label="VAT Filing Frequency" field="client-vat-frequency"><select className="input" value={form.vatFreq} onChange={(e) => update("vatFreq", e.target.value)}><option>Monthly</option><option>Quarterly</option></select></Field><Field label="CT Registration Number (TIN)" field="client-ct-tin"><input className="input" value={form.ctTin} onChange={(e) => update("ctTin", e.target.value)} /></Field><Field label="CT Registration Status" field="client-ct-status"><select className="input" value={form.ctStatus} onChange={(e) => update("ctStatus", e.target.value)}><option>Registered</option><option>Not Registered</option><option>Pending</option></select></Field><Field label="CT Registration Date" field="client-ct-date"><input className="input" type="date" value={form.ctDate} onChange={(e) => update("ctDate", e.target.value)} /></Field><Field label="Financial Year End" field="client-ct-fye"><input className="input" value={form.fye} onChange={(e) => update("fye", e.target.value)} /></Field></div>}
           {tab === 4 && <div className="grid gap-4 md:grid-cols-2"><Field label="Select existing group" field="client-group"><select className="input" value={form.group} onChange={(e) => update("group", e.target.value)}><option value="">No group</option>{state.groups.map((g) => <option key={g.id} value={g._id}>{g.name}</option>)}</select></Field><Field label="Create new group"><div className="flex gap-2"><input id="client-new-group" name="clientNewGroup" className="input" value={form.newGroup} onChange={(e) => update("newGroup", e.target.value)} /><Button onClick={async () => { if (form.newGroup) { const g = await groupService.create({ name: form.newGroup }); dispatch({ type: "SET_RESOURCE", resource: "groups", payload: [...state.groups, { ...g, id: g._id }] }); update("group", g._id); } }}>Create</Button></div></Field><div className="rounded-xl bg-purple-50 p-4 font-bold text-[#7c3aed] md:col-span-2">Current group: {state.groups.find((g) => g._id === form.group)?.name || "Ungrouped"} {form.group && <button onClick={() => update("group", "")} className="ml-3 text-[#dc2626]">Ungroup</button>}</div></div>}
@@ -302,6 +358,38 @@ function AttachmentUploadZone({ onFiles, isUploading }) {
         className="hidden"
         type="file"
         multiple
+        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+        onChange={(event) => {
+          onFiles(event.target.files);
+          event.target.value = "";
+        }}
+      />
+    </label>
+  );
+}
+
+function DocumentUploadZone({ id, title, subtitle, fileName, documentUrl, isUploading, onFiles }) {
+  const handleDrop = (event) => {
+    event.preventDefault();
+    onFiles(event.dataTransfer.files);
+  };
+  return (
+    <label
+      className={`upload-zone cursor-pointer transition hover:bg-slate-100 ${isUploading ? "pointer-events-none opacity-70" : ""}`}
+      htmlFor={id}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={handleDrop}
+    >
+      <UploadCloud className="mb-2 text-[#64748b]" size={28} />
+      <div className="text-[15px] font-extrabold text-slate-800">{isUploading ? "Uploading..." : title}</div>
+      <div className="mt-1 text-[12px] font-semibold text-slate-500">{subtitle}</div>
+      {fileName && <div className="mt-3 text-[13px] font-bold text-[#1e3a8a]">{fileName}</div>}
+      {documentUrl && <button type="button" className="mt-3 text-[12px] font-bold text-slate-600 underline" onClick={(event) => { event.preventDefault(); window.open(documentUrl, "_blank", "noopener,noreferrer"); }}>Open current file</button>}
+      <input
+        id={id}
+        name={id}
+        className="hidden"
+        type="file"
         accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
         onChange={(event) => {
           onFiles(event.target.files);

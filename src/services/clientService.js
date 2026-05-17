@@ -10,5 +10,6 @@ export const clientService = {
   bulkUpload: (rows) => api.post("/clients/bulk-upload", { rows }).then((res) => res.data),
   export: () => api.get("/clients/export", { responseType: "blob" }).then((res) => res.data),
   uploadAttachment: (id, formData) => api.post(`/clients/${id}/attachments`, formData).then((res) => res.data),
+  uploadDocument: (id, formData) => api.post(`/clients/${id}/documents`, formData).then((res) => res.data),
   deleteAttachment: (id, attachId) => api.delete(`/clients/${id}/attachments/${attachId}`).then((res) => res.data),
 };

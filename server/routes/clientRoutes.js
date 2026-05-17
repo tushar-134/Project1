@@ -16,6 +16,7 @@ router.get("/:id", ctrl.getClient);
 router.put("/:id", adminManager, ctrl.updateClient);
 router.delete("/:id", adminOnly, ctrl.deleteClient);
 // Bug #5 Fix: add adminManager guard so task_only users cannot upload attachments.
+router.post("/:id/documents", adminManager, upload.single("file"), ctrl.uploadClientDocument);
 router.post("/:id/attachments", adminManager, upload.single("file"), ctrl.uploadAttachment);
 router.delete("/:id/attachments/:attachId", adminManager, ctrl.deleteAttachment);
 

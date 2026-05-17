@@ -6,6 +6,18 @@ const ActivityLog = require("../models/ActivityLog");
 const { nextClientFileNo } = require("../utils/autoId");
 
 const populateClient = [{ path: "assignedUser", select: "name" }, { path: "group", select: "name" }, { path: "createdBy", select: "name" }];
+function buildUploadedFile(req) {
+  if (!req.file) return null;
+  const url = req.file.path?.startsWith?.("http")
+    ? req.file.path
+    : `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+  return {
+    name: req.file.originalname,
+    size: `${Math.round(req.file.size / 1024)} KB`,
+    fileType: req.file.mimetype,
+    url,
+  };
+}
 
 exports.listClients = async (req, res, next) => {
   try {
@@ -115,20 +127,58 @@ exports.uploadAttachment = async (req, res, next) => {
   try {
     const client = await Client.findById(req.params.id);
     if (!client) return res.status(404).json({ message: "Client not found" });
-    if (!req.file) return res.status(400).json({ message: "Please choose a file to upload" });
-    const fileUrl = req.file.path?.startsWith?.("http")
-      ? req.file.path
-      : `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+    const uploadedFile = buildUploadedFile(req);
+    if (!uploadedFile) return res.status(400).json({ message: "Please choose a file to upload" });
     client.attachments.push({
-      name: req.file.originalname,
-      size: `${Math.round(req.file.size / 1024)} KB`,
-      fileType: req.file.mimetype,
+      name: uploadedFile.name,
+      size: uploadedFile.size,
+      fileType: uploadedFile.fileType,
       description: req.body.description,
-      url: fileUrl,
+      url: uploadedFile.url,
       uploadedBy: req.user._id,
     });
     await client.save();
     res.status(201).json(client.attachments);
+  } catch (error) { next(error); }
+};
+
+exports.uploadClientDocument = async (req, res, next) => {
+  try {
+    const client = await Client.findById(req.params.id);
+    if (!client || !client.isActive) return res.status(404).json({ message: "Client not found" });
+    const uploadedFile = buildUploadedFile(req);
+    if (!uploadedFile) return res.status(400).json({ message: "Please choose a file to upload" });
+
+    const index = Number(req.body.index);
+    const section = req.body.section;
+    const description = req.body.description || "";
+    if (!Number.isInteger(index) || index < 0) return res.status(400).json({ message: "A valid document index is required" });
+
+    if (section === "tradeLicences") {
+      if (!client.tradeLicences[index]) return res.status(404).json({ message: "Trade licence not found" });
+      client.tradeLicences[index].documentUrl = uploadedFile.url;
+    } else if (section === "emiratesId") {
+      if (!client.contactPersons[index]) return res.status(404).json({ message: "Contact person not found" });
+      client.contactPersons[index].emiratesId = client.contactPersons[index].emiratesId || {};
+      client.contactPersons[index].emiratesId.documentUrl = uploadedFile.url;
+    } else if (section === "passport") {
+      if (!client.contactPersons[index]) return res.status(404).json({ message: "Contact person not found" });
+      client.contactPersons[index].passport = client.contactPersons[index].passport || {};
+      client.contactPersons[index].passport.documentUrl = uploadedFile.url;
+    } else {
+      return res.status(400).json({ message: "Unsupported document section" });
+    }
+
+    client.attachments.push({
+      name: uploadedFile.name,
+      size: uploadedFile.size,
+      fileType: uploadedFile.fileType,
+      description,
+      url: uploadedFile.url,
+      uploadedBy: req.user._id,
+    });
+    await client.save();
+    res.status(201).json(client);
   } catch (error) { next(error); }
 };
 

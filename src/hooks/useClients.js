@@ -26,6 +26,7 @@ export function useClients() {
     bulkUpload: clientService.bulkUpload,
     exportClients: clientService.export,
     uploadAttachment: clientService.uploadAttachment,
+    uploadDocument: clientService.uploadDocument,
     deleteAttachment: clientService.deleteAttachment,
   };
 }
