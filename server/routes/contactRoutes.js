@@ -13,8 +13,21 @@ router.post(
   adminManager,
   body("fullName").notEmpty(),
   body("client").notEmpty(),
-  body("mobile.countryCode").notEmpty(),
-  body("mobile.number").notEmpty(),
+  body("mobile.countryCode")
+    .customSanitizer((value) => {
+      const trimmed = String(value || "").trim();
+      if (!trimmed) return "";
+      const digits = trimmed.replace(/[^\d]/g, "");
+      return digits ? `+${digits}` : "";
+    })
+    .notEmpty()
+    .matches(/^\+\d{1,4}$/)
+    .withMessage("Country code must look like +971."),
+  body("mobile.number")
+    .customSanitizer((value) => String(value || "").replace(/\D+/g, ""))
+    .notEmpty()
+    .isLength({ min: 10, max: 10 })
+    .withMessage("Mobile number must be exactly 10 digits."),
   ctrl.createContact
 );
 router.put("/:id", adminManager, ctrl.updateContact);
