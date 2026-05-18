@@ -3,7 +3,7 @@ const User = require("../models/User");
 const generateToken = require("../utils/generateToken");
 
 function publicUser(user) {
-  return { id: user._id, name: user.name, email: user.email, role: user.role, mobile: user.mobile, isActive: user.isActive };
+  return { id: user._id, name: user.name, email: user.email, role: user.role, mobile: user.mobile, mobileCountryCode: user.mobileCountryCode, isActive: user.isActive };
 }
 
 exports.login = async (req, res, next) => {

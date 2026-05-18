@@ -3,6 +3,7 @@ const { body } = require("express-validator");
 const auth = require("../middleware/authMiddleware");
 const { adminManager } = require("../middleware/roleMiddleware");
 const ctrl = require("../controllers/contactController");
+const { getPhoneNumberSpec, normalizeDialCode, normalizePhoneNumber } = require("../utils/phoneUtils");
 
 const router = express.Router();
 
@@ -15,19 +16,22 @@ router.post(
   body("client").notEmpty(),
   body("mobile.countryCode")
     .customSanitizer((value) => {
-      const trimmed = String(value || "").trim();
-      if (!trimmed) return "";
-      const digits = trimmed.replace(/[^\d]/g, "");
-      return digits ? `+${digits}` : "";
+      return normalizeDialCode(value);
     })
     .notEmpty()
     .matches(/^\+\d{1,4}$/)
     .withMessage("Country code must look like +971."),
   body("mobile.number")
-    .customSanitizer((value) => String(value || "").replace(/\D+/g, ""))
+    .customSanitizer((value) => normalizePhoneNumber(value))
     .notEmpty()
-    .isLength({ min: 10, max: 10 })
-    .withMessage("Mobile number must be exactly 10 digits."),
+    .custom((value, { req }) => {
+      const digits = normalizePhoneNumber(value);
+      const { min } = getPhoneNumberSpec(req.body?.mobile?.countryCode);
+      if (digits.length !== min) {
+        throw new Error(`Mobile number must be exactly ${min} digits.`);
+      }
+      return true;
+    }),
   ctrl.createContact
 );
 router.put("/:id", adminManager, ctrl.updateContact);

@@ -7,47 +7,18 @@ import { useUsers } from "../../hooks/useUsers";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import Table from "../ui/Table.jsx";
+import { DIAL_CODE_OPTIONS } from "../../utils/dialCodeOptions.js";
+import { getPhoneNumberSpec, normalizeDialCode, normalizePhoneNumber } from "../../utils/phoneUtils.js";
 
 function normalizeUserField(value) {
   return String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 function normalizeMobile(value) {
-  return String(value || "").replace(/\D/g, "");
+  return normalizePhoneNumber(value);
 }
 
-const DEFAULT_COUNTRY_CODE = "+971";
-
-const COUNTRY_CODES = [
-  { value: "+971", label: "UAE / Abu Dhabi (+971)" },
-  { value: "+91", label: "India (+91)" },
-  { value: "+1", label: "USA / Canada (+1)" },
-  { value: "+44", label: "UK (+44)" },
-  { value: "+966", label: "Saudi Arabia (+966)" },
-  { value: "+974", label: "Qatar (+974)" },
-  { value: "+965", label: "Kuwait (+965)" },
-  { value: "+973", label: "Bahrain (+973)" },
-  { value: "+968", label: "Oman (+968)" },
-  { value: "+92", label: "Pakistan (+92)" },
-];
-
-function splitMobile(value) {
-  const raw = String(value || "").trim();
-  const digits = normalizeMobile(raw);
-  const matchedCode = COUNTRY_CODES
-    .map((country) => country.value)
-    .sort((a, b) => b.length - a.length)
-    .find((code) => raw.startsWith(code) || digits.startsWith(normalizeMobile(code)));
-
-  if (!digits) return { countryCode: DEFAULT_COUNTRY_CODE, mobile: "" };
-  if (!matchedCode || digits.length <= 10) return { countryCode: DEFAULT_COUNTRY_CODE, mobile: digits };
-  return { countryCode: matchedCode, mobile: digits.slice(normalizeMobile(matchedCode).length) };
-}
-
-function buildMobile(countryCode, mobile) {
-  const digits = normalizeMobile(mobile);
-  return digits ? `${countryCode}${digits}` : "";
-}
+const DEFAULT_DIAL_CODE = "+971";
 
 export default function Users() {
   const { state } = useApp();
@@ -55,7 +26,7 @@ export default function Users() {
   const { fetchUsers, updateRole, createUser, updateUser, deleteUser, updateStatus } = useUsers();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [form, setForm] = useState({ name: "", email: "", countryCode: DEFAULT_COUNTRY_CODE, mobile: "", role: "Task Only" });
+  const [form, setForm] = useState({ name: "", email: "", mobileCountryCode: DEFAULT_DIAL_CODE, mobile: "", role: "Task Only" });
   const [mobileError, setMobileError] = useState("");
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
@@ -68,25 +39,27 @@ export default function Users() {
     if (saving) return;
     setModalOpen(false);
     setEditingUser(null);
-    setForm({ name: "", email: "", countryCode: DEFAULT_COUNTRY_CODE, mobile: "", role: "Task Only" });
+    setForm({ name: "", email: "", mobileCountryCode: DEFAULT_DIAL_CODE, mobile: "", role: "Task Only" });
     setMobileError("");
   }
 
   function handleAddUser() {
     setEditingUser(null);
-    setForm({ name: "", email: "", countryCode: DEFAULT_COUNTRY_CODE, mobile: "", role: "Task Only" });
+    setForm({ name: "", email: "", mobileCountryCode: DEFAULT_DIAL_CODE, mobile: "", role: "Task Only" });
     setMobileError("");
     setModalOpen(true);
   }
 
   function handleEditUser(user) {
-    const mobileParts = splitMobile(user.mobile);
     setEditingUser(user);
+    const mobileCountryCode = normalizeDialCode(user.mobileCountryCode) || DEFAULT_DIAL_CODE;
+    let mobileNumber = normalizePhoneNumber(user.mobile);
+    if (mobileNumber.length > 10) mobileNumber = mobileNumber.slice(-10);
     setForm({
       name: user.name || "",
       email: user.email || "",
-      countryCode: mobileParts.countryCode,
-      mobile: mobileParts.mobile,
+      mobileCountryCode,
+      mobile: mobileNumber,
       role: user.role || "Task Only",
     });
     setMobileError("");
@@ -99,19 +72,25 @@ export default function Users() {
       toast.error("Name and email are required.");
       return;
     }
-    const localMobile = normalizeMobile(form.mobile);
-    const mobile = buildMobile(form.countryCode, localMobile);
-    const mobileDigits = normalizeMobile(mobile);
-    if (localMobile.length < 4 || mobileDigits.length < 7 || mobileDigits.length > 15) {
+    const mobileCountryCode = normalizeDialCode(form.mobileCountryCode);
+    const mobile = normalizePhoneNumber(form.mobile);
+    const { min, max } = getPhoneNumberSpec(mobileCountryCode);
+    if (!mobileCountryCode) {
+      setMobileError("Country code is required.");
+      return;
+    }
+    if (mobile.length !== min) {
       setMobileError("Phone number is invalid.");
       return;
     }
     setMobileError("");
+    const mobileDigits = normalizePhoneNumber(`${mobileCountryCode}${mobile}`);
     const duplicateUser = state.users.find((user) =>
       user._id !== editingUser?._id &&
       (
         normalizeUserField(user.email) === normalizeUserField(form.email) ||
-        (mobileDigits && normalizeMobile(user.mobile) === mobileDigits)
+        (mobileDigits && normalizePhoneNumber(`${user.mobileCountryCode || ""}${user.mobile || ""}`) === mobileDigits) ||
+        (!user.mobileCountryCode && normalizeMobile(user.mobile) === mobile)
       )
     );
     if (duplicateUser) {
@@ -122,10 +101,10 @@ export default function Users() {
     setSaving(true);
     try {
       if (editingUser) {
-        await updateUser(editingUser._id, { name: form.name.trim(), email: form.email.trim(), mobile });
+        await updateUser(editingUser._id, { name: form.name.trim(), email: form.email.trim(), mobileCountryCode, mobile });
         toast.success("User updated successfully.");
       } else {
-        await createUser({ name: form.name.trim(), email: form.email.trim(), mobile, role: form.role || "Task Only" });
+        await createUser({ name: form.name.trim(), email: form.email.trim(), mobileCountryCode, mobile, role: form.role || "Task Only" });
         toast.success("User created successfully.");
       }
       closeModal();
@@ -271,25 +250,35 @@ export default function Users() {
               <Field label="Name" field="user-form-name"><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
               <Field label="Email" field="user-form-email"><input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
               <Field label="Mobile" field="user-form-mobile">
-                <div className="grid gap-2 sm:grid-cols-[190px_minmax(0,1fr)]">
+                <div className="flex gap-2">
                   <select
-                    id="user-form-country-code"
-                    name="userFormCountryCode"
-                    className={`input ${mobileError ? "border-[#dc2626]" : ""}`}
-                    value={form.countryCode}
-                    onChange={(e) => { setForm({ ...form, countryCode: e.target.value }); setMobileError(""); }}
+                    className={`input w-44 ${mobileError ? "border-[#dc2626]" : ""}`}
+                    value={form.mobileCountryCode}
+                    onChange={(e) => {
+                      const code = e.target.value;
+                      const { max } = getPhoneNumberSpec(code);
+                      setForm({ ...form, mobileCountryCode: code, mobile: normalizePhoneNumber(form.mobile).slice(0, max) });
+                      setMobileError("");
+                    }}
                   >
-                    {COUNTRY_CODES.map((country) => <option key={country.value} value={country.value}>{country.label}</option>)}
+                    <option value="">Code</option>
+                    {DIAL_CODE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
                   </select>
                   <input
                     className={`input ${mobileError ? "border-[#dc2626]" : ""}`}
                     type="tel"
                     autoComplete="tel"
                     inputMode="numeric"
-                    maxLength={12}
-                    placeholder="501234567"
+                    maxLength={getPhoneNumberSpec(form.mobileCountryCode).max}
+                    placeholder={getPhoneNumberSpec(form.mobileCountryCode).placeholder}
                     value={form.mobile}
-                    onChange={(e) => { setForm({ ...form, mobile: e.target.value.replace(/\D+/g, "").slice(0, 12) }); setMobileError(""); }}
+                    onChange={(e) => {
+                      const { max } = getPhoneNumberSpec(form.mobileCountryCode);
+                      setForm({ ...form, mobile: normalizePhoneNumber(e.target.value).slice(0, max) });
+                      setMobileError("");
+                    }}
                   />
                 </div>
                 {mobileError && <div className="mt-1 text-[12px] font-bold text-[#dc2626]">{mobileError}</div>}

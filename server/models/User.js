@@ -6,6 +6,7 @@ const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   password: { type: String, required: true, select: false },
+  mobileCountryCode: { type: String, trim: true },
   mobile: String,
   role: { type: String, enum: ["admin", "manager", "task_only"], default: "task_only" },
   isActive: { type: Boolean, default: true },
