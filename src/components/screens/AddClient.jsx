@@ -470,7 +470,7 @@ export default function AddClient() {
         <div className="flex flex-col gap-3 border-t border-[#e2e8f0] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
           <Button variant="ghost" onClick={goPrevious} disabled={isFirstTab}>Previous</Button>
           <div className="flex justify-end gap-2">
-            {!isLastTab && <Button onClick={goNext}>Next</Button>}
+            {!isLastTab && <Button onClick={goNext}>Save and Continue</Button>}
             {isLastTab && <Button onClick={saveClient}>Save Details</Button>}
           </div>
         </div>
