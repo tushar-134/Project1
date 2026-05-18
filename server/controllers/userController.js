@@ -2,19 +2,18 @@ const crypto = require("crypto");
 const { validationResult } = require("express-validator");
 const User = require("../models/User");
 const sendEmail = require("../utils/sendEmail");
+const { isValidPhone, normalizeDialCode, normalizePhoneNumber } = require("../utils/phoneUtils");
 
 function normalize(value) {
   return String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 function normalizeMobile(value) {
-  const digits = String(value || "").replace(/\D/g, "");
-  return digits ? `+${digits}` : "";
+  return normalizePhoneNumber(value);
 }
 
-function hasValidMobile(value) {
-  const digits = String(value || "").replace(/\D/g, "");
-  return digits.length >= 7 && digits.length <= 15;
+function hasValidMobile(countryCode, value) {
+  return isValidPhone(countryCode, value);
 }
 
 async function findUserDuplicate({ email, mobile, excludeId }) {
@@ -27,7 +26,7 @@ async function findUserDuplicate({ email, mobile, excludeId }) {
       ...(normalizedMobile ? [{ mobile: { $exists: true } }] : []),
     ],
   };
-  const users = await User.find(query).select("email mobile");
+  const users = await User.find(query).select("email mobile mobileCountryCode");
   return users.find((user) =>
     normalize(user.email) === normalizedEmail ||
     (normalizedMobile && normalizeMobile(user.mobile) === normalizedMobile)
@@ -54,7 +53,8 @@ exports.createUser = async (req, res, next) => {
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
     const email = normalize(req.body.email);
     const mobile = normalizeMobile(req.body.mobile);
-    if (!hasValidMobile(req.body.mobile)) {
+    const mobileCountryCode = normalizeDialCode(req.body.mobileCountryCode);
+    if (!hasValidMobile(mobileCountryCode, req.body.mobile)) {
       return res.status(400).json({ message: "Phone number is invalid." });
     }
     if (await findUserDuplicate({ email: req.body.email, mobile: req.body.mobile })) {
@@ -62,7 +62,7 @@ exports.createUser = async (req, res, next) => {
     }
     // New users are seeded with a temporary password because invite email and first login are separate concerns.
     const tempPassword = crypto.randomBytes(6).toString("base64url");
-    const user = await User.create({ ...req.body, email, mobile, password: tempPassword });
+    const user = await User.create({ ...req.body, email, mobile, mobileCountryCode, password: tempPassword });
     await sendEmail({ to: user.email, subject: "Filing Buddy invite", text: `Your temporary password is ${tempPassword}` });
     res.status(201).json(await User.findById(user._id).select("-password"));
   } catch (error) {
@@ -76,7 +76,8 @@ exports.createUser = async (req, res, next) => {
 
 exports.updateUser = async (req, res, next) => {
   try {
-    if (!hasValidMobile(req.body.mobile)) {
+    const mobileCountryCode = normalizeDialCode(req.body.mobileCountryCode);
+    if (!hasValidMobile(mobileCountryCode, req.body.mobile)) {
       return res.status(400).json({ message: "Phone number is invalid." });
     }
     if (await findUserDuplicate({ email: req.body.email, mobile: req.body.mobile, excludeId: req.params.id })) {
@@ -86,6 +87,7 @@ exports.updateUser = async (req, res, next) => {
     const payload = { ...req.body };
     if ("email" in payload) payload.email = String(payload.email || "").trim().toLowerCase();
     if ("mobile" in payload) payload.mobile = normalizeMobile(payload.mobile);
+    if ("mobileCountryCode" in payload) payload.mobileCountryCode = normalizeDialCode(payload.mobileCountryCode);
     const user = await User.findByIdAndUpdate(req.params.id, payload, { new: true }).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
     res.json(user);

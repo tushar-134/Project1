@@ -8,6 +8,8 @@ import { useUsers } from "../../hooks/useUsers";
 import { groupService } from "../../services/groupService";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
+import { DIAL_CODE_OPTIONS } from "../../utils/dialCodeOptions.js";
+import { getPhoneNumberSpec, normalizeDialCode, normalizePhoneNumber } from "../../utils/phoneUtils.js";
 
 const tabs = ["Basic Details", "Trade Licences", "Contact Persons", "VAT / CT", "Client Group", "Portal Logins", "Custom Fields", "Attachments"];
 const countryCodes = ["AF","AX","AL","DZ","AS","AD","AO","AI","AQ","AG","AR","AM","AW","AU","AT","AZ","BS","BH","BD","BB","BY","BE","BZ","BJ","BM","BT","BO","BQ","BA","BW","BV","BR","IO","BN","BG","BF","BI","KH","CM","CA","CV","KY","CF","TD","CL","CN","CX","CC","CO","KM","CG","CD","CK","CR","CI","HR","CU","CW","CY","CZ","DK","DJ","DM","DO","EC","EG","SV","GQ","ER","EE","SZ","ET","FK","FO","FJ","FI","FR","GF","PF","TF","GA","GM","GE","DE","GH","GI","GR","GL","GD","GP","GU","GT","GG","GN","GW","GY","HT","HM","VA","HN","HK","HU","IS","IN","ID","IR","IQ","IE","IM","IL","IT","JM","JP","JE","JO","KZ","KE","KI","KP","KR","KW","KG","LA","LV","LB","LS","LR","LY","LI","LT","LU","MO","MG","MW","MY","MV","ML","MT","MH","MQ","MR","MU","YT","MX","FM","MD","MC","MN","ME","MS","MA","MZ","MM","NA","NR","NP","NL","NC","NZ","NI","NE","NG","NU","NF","MK","MP","NO","OM","PK","PW","PS","PA","PG","PY","PE","PH","PN","PL","PT","PR","QA","RE","RO","RU","RW","BL","SH","KN","LC","MF","PM","VC","WS","SM","ST","SA","SN","RS","SC","SL","SG","SX","SK","SI","SB","SO","ZA","GS","SS","ES","LK","SD","SR","SJ","SE","CH","SY","TW","TJ","TZ","TH","TL","TG","TK","TO","TT","TN","TR","TM","TC","TV","UG","UA","AE","GB","US","UM","UY","UZ","VU","VE","VN","VG","VI","WF","EH","YE","ZM","ZW"];
@@ -320,13 +322,24 @@ export default function AddClient() {
       toast.error("Please enter the client legal name.");
       return false;
     }
-    const invalidContactIndex = contacts.findIndex((contact) => {
-      const phoneDigits = String(contact.mobile || "").replace(/\D+/g, "");
+    const missingContactCodeIndex = contacts.findIndex((contact) => {
+      const phoneDigits = normalizePhoneNumber(contact.mobile);
       if (!phoneDigits) return false;
-      return phoneDigits.length !== 10;
+      return !String(contact.code || "").trim();
+    });
+    if (missingContactCodeIndex >= 0) {
+      toast.error(`Contact person ${missingContactCodeIndex + 1}: please select a country code.`);
+      return;
+    }
+    const invalidContactIndex = contacts.findIndex((contact) => {
+      const phoneDigits = normalizePhoneNumber(contact.mobile);
+      if (!phoneDigits) return false;
+      const { min } = getPhoneNumberSpec(contact.code);
+      return phoneDigits.length !== min;
     });
     if (invalidContactIndex >= 0) {
-      toast.error(`Contact person ${invalidContactIndex + 1}: mobile number must be exactly 10 digits.`);
+      const { min } = getPhoneNumberSpec(contacts[invalidContactIndex]?.code);
+      toast.error(`Contact person ${invalidContactIndex + 1}: mobile number must be exactly ${min} digits.`);
       return false;
     }
     setIsSaving(true);
@@ -344,7 +357,17 @@ export default function AddClient() {
         registeredAddress: { country: form.country, emirate: form.emirate, street: form.street, poBox: form.poBox, postalCode: form.postalCode },
         correspondenceAddress: form.differentAddress ? { street: form.correspondence } : undefined,
         tradeLicences: licences.map((l) => ({ licenceNumber: l.number, issueDate: l.issue, expiryDate: l.expiry, issuingAuthority: l.authority, licenceType: l.type?.toLowerCase() || "commercial", officialEmail: l.email })),
-        contactPersons: contacts.map((c) => ({ fullName: c.name, designation: c.designation, email: c.email, mobile: { countryCode: c.code, number: String(c.mobile || "").replace(/\D+/g, "") }, whatsapp: c.whatsapp, alternateEmail: c.alternate, isPrimary: c.primary, emiratesId: { number: c.eid }, passport: { number: c.passport, issuingCountry: c.issuingCountry } })),
+        contactPersons: contacts.map((c) => ({
+          fullName: c.name,
+          designation: c.designation,
+          email: c.email,
+          mobile: { countryCode: normalizeDialCode(c.code), number: normalizePhoneNumber(c.mobile) },
+          whatsapp: c.whatsapp,
+          alternateEmail: c.alternate,
+          isPrimary: c.primary,
+          emiratesId: { number: c.eid },
+          passport: { number: c.passport, issuingCountry: c.issuingCountry },
+        })),
         vatDetails: { trn: form.vatTrn, status: form.vatStatus === "Registered" ? "registered" : form.vatStatus === "Pending" ? "applying" : "not_registered", registrationDate: form.vatDate, filingFrequency: form.vatFreq.toLowerCase() },
         ctDetails: { tin: form.ctTin, status: form.ctStatus === "Registered" ? "registered" : form.ctStatus === "Pending" ? "applying" : "not_registered", registrationDate: form.ctDate, financialYearEnd: form.fye },
         group: form.group || undefined,
@@ -418,24 +441,6 @@ export default function AddClient() {
 
   return (
     <div className="space-y-5">
-      <datalist id="dial-code-options">
-        <option value="+971" label="United Arab Emirates" />
-        <option value="+91" label="India" />
-        <option value="+1" label="United States / Canada" />
-        <option value="+44" label="United Kingdom" />
-        <option value="+966" label="Saudi Arabia" />
-        <option value="+974" label="Qatar" />
-        <option value="+968" label="Oman" />
-        <option value="+965" label="Kuwait" />
-        <option value="+973" label="Bahrain" />
-        <option value="+92" label="Pakistan" />
-        <option value="+880" label="Bangladesh" />
-        <option value="+94" label="Sri Lanka" />
-        <option value="+63" label="Philippines" />
-        <option value="+65" label="Singapore" />
-        <option value="+61" label="Australia" />
-        <option value="+27" label="South Africa" />
-      </datalist>
       <div>
         <div className="page-kicker">Client Master</div>
         <h2 className="screen-title">{isEditMode ? "Edit Client" : "Add Client"}</h2>
@@ -458,8 +463,25 @@ export default function AddClient() {
                   <Field label="Email" field={`contact-email-${i}`}><input className="input" value={c.email} onChange={(e) => patch(i, { email: e.target.value })} /></Field>
                   <Field label="Mobile">
                     <div className="flex gap-2">
-                      <input list="dial-code-options" id={`contact-code-${i}`} name={`contactCode${i}`} className="input w-24" value={c.code} onChange={(e) => patch(i, { code: e.target.value.replace(/[^\d+]/g, "") })} placeholder="+971" />
-                      <input id={`contact-mobile-${i}`} name={`contactMobile${i}`} className="input" value={c.mobile} onChange={(e) => patch(i, { mobile: e.target.value.replace(/[^\d]/g, "").slice(0, 10) })} placeholder="10-digit" inputMode="numeric" maxLength={10} />
+                      <select id={`contact-code-${i}`} name={`contactCode${i}`} className="input w-44" value={c.code} onChange={(e) => patch(i, { code: e.target.value })}>
+                        <option value="">Code</option>
+                        {DIAL_CODE_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                      <input
+                        id={`contact-mobile-${i}`}
+                        name={`contactMobile${i}`}
+                        className="input"
+                        value={c.mobile}
+                        onChange={(e) => {
+                          const { max } = getPhoneNumberSpec(c.code);
+                          patch(i, { mobile: normalizePhoneNumber(e.target.value).slice(0, max) });
+                        }}
+                        placeholder={getPhoneNumberSpec(c.code).placeholder}
+                        inputMode="numeric"
+                        maxLength={getPhoneNumberSpec(c.code).max}
+                      />
                     </div>
                   </Field>
                   <Field label="WhatsApp" field={`contact-whatsapp-${i}`}><input className="input" value={c.whatsapp} onChange={(e) => patch(i, { whatsapp: e.target.value })} /></Field>

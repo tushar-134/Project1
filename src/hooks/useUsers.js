@@ -5,7 +5,10 @@ const roleLabel = { admin: "Admin", manager: "Manager", task_only: "Task Only" }
 const roleApi = { Admin: "admin", Manager: "manager", "Task Only": "task_only" };
 
 export function mapUser(user) {
-  return { ...user, id: user._id, role: roleLabel[user.role] || user.role, status: user.isActive ? "Active" : "Inactive" };
+  const dial = String(user.mobileCountryCode || "").trim();
+  const num = String(user.mobile || "").trim();
+  const mobile = [dial, num].filter(Boolean).join(" ").trim();
+  return { ...user, id: user._id, mobile, role: roleLabel[user.role] || user.role, status: user.isActive ? "Active" : "Inactive" };
 }
 
 export function useUsers() {

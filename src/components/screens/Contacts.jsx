@@ -8,25 +8,8 @@ import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import Table from "../ui/Table.jsx";
-
-const DIAL_CODE_OPTIONS = [
-  { label: "United Arab Emirates (+971)", value: "+971" },
-  { label: "India (+91)", value: "+91" },
-  { label: "United States / Canada (+1)", value: "+1" },
-  { label: "United Kingdom (+44)", value: "+44" },
-  { label: "Saudi Arabia (+966)", value: "+966" },
-  { label: "Qatar (+974)", value: "+974" },
-  { label: "Oman (+968)", value: "+968" },
-  { label: "Kuwait (+965)", value: "+965" },
-  { label: "Bahrain (+973)", value: "+973" },
-  { label: "Pakistan (+92)", value: "+92" },
-  { label: "Bangladesh (+880)", value: "+880" },
-  { label: "Sri Lanka (+94)", value: "+94" },
-  { label: "Philippines (+63)", value: "+63" },
-  { label: "Singapore (+65)", value: "+65" },
-  { label: "Australia (+61)", value: "+61" },
-  { label: "South Africa (+27)", value: "+27" },
-];
+import { DIAL_CODE_OPTIONS } from "../../utils/dialCodeOptions.js";
+import { getPhoneNumberSpec, normalizeDialCode, normalizePhoneNumber } from "../../utils/phoneUtils.js";
 
 const blankContact = { name: "", clientId: "", role: "", countryCode: "", mobile: "", email: "", type: "Client Contact", city: "" };
 
@@ -100,9 +83,10 @@ export default function Contacts() {
       toast.error("Client, name, country code and mobile are required.");
       return;
     }
-    const digits = form.mobile.replace(/\D+/g, "");
-    if (digits.length !== 10) {
-      toast.error("Mobile number must be exactly 10 digits.");
+    const digits = normalizePhoneNumber(form.mobile);
+    const { min } = getPhoneNumberSpec(form.countryCode);
+    if (digits.length !== min) {
+      toast.error(`Mobile number must be exactly ${min} digits.`);
       return;
     }
     const client = state.clients.find((item) => item._id === form.clientId || item.id === form.clientId);
@@ -118,7 +102,7 @@ export default function Contacts() {
         designation: form.role.trim(),
         email: form.email.trim(),
         mobile: {
-          countryCode: form.countryCode.trim(),
+          countryCode: normalizeDialCode(form.countryCode),
           number: digits,
         },
         type: form.type,
@@ -234,10 +218,13 @@ export default function Contacts() {
                   <input
                     className="input"
                     value={form.mobile}
-                    onChange={(e) => setForm({ ...form, mobile: e.target.value.replace(/[^\d]/g, "").slice(0, 10) })}
-                    placeholder="10-digit number"
+                    onChange={(e) => {
+                      const { max } = getPhoneNumberSpec(form.countryCode);
+                      setForm({ ...form, mobile: normalizePhoneNumber(e.target.value).slice(0, max) });
+                    }}
+                    placeholder={getPhoneNumberSpec(form.countryCode).placeholder}
                     inputMode="numeric"
-                    maxLength={10}
+                    maxLength={getPhoneNumberSpec(form.countryCode).max}
                   />
                 </div>
               </Field>
