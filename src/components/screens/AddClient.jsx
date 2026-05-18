@@ -49,6 +49,7 @@ export default function AddClient() {
   const [portals, setPortals] = useState([{ name: "EmaraTax", url: "https://tax.gov.ae", username: "", password: "", notes: "" }]);
   const [attachments, setAttachments] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const update = (key, value) => setForm((f) => ({ ...f, [key]: value }));
   useEffect(() => {
     fetchUsers().catch(() => {});
@@ -313,10 +314,11 @@ export default function AddClient() {
     }
   }
 
-  async function saveClient() {
+  async function saveClient({ continueToNext = false } = {}) {
+    if (isSaving) return false;
     if (!form.legalName) {
       toast.error("Please enter the client legal name.");
-      return;
+      return false;
     }
     const invalidContactIndex = contacts.findIndex((contact) => {
       const phoneDigits = String(contact.mobile || "").replace(/\D+/g, "");
@@ -325,8 +327,9 @@ export default function AddClient() {
     });
     if (invalidContactIndex >= 0) {
       toast.error(`Contact person ${invalidContactIndex + 1}: mobile number must be exactly 10 digits.`);
-      return;
+      return false;
     }
+    setIsSaving(true);
     try {
       // The screen state is intentionally tab-oriented and user-friendly; this transform is
       // where we fold it back into the nested API contract expected by the Mongo model.
@@ -368,7 +371,7 @@ export default function AddClient() {
             await uploadContactDocument(id, document.index, document.file, document.section);
           }
         }
-        toast.success("Client updated successfully.");
+        toast.success(continueToNext ? "Progress saved." : "Client updated successfully.");
       } else {
         const created = await createClient(payload);
         if (pendingLicenceDocuments.length) {
@@ -382,23 +385,34 @@ export default function AddClient() {
           }
         }
         if (pendingAttachments.length) {
+          let uploadedAttachments = [];
           for (const attachment of pendingAttachments) {
             const formData = new FormData();
             formData.append("file", attachment.file);
             formData.append("description", attachment.description || "");
-            await uploadAttachment(created._id, formData);
+            uploadedAttachments = await uploadAttachment(created._id, formData);
           }
+          if (uploadedAttachments.length) setAttachments(mapSavedAttachments(uploadedAttachments));
         }
-        toast.success(pendingAttachments.length || pendingLicenceDocuments.length || pendingContactDocuments.length ? "Client created and documents uploaded." : "Client created successfully.");
+        toast.success(continueToNext ? "Progress saved." : (pendingAttachments.length || pendingLicenceDocuments.length || pendingContactDocuments.length ? "Client created and documents uploaded." : "Client created successfully."));
+        if (continueToNext) navigate(`/clients/edit/${created._id}`, { replace: true });
+      }
+      if (continueToNext) {
+        setTab((current) => Math.min(current + 1, tabs.length - 1));
+        return true;
       }
       navigate("/clients/list");
+      return true;
     } catch (error) {
       toast.error(getApiErrorMessage(error) || "Unable to save client.");
+      return false;
+    } finally {
+      setIsSaving(false);
     }
   }
 
   const goPrevious = () => setTab((current) => Math.max(current - 1, 0));
-  const goNext = () => setTab((current) => Math.min(current + 1, tabs.length - 1));
+  const saveAndContinue = () => saveClient({ continueToNext: true });
   const isFirstTab = tab === 0;
   const isLastTab = tab === tabs.length - 1;
 
@@ -468,10 +482,10 @@ export default function AddClient() {
           {tab === 7 && <div className="space-y-3"><AttachmentUploadZone onFiles={uploadFiles} isUploading={isUploading} /><div className="overflow-x-auto"><table className="table min-w-max"><thead><tr><th>Name</th><th>Size</th><th>Type</th><th>Description</th><th>Uploaded On</th><th>Uploaded By</th><th>Actions</th></tr></thead><tbody>{attachments.length === 0 && <tr><td colSpan={7} className="text-center text-slate-500">No attachments uploaded yet.</td></tr>}{attachments.map((a) => <tr key={a.id || a.name}><td>{a.name}</td><td>{a.size}</td><td>{a.type}</td><td>{a.description || "-"}</td><td>{a.uploadedOn}</td><td>{a.uploadedBy}</td><td><Button size="sm" variant="ghost" disabled={!a.url} onClick={() => a.url && window.open(a.url, "_blank", "noopener,noreferrer")}>Download</Button> <Button size="sm" variant="danger" onClick={() => removeAttachment(a)}>Delete</Button></td></tr>)}</tbody></table></div></div>}
         </div>
         <div className="flex flex-col gap-3 border-t border-[#e2e8f0] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-          <Button variant="ghost" onClick={goPrevious} disabled={isFirstTab}>Previous</Button>
+          <Button variant="ghost" onClick={goPrevious} disabled={isFirstTab || isSaving}>Previous</Button>
           <div className="flex justify-end gap-2">
-            {!isLastTab && <Button onClick={goNext}>Save and Continue</Button>}
-            {isLastTab && <Button onClick={saveClient}>Save Details</Button>}
+            {!isLastTab && <Button onClick={saveAndContinue} disabled={isSaving}>{isSaving ? "Saving..." : "Save and Continue"}</Button>}
+            {isLastTab && <Button onClick={() => saveClient()} disabled={isSaving}>{isSaving ? "Saving..." : "Save Details"}</Button>}
           </div>
         </div>
       </Card>
