@@ -6,9 +6,15 @@ const ctrl = require("../controllers/userController");
 const router = express.Router();
 const mobileValidator = body("mobile")
   .optional({ values: "falsy" })
-  .customSanitizer((value) => String(value || "").trim().replace(/\D+/g, ""))
-  .isLength({ min: 10, max: 10 })
-  .withMessage("Mobile number must be exactly 10 digits.");
+  .customSanitizer((value) => {
+    const digits = String(value || "").trim().replace(/\D+/g, "");
+    return digits ? `+${digits}` : "";
+  })
+  .custom((value) => {
+    const digits = String(value || "").replace(/\D+/g, "");
+    return digits.length >= 7 && digits.length <= 15;
+  })
+  .withMessage("Mobile number must include a valid country code and number.");
 
 // User management is intentionally admin-only in one place instead of repeated across handlers.
 router.use(auth, adminOnly);

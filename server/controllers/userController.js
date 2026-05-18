@@ -8,11 +8,13 @@ function normalize(value) {
 }
 
 function normalizeMobile(value) {
-  return String(value || "").replace(/\D/g, "");
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits ? `+${digits}` : "";
 }
 
 function hasValidMobile(value) {
-  return normalizeMobile(value).length === 10;
+  const digits = String(value || "").replace(/\D/g, "");
+  return digits.length >= 7 && digits.length <= 15;
 }
 
 async function findUserDuplicate({ email, mobile, excludeId }) {

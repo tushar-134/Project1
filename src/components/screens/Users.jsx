@@ -16,13 +16,46 @@ function normalizeMobile(value) {
   return String(value || "").replace(/\D/g, "");
 }
 
+const DEFAULT_COUNTRY_CODE = "+971";
+
+const COUNTRY_CODES = [
+  { value: "+971", label: "UAE / Abu Dhabi (+971)" },
+  { value: "+91", label: "India (+91)" },
+  { value: "+1", label: "USA / Canada (+1)" },
+  { value: "+44", label: "UK (+44)" },
+  { value: "+966", label: "Saudi Arabia (+966)" },
+  { value: "+974", label: "Qatar (+974)" },
+  { value: "+965", label: "Kuwait (+965)" },
+  { value: "+973", label: "Bahrain (+973)" },
+  { value: "+968", label: "Oman (+968)" },
+  { value: "+92", label: "Pakistan (+92)" },
+];
+
+function splitMobile(value) {
+  const raw = String(value || "").trim();
+  const digits = normalizeMobile(raw);
+  const matchedCode = COUNTRY_CODES
+    .map((country) => country.value)
+    .sort((a, b) => b.length - a.length)
+    .find((code) => raw.startsWith(code) || digits.startsWith(normalizeMobile(code)));
+
+  if (!digits) return { countryCode: DEFAULT_COUNTRY_CODE, mobile: "" };
+  if (!matchedCode || digits.length <= 10) return { countryCode: DEFAULT_COUNTRY_CODE, mobile: digits };
+  return { countryCode: matchedCode, mobile: digits.slice(normalizeMobile(matchedCode).length) };
+}
+
+function buildMobile(countryCode, mobile) {
+  const digits = normalizeMobile(mobile);
+  return digits ? `${countryCode}${digits}` : "";
+}
+
 export default function Users() {
   const { state } = useApp();
   const { currentUser } = useAuth();
   const { fetchUsers, updateRole, createUser, updateUser, deleteUser, updateStatus } = useUsers();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [form, setForm] = useState({ name: "", email: "", mobile: "", role: "Task Only" });
+  const [form, setForm] = useState({ name: "", email: "", countryCode: DEFAULT_COUNTRY_CODE, mobile: "", role: "Task Only" });
   const [mobileError, setMobileError] = useState("");
   const [saving, setSaving] = useState(false);
   const savingRef = useRef(false);
@@ -35,23 +68,25 @@ export default function Users() {
     if (saving) return;
     setModalOpen(false);
     setEditingUser(null);
-    setForm({ name: "", email: "", mobile: "", role: "Task Only" });
+    setForm({ name: "", email: "", countryCode: DEFAULT_COUNTRY_CODE, mobile: "", role: "Task Only" });
     setMobileError("");
   }
 
   function handleAddUser() {
     setEditingUser(null);
-    setForm({ name: "", email: "", mobile: "", role: "Task Only" });
+    setForm({ name: "", email: "", countryCode: DEFAULT_COUNTRY_CODE, mobile: "", role: "Task Only" });
     setMobileError("");
     setModalOpen(true);
   }
 
   function handleEditUser(user) {
+    const mobileParts = splitMobile(user.mobile);
     setEditingUser(user);
     setForm({
       name: user.name || "",
       email: user.email || "",
-      mobile: user.mobile || "",
+      countryCode: mobileParts.countryCode,
+      mobile: mobileParts.mobile,
       role: user.role || "Task Only",
     });
     setMobileError("");
@@ -64,8 +99,10 @@ export default function Users() {
       toast.error("Name and email are required.");
       return;
     }
-    const mobile = normalizeMobile(form.mobile);
-    if (mobile.length !== 10) {
+    const localMobile = normalizeMobile(form.mobile);
+    const mobile = buildMobile(form.countryCode, localMobile);
+    const mobileDigits = normalizeMobile(mobile);
+    if (localMobile.length < 4 || mobileDigits.length < 7 || mobileDigits.length > 15) {
       setMobileError("Phone number is invalid.");
       return;
     }
@@ -74,7 +111,7 @@ export default function Users() {
       user._id !== editingUser?._id &&
       (
         normalizeUserField(user.email) === normalizeUserField(form.email) ||
-        (mobile && normalizeMobile(user.mobile) === mobile)
+        (mobileDigits && normalizeMobile(user.mobile) === mobileDigits)
       )
     );
     if (duplicateUser) {
@@ -234,7 +271,27 @@ export default function Users() {
               <Field label="Name" field="user-form-name"><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
               <Field label="Email" field="user-form-email"><input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
               <Field label="Mobile" field="user-form-mobile">
-                <input className={`input ${mobileError ? "border-[#dc2626]" : ""}`} type="tel" autoComplete="tel" inputMode="numeric" maxLength={10} placeholder="9876543210" value={form.mobile} onChange={(e) => { setForm({ ...form, mobile: e.target.value.replace(/\D+/g, "").slice(0, 10) }); setMobileError(""); }} />
+                <div className="grid gap-2 sm:grid-cols-[190px_minmax(0,1fr)]">
+                  <select
+                    id="user-form-country-code"
+                    name="userFormCountryCode"
+                    className={`input ${mobileError ? "border-[#dc2626]" : ""}`}
+                    value={form.countryCode}
+                    onChange={(e) => { setForm({ ...form, countryCode: e.target.value }); setMobileError(""); }}
+                  >
+                    {COUNTRY_CODES.map((country) => <option key={country.value} value={country.value}>{country.label}</option>)}
+                  </select>
+                  <input
+                    className={`input ${mobileError ? "border-[#dc2626]" : ""}`}
+                    type="tel"
+                    autoComplete="tel"
+                    inputMode="numeric"
+                    maxLength={12}
+                    placeholder="501234567"
+                    value={form.mobile}
+                    onChange={(e) => { setForm({ ...form, mobile: e.target.value.replace(/\D+/g, "").slice(0, 12) }); setMobileError(""); }}
+                  />
+                </div>
                 {mobileError && <div className="mt-1 text-[12px] font-bold text-[#dc2626]">{mobileError}</div>}
               </Field>
               {!editingUser && (
