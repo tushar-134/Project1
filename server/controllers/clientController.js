@@ -64,6 +64,13 @@ function duplicateMessage(client, payload) {
   return "A matching client already exists.";
 }
 
+function findInvalidContactMobile(contactPersons = []) {
+  return contactPersons.findIndex((contact) => {
+    const digits = String(contact?.mobile?.number || "").replace(/\D+/g, "");
+    return digits.length > 0 && digits.length !== 10;
+  });
+}
+
 function buildUploadedFile(req) {
   if (!req.file) return null;
   const url = req.file.path?.startsWith?.("http")
@@ -113,6 +120,8 @@ exports.createClient = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+    const invalidContactIndex = findInvalidContactMobile(req.body.contactPersons);
+    if (invalidContactIndex >= 0) return res.status(400).json({ message: `Contact person ${invalidContactIndex + 1}: Invalid number.` });
     const duplicate = await findDuplicateClient(req.body);
     if (duplicate) return res.status(409).json({ message: duplicateMessage(duplicate, req.body) });
     const client = await Client.create({ ...req.body, fileNo: await nextClientFileNo(), createdBy: req.user._id });
@@ -128,6 +137,10 @@ exports.updateClient = async (req, res, next) => {
   try {
     const client = await Client.findById(req.params.id);
     if (!client || !client.isActive) return res.status(404).json({ message: "Client not found" });
+    if ("contactPersons" in req.body) {
+      const invalidContactIndex = findInvalidContactMobile(req.body.contactPersons);
+      if (invalidContactIndex >= 0) return res.status(400).json({ message: `Contact person ${invalidContactIndex + 1}: Invalid number.` });
+    }
     const candidate = {
       legalName: "legalName" in req.body ? req.body.legalName : client.legalName,
       vatDetails: "vatDetails" in req.body ? req.body.vatDetails : client.vatDetails,

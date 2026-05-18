@@ -326,7 +326,7 @@ export default function AddClient() {
       return phoneDigits.length !== 10;
     });
     if (invalidContactIndex >= 0) {
-      toast.error(`Contact person ${invalidContactIndex + 1}: mobile number must be exactly 10 digits.`);
+      toast.error(`Contact person ${invalidContactIndex + 1}: Invalid number.`);
       return false;
     }
     setIsSaving(true);
