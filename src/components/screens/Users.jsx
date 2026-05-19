@@ -24,6 +24,7 @@ export default function Users() {
   const { state } = useApp();
   const { currentUser } = useAuth();
   const { fetchUsers, updateRole, createUser, updateUser, deleteUser, updateStatus } = useUsers();
+  const canManageUsers = currentUser?.role === "admin";
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [form, setForm] = useState({ name: "", email: "", mobileCountryCode: DEFAULT_DIAL_CODE, mobile: "", role: "Task Only" });
@@ -163,10 +164,12 @@ export default function Users() {
           <div className="page-kicker">Settings</div>
           <h2 className="screen-title">User Management</h2>
         </div>
-        <Button onClick={handleAddUser}>
-          <Plus size={16} />
-          Add User
-        </Button>
+        {canManageUsers && (
+          <Button onClick={handleAddUser}>
+            <Plus size={16} />
+            Add User
+          </Button>
+        )}
       </div>
       <Card>
         <Table>
@@ -199,7 +202,7 @@ export default function Users() {
                     name={`userRole${u.id}`}
                     className="input h-8 w-36"
                     value={u.role}
-                    disabled={currentUser?.id === u._id}
+                    disabled={!canManageUsers || currentUser?.id === u._id}
                     onChange={(e) => handleRoleChange(u, e.target.value)}
                   >
                     <option>Task Only</option>
@@ -210,21 +213,25 @@ export default function Users() {
                 <td>
                   <button
                     className="rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-extrabold text-[#059669] disabled:cursor-not-allowed disabled:opacity-60"
-                    disabled={currentUser?.id === u._id && u.status === "Active"}
+                    disabled={!canManageUsers || (currentUser?.id === u._id && u.status === "Active")}
                     onClick={() => handleStatusToggle(u)}
                   >
                     {u.status}
                   </button>
                 </td>
                 <td>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="ghost" onClick={() => handleEditUser(u)}>
-                      Edit
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => handleDeleteUser(u)}>
-                      Delete
-                    </Button>
-                  </div>
+                  {canManageUsers ? (
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="ghost" onClick={() => handleEditUser(u)}>
+                        Edit
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => handleDeleteUser(u)}>
+                        Delete
+                      </Button>
+                    </div>
+                  ) : (
+                    <span className="text-[12px] font-semibold text-slate-400">View only</span>
+                  )}
                 </td>
               </tr>
             ))}

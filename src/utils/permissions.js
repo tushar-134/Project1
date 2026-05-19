@@ -28,6 +28,10 @@ export function canManageUsers(role) {
   return hasAnyRole(role, ["admin"]);
 }
 
+export function canViewUsers(role) {
+  return hasAnyRole(role, ["admin", "manager"]);
+}
+
 export function canManageGroups(role) {
   return hasAnyRole(role, ["admin", "manager"]);
 }

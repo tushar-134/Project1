@@ -4,7 +4,7 @@ import { X, Boxes, ClipboardList, ContactRound, FilePlus2, Files, LayoutDashboar
 import { useAuth } from "../../context/AuthContext";
 import { useApp } from "../../context/AppContext";
 import { useTasks } from "../../hooks/useTasks";
-import { canManageCategories, canManageClients, canManageGroups, canManageUsers, canManageTasks, canViewContacts, canViewFtaTracker, canViewReports, ROLE_LABELS } from "../../utils/permissions.js";
+import { canManageCategories, canManageClients, canManageGroups, canManageUsers, canManageTasks, canViewContacts, canViewFtaTracker, canViewReports, canViewUsers, ROLE_LABELS } from "../../utils/permissions.js";
 
 export const navItems = [
   { section: "Main", links: [{ label: "Dashboard", to: "/dashboard", icon: LayoutDashboard }] },
@@ -55,7 +55,7 @@ export default function Sidebar({ open = false, onClose = () => {}, mobile = fal
           case "/tasks/categories":
             return canManageCategories(role);
           case "/settings/users":
-            return canManageUsers(role);
+            return canViewUsers(role);
           case "/settings/groups":
             return canManageGroups(role);
           case "/reports":
