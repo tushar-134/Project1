@@ -2,7 +2,9 @@ import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, C
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
+import { useAuth } from "../../context/AuthContext.jsx";
 import { reportService } from "../../services/reportService";
+import { ROLE_LABELS } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
 import Card from "../ui/Card.jsx";
 import StatusPill from "../ui/StatusPill.jsx";
@@ -23,9 +25,11 @@ const categoryLabels = {
 
 export default function Dashboard() {
   const { state, dispatch } = useApp();
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [month, setMonth] = useState(new Date(2026, 4, 1));
   const monthText = month.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+  const roleLabel = ROLE_LABELS[currentUser?.role] || currentUser?.role || "User";
   const moveMonth = (delta) => setMonth(new Date(month.getFullYear(), month.getMonth() + delta, 1));
   useEffect(() => {
     // Dashboard stats are month-sensitive, so the page refetches whenever the picker changes.
@@ -45,7 +49,15 @@ export default function Dashboard() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div><div className="page-kicker">Practice Overview</div><h2 className="screen-title">Dashboard</h2></div>
+        <div>
+          <div className="page-kicker">Practice Overview</div>
+          <h2 className="screen-title">Dashboard</h2>
+          <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[12px] font-extrabold text-slate-700 shadow-[inset_0_0_0_1px_#e2e8f0]">
+            <span className="text-slate-500">Logged in as</span>
+            <span>{currentUser?.name || "User"}</span>
+            <span className="rounded-full bg-[#1e3a8a] px-2 py-0.5 text-[11px] text-white">{roleLabel}</span>
+          </div>
+        </div>
         <div className="flex h-9 items-center overflow-hidden rounded-lg border border-[#e2e8f0] bg-white">
           <button onClick={() => moveMonth(-1)} className="grid h-9 w-9 place-items-center hover:bg-slate-50"><ChevronLeft size={16} /></button>
           <div className="min-w-36 px-3 text-center text-[12px] font-extrabold">{monthText}</div>

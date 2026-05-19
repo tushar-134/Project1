@@ -3,6 +3,7 @@ import { Bell, Menu } from "lucide-react";
 import NotificationPanel from "./NotificationPanel.jsx";
 import { useAuth } from "../../context/AuthContext";
 import { useApp } from "../../context/AppContext";
+import { ROLE_LABELS } from "../../utils/permissions.js";
 
 export default function TopBar({ title, onMenuClick }) {
   const [open, setOpen] = useState(false);
@@ -10,6 +11,7 @@ export default function TopBar({ title, onMenuClick }) {
   const { currentUser } = useAuth();
   const { state } = useApp();
   const initials = (currentUser?.name || "User").split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+  const roleLabel = ROLE_LABELS[currentUser?.role] || currentUser?.role || "User";
 
   useEffect(() => {
     // Clicking outside the bell/panel cluster should close notifications without affecting the rest of the page.
@@ -34,8 +36,8 @@ export default function TopBar({ title, onMenuClick }) {
           {state.unreadCount > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#dc2626] ring-2 ring-white" />}
         </button>
         <div className="hidden text-right sm:block">
-          <div className="text-[12px] font-extrabold">Filing Buddy Accounting LLC</div>
-          <div className="text-[10px] font-bold text-slate-500">UAE Practice Management</div>
+          <div className="text-[12px] font-extrabold">{currentUser?.name || "Signed In User"}</div>
+          <div className="text-[10px] font-bold text-slate-500">{roleLabel}</div>
         </div>
         <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#1e3a8a] text-[12px] font-black text-white">{initials}</div>
         <NotificationPanel open={open} />
