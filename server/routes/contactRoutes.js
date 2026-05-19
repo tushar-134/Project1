@@ -8,7 +8,7 @@ const { getPhoneNumberSpec, normalizeDialCode, normalizePhoneNumber } = require(
 const router = express.Router();
 
 router.use(auth);
-router.get("/", ctrl.listContacts);
+router.get("/", adminManager, ctrl.listContacts);
 router.post(
   "/",
   adminManager,

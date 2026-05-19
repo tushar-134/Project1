@@ -34,16 +34,16 @@ createRoot(document.getElementById("root")).render(
             <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/clients/add" element={<AddClient />} />
-              <Route path="/clients/edit/:id" element={<AddClient />} />
+              <Route path="/clients/add" element={<ProtectedRoute roles={["admin", "manager"]}><AddClient /></ProtectedRoute>} />
+              <Route path="/clients/edit/:id" element={<ProtectedRoute roles={["admin", "manager"]}><AddClient /></ProtectedRoute>} />
               <Route path="/clients/list" element={<ClientList />} />
-              <Route path="/clients/bulk-upload" element={<BulkUpload />} />
-              <Route path="/contacts" element={<Contacts />} />
-              <Route path="/tasks/add" element={<AddTask />} />
-              <Route path="/tasks/edit/:id" element={<AddTask />} />
+              <Route path="/clients/bulk-upload" element={<ProtectedRoute roles={["admin", "manager"]}><BulkUpload /></ProtectedRoute>} />
+              <Route path="/contacts" element={<ProtectedRoute roles={["admin", "manager"]}><Contacts /></ProtectedRoute>} />
+              <Route path="/tasks/add" element={<ProtectedRoute roles={["admin", "manager"]}><AddTask /></ProtectedRoute>} />
+              <Route path="/tasks/edit/:id" element={<ProtectedRoute roles={["admin", "manager"]}><AddTask /></ProtectedRoute>} />
               <Route path="/tasks/list" element={<TaskList />} />
-              <Route path="/tasks/fta-tracker" element={<FtaTracker />} />
-              <Route path="/tasks/categories" element={<Categories />} />
+              <Route path="/tasks/fta-tracker" element={<ProtectedRoute roles={["admin", "manager"]}><FtaTracker /></ProtectedRoute>} />
+              <Route path="/tasks/categories" element={<ProtectedRoute roles={["admin"]}><Categories /></ProtectedRoute>} />
               <Route path="/settings/users" element={<ProtectedRoute roles={["admin"]}><Users /></ProtectedRoute>} />
               <Route path="/settings/groups" element={<ProtectedRoute roles={["admin", "manager"]}><ClientGroups /></ProtectedRoute>} />
               <Route path="/reports" element={<ProtectedRoute roles={["admin", "manager"]}><Reports /></ProtectedRoute>} />

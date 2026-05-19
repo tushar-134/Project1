@@ -4,6 +4,7 @@ import { X, Boxes, ClipboardList, ContactRound, FilePlus2, Files, LayoutDashboar
 import { useAuth } from "../../context/AuthContext";
 import { useApp } from "../../context/AppContext";
 import { useTasks } from "../../hooks/useTasks";
+import { canManageCategories, canManageClients, canManageGroups, canManageUsers, canManageTasks, canViewContacts, canViewFtaTracker, canViewReports, ROLE_LABELS } from "../../utils/permissions.js";
 
 export const navItems = [
   { section: "Main", links: [{ label: "Dashboard", to: "/dashboard", icon: LayoutDashboard }] },
@@ -32,12 +33,41 @@ export default function Sidebar({ open = false, onClose = () => {}, mobile = fal
   const { currentUser, logout } = useAuth();
   const { state } = useApp();
   const { fetchFtaTracker } = useTasks();
+  const role = currentUser?.role;
   // Sidebar badges are driven from live task state so they stay accurate after status changes.
   useEffect(() => {
-    if (!mobile || open) fetchFtaTracker().catch(() => {});
-  }, [mobile, open]);
+    if ((!mobile || open) && canViewFtaTracker(role)) fetchFtaTracker().catch(() => {});
+  }, [mobile, open, role]);
   const ftaCount = state.ftaItems.filter((task) => task.ftaStatus !== "approved" && task.status !== "Approved").length;
   const initials = (currentUser?.name || "User").split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
+  const visibleNavItems = navItems
+    .map((group) => ({
+      ...group,
+      links: group.links.filter((link) => {
+        switch (link.to) {
+          case "/clients/add":
+          case "/clients/bulk-upload":
+            return canManageClients(role);
+          case "/tasks/add":
+            return canManageTasks(role);
+          case "/tasks/fta-tracker":
+            return canViewFtaTracker(role);
+          case "/tasks/categories":
+            return canManageCategories(role);
+          case "/settings/users":
+            return canManageUsers(role);
+          case "/settings/groups":
+            return canManageGroups(role);
+          case "/reports":
+            return canViewReports(role);
+          case "/contacts":
+            return canViewContacts(role);
+          default:
+            return true;
+        }
+      }),
+    }))
+    .filter((group) => group.links.length);
   const asideClass = mobile
     ? `side-scroll fixed left-0 top-0 z-50 flex h-dvh w-[260px] max-w-[82vw] flex-col overflow-y-auto bg-[#1e3a8a] text-white shadow-2xl transition-transform duration-200 ${open ? "translate-x-0" : "-translate-x-full"}`
     : "side-scroll fixed left-0 top-0 z-30 hidden h-screen w-[220px] min-w-[220px] flex-col overflow-y-auto bg-[#1e3a8a] text-white lg:flex";
@@ -56,7 +86,7 @@ export default function Sidebar({ open = false, onClose = () => {}, mobile = fal
         </div>
       </div>
       <nav className="flex-1 px-3 py-4">
-        {navItems.map((group) => (
+        {visibleNavItems.map((group) => (
           <div key={group.section} className="mb-5">
             <div className="mb-2 px-2 text-[10px] font-extrabold uppercase tracking-[.12em] text-white/45">{group.section}</div>
             <div className="space-y-1">
@@ -76,7 +106,7 @@ export default function Sidebar({ open = false, onClose = () => {}, mobile = fal
           <div className="grid h-9 w-9 place-items-center rounded-full bg-[#eab308] text-[12px] font-black text-white">{initials}</div>
           <div className="min-w-0">
             <div className="truncate text-[12px] font-extrabold">{currentUser?.name}</div>
-            <div className="text-[10px] font-bold text-white/60">{currentUser?.role}</div>
+            <div className="text-[10px] font-bold text-white/60">{ROLE_LABELS[currentUser?.role] || currentUser?.role}</div>
           </div>
         </div>
         <button onClick={logout} className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/10 text-[12px] font-extrabold text-white/85 transition hover:bg-white/20 hover:text-white">

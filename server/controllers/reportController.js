@@ -18,13 +18,17 @@ function daysOverdue(date) {
 exports.dashboardStats = async (req, res, next) => {
   try {
     const dueDate = monthRange(req.query.month);
-    const taskScope = dueDate ? { dueDate } : {};
+    const taskScope = { ...(dueDate ? { dueDate } : {}), ...(req.user.role === "task_only" ? { assignedTo: req.user._id } : {}) };
+    const clientScope = { isActive: true, ...(req.user.role === "task_only" ? { assignedUser: req.user._id } : {}) };
+    const activityTaskIds = req.user.role === "task_only"
+      ? await Task.find({ assignedTo: req.user._id }).distinct("_id")
+      : null;
     const [totalClients, pendingTasks, overdueTasks, ftaPending, recentActivity] = await Promise.all([
-      Client.countDocuments({ isActive: true }),
+      Client.countDocuments(clientScope),
       Task.countDocuments({ ...taskScope, status: { $ne: "completed" } }),
       Task.countDocuments({ ...taskScope, dueDate: { ...(dueDate || {}), $lt: new Date() }, status: { $ne: "completed" } }),
-      Task.countDocuments({ isAwaitingFta: true, ftaStatus: { $ne: "approved" } }),
-      ActivityLog.find().populate({ path: "task", populate: { path: "client", select: "legalName" } }).populate("user", "name").sort({ createdAt: -1 }).limit(10),
+      Task.countDocuments({ ...taskScope, isAwaitingFta: true, ftaStatus: { $ne: "approved" } }),
+      ActivityLog.find(req.user.role === "task_only" ? { task: { $in: activityTaskIds } } : {}).populate({ path: "task", populate: { path: "client", select: "legalName" } }).populate("user", "name").sort({ createdAt: -1 }).limit(10),
     ]);
     // Bug #10 Fix: use $group aggregation to get all category counts in one query
     // instead of firing 2 Mongo queries per category (N+1 pattern).

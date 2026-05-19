@@ -4,9 +4,10 @@ const { adminManager } = require("../middleware/roleMiddleware");
 const ctrl = require("../controllers/reportController");
 const router = express.Router();
 
-// Reports can expose broad practice data, so they follow the same admin/manager boundary as the prototype.
+// Dashboard stats are shown on the home screen for every signed-in user, with data scoped by role.
+router.get("/dashboard-stats", auth, ctrl.dashboardStats);
+// The rest of the reports expose broad practice data, so they stay manager/admin only.
 router.use(auth, adminManager);
-router.get("/dashboard-stats", ctrl.dashboardStats);
 router.get("/login-activity", ctrl.loginActivity);
 router.get("/task-activity", ctrl.taskActivity);
 router.get("/client-wise", ctrl.clientWise);
