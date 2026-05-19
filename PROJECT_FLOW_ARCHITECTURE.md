@@ -338,4 +338,3 @@ The project should always follow these rules:
 - middleware enforces access
 - controllers implement business logic
 - logs and notifications record important actions
-

@@ -1,8 +1,8 @@
 # Filing Buddy Role Architecture
 
-## Roles
+## 1. Role Model
 
-The system uses three roles:
+The system uses 3 roles only:
 
 - `admin`
 - `manager`
@@ -10,7 +10,7 @@ The system uses three roles:
 
 These roles define what each user can see, create, assign, update, or delete.
 
-## Role Intent
+## 2. Role Intent
 
 ### Admin
 
@@ -67,7 +67,7 @@ Task Only cannot:
 - access reports
 - access settings modules
 
-## Permission Matrix
+## 3. Permission Matrix
 
 | Action | Admin | Manager | Task Only |
 |---|---|---|---|
@@ -92,18 +92,18 @@ Task Only cannot:
 | View reports | Yes | Yes | No |
 | View notifications | Yes | Yes | Yes |
 
-## Frontend Role Architecture
+## 4. Frontend Role Architecture
 
 The frontend should use role-aware rendering.
 
-### Role Sources
+### 4.1 Role Sources
 
 Role is stored in:
 
 - `AuthContext`
 - the JWT-backed `/api/auth/me` response
 
-### Frontend Rules
+### 4.2 Frontend Rules
 
 The frontend should:
 
@@ -113,7 +113,7 @@ The frontend should:
 - hide assign controls for `task_only`
 - hide user/settings/report sections for `task_only`
 
-### Sidebar by Role
+### 4.3 Sidebar by Role
 
 #### Admin
 
@@ -137,11 +137,11 @@ The frontend should:
 - Task List
 - Notifications
 
-## Backend Role Architecture
+## 5. Backend Role Architecture
 
 The backend is the true authority for permissions.
 
-### Request Flow
+### 5.1 Request Flow
 
 ```text
 Route
@@ -151,7 +151,7 @@ Route
 -> database
 ```
 
-### authMiddleware
+### 5.2 authMiddleware
 
 `authMiddleware` does:
 
@@ -159,7 +159,7 @@ Route
 - load the authenticated user identity
 - attach user info to `req.user`
 
-### roleMiddleware
+### 5.3 roleMiddleware
 
 `roleMiddleware` should expose helpers such as:
 
@@ -167,15 +167,15 @@ Route
 - `adminManager`
 - task ownership checks for `task_only`
 
-## API Access by Role
+## 6. API Access by Role
 
-### Auth
+### 6.1 Auth
 
 - `POST /api/auth/login` -> all roles
 - `GET /api/auth/me` -> authenticated users
 - `PUT /api/auth/change-password` -> authenticated users
 
-### Clients
+### 6.2 Clients
 
 - `GET /api/clients` -> admin, manager
 - `GET /api/clients/:id` -> admin, manager
@@ -183,7 +183,7 @@ Route
 - `PUT /api/clients/:id` -> admin, manager
 - `DELETE /api/clients/:id` -> admin only
 
-### Tasks
+### 6.3 Tasks
 
 - `GET /api/tasks`
   - admin -> all tasks
@@ -202,7 +202,7 @@ Route
   - task_only -> own task only
 - `DELETE /api/tasks/:id` -> admin only
 
-### Users
+### 6.4 Users
 
 - `GET /api/users` -> admin only
 - `GET /api/users/:id` -> admin only
@@ -212,7 +212,7 @@ Route
 - `PATCH /api/users/:id/status` -> admin only
 - `DELETE /api/users/:id` -> admin only
 
-### Groups
+### 6.5 Groups
 
 - `GET /api/groups` -> admin, manager
 - `POST /api/groups` -> admin, manager
@@ -220,24 +220,24 @@ Route
 - `PATCH /api/groups/:id/clients` -> admin, manager
 - `DELETE /api/groups/:id` -> admin, manager or admin only depending on business rule
 
-### Categories
+### 6.6 Categories
 
 - `GET /api/categories` -> authenticated users or admin/manager only
 - `POST /api/categories` -> admin only
 - `PUT /api/categories/:id` -> admin only
 - `DELETE /api/categories/:id` -> admin only
 
-### Reports
+### 6.7 Reports
 
 - `GET /api/reports/*` -> admin, manager
 
-### Notifications
+### 6.8 Notifications
 
 - `GET /api/notifications` -> authenticated users
 - `PATCH /api/notifications/:id/read` -> authenticated users
 - `PATCH /api/notifications/mark-all-read` -> authenticated users
 
-## Task Ownership Rule
+## 7. Task Ownership Rule
 
 This is the key rule for `task_only`.
 
@@ -251,11 +251,11 @@ When a `task_only` user tries to update status:
 
 This check must not depend only on the frontend.
 
-## Assignment Architecture
+## 8. Assignment Architecture
 
 Assignment is controlled only by `admin` and `manager`.
 
-### Assignment Flow
+### 8.1 Assignment Flow
 
 ```text
 Admin or Manager creates task
@@ -266,29 +266,29 @@ Admin or Manager creates task
 -> task_only user sees assigned work only
 ```
 
-### Assignment Rule
+### 8.2 Assignment Rule
 
 The backend must reject assignment attempts made by `task_only`.
 
-## Delete Architecture
+## 9. Delete Architecture
 
 Delete is controlled only by `admin`.
 
-### Delete Rules
+### 9.1 Delete Rules
 
 - task delete -> admin only
 - client delete -> admin only
 - user delete -> admin only
 
-### Manager Delete Rule
+### 9.2 Manager Delete Rule
 
 Manager can operate work but cannot remove data permanently.
 
-### Task Only Delete Rule
+### 9.3 Task Only Delete Rule
 
 Task Only cannot delete anything.
 
-## Recommended UI Behavior
+## 10. Recommended UI Behavior
 
 The UI should make the role model obvious:
 
@@ -299,7 +299,7 @@ The UI should make the role model obvious:
 
 But the backend must still enforce every permission again.
 
-## Final Principle
+## 11. Final Principle
 
 Use this rule across the whole project:
 
