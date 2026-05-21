@@ -91,7 +91,11 @@ exports.listClients = async (req, res, next) => {
     if (jurisdiction) query.jurisdiction = jurisdiction;
     if (group) query.group = group;
     if (assignedUser) query.assignedUser = assignedUser;
-    if (req.user.role === "task_only") query.assignedUser = req.user._id;
+    if (req.user.role === "task_only") {
+      // task_only users may only see clients whose tasks are assigned to them.
+      const assignedClientIds = await Task.find({ assignedTo: req.user._id }).distinct("client");
+      query._id = { $in: assignedClientIds };
+    }
     if (search) {
       query.$or = [
         { legalName: new RegExp(search, "i") },
@@ -113,8 +117,10 @@ exports.getClient = async (req, res, next) => {
   try {
     const client = await Client.findById(req.params.id).populate(populateClient).populate("attachments.uploadedBy", "name");
     if (!client || !client.isActive) return res.status(404).json({ message: "Client not found" });
-    if (req.user.role === "task_only" && String(client.assignedUser?._id || client.assignedUser) !== String(req.user._id)) {
-      return res.status(403).json({ message: "Forbidden" });
+    if (req.user.role === "task_only") {
+      // task_only users may only access a client if they have at least one task assigned to them for that client.
+      const hasTask = await Task.exists({ client: client._id, assignedTo: req.user._id });
+      if (!hasTask) return res.status(403).json({ message: "Forbidden" });
     }
     res.json(client);
   } catch (error) { next(error); }
