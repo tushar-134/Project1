@@ -124,6 +124,9 @@ exports.createClient = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+    if (req.user.role === "manager" && req.body.assignedUser && String(req.body.assignedUser) !== String(req.user._id)) {
+      return res.status(403).json({ message: "Managers can only assign clients to themselves." });
+    }
     const invalidContactIndex = findInvalidContactMobile(req.body.contactPersons);
     if (invalidContactIndex >= 0) return res.status(400).json({ message: `Contact person ${invalidContactIndex + 1}: Invalid number.` });
     const duplicate = await findDuplicateClient(req.body);
@@ -141,6 +144,9 @@ exports.updateClient = async (req, res, next) => {
   try {
     const client = await Client.findById(req.params.id);
     if (!client || !client.isActive) return res.status(404).json({ message: "Client not found" });
+    if (req.user.role === "manager" && "assignedUser" in req.body && req.body.assignedUser && String(req.body.assignedUser) !== String(req.user._id)) {
+      return res.status(403).json({ message: "Managers can only assign clients to themselves." });
+    }
     if ("contactPersons" in req.body) {
       const invalidContactIndex = findInvalidContactMobile(req.body.contactPersons);
       if (invalidContactIndex >= 0) return res.status(400).json({ message: `Contact person ${invalidContactIndex + 1}: Invalid number.` });

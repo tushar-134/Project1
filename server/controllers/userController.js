@@ -121,6 +121,11 @@ exports.updateStatus = async (req, res, next) => {
 exports.deleteUser = async (req, res, next) => {
   try {
     if (String(req.params.id) === String(req.user._id)) return res.status(400).json({ message: "Cannot delete self" });
+    const target = await User.findById(req.params.id).select("role");
+    if (!target) return res.status(404).json({ message: "User not found" });
+    if (target.role === "admin") {
+      return res.status(403).json({ message: "Cannot delete an admin user." });
+    }
     await User.findByIdAndDelete(req.params.id);
     res.json({ message: "User deleted" });
   } catch (error) { next(error); }

@@ -160,6 +160,9 @@ exports.createTask = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+    if (req.user.role === "manager" && "assignedTo" in req.body && String(req.body.assignedTo || "") !== String(req.user._id)) {
+      return res.status(403).json({ message: "Managers can only assign tasks to themselves." });
+    }
     const status = req.body.status || (req.body.isAwaitingFta ? "submitted_to_fta" : "not_started");
     const recurringFields = normalizeRecurringFields(req.body, req.body.dueDate);
     const task = await Task.create({
@@ -181,6 +184,9 @@ exports.updateTask = async (req, res, next) => {
     const task = await Task.findById(req.params.id);
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
+    }
+    if (req.user.role === "manager" && "assignedTo" in req.body && String(req.body.assignedTo || "") !== String(req.user._id)) {
+      return res.status(403).json({ message: "Managers can only assign tasks to themselves." });
     }
     const previousStatus = task.status;
     // Bug #4 Fix: whitelist editable fields to block mass-assignment of taskId, createdBy, etc.
