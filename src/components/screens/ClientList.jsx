@@ -102,18 +102,20 @@ export default function ClientList() {
                       <Button size="sm" variant="ghost" onClick={() => navigate(`/clients/edit/${client.id}`)}>
                         <Pencil size={14} />
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={async () => {
-                          if (confirm("Delete client?")) {
-                            await deleteClient(client._id);
-                            fetchClients();
-                          }
-                        }}
-                      >
-                        <Trash2 size={14} />
-                      </Button>
+                      {currentUser?.role === "admin" && (
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={async () => {
+                            if (confirm("Delete client?")) {
+                              await deleteClient(client._id);
+                              fetchClients();
+                            }
+                          }}
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      )}
                     </div>
                   </td>
                 )}
