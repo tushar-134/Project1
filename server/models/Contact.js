@@ -16,4 +16,9 @@ const contactSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 }, { timestamps: true });
 
+contactSchema.index({ isActive: 1, client: 1, createdAt: -1 });
+contactSchema.index({ isActive: 1, createdAt: -1 });
+contactSchema.index({ client: 1 });
+contactSchema.index({ createdBy: 1 });
+
 module.exports = mongoose.model("Contact", contactSchema);

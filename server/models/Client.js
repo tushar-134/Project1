@@ -85,4 +85,13 @@ clientSchema.pre("save", function encryptPortalPasswords() {
   }
 });
 
+clientSchema.index({ isActive: 1, createdAt: -1 });
+clientSchema.index({ isActive: 1, jurisdiction: 1, createdAt: -1 });
+clientSchema.index({ isActive: 1, group: 1, createdAt: -1 });
+clientSchema.index({ isActive: 1, assignedUser: 1, createdAt: -1 });
+clientSchema.index({ legalName: 1 });
+clientSchema.index({ "vatDetails.trn": 1 });
+clientSchema.index({ "tradeLicences.licenceNumber": 1 });
+clientSchema.index({ group: 1 });
+
 module.exports = mongoose.model("Client", clientSchema);
