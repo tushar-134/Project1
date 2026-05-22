@@ -21,7 +21,8 @@ export default function AddTask() {
   const { fetchClients } = useClients();
   const { fetchUsers } = useUsers();
   const { createTask, getTask, updateTask } = useTasks();
-  const [step, setStep] = useState(1);
+  // If navigated from TaskList with prefetched task data, start directly at step 3 (no flash).
+  const [step, setStep] = useState(() => (isEditMode && location.state?.task) ? 3 : 1);
   const [categoryId, setCategoryId] = useState("vat");
   const [categoryName, setCategoryName] = useState("VAT");
   const category = state.categories.find((cat) => cat.id === categoryId);
@@ -59,13 +60,16 @@ export default function AddTask() {
       const nextCategoryId = categoryMap[task.category] || String(task.category || "").toLowerCase();
       setCategoryId(nextCategoryId);
       setCategoryName(task.category || "VAT");
-      setType(task.taskType || "");
-      setRecurring(Boolean(task.isRecurring));
+      setType(task.taskType || task.type || "");
+      setRecurring(Boolean(task.isRecurring ?? task.recurring));
       setFta(Boolean(task.isAwaitingFta));
-      setSavedStatus(task.status || "not_started");
+      // Handle both mapped shape (apiStatus) and raw API shape (status enum)
+      setSavedStatus(task.apiStatus || task.status || "not_started");
       setDetails({
-        client: task.client?._id || task.client || "",
-        assigned: task.assignedTo?._id || task.assignedTo || "",
+        // Handle both mapped shape (clientId) and raw API shape (client._id)
+        client: task.client?._id || task.clientId || (typeof task.client === "string" ? "" : task.client) || "",
+        // Handle both mapped shape (assignedId) and raw API shape (assignedTo._id)
+        assigned: task.assignedTo?._id || task.assignedId || (typeof task.assignedTo === "string" ? task.assignedTo : "") || "",
         dueDate: task.dueDate?.slice?.(0, 10) || "",
         period: task.period || "",
         description: task.description || "",
