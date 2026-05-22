@@ -1,5 +1,5 @@
 import { cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { Check, Send } from "lucide-react";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
@@ -16,6 +16,7 @@ export default function AddTask() {
   const { state, dispatch } = useApp();
   const navigate = useNavigate();
   const { id } = useParams();
+  const location = useLocation();
   const isEditMode = Boolean(id);
   const { fetchClients } = useClients();
   const { fetchUsers } = useUsers();
@@ -39,7 +40,8 @@ export default function AddTask() {
   }, []);
   useEffect(() => {
     if (!isEditMode) return;
-    getTask(id).then((task) => {
+
+    function populate(task) {
       const categoryMap = {
         VAT: "vat",
         CT: "ct",
@@ -72,10 +74,19 @@ export default function AddTask() {
         endDate: task.recurringConfig?.endDate?.slice?.(0, 10) || "",
       });
       setStep(3);
-    }).catch(() => {
-      toast.error("Unable to load this task for editing.");
-      navigate("/tasks/list");
-    });
+    }
+
+    // If TaskList passed the task row via router state, use it immediately (instant open).
+    // Fall back to a fresh API call only when navigating directly via URL.
+    const prefetched = location.state?.task;
+    if (prefetched) {
+      populate(prefetched);
+    } else {
+      getTask(id).then(populate).catch(() => {
+        toast.error("Unable to load this task for editing.");
+        navigate("/tasks/list");
+      });
+    }
   }, [id, isEditMode]);
 
   useEffect(() => {

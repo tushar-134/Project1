@@ -235,7 +235,7 @@ export default function TaskList() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => navigate(`/tasks/edit/${task.id}`)}
+                        onClick={() => navigate(`/tasks/edit/${task.id}`, { state: { task } })}
                       >
                         Edit
                       </Button>
