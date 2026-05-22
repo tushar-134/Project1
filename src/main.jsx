@@ -34,10 +34,10 @@ createRoot(document.getElementById("root")).render(
             <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route index element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/clients/add" element={<ProtectedRoute roles={["admin", "manager"]}><AddClient /></ProtectedRoute>} />
+              <Route path="/clients/add" element={<ProtectedRoute roles={["admin"]}><AddClient /></ProtectedRoute>} />
               <Route path="/clients/edit/:id" element={<ProtectedRoute roles={["admin", "manager"]}><AddClient /></ProtectedRoute>} />
               <Route path="/clients/list" element={<ClientList />} />
-              <Route path="/clients/bulk-upload" element={<ProtectedRoute roles={["admin", "manager"]}><BulkUpload /></ProtectedRoute>} />
+              <Route path="/clients/bulk-upload" element={<ProtectedRoute roles={["admin"]}><BulkUpload /></ProtectedRoute>} />
               <Route path="/contacts" element={<ProtectedRoute roles={["admin", "manager"]}><Contacts /></ProtectedRoute>} />
               <Route path="/tasks/add" element={<ProtectedRoute roles={["admin", "manager"]}><AddTask /></ProtectedRoute>} />
               <Route path="/tasks/edit/:id" element={<ProtectedRoute roles={["admin", "manager"]}><AddTask /></ProtectedRoute>} />
