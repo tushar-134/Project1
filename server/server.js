@@ -163,11 +163,13 @@ connectDB().then(async () => {
         ["FB/2026/T008", nova,     "CT",         "CT Registration",        "2026-05-10", omar, "submitted_to_fta",false,null,      true, "in_review"],
         ["FB/2026/T009", alBaraka, "VAT",        "VAT Refund Application", "2026-05-10", sara, "submitted_to_fta",false,null,      true, "additional_query"],
       ];
+      let lastTask;
       for (const [taskId, client, category, taskType, dueDate, assignedTo, status, isRecurring, frequency, isAwaitingFta, ftaStatus] of seedTasks) {
         const task = await Task.create({ taskId, client: client._id, category, taskType, dueDate, assignedTo: assignedTo?._id, status, isRecurring, recurringConfig: frequency ? { frequency } : undefined, isAwaitingFta, ftaStatus, ftaSubmittedDate: isAwaitingFta ? new Date("2026-05-01") : undefined, createdBy: admin._id });
         await ActivityLog.create({ task: task._id, user: admin._id, action: "Created", newStatus: status });
+        lastTask = task;
       }
-      await Notification.create({ recipient: sara._id, title: "FTA query received", message: "FB/2026/T009 has an additional FTA query.", type: "fta_query" });
+      await Notification.create({ recipient: sara._id, title: "FTA query received", message: "FB/2026/T009 has an additional FTA query.", type: "fta_query", relatedTask: lastTask._id });
       console.log("✅ Seed complete! Login: admin@filingbuddy.ae / Admin@123");
     } catch (seedErr) {
       console.error("Seed error:", seedErr.message);
