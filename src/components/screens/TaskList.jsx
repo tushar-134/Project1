@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { useUsers } from "../../hooks/useUsers.js";
 import { useTasks } from "../../hooks/useTasks";
 import { downloadBlob } from "../../utils/adapterUtils";
 import { canManageTasks } from "../../utils/permissions.js";
@@ -42,16 +43,18 @@ export default function TaskList() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { fetchTasks, updateStatus, exportTasks } = useTasks();
+  const { fetchTasks, updateStatus, updateAssignee, exportTasks } = useTasks();
   const [cat, setCat] = useState(searchParams.get("category") || "All");
   const [status, setStatus] = useState("All");
   const [scope, setScope] = useState("By Month");
   const [month, setMonth] = useState(searchParams.get("month") || "2026-05");
 
   const canManage = canManageTasks(currentUser?.role);
-  // BRD 5.4: Admin/Manager can change status for any task.
-  // Task Only can only change status for tasks assigned to them.
   const isTaskOnly = currentUser?.role === "task_only";
+  const { fetchUsers } = useUsers();
+
+  // Load users list for the inline assignee dropdown
+  useEffect(() => { if (canManage) fetchUsers().catch(() => {}); }, [canManage]);
 
   useEffect(() => {
     fetchTasks({
@@ -160,7 +163,27 @@ export default function TaskList() {
                       </span>
                     )}
                   </td>
-                  <td>{task.assigned}</td>
+                  <td>
+                    {canManage ? (
+                      // Admin/Manager: inline assignee dropdown
+                      <select
+                        id={`task-assignee-${task.id}`}
+                        className="input h-8 min-w-36"
+                        value={task.assignedId || ""}
+                        onChange={(e) => {
+                          const selected = state.users.find((u) => u._id === e.target.value || u.id === e.target.value);
+                          updateAssignee(task.id, e.target.value || null, selected?.name || "Unassigned").catch(() => fetchTasks());
+                        }}
+                      >
+                        <option value="">Unassigned</option>
+                        {state.users.map((u) => (
+                          <option key={u._id || u.id} value={u._id || u.id}>{u.name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span>{task.assigned}</span>
+                    )}
+                  </td>
                   <td>
                     {canChangeStatus ? (
                       <select

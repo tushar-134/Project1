@@ -41,6 +41,8 @@ function reducer(state, action) {
       return { ...state, errors: { ...state.errors, [action.resource]: action.error }, loading: { ...state.loading, [action.resource]: false } };
     case "UPDATE_TASK_STATUS":
       return { ...state, tasks: state.tasks.map((task) => task._id === action.id || task.id === action.id ? { ...task, status: action.status, displayStatus: action.displayStatus || task.displayStatus, ...(action.isAwaitingFta !== undefined ? { isAwaitingFta: action.isAwaitingFta } : {}) } : task) };
+    case "UPDATE_TASK_ASSIGNEE":
+      return { ...state, tasks: state.tasks.map((task) => task._id === action.id || task.id === action.id ? { ...task, assignedId: action.assignedTo, assigned: action.assigned } : task) };
     case "UPDATE_FTA_STATUS":
       return { ...state, ftaItems: state.ftaItems.map((item) => item._id === action.id || item.id === action.id ? { ...item, ftaStatus: action.status, status: action.displayStatus || item.status } : item) };
     case "MARK_NOTIFICATION_READ":

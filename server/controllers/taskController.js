@@ -275,6 +275,10 @@ exports.updateStatus = async (req, res, next) => {
       updateFields.ftaStatus = "in_review";
       updateFields.ftaSubmittedDate = new Date();
       console.log(`[FTA] Task ${task.taskId} submitted to FTA tracker by user ${req.user._id}`);
+    } else {
+      // Changing status away from submitted_to_fta means the task is no longer awaiting FTA.
+      // Reset so it is removed from the FTA Tracker and Edit Task toggle reflects correctly.
+      updateFields.isAwaitingFta = false;
     }
 
     // Use findByIdAndUpdate to guarantee all fields are persisted
@@ -296,6 +300,27 @@ exports.updateStatus = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
+
+exports.updateAssignee = async (req, res, next) => {
+  try {
+    const { assignedTo } = req.body;
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ message: "Task not found" });
+    // Only admin/manager can reassign (task_only can't)
+    const updateFields = { assignedTo: assignedTo || null };
+    const updated = await Task.findByIdAndUpdate(
+      task._id,
+      { $set: updateFields },
+      { new: true, runValidators: true }
+    ).populate(populateTask);
+    await auditLogger({ task: updated._id, user: req.user._id, action: "Updated", newStatus: updated.status });
+    // Notify the new assignee
+    if (updated.assignedTo && String(updated.assignedTo._id || updated.assignedTo) !== String(req.user._id)) {
+      await Notification.create({ recipient: updated.assignedTo._id || updated.assignedTo, title: "Task reassigned to you", message: `${updated.taskId} ${updated.taskType}`, type: "task_update", relatedTask: updated._id });
+    }
+    res.json(updated);
+  } catch (error) { next(error); }
+};
 
 exports.ftaTracker = async (req, res, next) => {
   try {

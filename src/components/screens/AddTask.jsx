@@ -119,12 +119,14 @@ export default function AddTask() {
         isRecurring: recurring,
         recurringConfig: recurring ? { frequency: details.frequency, nextDueDate: details.nextDue, endDate: details.endDate || undefined } : undefined,
         isAwaitingFta: fta,
-        status: fta ? "submitted_to_fta" : savedStatus,
+        // In edit mode, preserve the current status — don't override it just because FTA toggle is on.
+        // In create mode, auto-set to submitted_to_fta if FTA toggle is on, else not_started.
+        status: isEditMode ? savedStatus : (fta ? "submitted_to_fta" : "not_started"),
       };
       if (isEditMode) {
         await updateTask(id, payload);
       } else {
-        await createTask({ ...payload, status: fta ? "submitted_to_fta" : "not_started" });
+        await createTask(payload);
       }
       toast.success(isEditMode ? "Task updated successfully." : "Task created successfully.");
       navigate("/tasks/list");
