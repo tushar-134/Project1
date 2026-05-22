@@ -54,10 +54,20 @@ function reducer(state, action) {
           state.unreadCount - (state.notifications.some((item) => item._id === action.id && !item.isRead) ? 1 : 0)
         ),
       };
-    case "MARK_ALL_NOTIFICATIONS_READ":
+    case "REMOVE_NOTIFICATION":
       return {
         ...state,
-        notifications: state.notifications.map((item) => ({ ...item, isRead: true })),
+        notifications: state.notifications.filter((item) => item._id !== action.id),
+        unreadCount: Math.max(
+          0,
+          state.unreadCount - (state.notifications.some((item) => item._id === action.id && !item.isRead) ? 1 : 0)
+        ),
+      };
+    case "MARK_ALL_NOTIFICATIONS_READ":
+      // Clear the list entirely — panel shows only unread, so all-read = empty panel.
+      return {
+        ...state,
+        notifications: [],
         unreadCount: 0,
       };
     default:
