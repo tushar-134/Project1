@@ -6,6 +6,21 @@ const ActivityLog = require("../models/ActivityLog");
 const auditLogger = require("../utils/auditLogger");
 const { nextTaskId } = require("../utils/autoId");
 
+// Human-readable status labels for notification messages
+const STATUS_LABEL = {
+  not_started: "Not Yet Started",
+  wip: "WIP",
+  submitted_to_fta: "Submitted to FTA",
+  completed: "Completed",
+};
+const FTA_STATUS_LABEL = {
+  in_review: "In Review",
+  additional_query: "Additional Query",
+  approved: "Approved",
+  rejected: "Rejected",
+};
+function statusLabel(s) { return STATUS_LABEL[s] || FTA_STATUS_LABEL[s] || s; }
+
 function asDate(value) {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
@@ -112,7 +127,7 @@ async function maybeGenerateNextRecurringTask(task, userId) {
     await Notification.create({
       recipient: nextTask.assignedTo,
       title: "Recurring task generated",
-      message: `${nextTask.taskId} ${nextTask.taskType}`,
+      message: `${nextTask.taskId} — ${nextTask.taskType} (${statusLabel(nextTask.status)})`,
       type: "task_update",
       relatedTask: nextTask._id,
     });
@@ -188,7 +203,7 @@ exports.createTask = async (req, res, next) => {
     });
     await auditLogger({ task: task._id, user: req.user._id, action: "Created", newStatus: task.status });
     if (task.assignedTo && String(task.assignedTo) !== String(req.user._id)) {
-      await Notification.create({ recipient: task.assignedTo, title: "New task assigned", message: `${task.taskId} ${task.taskType}`, type: "task_update", relatedTask: task._id });
+      await Notification.create({ recipient: task.assignedTo, title: "New task assigned", message: `${task.taskId} — ${task.taskType} (${statusLabel(task.status)})`, type: "task_update", relatedTask: task._id });
     }
     res.status(201).json(await task.populate(populateTask));
   } catch (error) { next(error); }
@@ -294,7 +309,7 @@ exports.updateStatus = async (req, res, next) => {
     await auditLogger({ task: updated._id, user: req.user._id, action: "Status Changed", previousStatus, newStatus: updated.status });
     // Only notify assignee if it's not the same person making the change (from main)
     if (updated.assignedTo && String(updated.assignedTo._id || updated.assignedTo) !== String(req.user._id)) {
-      await Notification.create({ recipient: updated.assignedTo._id || updated.assignedTo, title: "Task status changed", message: `${updated.taskId} moved to ${updated.status}`, type: "task_update", relatedTask: updated._id });
+      await Notification.create({ recipient: updated.assignedTo._id || updated.assignedTo, title: "Task status changed", message: `${updated.taskId} moved to ${statusLabel(updated.status)}`, type: "task_update", relatedTask: updated._id });
     }
     res.json(updated);
   } catch (error) { next(error); }
@@ -316,7 +331,7 @@ exports.updateAssignee = async (req, res, next) => {
     await auditLogger({ task: updated._id, user: req.user._id, action: "Updated", newStatus: updated.status });
     // Notify the new assignee
     if (updated.assignedTo && String(updated.assignedTo._id || updated.assignedTo) !== String(req.user._id)) {
-      await Notification.create({ recipient: updated.assignedTo._id || updated.assignedTo, title: "Task reassigned to you", message: `${updated.taskId} ${updated.taskType}`, type: "task_update", relatedTask: updated._id });
+      await Notification.create({ recipient: updated.assignedTo._id || updated.assignedTo, title: "Task reassigned to you", message: `${updated.taskId} — ${updated.taskType} (${statusLabel(updated.status)})`, type: "task_update", relatedTask: updated._id });
     }
     res.json(updated);
   } catch (error) { next(error); }

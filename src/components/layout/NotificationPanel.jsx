@@ -65,12 +65,12 @@ export default function NotificationPanel({ open, onClose }) {
     // 1. Start slide-out animation
     setDismissing((prev) => new Set(prev).add(item._id));
 
-    // 2. After animation (300ms): remove from state + navigate + close
-    setTimeout(() => {
-      markRead(item._id);                   // marks read in DB + removes from state
+    // 2. After animation (300ms): mark read in DB + remove from state → navigate → close
+    setTimeout(async () => {
+      await markRead(item._id);               // marks read in DB + removes from state
       const target = getNavTarget(item);
-      onClose?.();                          // close the notification panel
-      navigate(target);                     // go to the related page
+      onClose?.();                            // close the notification panel
+      navigate(target);                       // go to the related page
       setDismissing((prev) => {
         const next = new Set(prev);
         next.delete(item._id);
