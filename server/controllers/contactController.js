@@ -50,6 +50,8 @@ exports.createContact = async (req, res, next) => {
 
 exports.updateContact = async (req, res, next) => {
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
     const contact = await Contact.findById(req.params.id);
     if (!contact || !contact.isActive) return res.status(404).json({ message: "Contact not found" });
     const ALLOWED = ["fullName", "client", "designation", "email", "type", "city", "isPrimary"];

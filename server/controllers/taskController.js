@@ -57,6 +57,18 @@ function normalizeRecurringFields(body, fallbackDueDate) {
   };
 }
 
+async function ensureManagerCanAssign(req, assignedTo) {
+  if (req.user.role !== "manager" || !assignedTo) return null;
+  const assignee = await User.findById(assignedTo).select("role");
+  if (!assignee) {
+    return { status: 404, message: "Assigned user not found" };
+  }
+  if (assignee.role === "admin") {
+    return { status: 403, message: "Managers cannot assign tasks to admin users." };
+  }
+  return null;
+}
+
 async function maybeGenerateNextRecurringTask(task, userId) {
   if (!task?.isRecurring || task.recurringGeneratedTask) return null;
   const frequency = task.recurringConfig?.frequency;
@@ -160,8 +172,9 @@ exports.createTask = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-    if (req.user.role === "manager" && "assignedTo" in req.body && String(req.body.assignedTo || "") !== String(req.user._id)) {
-      return res.status(403).json({ message: "Managers can only assign tasks to themselves." });
+    const assignmentError = await ensureManagerCanAssign(req, req.body.assignedTo);
+    if (assignmentError) {
+      return res.status(assignmentError.status).json({ message: assignmentError.message });
     }
     const status = req.body.status || (req.body.isAwaitingFta ? "submitted_to_fta" : "not_started");
     const recurringFields = normalizeRecurringFields(req.body, req.body.dueDate);
@@ -185,8 +198,12 @@ exports.updateTask = async (req, res, next) => {
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
     }
-    if (req.user.role === "manager" && "assignedTo" in req.body && String(req.body.assignedTo || "") !== String(req.user._id)) {
-      return res.status(403).json({ message: "Managers can only assign tasks to themselves." });
+    const assignmentError = await ensureManagerCanAssign(
+      req,
+      "assignedTo" in req.body ? req.body.assignedTo : task.assignedTo,
+    );
+    if (assignmentError) {
+      return res.status(assignmentError.status).json({ message: assignmentError.message });
     }
     const previousStatus = task.status;
     // Bug #4 Fix: whitelist editable fields to block mass-assignment of taskId, createdBy, etc.

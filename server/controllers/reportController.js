@@ -19,10 +19,16 @@ exports.dashboardStats = async (req, res, next) => {
   try {
     const dueDate = monthRange(req.query.month);
     const taskScope = { ...(dueDate ? { dueDate } : {}), ...(req.user.role === "task_only" ? { assignedTo: req.user._id } : {}) };
-    const clientScope = { isActive: true, ...(req.user.role === "task_only" ? { assignedUser: req.user._id } : {}) };
     const activityTaskIds = req.user.role === "task_only"
       ? await Task.find({ assignedTo: req.user._id }).distinct("_id")
       : null;
+    const visibleClientIds = req.user.role === "task_only"
+      ? await Task.find({ assignedTo: req.user._id }).distinct("client")
+      : null;
+    const clientScope = {
+      isActive: true,
+      ...(req.user.role === "task_only" ? { _id: { $in: visibleClientIds } } : {}),
+    };
     const [totalClients, pendingTasks, overdueTasks, ftaPending, recentActivity] = await Promise.all([
       Client.countDocuments(clientScope),
       Task.countDocuments({ ...taskScope, status: { $ne: "completed" } }),
@@ -32,7 +38,11 @@ exports.dashboardStats = async (req, res, next) => {
     ]);
     // Bug #10 Fix: use $group aggregation to get all category counts in one query
     // instead of firing 2 Mongo queries per category (N+1 pattern).
-    const matchStage = { status: { $ne: "completed" }, ...(dueDate ? { dueDate } : {}) };
+    const matchStage = {
+      status: { $ne: "completed" },
+      ...(dueDate ? { dueDate } : {}),
+      ...(req.user.role === "task_only" ? { assignedTo: req.user._id } : {}),
+    };
     const catAgg = await Task.aggregate([
       { $match: matchStage },
       { $group: {
