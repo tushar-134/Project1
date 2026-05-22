@@ -286,9 +286,9 @@ exports.updateFtaStatus = async (req, res, next) => {
     task.ftaStatus = req.body.ftaStatus;
     await task.save();
     await auditLogger({ task: task._id, user: req.user._id, action: "FTA Status Changed", previousStatus, newStatus: task.ftaStatus });
-    if (task.ftaStatus === "additional_query") {
+    if (previousStatus !== "additional_query" && task.ftaStatus === "additional_query") {
       const admins = await User.find({ role: "admin", isActive: true });
-      const recipients = [task.assignedTo, ...admins.map((u) => u._id)].filter(Boolean);
+      const recipients = [...new Set([task.assignedTo, ...admins.map((u) => u._id)].filter(Boolean).map((id) => String(id)))];
       await Notification.insertMany(recipients.map((recipient) => ({ recipient, title: "FTA query received", message: `${task.taskId} has an additional FTA query.`, type: "fta_query", relatedTask: task._id })));
     }
     res.json(await task.populate(populateTask));

@@ -49,13 +49,45 @@ app.use("/api/notifications", require("./routes/notificationRoutes"));
 app.use(notFound);
 app.use(errorMiddleware);
 
+async function insertMissingNotifications(entries) {
+  if (!entries.length) return;
+  const recipients = [...new Set(entries.map((entry) => String(entry.recipient)).filter(Boolean))];
+  const relatedTaskIds = [...new Set(entries.map((entry) => String(entry.relatedTask)).filter(Boolean))];
+  const types = [...new Set(entries.map((entry) => entry.type).filter(Boolean))];
+
+  const existing = await Notification.find({
+    recipient: { $in: recipients },
+    relatedTask: { $in: relatedTaskIds },
+    type: { $in: types },
+  }).select("recipient relatedTask type");
+
+  const existingKeys = new Set(
+    existing.map((entry) => `${String(entry.recipient)}:${entry.type}:${String(entry.relatedTask)}`)
+  );
+
+  const freshEntries = entries.filter((entry) => {
+    const key = `${String(entry.recipient)}:${entry.type}:${String(entry.relatedTask)}`;
+    if (existingKeys.has(key)) return false;
+    existingKeys.add(key);
+    return true;
+  });
+
+  if (freshEntries.length) await Notification.insertMany(freshEntries);
+}
+
 async function dailyTaskNotifications() {
   // We compute date windows in UTC because all persisted task dates are stored in UTC.
   const now = new Date();
   const start3 = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 3));
   const end3 = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 4));
   const dueSoon = await Task.find({ dueDate: { $gte: start3, $lt: end3 }, status: { $ne: "completed" }, assignedTo: { $ne: null } });
-  await Notification.insertMany(dueSoon.map((task) => ({ recipient: task.assignedTo, title: "Task due in 3 days", message: `${task.taskId} is due soon.`, type: "task_due", relatedTask: task._id })));
+  await insertMissingNotifications(dueSoon.map((task) => ({
+    recipient: task.assignedTo,
+    title: "Task due in 3 days",
+    message: `${task.taskId} is due soon.`,
+    type: "task_due",
+    relatedTask: task._id,
+  })));
 
   const overdue = await Task.find({ dueDate: { $lt: now }, status: { $ne: "completed" } }).populate("assignedTo", "email name");
   const admins = await User.find({ role: "admin", isActive: true });
@@ -63,7 +95,7 @@ async function dailyTaskNotifications() {
   overdue.forEach((task) => {
     [task.assignedTo?._id, ...admins.map((admin) => admin._id)].filter(Boolean).forEach((recipient) => notifications.push({ recipient, title: "Task overdue", message: `${task.taskId} is overdue.`, type: "task_overdue", relatedTask: task._id }));
   });
-  if (notifications.length) await Notification.insertMany(notifications);
+  await insertMissingNotifications(notifications);
   const byEmail = new Map();
   overdue.forEach((task) => { if (task.assignedTo?.email) byEmail.set(task.assignedTo.email, [...(byEmail.get(task.assignedTo.email) || []), task.taskId]); });
   admins.forEach((admin) => byEmail.set(admin.email, overdue.map((task) => task.taskId)));
