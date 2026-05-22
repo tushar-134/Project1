@@ -11,8 +11,30 @@ import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import Table from "../ui/Table.jsx";
 
-const statuses = ["All", "Not Yet Started", "WIP", "Completed", "Submitted to FTA"];
+// BRD 5.4 — all four statuses; "Submitted to FTA" is gated to FTA-tracked tasks only
+const ALL_STATUSES = ["Not Yet Started", "WIP", "Completed", "Submitted to FTA"];
+const BASE_STATUSES = ["Not Yet Started", "WIP", "Completed"]; // for non-FTA tasks
+const FILTER_STATUSES = ["All", "Not Yet Started", "WIP", "Completed", "Submitted to FTA"];
+
 const cats = ["All", "VAT", "Corporate Tax", "Audit", "Accounting", "MIS Reporting", "E-Invoicing", "VAT Refund", "Other"];
+
+// Colour map for the status pill shown in read-only states
+const STATUS_PILL = {
+  "Not Yet Started": { bg: "bg-slate-100", text: "text-slate-600" },
+  WIP:               { bg: "bg-blue-50",   text: "text-blue-700" },
+  Completed:         { bg: "bg-green-100", text: "text-green-700" },
+  "Submitted to FTA":{ bg: "bg-purple-50", text: "text-purple-700" },
+};
+
+/** Read-only coloured pill used when the user cannot change a status */
+function StatusPill({ status }) {
+  const { bg, text } = STATUS_PILL[status] || { bg: "bg-slate-100", text: "text-slate-500" };
+  return (
+    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-extrabold ${bg} ${text}`}>
+      {status}
+    </span>
+  );
+}
 
 export default function TaskList() {
   const { state } = useApp();
@@ -24,15 +46,32 @@ export default function TaskList() {
   const [status, setStatus] = useState("All");
   const [scope, setScope] = useState("By Month");
   const [month, setMonth] = useState(searchParams.get("month") || "2026-05");
+
   const canManage = canManageTasks(currentUser?.role);
+  // BRD 5.4: Admin/Manager can change status for any task.
+  // Task Only can only change status for tasks assigned to them.
+  const isTaskOnly = currentUser?.role === "task_only";
 
   useEffect(() => {
-    // Filters are translated directly into API query params so server-side role rules still apply.
-    fetchTasks({ category: cat, status, month: scope === "By Month" ? month : undefined, overdue: scope === "Overdue" ? "true" : undefined }).catch(() => {});
+    fetchTasks({
+      category: cat,
+      status,
+      month: scope === "By Month" ? month : undefined,
+      overdue: scope === "Overdue" ? "true" : undefined,
+    }).catch(() => {});
   }, [cat, status, scope, month]);
 
   const rows = state.tasks;
-  const exportCsv = async () => downloadBlob(await exportTasks({ category: cat, status, month: scope === "By Month" ? month : undefined, overdue: scope === "Overdue" ? "true" : undefined }), "tasks.csv");
+  const exportCsv = async () =>
+    downloadBlob(
+      await exportTasks({
+        category: cat,
+        status,
+        month: scope === "By Month" ? month : undefined,
+        overdue: scope === "Overdue" ? "true" : undefined,
+      }),
+      "tasks.csv"
+    );
 
   return (
     <div className="space-y-5">
@@ -50,12 +89,26 @@ export default function TaskList() {
       </div>
 
       <Filter label="Category" items={cats} value={cat} setValue={setCat} />
-      <Filter label="Status" items={statuses} value={status} setValue={setStatus} />
+      <Filter label="Status" items={FILTER_STATUSES} value={status} setValue={setStatus} />
 
       <div className="flex flex-wrap items-center gap-2">
         <Filter label="Scope" items={["By Month", "Overdue", "All"]} value={scope} setValue={setScope} compact />
-        <input id="task-list-month" name="taskListMonth" className="input w-40" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
+        <input
+          id="task-list-month"
+          name="taskListMonth"
+          className="input w-40"
+          type="month"
+          value={month}
+          onChange={(e) => setMonth(e.target.value)}
+        />
       </div>
+
+      {/* BRD 5.4 role note */}
+      {isTaskOnly && (
+        <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-2.5 text-[12px] font-medium text-blue-700">
+          You can update status only for tasks assigned to you.
+        </div>
+      )}
 
       <Card>
         <Table>
@@ -73,38 +126,73 @@ export default function TaskList() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((task) => (
-              <tr key={task.id}>
-                <td className="font-extrabold text-[#1e3a8a]">{task.taskId}</td>
-                <td>{task.client}</td>
-                <td><Badge>{task.category}</Badge></td>
-                <td>{task.type}</td>
-                <td>
-                  <div>{task.dueDate}</div>
-                  {task.overdueDays > 0 && <span className="mt-1 inline-flex rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-extrabold text-[#dc2626]">{task.overdueDays}d overdue</span>}
-                </td>
-                <td>{task.assigned}</td>
-                <td>
-                  <select
-                    id={`task-status-${task.id}`}
-                    name={`taskStatus${task.id}`}
-                    className="input h-8 min-w-36"
-                    value={task.status}
-                    onChange={(e) => updateStatus(task.id, e.target.value).catch(() => fetchTasks())}
-                  >
-                    {statuses.filter((item) => item !== "All").map((item) => <option key={item}>{item}</option>)}
-                  </select>
-                </td>
-                <td>{task.recurring && <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-extrabold text-[#1e3a8a]">Recurring</span>}</td>
-                {canManage && (
+            {rows.map((task) => {
+              // BRD 5.4: task_only can only change status for tasks assigned to them
+              const canChangeStatus =
+                canManage ||
+                (isTaskOnly && String(task.assignedId) === String(currentUser?._id || currentUser?.id));
+
+              // BRD 5.4: "Submitted to FTA" only available for FTA-tracked tasks
+              const availableStatuses = task.isAwaitingFta ? ALL_STATUSES : BASE_STATUSES;
+
+              return (
+                <tr key={task.id}>
+                  <td className="font-extrabold text-[#1e3a8a]">{task.taskId}</td>
+                  <td>{task.client}</td>
                   <td>
-                    <Button size="sm" variant="ghost" onClick={() => navigate(`/tasks/edit/${task.id}`)}>
-                      Edit
-                    </Button>
+                    <Badge>{task.category}</Badge>
                   </td>
-                )}
-              </tr>
-            ))}
+                  <td>{task.type}</td>
+                  <td>
+                    <div>{task.dueDate}</div>
+                    {task.overdueDays > 0 && (
+                      <span className="mt-1 inline-flex rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-extrabold text-[#dc2626]">
+                        {task.overdueDays}d overdue
+                      </span>
+                    )}
+                  </td>
+                  <td>{task.assigned}</td>
+                  <td>
+                    {canChangeStatus ? (
+                      <select
+                        id={`task-status-${task.id}`}
+                        name={`taskStatus${task.id}`}
+                        className="input h-8 min-w-40"
+                        value={task.status}
+                        onChange={(e) =>
+                          updateStatus(task.id, e.target.value).catch(() => fetchTasks())
+                        }
+                      >
+                        {availableStatuses.map((s) => (
+                          <option key={s}>{s}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      // BRD 5.4: task_only sees a locked pill for tasks not assigned to them
+                      <StatusPill status={task.status} />
+                    )}
+                  </td>
+                  <td>
+                    {task.recurring && (
+                      <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-extrabold text-[#1e3a8a]">
+                        Recurring
+                      </span>
+                    )}
+                  </td>
+                  {canManage && (
+                    <td>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => navigate(`/tasks/edit/${task.id}`)}
+                      >
+                        Edit
+                      </Button>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </Table>
       </Card>
@@ -120,7 +208,9 @@ function Filter({ label, items, value, setValue, compact }) {
         <button
           key={item}
           onClick={() => setValue(item)}
-          className={`rounded-full px-3 py-1.5 text-[12px] font-extrabold ${value === item ? "bg-[#1e3a8a] text-white" : "bg-slate-100 text-slate-600"}`}
+          className={`rounded-full px-3 py-1.5 text-[12px] font-extrabold ${
+            value === item ? "bg-[#1e3a8a] text-white" : "bg-slate-100 text-slate-600"
+          }`}
         >
           {item}
         </button>

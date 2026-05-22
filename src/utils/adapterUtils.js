@@ -76,6 +76,8 @@ export function mapTask(task) {
     apiStatus: task.status,
     recurring: task.isRecurring,
     overdueDays: daysOverdue(task.dueDate, task.status),
+    // Needed so TaskList can gate "Submitted to FTA" to FTA-tracked tasks only (BRD 5.4)
+    isAwaitingFta: task.isAwaitingFta ?? false,
   };
 }
 
