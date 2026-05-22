@@ -28,4 +28,10 @@ taskSchema.virtual("isOverdue").get(function isOverdue() {
   return this.dueDate && this.dueDate < new Date() && this.status !== "completed";
 });
 
+taskSchema.index({ assignedTo: 1, dueDate: 1, status: 1 });
+taskSchema.index({ dueDate: 1, status: 1 });
+taskSchema.index({ category: 1, status: 1, dueDate: 1 });
+taskSchema.index({ client: 1 });
+taskSchema.index({ isAwaitingFta: 1, category: 1, ftaSubmittedDate: -1, createdAt: -1 });
+
 module.exports = mongoose.model("Task", taskSchema);

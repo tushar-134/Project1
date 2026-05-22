@@ -7,4 +7,6 @@ const clientGroupSchema = new mongoose.Schema({
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 }, { timestamps: true });
 
+clientGroupSchema.index({ clients: 1 });
+
 module.exports = mongoose.model("ClientGroup", clientGroupSchema);

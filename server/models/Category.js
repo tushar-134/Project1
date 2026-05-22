@@ -11,4 +11,7 @@ const categorySchema = new mongoose.Schema({
   taskTypes: [{ name: { type: String, required: true }, isActive: { type: Boolean, default: true } }],
 }, { timestamps: true });
 
+categorySchema.index({ isActive: 1, createdAt: 1 });
+categorySchema.index({ name: 1 });
+
 module.exports = mongoose.model("Category", categorySchema);
