@@ -11,4 +11,5 @@ export const taskService = {
   ftaTracker: (params) => api.get("/tasks/fta-tracker", { params }).then((res) => res.data),
   updateFtaStatus: (id, ftaStatus) => api.patch(`/tasks/${id}/fta-status`, { ftaStatus }).then((res) => res.data),
   export: (params) => api.get("/tasks/export", { params, responseType: "blob" }).then((res) => res.data),
+  getLogs: (id) => api.get(`/tasks/${id}/logs`).then((res) => res.data),
 };

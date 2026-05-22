@@ -62,3 +62,219 @@ button { touch-action: manipulation; }
     white-space: nowrap;
   }
 }
+
+/* ── Task ID link in task list ── */
+.task-id-link {
+  background: none;
+  border: none;
+  color: #1e3a8a;
+  font-weight: 800;
+  font-size: inherit;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  position: relative;
+}
+.task-id-link::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 6px;
+  right: 6px;
+  height: 2px;
+  background: #1e3a8a;
+  border-radius: 1px;
+  opacity: 0;
+  transform: scaleX(0);
+  transition: all 0.2s ease;
+}
+.task-id-link:hover {
+  background: rgba(30, 58, 138, 0.06);
+  color: #162d6e;
+}
+.task-id-link:hover::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+/* ── Task Detail Page ── */
+.task-detail-card {
+  overflow: hidden;
+}
+.task-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, rgba(30,58,138,.02), rgba(30,58,138,.06));
+}
+.task-detail-icon-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #1e3a8a;
+  color: white;
+  flex-shrink: 0;
+}
+.task-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0;
+  padding: 0;
+}
+.task-detail-field {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  transition: background 0.15s ease;
+}
+.task-detail-field:hover {
+  background: rgba(30, 58, 138, 0.015);
+}
+.task-detail-field-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+  margin-bottom: 6px;
+}
+.task-detail-field-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.task-detail-description {
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(241, 245, 249, 0.5);
+}
+.task-detail-timestamps {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 24px;
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+/* ── Activity Log Timeline ── */
+.task-log-icon-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #1e3a8a, #2563eb);
+  color: white;
+  flex-shrink: 0;
+}
+.task-log-timeline {
+  position: relative;
+  padding-left: 4px;
+}
+.task-log-entry {
+  display: flex;
+  gap: 16px;
+  position: relative;
+  padding-bottom: 4px;
+}
+.task-log-connector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  width: 24px;
+  padding-top: 16px;
+}
+.task-log-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  z-index: 1;
+}
+.task-log-line {
+  width: 2px;
+  flex: 1;
+  background: linear-gradient(to bottom, #e2e8f0, #f1f5f9);
+  margin-top: 4px;
+}
+.task-log-card {
+  flex: 1;
+  padding: 14px 18px;
+  margin-bottom: 8px;
+  border-width: 1px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.task-log-card:hover {
+  transform: translateX(3px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.task-log-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.task-log-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.task-log-status-change {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+/* ── Loader ── */
+.task-detail-loader {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #1e3a8a;
+  border-radius: 50%;
+  animation: task-spin 0.7s linear infinite;
+}
+@keyframes task-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 640px) {
+  .task-detail-grid {
+    grid-template-columns: 1fr;
+  }
+  .task-detail-field {
+    border-right: none;
+  }
+  .task-detail-header {
+    padding: 16px;
+  }
+  .task-log-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
