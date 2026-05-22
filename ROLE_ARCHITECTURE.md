@@ -179,7 +179,7 @@ Route
 
 - `GET /api/clients` -> admin, manager
 - `GET /api/clients/:id` -> admin, manager
-- `POST /api/clients` -> admin, manager
+- `POST /api/clients` -> admin only
 - `PUT /api/clients/:id` -> admin, manager
 - `DELETE /api/clients/:id` -> admin only
 
@@ -308,4 +308,3 @@ Use this rule across the whole project:
 - database stores truth
 - JWT identifies the role
 - middleware enforces the role
-

@@ -5,7 +5,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useClients } from "../../hooks/useClients";
 import { downloadBlob } from "../../utils/adapterUtils";
-import { canManageClients } from "../../utils/permissions.js";
+import { canCreateClients, canManageClients } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
@@ -18,6 +18,7 @@ export default function ClientList() {
   const { fetchClients, deleteClient, exportClients } = useClients();
   const [query, setQuery] = useState("");
   const canManage = canManageClients(currentUser?.role);
+  const canCreate = canCreateClients(currentUser?.role);
 
   useEffect(() => {
     // Search is debounced so the list does not issue a request on every keystroke.
@@ -37,10 +38,12 @@ export default function ClientList() {
         </div>
         {canManage && (
           <div className="flex gap-2">
-            <Button variant="ghost" onClick={() => navigate("/clients/bulk-upload")}>
-              <Upload size={16} />
-              Import
-            </Button>
+            {canCreate && (
+              <Button variant="ghost" onClick={() => navigate("/clients/bulk-upload")}>
+                <Upload size={16} />
+                Import
+              </Button>
+            )}
             <Button variant="ghost" onClick={exportCsv}>
               <Download size={16} />
               Export
