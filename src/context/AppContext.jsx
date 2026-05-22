@@ -43,6 +43,23 @@ function reducer(state, action) {
       return { ...state, tasks: state.tasks.map((task) => task._id === action.id || task.id === action.id ? { ...task, status: action.status, displayStatus: action.displayStatus || task.displayStatus } : task) };
     case "UPDATE_FTA_STATUS":
       return { ...state, ftaItems: state.ftaItems.map((item) => item._id === action.id || item.id === action.id ? { ...item, ftaStatus: action.status, status: action.displayStatus || item.status } : item) };
+    case "MARK_NOTIFICATION_READ":
+      return {
+        ...state,
+        notifications: state.notifications.map((item) =>
+          item._id === action.id ? { ...item, isRead: true } : item
+        ),
+        unreadCount: Math.max(
+          0,
+          state.unreadCount - (state.notifications.some((item) => item._id === action.id && !item.isRead) ? 1 : 0)
+        ),
+      };
+    case "MARK_ALL_NOTIFICATIONS_READ":
+      return {
+        ...state,
+        notifications: state.notifications.map((item) => ({ ...item, isRead: true })),
+        unreadCount: 0,
+      };
     default:
       return state;
   }

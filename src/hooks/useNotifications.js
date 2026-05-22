@@ -16,10 +16,12 @@ export function useNotifications() {
   }
   async function markRead(id) {
     await notificationService.markRead(id);
+    dispatch({ type: "MARK_NOTIFICATION_READ", id });
     return fetchNotifications();
   }
   async function markAllRead() {
     await notificationService.markAllRead();
+    dispatch({ type: "MARK_ALL_NOTIFICATIONS_READ" });
     return fetchNotifications();
   }
   return { fetchNotifications, markRead, markAllRead };
