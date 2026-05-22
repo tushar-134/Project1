@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { reportService } from "../../services/reportService";
-import { canManageTasks, ROLE_LABELS } from "../../utils/permissions.js";
+import { ROLE_LABELS } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
 import Card from "../ui/Card.jsx";
 import StatusPill from "../ui/StatusPill.jsx";
@@ -101,11 +101,10 @@ export default function Dashboard() {
             {(state.activity || []).map((item) => {
               const task = item.task || item;
               const taskMongoId = task._id || item._id;
-              const canManage = canManageTasks(currentUser?.role);
               return (
                 <tr key={item._id || item.taskId}>
                   <td className="font-extrabold text-[#1e3a8a]">
-                    {canManage && taskMongoId ? (
+                    {taskMongoId ? (
                       <button
                         className="task-id-link"
                         onClick={() => navigate(`/tasks/${taskMongoId}`)}
