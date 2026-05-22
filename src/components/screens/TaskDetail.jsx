@@ -1,8 +1,10 @@
 import { ArrowLeft, Calendar, Clock, FileText, User, Tag, Briefcase, AlertTriangle, RotateCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext.jsx";
 import { taskService } from "../../services/taskService.js";
 import { statusFromApi, ftaStatusFromApi } from "../../utils/adapterUtils.js";
+import { canManageTasks } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
@@ -51,6 +53,8 @@ function getActionMeta(action) {
 export default function TaskDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
+  const canManage = canManageTasks(currentUser?.role);
   const [task, setTask] = useState(null);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -128,11 +132,13 @@ export default function TaskDetail() {
             </h2>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="ghost" size="sm" onClick={() => navigate(`/tasks/edit/${task._id}`)}>
-            <FileText size={14} /> Edit Task
-          </Button>
-        </div>
+        {canManage && (
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={() => navigate(`/tasks/edit/${task._id}`)}>
+              <FileText size={14} /> Edit Task
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Task Details Card */}

@@ -43,7 +43,7 @@ createRoot(document.getElementById("root")).render(
               <Route path="/tasks/add" element={<ProtectedRoute roles={["admin", "manager"]}><AddTask /></ProtectedRoute>} />
               <Route path="/tasks/edit/:id" element={<ProtectedRoute roles={["admin", "manager"]}><AddTask /></ProtectedRoute>} />
               <Route path="/tasks/list" element={<TaskList />} />
-              <Route path="/tasks/:id" element={<ProtectedRoute roles={["admin", "manager"]}><TaskDetail /></ProtectedRoute>} />
+              <Route path="/tasks/:id" element={<ProtectedRoute roles={["admin", "manager", "task_only"]}><TaskDetail /></ProtectedRoute>} />
               <Route path="/tasks/fta-tracker" element={<ProtectedRoute roles={["admin", "manager", "task_only"]}><FtaTracker /></ProtectedRoute>} />
               <Route path="/tasks/categories" element={<ProtectedRoute roles={["admin"]}><Categories /></ProtectedRoute>} />
               <Route path="/settings/users" element={<ProtectedRoute roles={["admin", "manager"]}><Users /></ProtectedRoute>} />
