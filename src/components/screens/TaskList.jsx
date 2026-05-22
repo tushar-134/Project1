@@ -17,8 +17,8 @@ import Table from "../ui/Table.jsx";
 const ALL_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed"];
 const BASE_STATUSES = ["Not Yet Started", "WIP", "Completed"]; // for non-FTA tasks
 const FILTER_STATUSES = ["All", "Not Yet Started", "WIP", "Submitted to FTA", "Completed"];
-
-const cats = ["All", "VAT", "Corporate Tax", "Audit", "Accounting", "MIS Reporting", "E-Invoicing", "VAT Refund", "Other"];
+// Category order for stable display
+const CAT_ORDER = ["VAT", "Corporate Tax", "Audit", "Accounting", "MIS Reporting", "E-Invoicing", "VAT Refund", "Other"];
 
 // Colour map for the status pill shown in read-only states
 const STATUS_PILL = {
@@ -62,8 +62,23 @@ export default function TaskList() {
 
   const refetchTasks = useCallback(() => fetchTasks(filterRef.current).catch(() => {}), [fetchTasks]);
 
+  // Track which categories actually have tasks in the current scope/month.
+  // We update this only when fetching with category=All so the filter buttons
+  // don't disappear when the user drills into a specific category.
+  const [availableCats, setAvailableCats] = useState(["All"]);
+
   useEffect(() => {
-    fetchTasks(filterRef.current).catch(() => {});
+    const params = filterRef.current;
+    fetchTasks(params)
+      .then((tasks) => {
+        if (cat === "All") {
+          // Derive unique categories from actual tasks, in canonical order
+          const found = new Set(tasks.map((t) => t.category));
+          const ordered = ["All", ...CAT_ORDER.filter((c) => found.has(c))];
+          setAvailableCats(ordered);
+        }
+      })
+      .catch(() => {});
   }, [cat, status, scope, month]);
 
   const rows = state.tasks;
@@ -93,7 +108,7 @@ export default function TaskList() {
         )}
       </div>
 
-      <Filter label="Category" items={cats} value={cat} setValue={setCat} />
+      <Filter label="Category" items={availableCats} value={cat} setValue={setCat} />
       <Filter label="Status" items={FILTER_STATUSES} value={status} setValue={setStatus} />
 
       <div className="flex flex-wrap items-center gap-2">
