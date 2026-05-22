@@ -8,13 +8,16 @@ const Notification = require("../models/Notification");
 const ActivityLog = require("../models/ActivityLog");
 const { nextClientFileNo } = require("../utils/autoId");
 
-// Managers can assign clients to themselves or other managers, but never to admin users.
+// Managers can assign clients to themselves or task_only users only — not to other managers or admins.
 async function ensureManagerCanAssignClient(req, assignedUser) {
   if (req.user.role !== "manager" || !assignedUser) return null;
   if (String(assignedUser) === String(req.user._id)) return null; // self-assign always OK
   const target = await User.findById(assignedUser).select("role");
   if (!target) return { status: 404, message: "Assigned user not found" };
-  if (target.role === "admin") return { status: 403, message: "Managers cannot assign clients to admin users." };
+  // Managers can only assign to themselves or task_only users
+  if (target.role !== "task_only") {
+    return { status: 403, message: "Managers can only assign clients to themselves or task-only users." };
+  }
   return null;
 }
 

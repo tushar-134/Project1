@@ -59,12 +59,12 @@ function normalizeRecurringFields(body, fallbackDueDate) {
 
 async function ensureManagerCanAssign(req, assignedTo) {
   if (req.user.role !== "manager" || !assignedTo) return null;
+  if (String(assignedTo) === String(req.user._id)) return null; // self-assign always OK
   const assignee = await User.findById(assignedTo).select("role");
-  if (!assignee) {
-    return { status: 404, message: "Assigned user not found" };
-  }
-  if (assignee.role === "admin") {
-    return { status: 403, message: "Managers cannot assign tasks to admin users." };
+  if (!assignee) return { status: 404, message: "Assigned user not found" };
+  // Managers can only assign to themselves or task_only users
+  if (assignee.role !== "task_only") {
+    return { status: 403, message: "Managers can only assign tasks to themselves or task-only users." };
   }
   return null;
 }
