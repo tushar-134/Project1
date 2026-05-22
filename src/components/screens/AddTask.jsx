@@ -28,6 +28,7 @@ export default function AddTask() {
   const [recurring, setRecurring] = useState(false);
   const [fta, setFta] = useState(false);
   const [savedStatus, setSavedStatus] = useState("not_started");
+  const [submitting, setSubmitting] = useState(false);
   const [details, setDetails] = useState({ client: "", assigned: "", dueDate: "2026-05-31", period: "Q2 2026", description: "", frequency: "monthly", nextDue: "2026-06-30", endDate: "" });
   const chips = useMemo(() => category?.taskTypes || [], [category]);
   useEffect(() => {
@@ -92,6 +93,7 @@ export default function AddTask() {
     setStep(2);
   }
   async function submit() {
+    if (submitting) return; // guard against double-clicks
     if (!details.client) {
       toast.error("Please select a client before submitting the task.");
       return;
@@ -100,6 +102,7 @@ export default function AddTask() {
       toast.error("Please choose a due date before submitting the task.");
       return;
     }
+    setSubmitting(true);
     try {
       const resolvedCategory = state.categories.find((cat) => cat.id === categoryId)
         || state.categories.find((cat) => cat.name === categoryName);
@@ -134,6 +137,8 @@ export default function AddTask() {
       const fallback = isEditMode ? "Unable to save task right now." : "Unable to create task right now.";
       const message = error?.response?.data?.errors?.[0]?.msg || error?.response?.data?.message || error?.message || fallback;
       toast.error(message);
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -163,7 +168,7 @@ export default function AddTask() {
           <div className={`smooth-panel overflow-hidden ${recurring ? "max-h-44 opacity-100" : "max-h-0 opacity-0"}`}><div className="mt-3 grid gap-3 rounded-xl bg-slate-50 p-3 md:grid-cols-3"><Field label="Frequency" field="taskRecurringFrequency"><select className="input" value={details.frequency} onChange={(e) => setDetails({ ...details, frequency: e.target.value })}><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="annual">Annually</option></select></Field><Field label="Next Due Date" field="taskNextDueDate"><input className="input" type="date" value={details.nextDue} onChange={(e) => setDetails({ ...details, nextDue: e.target.value })} /></Field><Field label="End Date" field="taskRecurringEndDate"><input className="input" type="date" value={details.endDate} onChange={(e) => setDetails({ ...details, endDate: e.target.value })} /></Field></div></div>
           <ToggleRow label="Awaiting FTA Response" checked={fta} onChange={setFta} />
           <div className={`smooth-panel overflow-hidden ${fta ? "max-h-20 opacity-100" : "max-h-0 opacity-0"}`}><div className="mt-3 rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-[12px] font-semibold text-yellow-800">This task will be routed to FTA Tracker when submitted.</div></div>
-          <div className="mt-5 flex gap-2"><Button variant="ghost" onClick={() => setStep(2)}>Back</Button><Button onClick={submit}><Send size={16} />{isEditMode ? "Save Task" : "Submit Task"}</Button></div>
+          <div className="mt-5 flex gap-2"><Button variant="ghost" onClick={() => setStep(2)}>Back</Button><Button onClick={submit} disabled={submitting}><Send size={16} />{submitting ? (isEditMode ? "Saving..." : "Submitting...") : (isEditMode ? "Save Task" : "Submit Task")}</Button></div>
         </Card>
       )}
     </div>
