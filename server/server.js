@@ -29,6 +29,7 @@ app.use(cors({
     return callback(new Error(`CORS blocked for origin: ${origin}`));
   },
   credentials: true,
+  exposedHeaders: ["x-auth-token"],
 }));
 app.use(express.json({ limit: "5mb" }));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }));
