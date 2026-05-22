@@ -169,11 +169,6 @@ export default function FtaTracker() {
         })}
       </div>
 
-      {/* Tab description banner */}
-      <div className={`rounded-lg border px-4 py-3 text-[13px] font-medium ${currentTab.bg} ${currentTab.text}`} style={{ borderColor: currentTab.color + "33" }}>
-        <span className="font-extrabold">{currentTab.label}:</span> {currentTab.description}
-      </div>
-
       {/* Table */}
       <Card>
         {loading ? (
