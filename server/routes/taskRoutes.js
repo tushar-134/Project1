@@ -9,7 +9,7 @@ const router = express.Router();
 router.use(auth);
 router.get("/", ctrl.listTasks);
 router.get("/export", adminManager, ctrl.exportTasks);
-router.get("/fta-tracker", adminManager, ctrl.ftaTracker);
+router.get("/fta-tracker", requireRoles("admin", "manager", "task_only"), ctrl.ftaTracker);
 router.post("/", adminManager, body("category").notEmpty(), body("taskType").notEmpty(), body("client").notEmpty(), body("dueDate").isISO8601(), ctrl.createTask);
 router.get("/:id", ctrl.getTask);
 router.put("/:id", adminManager, ctrl.updateTask);

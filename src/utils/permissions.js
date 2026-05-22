@@ -21,7 +21,7 @@ export function canManageTasks(role) {
 }
 
 export function canViewFtaTracker(role) {
-  return hasAnyRole(role, ["admin", "manager"]);
+  return hasAnyRole(role, ["admin", "manager", "task_only"]);
 }
 
 export function canManageCategories(role) {

@@ -270,6 +270,8 @@ exports.updateStatus = async (req, res, next) => {
 exports.ftaTracker = async (req, res, next) => {
   try {
     const query = { isAwaitingFta: true };
+    // task_only users can only see FTA tasks that are assigned to them
+    if (req.user.role === "task_only") query.assignedTo = req.user._id;
     if (req.query.category && req.query.category !== "All") query.category = req.query.category;
     const tasks = await Task.find(query).populate(populateTask).sort({ ftaSubmittedDate: -1, createdAt: -1 });
     res.json(tasks);
