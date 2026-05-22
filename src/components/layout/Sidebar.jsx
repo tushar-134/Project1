@@ -90,11 +90,10 @@ export default function Sidebar({ open = false, onClose = () => {}, mobile = fal
           <div key={group.section} className="mb-5">
             <div className="mb-2 px-2 text-[10px] font-extrabold uppercase tracking-[.12em] text-white/45">{group.section}</div>
             <div className="space-y-1">
-              {group.links.map(({ label, to, icon: Icon, badge }) => (
+              {group.links.map(({ label, to, icon: Icon }) => (
                 <NavLink key={to} to={to} onClick={mobile ? onClose : undefined} className={({ isActive }) => `flex h-9 items-center gap-2.5 rounded-lg px-3 text-[12px] font-bold transition ${isActive ? "bg-white/18 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.14)]" : "text-white/76 hover:bg-white/10 hover:text-white"}`}>
                   <Icon size={16} />
                   <span className="min-w-0 flex-1 truncate">{label}</span>
-                  {badge && <span className="rounded-full bg-[#eab308] px-1.5 py-0.5 text-[10px] font-black text-white">{label === "FTA Tracker" ? ftaCount : badge}</span>}
                 </NavLink>
               ))}
             </div>
