@@ -28,7 +28,11 @@ api.interceptors.request.use((config) => {
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const refreshedToken = response.headers?.["x-auth-token"];
+    if (refreshedToken) localStorage.setItem("filingBuddyToken", refreshedToken);
+    return response;
+  },
   (error) => {
     // We treat any 401 as a session reset so the UI does not drift into a half-authenticated state.
     if (error.response?.status === 401) {
