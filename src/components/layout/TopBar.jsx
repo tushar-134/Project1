@@ -40,7 +40,7 @@ export default function TopBar({ title, onMenuClick }) {
           <div className="text-[10px] font-bold text-slate-500">{roleLabel}</div>
         </div>
         <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#1e3a8a] text-[12px] font-black text-white">{initials}</div>
-        <NotificationPanel open={open} />
+        <NotificationPanel open={open} onClose={() => setOpen(false)} />
       </div>
     </header>
   );
