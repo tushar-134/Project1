@@ -256,7 +256,13 @@ exports.updateStatus = async (req, res, next) => {
     if (req.user.role === "task_only" && String(task.assignedTo) !== String(req.user._id)) return res.status(403).json({ message: "Forbidden" });
     const previousStatus = task.status;
     task.status = req.body.status;
-    if (task.status === "submitted_to_fta" && task.isAwaitingFta && !task.ftaSubmittedDate) task.ftaSubmittedDate = new Date();
+    // When "Submitted to FTA" is selected from the Task List dropdown, automatically route
+    // the task into the FTA Tracker regardless of whether the toggle was pre-set on the task.
+    if (task.status === "submitted_to_fta") {
+      task.isAwaitingFta = true;
+      if (!task.ftaSubmittedDate) task.ftaSubmittedDate = new Date();
+      if (!task.ftaStatus) task.ftaStatus = "in_review";
+    }
     await task.save();
     if (previousStatus !== "completed" && task.status === "completed") {
       await maybeGenerateNextRecurringTask(task, req.user._id);
