@@ -15,6 +15,7 @@ import BulkUpload from "./components/screens/BulkUpload.jsx";
 import Contacts from "./components/screens/Contacts.jsx";
 import AddTask from "./components/screens/AddTask.jsx";
 import TaskList from "./components/screens/TaskList.jsx";
+import TaskDetail from "./components/screens/TaskDetail.jsx";
 import FtaTracker from "./components/screens/FtaTracker.jsx";
 import Categories from "./components/screens/Categories.jsx";
 import Users from "./components/screens/Users.jsx";
@@ -42,6 +43,7 @@ createRoot(document.getElementById("root")).render(
               <Route path="/tasks/add" element={<ProtectedRoute roles={["admin", "manager"]}><AddTask /></ProtectedRoute>} />
               <Route path="/tasks/edit/:id" element={<ProtectedRoute roles={["admin", "manager"]}><AddTask /></ProtectedRoute>} />
               <Route path="/tasks/list" element={<TaskList />} />
+              <Route path="/tasks/:id" element={<ProtectedRoute roles={["admin", "manager", "task_only"]}><TaskDetail /></ProtectedRoute>} />
               <Route path="/tasks/fta-tracker" element={<ProtectedRoute roles={["admin", "manager", "task_only"]}><FtaTracker /></ProtectedRoute>} />
               <Route path="/tasks/categories" element={<ProtectedRoute roles={["admin"]}><Categories /></ProtectedRoute>} />
               <Route path="/settings/users" element={<ProtectedRoute roles={["admin", "manager"]}><Users /></ProtectedRoute>} />

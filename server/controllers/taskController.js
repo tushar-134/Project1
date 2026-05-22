@@ -187,7 +187,9 @@ exports.createTask = async (req, res, next) => {
       createdBy: req.user._id,
     });
     await auditLogger({ task: task._id, user: req.user._id, action: "Created", newStatus: task.status });
-    if (task.assignedTo) await Notification.create({ recipient: task.assignedTo, title: "New task assigned", message: `${task.taskId} ${task.taskType}`, type: "task_update", relatedTask: task._id });
+    if (task.assignedTo && String(task.assignedTo) !== String(req.user._id)) {
+      await Notification.create({ recipient: task.assignedTo, title: "New task assigned", message: `${task.taskId} ${task.taskType}`, type: "task_update", relatedTask: task._id });
+    }
     res.status(201).json(await task.populate(populateTask));
   } catch (error) { next(error); }
 };
@@ -258,10 +260,15 @@ exports.updateStatus = async (req, res, next) => {
     const previousStatus = task.status;
     const newStatus = req.body.status;
 
+    // Early return if status hasn't changed (from main)
+    if (previousStatus === newStatus) {
+      return res.json(await task.populate(populateTask));
+    }
+
     // Build the update object
     const updateFields = { status: newStatus };
 
-    // When "Submitted to FTA" is selected, auto-route the task into FTA Tracker
+    // When "Submitted to FTA" is selected, auto-route the task into FTA Tracker.
     // Use $set directly to avoid mongoose dirty-tracking issues with boolean/enum fields.
     if (newStatus === "submitted_to_fta") {
       updateFields.isAwaitingFta = true;
@@ -281,7 +288,10 @@ exports.updateStatus = async (req, res, next) => {
       await maybeGenerateNextRecurringTask(updated, req.user._id);
     }
     await auditLogger({ task: updated._id, user: req.user._id, action: "Status Changed", previousStatus, newStatus: updated.status });
-    if (updated.assignedTo) await Notification.create({ recipient: updated.assignedTo._id || updated.assignedTo, title: "Task status changed", message: `${updated.taskId} moved to ${updated.status}`, type: "task_update", relatedTask: updated._id });
+    // Only notify assignee if it's not the same person making the change (from main)
+    if (updated.assignedTo && String(updated.assignedTo._id || updated.assignedTo) !== String(req.user._id)) {
+      await Notification.create({ recipient: updated.assignedTo._id || updated.assignedTo, title: "Task status changed", message: `${updated.taskId} moved to ${updated.status}`, type: "task_update", relatedTask: updated._id });
+    }
     res.json(updated);
   } catch (error) { next(error); }
 };
@@ -306,12 +316,22 @@ exports.updateFtaStatus = async (req, res, next) => {
     task.ftaStatus = req.body.ftaStatus;
     await task.save();
     await auditLogger({ task: task._id, user: req.user._id, action: "FTA Status Changed", previousStatus, newStatus: task.ftaStatus });
-    if (task.ftaStatus === "additional_query") {
+    if (previousStatus !== "additional_query" && task.ftaStatus === "additional_query") {
       const admins = await User.find({ role: "admin", isActive: true });
-      const recipients = [task.assignedTo, ...admins.map((u) => u._id)].filter(Boolean);
+      const recipients = [...new Set([task.assignedTo, ...admins.map((u) => u._id)].filter(Boolean).map((id) => String(id)))];
       await Notification.insertMany(recipients.map((recipient) => ({ recipient, title: "FTA query received", message: `${task.taskId} has an additional FTA query.`, type: "fta_query", relatedTask: task._id })));
     }
     res.json(await task.populate(populateTask));
+  } catch (error) { next(error); }
+};
+
+exports.getTaskLogs = async (req, res, next) => {
+  try {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ message: "Task not found" });
+    if (req.user.role === "task_only" && String(task.assignedTo) !== String(req.user._id)) return res.status(403).json({ message: "Forbidden" });
+    const logs = await ActivityLog.find({ task: task._id }).populate("user", "name email role").sort({ createdAt: -1 });
+    res.json(logs);
   } catch (error) { next(error); }
 };
 
