@@ -8,6 +8,16 @@ const Notification = require("../models/Notification");
 const ActivityLog = require("../models/ActivityLog");
 const { nextClientFileNo } = require("../utils/autoId");
 
+// Managers can assign clients to themselves or other managers, but never to admin users.
+async function ensureManagerCanAssignClient(req, assignedUser) {
+  if (req.user.role !== "manager" || !assignedUser) return null;
+  if (String(assignedUser) === String(req.user._id)) return null; // self-assign always OK
+  const target = await User.findById(assignedUser).select("role");
+  if (!target) return { status: 404, message: "Assigned user not found" };
+  if (target.role === "admin") return { status: 403, message: "Managers cannot assign clients to admin users." };
+  return null;
+}
+
 const populateClient = [{ path: "assignedUser", select: "name" }, { path: "group", select: "name" }, { path: "createdBy", select: "name" }];
 
 function escapeRegex(value) {
@@ -130,9 +140,8 @@ exports.createClient = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
-    if (req.user.role === "manager" && req.body.assignedUser && String(req.body.assignedUser) !== String(req.user._id)) {
-      return res.status(403).json({ message: "Managers can only assign clients to themselves." });
-    }
+    const clientAssignError = await ensureManagerCanAssignClient(req, req.body.assignedUser);
+    if (clientAssignError) return res.status(clientAssignError.status).json({ message: clientAssignError.message });
     const invalidContactIndex = findInvalidContactMobile(req.body.contactPersons);
     if (invalidContactIndex >= 0) return res.status(400).json({ message: `Contact person ${invalidContactIndex + 1}: Invalid number.` });
     const duplicate = await findDuplicateClient(req.body);
@@ -150,8 +159,9 @@ exports.updateClient = async (req, res, next) => {
   try {
     const client = await Client.findById(req.params.id);
     if (!client || !client.isActive) return res.status(404).json({ message: "Client not found" });
-    if (req.user.role === "manager" && "assignedUser" in req.body && req.body.assignedUser && String(req.body.assignedUser) !== String(req.user._id)) {
-      return res.status(403).json({ message: "Managers can only assign clients to themselves." });
+    if ("assignedUser" in req.body) {
+      const clientAssignError = await ensureManagerCanAssignClient(req, req.body.assignedUser);
+      if (clientAssignError) return res.status(clientAssignError.status).json({ message: clientAssignError.message });
     }
     if ("contactPersons" in req.body) {
       const invalidContactIndex = findInvalidContactMobile(req.body.contactPersons);
