@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { reportService } from "../../services/reportService";
-import { ROLE_LABELS } from "../../utils/permissions.js";
+import { canManageTasks, ROLE_LABELS } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
 import Card from "../ui/Card.jsx";
 import StatusPill from "../ui/StatusPill.jsx";
@@ -100,9 +100,23 @@ export default function Dashboard() {
           <tbody>
             {(state.activity || []).map((item) => {
               const task = item.task || item;
+              const taskMongoId = task._id || item._id;
+              const canManage = canManageTasks(currentUser?.role);
               return (
                 <tr key={item._id || item.taskId}>
-                  <td className="font-extrabold text-[#1e3a8a]">{task.taskId || item.taskId}</td><td>{task.client?.legalName || item.client || "—"}</td><td><Badge>{task.category || item.category || "Other"}</Badge></td><td>{task.taskType || item.task}</td><td>{task.dueDate?.slice?.(0, 10) || item.createdAt?.slice?.(0, 10)}</td><td>{item.user?.name || item.user || "—"}</td><td><StatusPill status={item.newStatus || item.action} /></td>
+                  <td className="font-extrabold text-[#1e3a8a]">
+                    {canManage && taskMongoId ? (
+                      <button
+                        className="task-id-link"
+                        onClick={() => navigate(`/tasks/${taskMongoId}`)}
+                        title="View task details"
+                      >
+                        {task.taskId || item.taskId}
+                      </button>
+                    ) : (
+                      task.taskId || item.taskId
+                    )}
+                  </td><td>{task.client?.legalName || item.client || "—"}</td><td><Badge>{task.category || item.category || "Other"}</Badge></td><td>{task.taskType || item.task}</td><td>{task.dueDate?.slice?.(0, 10) || item.createdAt?.slice?.(0, 10)}</td><td>{item.user?.name || item.user || "—"}</td><td><StatusPill status={item.newStatus || item.action} /></td>
                 </tr>
               );
             })}
