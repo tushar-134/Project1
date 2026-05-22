@@ -254,25 +254,38 @@ exports.updateStatus = async (req, res, next) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: "Task not found" });
     if (req.user.role === "task_only" && String(task.assignedTo) !== String(req.user._id)) return res.status(403).json({ message: "Forbidden" });
+
     const previousStatus = task.status;
-    task.status = req.body.status;
-    // When "Submitted to FTA" is selected from the Task List dropdown, automatically route
-    // the task into the FTA Tracker regardless of whether the toggle was pre-set on the task.
-    // Always reset ftaStatus to "in_review" so re-submitted tasks go back to the In Review tab.
-    if (task.status === "submitted_to_fta") {
-      task.isAwaitingFta = true;
-      task.ftaStatus = "in_review";
-      task.ftaSubmittedDate = new Date();
+    const newStatus = req.body.status;
+
+    // Build the update object
+    const updateFields = { status: newStatus };
+
+    // When "Submitted to FTA" is selected, auto-route the task into FTA Tracker
+    // Use $set directly to avoid mongoose dirty-tracking issues with boolean/enum fields.
+    if (newStatus === "submitted_to_fta") {
+      updateFields.isAwaitingFta = true;
+      updateFields.ftaStatus = "in_review";
+      updateFields.ftaSubmittedDate = new Date();
+      console.log(`[FTA] Task ${task.taskId} submitted to FTA tracker by user ${req.user._id}`);
     }
-    await task.save();
-    if (previousStatus !== "completed" && task.status === "completed") {
-      await maybeGenerateNextRecurringTask(task, req.user._id);
+
+    // Use findByIdAndUpdate to guarantee all fields are persisted
+    const updated = await Task.findByIdAndUpdate(
+      task._id,
+      { $set: updateFields },
+      { new: true, runValidators: true }
+    ).populate(populateTask);
+
+    if (previousStatus !== "completed" && newStatus === "completed") {
+      await maybeGenerateNextRecurringTask(updated, req.user._id);
     }
-    await auditLogger({ task: task._id, user: req.user._id, action: "Status Changed", previousStatus, newStatus: task.status });
-    if (task.assignedTo) await Notification.create({ recipient: task.assignedTo, title: "Task status changed", message: `${task.taskId} moved to ${task.status}`, type: "task_update", relatedTask: task._id });
-    res.json(await task.populate(populateTask));
+    await auditLogger({ task: updated._id, user: req.user._id, action: "Status Changed", previousStatus, newStatus: updated.status });
+    if (updated.assignedTo) await Notification.create({ recipient: updated.assignedTo._id || updated.assignedTo, title: "Task status changed", message: `${updated.taskId} moved to ${updated.status}`, type: "task_update", relatedTask: updated._id });
+    res.json(updated);
   } catch (error) { next(error); }
 };
+
 
 exports.ftaTracker = async (req, res, next) => {
   try {
