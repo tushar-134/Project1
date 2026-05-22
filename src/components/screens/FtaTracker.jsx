@@ -1,6 +1,7 @@
-import { AlertCircle, CheckCircle2, Clock, Filter } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, Filter, Info } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext.jsx";
 import { useApp } from "../../context/AppContext.jsx";
 import { useTasks } from "../../hooks/useTasks";
 import Badge from "../ui/Badge.jsx";
@@ -51,6 +52,8 @@ const TABS = [
 const FTA_STATUSES = ["In Review", "Additional Query From FTA", "Approved"];
 
 export default function FtaTracker() {
+  const { currentUser } = useAuth();
+  const isTaskOnly = currentUser?.role === "task_only";
   const { state } = useApp();
   const navigate = useNavigate();
   const { fetchFtaTracker, updateFtaStatus } = useTasks();
@@ -88,6 +91,14 @@ export default function FtaTracker() {
           the 'FTA Response Toggle' enabled is set to status 'Submitted to FTA'.
         </p>
       </div>
+
+      {/* Task-only info banner */}
+      {isTaskOnly && (
+        <div className="flex items-center gap-2.5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-[13px] text-blue-800">
+          <Info size={15} className="shrink-0 text-blue-500" />
+          <span>You are viewing FTA tasks <strong>assigned to you only</strong>. Contact your manager to update FTA status.</span>
+        </div>
+      )}
 
       {/* Category filter */}
       <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[#e2e8f0] bg-white p-3">
@@ -167,10 +178,9 @@ export default function FtaTracker() {
                 <th>Due Date</th>
                 <th>Submitted On</th>
                 <th>Assigned</th>
-                {!currentTab.readOnly && <th>FTA Status</th>}
-                {currentTab.readOnly && <th>FTA Status</th>}
+                <th>FTA Status</th>
                 <th>Recurring</th>
-                <th>Edit</th>
+                {!isTaskOnly && <th>Edit</th>}
               </tr>
             </thead>
             <tbody>
@@ -202,10 +212,9 @@ export default function FtaTracker() {
                   <td>{item.submitted || "—"}</td>
                   <td>{item.assigned}</td>
                   <td>
-                    {currentTab.readOnly ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-[11px] font-extrabold text-green-700">
-                        <CheckCircle2 size={11} /> Approved
-                      </span>
+                    {/* task_only: always read-only badge; others: dropdown unless tab is readOnly */}
+                    {isTaskOnly || currentTab.readOnly ? (
+                      <FtaStatusBadge status={item.status} />
                     ) : (
                       <select
                         id={`fta-status-${item.id}`}
@@ -231,15 +240,17 @@ export default function FtaTracker() {
                       </span>
                     )}
                   </td>
-                  <td>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => navigate(`/tasks/edit/${item.id}`)}
-                    >
-                      Edit
-                    </Button>
-                  </td>
+                  {!isTaskOnly && (
+                    <td>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => navigate(`/tasks/edit/${item.id}`)}
+                      >
+                        Edit
+                      </Button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -263,5 +274,27 @@ function EmptyState({ tab }) {
       <div className="text-[14px] font-extrabold text-slate-700">No tasks in "{tab.label}"</div>
       <div className="max-w-xs text-[13px] text-slate-400">{tab.description}</div>
     </div>
+  );
+}
+
+function FtaStatusBadge({ status }) {
+  if (status === "Approved") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-3 py-1 text-[11px] font-extrabold text-green-700">
+        <CheckCircle2 size={11} /> Approved
+      </span>
+    );
+  }
+  if (status === "Additional Query From FTA") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-3 py-1 text-[11px] font-extrabold text-yellow-700">
+        <AlertCircle size={11} /> Additional Query
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-[11px] font-extrabold text-[#1e3a8a]">
+      <Clock size={11} /> In Review
+    </span>
   );
 }
