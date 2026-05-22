@@ -133,8 +133,8 @@ export default function TaskList() {
                 canManage ||
                 (isTaskOnly && String(task.assignedId) === String(currentUser?._id || currentUser?.id));
 
-              // BRD 5.4: "Submitted to FTA" only available for FTA-tracked tasks
-              const availableStatuses = task.isAwaitingFta ? ALL_STATUSES : BASE_STATUSES;
+              // BRD 5.4: "Submitted to FTA" available for all tasks — backend auto-routes to FTA Tracker
+              const availableStatuses = ALL_STATUSES;
 
               return (
                 <tr key={task.id}>

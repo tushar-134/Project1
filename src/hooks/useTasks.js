@@ -34,7 +34,9 @@ export function useTasks() {
     // Status updates are optimistic because the task list is designed for quick inline changes.
     dispatch({ type: "UPDATE_TASK_STATUS", id, status: statusToApi[label], displayStatus: label });
     const task = await taskService.updateStatus(id, statusToApi[label] || label);
-    dispatch({ type: "UPDATE_TASK_STATUS", id, status: task.status, displayStatus: statusFromApi[task.status] || task.status });
+    // Selecting "Submitted to FTA" auto-sets isAwaitingFta=true on the backend — sync it here.
+    const mapped = mapTask(task);
+    dispatch({ type: "UPDATE_TASK_STATUS", id, status: task.status, displayStatus: statusFromApi[task.status] || task.status, isAwaitingFta: mapped.isAwaitingFta });
     return task;
   }
   async function updateFtaStatus(id, label) {
