@@ -302,6 +302,16 @@ exports.updateFtaStatus = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
+exports.getTaskLogs = async (req, res, next) => {
+  try {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ message: "Task not found" });
+    if (req.user.role === "task_only" && String(task.assignedTo) !== String(req.user._id)) return res.status(403).json({ message: "Forbidden" });
+    const logs = await ActivityLog.find({ task: task._id }).populate("user", "name email role").sort({ createdAt: -1 });
+    res.json(logs);
+  } catch (error) { next(error); }
+};
+
 exports.exportTasks = async (req, res, next) => {
   try {
     const tasks = await Task.find(taskQuery(req)).populate(populateTask);

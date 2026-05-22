@@ -16,5 +16,6 @@ router.put("/:id", adminManager, ctrl.updateTask);
 router.delete("/:id", adminOnly, ctrl.deleteTask);
 router.patch("/:id/status", requireRoles("admin", "manager", "task_only"), body("status").isIn(["not_started", "wip", "completed", "submitted_to_fta"]), ctrl.updateStatus);
 router.patch("/:id/fta-status", adminManager, body("ftaStatus").isIn(["in_review", "additional_query", "approved"]), ctrl.updateFtaStatus);
+router.get("/:id/logs", ctrl.getTaskLogs);
 
 module.exports = router;

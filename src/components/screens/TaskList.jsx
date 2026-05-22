@@ -138,7 +138,19 @@ export default function TaskList() {
 
               return (
                 <tr key={task.id}>
-                  <td className="font-extrabold text-[#1e3a8a]">{task.taskId}</td>
+                  <td className="font-extrabold text-[#1e3a8a]">
+                    {canManage ? (
+                      <button
+                        className="task-id-link"
+                        onClick={() => navigate(`/tasks/${task.id}`)}
+                        title="View task details"
+                      >
+                        {task.taskId}
+                      </button>
+                    ) : (
+                      task.taskId
+                    )}
+                  </td>
                   <td>{task.client}</td>
                   <td>
                     <Badge>{task.category}</Badge>
