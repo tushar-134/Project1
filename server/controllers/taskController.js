@@ -187,7 +187,9 @@ exports.createTask = async (req, res, next) => {
       createdBy: req.user._id,
     });
     await auditLogger({ task: task._id, user: req.user._id, action: "Created", newStatus: task.status });
-    if (task.assignedTo) await Notification.create({ recipient: task.assignedTo, title: "New task assigned", message: `${task.taskId} ${task.taskType}`, type: "task_update", relatedTask: task._id });
+    if (task.assignedTo && String(task.assignedTo) !== String(req.user._id)) {
+      await Notification.create({ recipient: task.assignedTo, title: "New task assigned", message: `${task.taskId} ${task.taskType}`, type: "task_update", relatedTask: task._id });
+    }
     res.status(201).json(await task.populate(populateTask));
   } catch (error) { next(error); }
 };
@@ -255,6 +257,9 @@ exports.updateStatus = async (req, res, next) => {
     if (!task) return res.status(404).json({ message: "Task not found" });
     if (req.user.role === "task_only" && String(task.assignedTo) !== String(req.user._id)) return res.status(403).json({ message: "Forbidden" });
     const previousStatus = task.status;
+    if (previousStatus === req.body.status) {
+      return res.json(await task.populate(populateTask));
+    }
     task.status = req.body.status;
     if (task.status === "submitted_to_fta" && task.isAwaitingFta && !task.ftaSubmittedDate) task.ftaSubmittedDate = new Date();
     await task.save();
@@ -262,7 +267,9 @@ exports.updateStatus = async (req, res, next) => {
       await maybeGenerateNextRecurringTask(task, req.user._id);
     }
     await auditLogger({ task: task._id, user: req.user._id, action: "Status Changed", previousStatus, newStatus: task.status });
-    if (task.assignedTo) await Notification.create({ recipient: task.assignedTo, title: "Task status changed", message: `${task.taskId} moved to ${task.status}`, type: "task_update", relatedTask: task._id });
+    if (task.assignedTo && String(task.assignedTo) !== String(req.user._id)) {
+      await Notification.create({ recipient: task.assignedTo, title: "Task status changed", message: `${task.taskId} moved to ${task.status}`, type: "task_update", relatedTask: task._id });
+    }
     res.json(await task.populate(populateTask));
   } catch (error) { next(error); }
 };

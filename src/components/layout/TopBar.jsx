@@ -30,8 +30,8 @@ export default function TopBar({ title, onMenuClick }) {
         </button>
         <h1 className="min-w-0 truncate text-[16px] font-extrabold text-slate-900 sm:text-[18px]">{title}</h1>
       </div>
-      <div ref={wrapRef} className="flex shrink-0 items-center gap-2 sm:gap-4">
-        <button onClick={() => setOpen((v) => !v)} className="relative grid h-9 w-9 place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-600 hover:bg-slate-50" aria-label="Notifications">
+      <div ref={wrapRef} className="relative flex shrink-0 items-center gap-2 sm:gap-4">
+        <button onClick={() => setOpen((v) => !v)} className="relative grid h-9 w-9 place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-600 hover:bg-slate-50" aria-label="Notifications" aria-expanded={open}>
           <Bell size={17} />
           {state.unreadCount > 0 && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#dc2626] ring-2 ring-white" />}
         </button>
