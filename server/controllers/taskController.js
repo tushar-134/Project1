@@ -258,10 +258,11 @@ exports.updateStatus = async (req, res, next) => {
     task.status = req.body.status;
     // When "Submitted to FTA" is selected from the Task List dropdown, automatically route
     // the task into the FTA Tracker regardless of whether the toggle was pre-set on the task.
+    // Always reset ftaStatus to "in_review" so re-submitted tasks go back to the In Review tab.
     if (task.status === "submitted_to_fta") {
       task.isAwaitingFta = true;
-      if (!task.ftaSubmittedDate) task.ftaSubmittedDate = new Date();
-      if (!task.ftaStatus) task.ftaStatus = "in_review";
+      task.ftaStatus = "in_review";
+      task.ftaSubmittedDate = new Date();
     }
     await task.save();
     if (previousStatus !== "completed" && task.status === "completed") {

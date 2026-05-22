@@ -1,6 +1,6 @@
-import { AlertCircle, CheckCircle2, Clock, Filter, Info } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, Filter, Info, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useApp } from "../../context/AppContext.jsx";
 import { useTasks } from "../../hooks/useTasks";
@@ -56,15 +56,22 @@ export default function FtaTracker() {
   const isTaskOnly = currentUser?.role === "task_only";
   const { state } = useApp();
   const navigate = useNavigate();
+  const location = useLocation();
   const { fetchFtaTracker, updateFtaStatus } = useTasks();
   const [activeTab, setActiveTab] = useState("in_review");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  function refresh() {
     setLoading(true);
     fetchFtaTracker({}).catch(() => {}).finally(() => setLoading(false));
-  }, []);
+  }
+
+  // Re-fetch every time the user navigates to this page
+  useEffect(() => {
+    refresh();
+  }, [location.pathname]);
+
 
   const currentTab = TABS.find((t) => t.id === activeTab);
 
@@ -83,13 +90,19 @@ export default function FtaTracker() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div>
-        <div className="page-kicker">FTA Response Queue</div>
-        <h2 className="screen-title">FTA Submission Tracker</h2>
-        <p className="mt-1 text-[13px] text-slate-500">
-          Dedicated module for managing submissions that require FTA to review and respond. Triggered when any task with
-          the 'FTA Response Toggle' enabled is set to status 'Submitted to FTA'.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="page-kicker">FTA Response Queue</div>
+          <h2 className="screen-title">FTA Submission Tracker</h2>
+          <p className="mt-1 text-[13px] text-slate-500">
+            Dedicated module for managing submissions that require FTA to review and respond. Triggered when any task
+            status is set to &apos;Submitted to FTA&apos;.
+          </p>
+        </div>
+        <Button variant="ghost" onClick={refresh} disabled={loading}>
+          <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
+          Refresh
+        </Button>
       </div>
 
       {/* Task-only info banner */}
