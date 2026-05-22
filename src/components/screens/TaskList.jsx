@@ -1,5 +1,5 @@
 import { Download } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -56,13 +56,14 @@ export default function TaskList() {
   // Load users list for the inline assignee dropdown
   useEffect(() => { if (canManage) fetchUsers().catch(() => {}); }, [canManage]);
 
+  // Keep a ref to current filter params so refetch after status-change always uses fresh values.
+  const filterRef = useRef({});
+  filterRef.current = { category: cat, status, month: scope === "By Month" ? month : undefined, overdue: scope === "Overdue" ? "true" : undefined };
+
+  const refetchTasks = useCallback(() => fetchTasks(filterRef.current).catch(() => {}), [fetchTasks]);
+
   useEffect(() => {
-    fetchTasks({
-      category: cat,
-      status,
-      month: scope === "By Month" ? month : undefined,
-      overdue: scope === "Overdue" ? "true" : undefined,
-    }).catch(() => {});
+    fetchTasks(filterRef.current).catch(() => {});
   }, [cat, status, scope, month]);
 
   const rows = state.tasks;
@@ -194,7 +195,8 @@ export default function TaskList() {
                         // select doesn't revert to the first option while the API request is in flight.
                         value={task.displayStatus ?? task.status}
                         onChange={(e) =>
-                          updateStatus(task.id, e.target.value).catch(() => fetchTasks())
+                          // Always re-fetch after update (success or fail) to guarantee DB sync.
+                          updateStatus(task.id, e.target.value).then(() => refetchTasks()).catch(() => refetchTasks())
                         }
                       >
                         {availableStatuses.map((s) => (
