@@ -14,5 +14,13 @@ exports.markAllRead = async (req, res, next) => {
   try { await Notification.updateMany({ recipient: req.user._id }, { isRead: true }); res.json({ message: "Marked read" }); } catch (error) { next(error); }
 };
 exports.markRead = async (req, res, next) => {
-  try { res.json(await Notification.findOneAndUpdate({ _id: req.params.id, recipient: req.user._id }, { isRead: true }, { new: true })); } catch (error) { next(error); }
+  try {
+    const notification = await Notification.findOneAndUpdate(
+      { _id: req.params.id, recipient: req.user._id },
+      { isRead: true },
+      { new: true }
+    );
+    if (!notification) return res.status(404).json({ message: "Notification not found" });
+    res.json(notification);
+  } catch (error) { next(error); }
 };
