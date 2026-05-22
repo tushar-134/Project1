@@ -12,9 +12,10 @@ import Card from "../ui/Card.jsx";
 import Table from "../ui/Table.jsx";
 
 // BRD 5.4 — all four statuses; "Submitted to FTA" is gated to FTA-tracked tasks only
-const ALL_STATUSES = ["Not Yet Started", "WIP", "Completed", "Submitted to FTA"];
+// Order: Not Yet Started → WIP → Submitted to FTA → Completed
+const ALL_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed"];
 const BASE_STATUSES = ["Not Yet Started", "WIP", "Completed"]; // for non-FTA tasks
-const FILTER_STATUSES = ["All", "Not Yet Started", "WIP", "Completed", "Submitted to FTA"];
+const FILTER_STATUSES = ["All", "Not Yet Started", "WIP", "Submitted to FTA", "Completed"];
 
 const cats = ["All", "VAT", "Corporate Tax", "Audit", "Accounting", "MIS Reporting", "E-Invoicing", "VAT Refund", "Other"];
 
@@ -158,7 +159,9 @@ export default function TaskList() {
                         id={`task-status-${task.id}`}
                         name={`taskStatus${task.id}`}
                         className="input h-8 min-w-40"
-                        value={task.status}
+                        // Use displayStatus when available (set by optimistic update) so the
+                        // select doesn't revert to the first option while the API request is in flight.
+                        value={task.displayStatus ?? task.status}
                         onChange={(e) =>
                           updateStatus(task.id, e.target.value).catch(() => fetchTasks())
                         }
