@@ -1,46 +1,82 @@
-import { Activity, Clock, FileText, ListChecks, User, Users } from "lucide-react";
+import { Activity, Clock, Download, FileText, ListChecks, User, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../../context/AppContext.jsx";
 import { reportService } from "../../services/reportService";
+import { downloadBlob } from "../../utils/adapterUtils";
+import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import Table from "../ui/Table.jsx";
 
 const tiles = [
-  ["Login Activity", User],
-  ["Task Activity", Activity],
-  ["Client-wise Report", Users],
-  ["User-wise Report", ListChecks],
-  ["Overdue Report", Clock],
-  ["FTA Tracker Report", FileText],
+  ["Login Activity", "login-activity", User],
+  ["Task Activity", "task-activity", Activity],
+  ["Client-wise Report", "client-wise", Users],
+  ["User-wise Report", "user-wise", ListChecks],
+  ["Overdue Report", "overdue", Clock],
+  ["FTA Tracker Report", "fta-tracker", FileText],
 ];
 
 const reportCalls = {
-  "Login Activity": reportService.loginActivity,
-  "Task Activity": reportService.taskActivity,
-  "Client-wise Report": reportService.clientWise,
-  "User-wise Report": reportService.userWise,
-  "Overdue Report": reportService.overdue,
-  "FTA Tracker Report": reportService.ftaTracker,
+  "login-activity": reportService.loginActivity,
+  "task-activity": reportService.taskActivity,
+  "client-wise": reportService.clientWise,
+  "user-wise": reportService.userWise,
+  overdue: reportService.overdue,
+  "fta-tracker": reportService.ftaTracker,
 };
 
-const formatDateTime = (value) => (value ? new Date(value).toLocaleString() : "-");
+const reportNames = Object.fromEntries(tiles.map(([name, key]) => [key, name]));
+const pad = (value) => String(value).padStart(2, "0");
+const dateInputValue = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+const displayDateValue = (date) => `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
+const defaultDates = () => {
+  const end = new Date();
+  const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+  return { startDate: dateInputValue(start), endDate: dateInputValue(end) };
+};
+const defaultDraftDates = () => {
+  const end = new Date();
+  const start = new Date(end.getTime() - 24 * 60 * 60 * 1000);
+  return { startDate: displayDateValue(start), endDate: displayDateValue(end) };
+};
+const displayToApiDate = (value) => {
+  const match = String(value || "").trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!match) return null;
+  const [, day, month, year] = match;
+  const date = new Date(Number(year), Number(month) - 1, Number(day));
+  if (date.getFullYear() !== Number(year) || date.getMonth() !== Number(month) - 1 || date.getDate() !== Number(day)) return null;
+  return `${year}-${month}-${day}`;
+};
+const formatDate = (value) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()}`;
+};
+const formatDateTime = (value) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  const hours = date.getHours();
+  const displayHours = hours % 12 || 12;
+  const period = hours >= 12 ? "PM" : "AM";
+  return `${formatDate(date)} ${pad(displayHours)}:${pad(date.getMinutes())} ${period}`;
+};
 const asText = (value) => {
   if (value === null || value === undefined || value === "") return "-";
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
-  if (value.name || value.email || value.legalName || value.taskId || value.fileNo) {
-    return value.name || value.email || value.legalName || value.taskId || value.fileNo;
-  }
+  if (value.name || value.email || value.legalName || value.taskId || value.fileNo) return value.name || value.email || value.legalName || value.taskId || value.fileNo;
   return "-";
 };
 
 const reportColumns = {
-  "Login Activity": [
+  "login-activity": [
     ["Name", (row) => row.name || "-"],
     ["Email", (row) => row.email || "-"],
     ["Role", (row) => row.role || "-"],
     ["Last Login", (row) => formatDateTime(row.lastLogin)],
   ],
-  "Task Activity": [
+  "task-activity": [
     ["Task ID", (row) => row.task?.taskId || row.taskId || "-"],
     ["User", (row) => row.user?.name || row.user?.email || asText(row.user)],
     ["Date & Time", (row) => formatDateTime(row.createdAt || row.date)],
@@ -48,8 +84,9 @@ const reportColumns = {
     ["Task Name", (row) => row.task?.taskType || asText(row.task)],
     ["Category", (row) => row.task?.category || row.category || "-"],
     ["Action", (row) => row.action || "-"],
+    ["Last Updated", (row) => formatDateTime(row.updatedAt)],
   ],
-  "Client-wise Report": [
+  "client-wise": [
     ["Client", (row) => row.client?.legalName || "-"],
     ["File No", (row) => row.client?.fileNo || "-"],
     ["Total", (row) => row.total ?? 0],
@@ -57,8 +94,9 @@ const reportColumns = {
     ["WIP", (row) => row.wip ?? 0],
     ["Completed", (row) => row.completed ?? 0],
     ["Submitted to FTA", (row) => row.submitted_to_fta ?? 0],
+    ["Last Updated", (row) => formatDateTime(row.updatedAt)],
   ],
-  "User-wise Report": [
+  "user-wise": [
     ["User", (row) => row.user?.name || "Unassigned"],
     ["Email", (row) => row.user?.email || "-"],
     ["Role", (row) => row.user?.role || "-"],
@@ -67,17 +105,19 @@ const reportColumns = {
     ["WIP", (row) => row.wip ?? 0],
     ["Completed", (row) => row.completed ?? 0],
     ["Submitted to FTA", (row) => row.submitted_to_fta ?? 0],
+    ["Last Updated", (row) => formatDateTime(row.updatedAt)],
   ],
-  "Overdue Report": [
+  overdue: [
     ["Task ID", (row) => row.taskId || "-"],
     ["Client", (row) => row.client?.legalName || "-"],
     ["Assigned To", (row) => row.assignedTo?.name || "-"],
     ["Task Name", (row) => row.taskType || "-"],
     ["Category", (row) => row.category || "-"],
-    ["Due Date", (row) => formatDateTime(row.dueDate)],
+    ["Due Date", (row) => formatDate(row.dueDate)],
     ["Days Overdue", (row) => row.daysOverdue ?? 0],
+    ["Last Updated", (row) => formatDateTime(row.updatedAt)],
   ],
-  "FTA Tracker Report": [
+  "fta-tracker": [
     ["Task ID", (row) => row.taskId || "-"],
     ["Client", (row) => row.client?.legalName || "-"],
     ["Assigned To", (row) => row.assignedTo?.name || "-"],
@@ -85,28 +125,77 @@ const reportColumns = {
     ["Category", (row) => row.category || "-"],
     ["FTA Status", (row) => row.ftaStatus || "-"],
     ["Submitted", (row) => formatDateTime(row.ftaSubmittedDate)],
+    ["Last Updated", (row) => formatDateTime(row.updatedAt)],
   ],
 };
 
 function normalizeReportData(data) {
-  if (Array.isArray(data)) return data;
-  return data?.tasks || [];
+  if (Array.isArray(data)) return { items: data, total: data.length, page: 1, pages: 1 };
+  return { items: data?.items || data?.tasks || [], total: data?.total || 0, page: data?.page || 1, pages: data?.pages || 1 };
 }
 
 export default function Reports() {
   const { state, dispatch } = useApp();
-  const [activeReport, setActiveReport] = useState("Login Activity");
-  const columns = useMemo(() => reportColumns[activeReport] || reportColumns["Task Activity"], [activeReport]);
+  const [activeReport, setActiveReport] = useState("login-activity");
+  const [draftRange, setDraftRange] = useState(defaultDraftDates);
+  const [range, setRange] = useState(defaultDates);
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1 });
+  const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [rangeError, setRangeError] = useState("");
+  const columns = useMemo(() => reportColumns[activeReport] || reportColumns["task-activity"], [activeReport]);
 
-  const loadReport = (name = activeReport) => {
-    setActiveReport(name);
-    reportCalls[name]?.()
-      .then((data) => dispatch({ type: "SET_RESOURCE", resource: "activity", payload: normalizeReportData(data) }))
-      .catch(() => {});
+  const loadReport = (report = activeReport, nextPage = page, nextRange = range) => {
+    setLoading(true);
+    reportCalls[report]?.({ ...nextRange, page: nextPage })
+      .then((data) => {
+        const result = normalizeReportData(data);
+        dispatch({ type: "SET_RESOURCE", resource: "activity", payload: result.items });
+        setMeta({ total: result.total, page: result.page, pages: result.pages });
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  const selectReport = (report) => {
+    setActiveReport(report);
+    setPage(1);
+    loadReport(report, 1);
+  };
+
+  const applyRange = () => {
+    const nextRange = { startDate: displayToApiDate(draftRange.startDate), endDate: displayToApiDate(draftRange.endDate) };
+    if (!nextRange.startDate || !nextRange.endDate) {
+      setRangeError("Use dd/mm/yyyy for both dates.");
+      return;
+    }
+    if (new Date(nextRange.startDate) > new Date(nextRange.endDate)) {
+      setRangeError("From date must be before To date.");
+      return;
+    }
+    setRangeError("");
+    setRange(nextRange);
+    setPage(1);
+    loadReport(activeReport, 1, nextRange);
+  };
+
+  const goToPage = (nextPage) => {
+    const safePage = Math.min(Math.max(1, nextPage), meta.pages || 1);
+    setPage(safePage);
+    loadReport(activeReport, safePage);
+  };
+
+  const downloadCsv = () => {
+    setDownloading(true);
+    reportService.exportCsv(activeReport, range)
+      .then((blob) => downloadBlob(blob, `${activeReport}-${range.startDate}-to-${range.endDate}.csv`))
+      .catch(() => {})
+      .finally(() => setDownloading(false));
   };
 
   useEffect(() => {
-    loadReport("Login Activity");
+    loadReport("login-activity", 1, range);
   }, []);
 
   return (
@@ -116,11 +205,11 @@ export default function Reports() {
         <h2 className="screen-title">Reports</h2>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {tiles.map(([name, Icon]) => (
+        {tiles.map(([name, key, Icon]) => (
           <Card
-            key={name}
-            className={`cursor-pointer p-4 transition hover:-translate-y-0.5 hover:shadow-md ${activeReport === name ? "ring-2 ring-[#1e3a8a]" : ""}`}
-            onClick={() => loadReport(name)}
+            key={key}
+            className={`cursor-pointer p-4 transition hover:-translate-y-0.5 hover:shadow-md ${activeReport === key ? "ring-2 ring-[#1e3a8a]" : ""}`}
+            onClick={() => selectReport(key)}
           >
             <Icon className="mb-3 text-[#1e3a8a]" size={24} />
             <div className="font-extrabold">{name}</div>
@@ -128,8 +217,28 @@ export default function Reports() {
           </Card>
         ))}
       </div>
+      <Card className="p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="text-[12px] font-extrabold text-slate-600">
+            From
+            <input className="mt-1 block rounded border border-[#cbd5e1] px-3 py-2 text-[14px]" inputMode="numeric" placeholder="dd/mm/yyyy" value={draftRange.startDate} onChange={(event) => setDraftRange((current) => ({ ...current, startDate: event.target.value }))} />
+          </label>
+          <label className="text-[12px] font-extrabold text-slate-600">
+            To
+            <input className="mt-1 block rounded border border-[#cbd5e1] px-3 py-2 text-[14px]" inputMode="numeric" placeholder="dd/mm/yyyy" value={draftRange.endDate} onChange={(event) => setDraftRange((current) => ({ ...current, endDate: event.target.value }))} />
+          </label>
+          <Button onClick={applyRange}>Apply</Button>
+          <Button variant="ghost" onClick={downloadCsv} disabled={downloading}>
+            <Download size={16} /> {downloading ? "Preparing CSV" : "Download CSV Report"}
+          </Button>
+        </div>
+        {rangeError && <div className="mt-2 text-[12px] font-semibold text-[#dc2626]">{rangeError}</div>}
+      </Card>
       <Card>
-        <div className="border-b border-[#e2e8f0] px-4 py-3 text-[14px] font-extrabold">{activeReport}</div>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e2e8f0] px-4 py-3">
+          <div className="text-[14px] font-extrabold">{reportNames[activeReport]}</div>
+          <div className="text-[12px] font-semibold text-slate-500">Sorted by {activeReport === "login-activity" ? "last login time" : "last updated time"}</div>
+        </div>
         <Table>
           <thead>
             <tr>{columns.map(([label]) => <th key={label}>{label}</th>)}</tr>
@@ -138,19 +247,25 @@ export default function Reports() {
             {state.activity.map((row, index) => (
               <tr key={row._id || `${activeReport}-${index}`}>
                 {columns.map(([label, render], cellIndex) => (
-                  <td key={label} className={cellIndex === 0 ? "font-extrabold text-[#1e3a8a]" : ""}>
-                    {asText(render(row))}
-                  </td>
+                  <td key={label} className={cellIndex === 0 ? "font-extrabold text-[#1e3a8a]" : ""}>{asText(render(row))}</td>
                 ))}
               </tr>
             ))}
-            {!state.activity.length && (
-              <tr>
-                <td className="text-center text-slate-500" colSpan={columns.length}>No report data found</td>
-              </tr>
+            {!loading && !state.activity.length && (
+              <tr><td className="text-center text-slate-500" colSpan={columns.length}>No report data found</td></tr>
+            )}
+            {loading && (
+              <tr><td className="text-center text-slate-500" colSpan={columns.length}>Loading report...</td></tr>
             )}
           </tbody>
         </Table>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#e2e8f0] px-4 py-3 text-[13px] font-semibold text-slate-600">
+          <div>Page {meta.page} of {meta.pages} - {meta.total} total</div>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => goToPage(page - 1)} disabled={loading || page <= 1}>Previous</Button>
+            <Button variant="ghost" onClick={() => goToPage(page + 1)} disabled={loading || page >= meta.pages}>Next</Button>
+          </div>
+        </div>
       </Card>
     </div>
   );
