@@ -1,4 +1,4 @@
-import { cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
+import { cloneElement, isValidElement, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Plus, Trash2, UploadCloud } from "lucide-react";
 import toast from "react-hot-toast";
@@ -497,7 +497,7 @@ export default function AddClient() {
               )}
             />
           )}
-          {tab === 3 && <div className="grid gap-3 md:grid-cols-2"><Field label="VAT Registration Status" field="client-vat-status"><select className="input" value={form.vatStatus} onChange={(e) => update("vatStatus", e.target.value)}><option>Registered</option><option>Not Registered</option><option>Pending</option></select></Field><Field label="VAT TRN" field="client-vat-trn"><input className="input" value={form.vatTrn} onChange={(e) => update("vatTrn", e.target.value)} /></Field><Field label="VAT Registration Date" field="client-vat-date"><input className="input" type="date" value={form.vatDate} onChange={(e) => update("vatDate", e.target.value)} /></Field><Field label="VAT Filing Frequency" field="client-vat-frequency"><select className="input" value={form.vatFreq} onChange={(e) => update("vatFreq", e.target.value)}><option>Monthly</option><option>Quarterly</option></select></Field><Field label="CT Registration Number (TIN)" field="client-ct-tin"><input className="input" value={form.ctTin} onChange={(e) => update("ctTin", e.target.value)} /></Field><Field label="CT Registration Status" field="client-ct-status"><select className="input" value={form.ctStatus} onChange={(e) => update("ctStatus", e.target.value)}><option>Registered</option><option>Not Registered</option><option>Pending</option></select></Field><Field label="CT Registration Date" field="client-ct-date"><input className="input" type="date" value={form.ctDate} onChange={(e) => update("ctDate", e.target.value)} /></Field><Field label="Financial Year End" field="client-ct-fye"><input className="input" value={form.fye} onChange={(e) => update("fye", e.target.value)} /></Field></div>}
+          {tab === 3 && <div className="grid gap-3 md:grid-cols-2"><Field label="VAT Registration Status" field="client-vat-status"><select className="input" value={form.vatStatus} onChange={(e) => update("vatStatus", e.target.value)}><option>Registered</option><option>Not Registered</option><option>Pending</option></select></Field><Field label="VAT TRN" field="client-vat-trn"><input className="input" value={form.vatTrn} onChange={(e) => update("vatTrn", e.target.value)} /></Field><Field label="VAT Registration Date" field="client-vat-date"><input className="input" type="date" value={form.vatDate} onChange={(e) => update("vatDate", e.target.value)} /></Field><Field label="VAT Filing Frequency" field="client-vat-frequency"><select className="input" value={form.vatFreq} onChange={(e) => update("vatFreq", e.target.value)}><option>Monthly</option><option>Quarterly</option></select></Field><Field label="CT Registration Number (TIN)" field="client-ct-tin"><input className="input" value={form.ctTin} onChange={(e) => update("ctTin", e.target.value)} /></Field><Field label="CT Registration Status" field="client-ct-status"><select className="input" value={form.ctStatus} onChange={(e) => update("ctStatus", e.target.value)}><option>Registered</option><option>Not Registered</option><option>Pending</option></select></Field><Field label="CT Registration Date" field="client-ct-date"><input className="input" type="date" value={form.ctDate} onChange={(e) => update("ctDate", e.target.value)} /></Field><label><span className="field-label">Financial Year End</span><FyeCalendarPicker id="client-ct-fye" value={form.fye} onChange={(v) => update("fye", v)} /></label></div>}
           {tab === 4 && <div className="grid gap-4 md:grid-cols-2"><Field label="Select existing group" field="client-group"><select className="input" value={form.group} onChange={(e) => update("group", e.target.value)}><option value="">No group</option>{state.groups.map((g) => <option key={g.id} value={g._id}>{g.name}</option>)}</select></Field><Field label="Create new group"><div className="flex gap-2"><input id="client-new-group" name="clientNewGroup" className="input" value={form.newGroup} onChange={(e) => update("newGroup", e.target.value)} /><Button onClick={async () => { if (form.newGroup) { const g = await groupService.create({ name: form.newGroup }); dispatch({ type: "SET_RESOURCE", resource: "groups", payload: [...state.groups, { ...g, id: g._id }] }); update("group", g._id); } }}>Create</Button></div></Field><div className="rounded-xl bg-purple-50 p-4 font-bold text-[#7c3aed] md:col-span-2">Current group: {state.groups.find((g) => g._id === form.group)?.name || "Ungrouped"} {form.group && <button onClick={() => update("group", "")} className="ml-3 text-[#dc2626]">Ungroup</button>}</div></div>}
           {tab === 5 && <Repeat title="Portal" items={portals} setItems={setPortals} blank={{ name: "", url: "", username: "", password: "", notes: "" }} render={(p, i, patch) => <div className="grid gap-3 md:grid-cols-2"><Field label="Portal Name" field={`portal-name-${i}`}><input className="input" value={p.name} onChange={(e) => patch(i, { name: e.target.value })} /></Field><Field label="URL" field={`portal-url-${i}`}><input className="input" value={p.url} onChange={(e) => patch(i, { url: e.target.value })} /></Field><Field label="Username/TRN" field={`portal-username-${i}`}><input className="input" value={p.username} onChange={(e) => patch(i, { username: e.target.value })} /></Field><Field label="Password" field={`portal-password-${i}`}><input className="input" type="password" value={p.password} onChange={(e) => patch(i, { password: e.target.value })} /></Field><Field label="Notes" field={`portal-notes-${i}`}><textarea className="input textarea" value={p.notes} onChange={(e) => patch(i, { notes: e.target.value })} /></Field></div>} />}
           {tab === 6 && <div className="grid gap-3 md:grid-cols-2"><Field label="QRMP Preference" field="client-qrmp"><input className="input" value={form.qrmp} onChange={(e) => update("qrmp", e.target.value)} /></Field><Field label="Audit Firm Name" field="client-audit-firm"><input className="input" value={form.auditFirm} onChange={(e) => update("auditFirm", e.target.value)} /></Field><Field label="Bank Name" field="client-bank"><input className="input" value={form.bank} onChange={(e) => update("bank", e.target.value)} /></Field><Field label="IBAN" field="client-iban"><input className="input" value={form.iban} onChange={(e) => update("iban", e.target.value)} /></Field><div className="rounded-xl bg-slate-50 p-3 text-[12px] font-semibold text-slate-500 md:col-span-2">You can add custom fields from Settings</div></div>}
@@ -579,8 +579,146 @@ function DocumentUploadZone({ id, title, subtitle, fileName, documentUrl, isUplo
   );
 }
 
+const FYE_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const FYE_DAYS_IN_MONTH = [31,29,31,30,31,30,31,31,30,31,30,31];
+
+function parseFye(value) {
+  if (!value) return { day: null, month: null };
+  const parts = value.trim().split(" ");
+  if (parts.length < 2) return { day: null, month: null };
+  const day = parseInt(parts[0], 10);
+  const month = FYE_MONTHS.find((m) => m.toLowerCase() === parts[1]?.toLowerCase()) || null;
+  return { day: isNaN(day) ? null : day, month };
+}
+
+function FyeCalendarPicker({ value, onChange, id }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+  const { day: selDay, month: selMonth } = parseFye(value);
+  const [hoverMonth, setHoverMonth] = useState(selMonth || "December");
+  const activeMonth = hoverMonth || selMonth || "December";
+  const monthIdx = FYE_MONTHS.indexOf(activeMonth);
+  const maxDay = monthIdx >= 0 ? FYE_DAYS_IN_MONTH[monthIdx] : 31;
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  function selectDate(month, day) {
+    onChange(`${day} ${month}`);
+    setOpen(false);
+  }
+
+  return (
+    <div ref={wrapRef} style={{ position: "relative" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <input
+          id={id}
+          name={id}
+          className="input"
+          readOnly
+          value={value}
+          placeholder="e.g. 31 December"
+          onClick={() => setOpen((o) => !o)}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen((o) => !o); } }}
+          style={{ cursor: "pointer" }}
+        />
+        <button
+          type="button"
+          aria-label="Open calendar"
+          onClick={() => setOpen((o) => !o)}
+          style={{
+            flexShrink: 0, width: 34, height: 34, borderRadius: 8,
+            background: open ? "#1e3a8a" : "#f1f5f9",
+            border: "1px solid #e2e8f0", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            color: open ? "#fff" : "#64748b", transition: "all .18s ease",
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2"/>
+            <line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/>
+            <line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+        </button>
+      </div>
+      {open && (
+        <div style={{
+          position: "absolute", top: 0, left: "calc(100% + 10px)",
+          zIndex: 9999, background: "#fff",
+          border: "1px solid #e2e8f0", borderRadius: 14,
+          boxShadow: "0 8px 32px rgba(30,58,138,.13), 0 2px 8px rgba(0,0,0,.07)",
+          padding: "12px", minWidth: 340, display: "flex", gap: 10,
+          animation: "fye-pop .15s ease",
+        }}>
+          {/* Month column */}
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em", color: "#94a3b8", marginBottom: 8, paddingLeft: 4 }}>Month</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              {FYE_MONTHS.map((m) => {
+                const isSelected = selMonth === m;
+                const isHover = hoverMonth === m;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    onMouseEnter={() => setHoverMonth(m)}
+                    onClick={() => { if (selDay && selDay <= FYE_DAYS_IN_MONTH[FYE_MONTHS.indexOf(m)]) { selectDate(m, selDay); } else { setHoverMonth(m); } }}
+                    style={{
+                      width: "100%", textAlign: "left", padding: "5px 8px",
+                      borderRadius: 7, border: "none", cursor: "pointer", fontSize: 12,
+                      fontWeight: isSelected ? 800 : 600,
+                      background: isSelected ? "#1e3a8a" : isHover ? "#eff6ff" : "transparent",
+                      color: isSelected ? "#fff" : isHover ? "#1e3a8a" : "#334155",
+                      transition: "all .12s ease",
+                    }}
+                  >{m}</button>
+                );
+              })}
+            </div>
+          </div>
+          {/* Divider */}
+          <div style={{ width: 1, background: "#e2e8f0", borderRadius: 1, margin: "0 2px" }} />
+          {/* Day column */}
+          <div style={{ width: 160 }}>
+            <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em", color: "#94a3b8", marginBottom: 8, paddingLeft: 2 }}>Day <span style={{ fontWeight: 500, textTransform: "none", color: "#cbd5e1" }}>({activeMonth})</span></div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 3 }}>
+              {Array.from({ length: maxDay }, (_, i) => i + 1).map((d) => {
+                const isSelected = selDay === d && selMonth === activeMonth;
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => selectDate(activeMonth, d)}
+                    style={{
+                      padding: "5px 0", borderRadius: 7, border: "none", cursor: "pointer",
+                      fontSize: 12, fontWeight: isSelected ? 800 : 600, textAlign: "center",
+                      background: isSelected ? "#1e3a8a" : "transparent",
+                      color: isSelected ? "#fff" : "#334155",
+                      transition: "all .12s ease",
+                    }}
+                    onMouseEnter={(e) => { if (!isSelected) { e.currentTarget.style.background = "#eff6ff"; e.currentTarget.style.color = "#1e3a8a"; } }}
+                    onMouseLeave={(e) => { if (!isSelected) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#334155"; } }}
+                  >{d}</button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+      <style>{`@keyframes fye-pop { from { opacity:0; transform:translateY(-6px) scale(.97); } to { opacity:1; transform:translateY(0) scale(1); } }`}</style>
+    </div>
+  );
+}
+
 function Basic({ form, update, countries }) {
-  return <div className="space-y-4"><div className="grid gap-3 md:grid-cols-2">{["Legal Person", "Natural Person"].map((type) => <button key={type} onClick={() => update("clientType", type)} className={`rounded-xl border p-4 text-left ${form.clientType === type ? "border-[#1e3a8a] bg-blue-50" : "border-[#e2e8f0]"}`}><div className="font-extrabold">{type}</div><div className="text-[12px] text-slate-500">{type === "Legal Person" ? "Companies, branches, free zone entities" : "Individual taxable persons"}</div></button>)}</div><div className="grid gap-3 md:grid-cols-3"><Field label="File No." field="client-file-no"><input className="input" value={form.fileNo} onChange={(e) => update("fileNo", e.target.value)} /></Field><Field label="Legal Name*" field="client-legal-name"><input className="input" value={form.legalName} onChange={(e) => update("legalName", e.target.value)} /></Field><Field label="Trade Name" field="client-trade-name"><input className="input" value={form.tradeName} onChange={(e) => update("tradeName", e.target.value)} /></Field><Field label="Financial Year End*" field="client-fye"><input className="input" value={form.fye} onChange={(e) => update("fye", e.target.value)} /></Field><Field label="Jurisdiction" field="client-jurisdiction"><select className="input" value={form.jurisdiction} onChange={(e) => update("jurisdiction", e.target.value)}><option>Mainland</option><option>Free Zone</option><option>Designated Zone</option><option>Offshore</option></select></Field><Field label="Assigned User" field="client-assigned-user"><input className="input" value={form.assigned} onChange={(e) => update("assigned", e.target.value)} /></Field></div><div className="grid gap-3 md:grid-cols-5"><Field label="Country" field="client-country"><select className="input" value={form.country} onChange={(e) => update("country", e.target.value)}>{countries.map((c) => <option key={c}>{c}</option>)}</select></Field><Field label="Emirate/State" field="client-emirate"><input className="input" value={form.emirate} onChange={(e) => update("emirate", e.target.value)} /></Field><Field label="Street" field="client-street"><input className="input" value={form.street} onChange={(e) => update("street", e.target.value)} /></Field><Field label="PO Box" field="client-po-box"><input className="input" value={form.poBox} onChange={(e) => update("poBox", e.target.value)} /></Field><Field label="Postal Code" field="client-postal-code"><input className="input" value={form.postalCode} onChange={(e) => update("postalCode", e.target.value)} /></Field></div><label className="flex items-center gap-2 font-bold" htmlFor="client-different-address"><input id="client-different-address" name="clientDifferentAddress" type="checkbox" checked={form.differentAddress} onChange={(e) => update("differentAddress", e.target.checked)} /> Actual/Correspondence Address is different</label>{form.differentAddress && <textarea id="client-correspondence-address" name="clientCorrespondenceAddress" className="input textarea" value={form.correspondence} onChange={(e) => update("correspondence", e.target.value)} />}</div>;
+  return <div className="space-y-4"><div className="grid gap-3 md:grid-cols-2">{["Legal Person", "Natural Person"].map((type) => <button key={type} onClick={() => update("clientType", type)} className={`rounded-xl border p-4 text-left ${form.clientType === type ? "border-[#1e3a8a] bg-blue-50" : "border-[#e2e8f0]"}`}><div className="font-extrabold">{type}</div><div className="text-[12px] text-slate-500">{type === "Legal Person" ? "Companies, branches, free zone entities" : "Individual taxable persons"}</div></button>)}</div><div className="grid gap-3 md:grid-cols-3"><Field label="File No." field="client-file-no"><input className="input" value={form.fileNo} onChange={(e) => update("fileNo", e.target.value)} /></Field><Field label="Legal Name*" field="client-legal-name"><input className="input" value={form.legalName} onChange={(e) => update("legalName", e.target.value)} /></Field><Field label="Trade Name" field="client-trade-name"><input className="input" value={form.tradeName} onChange={(e) => update("tradeName", e.target.value)} /></Field><label><span className="field-label">Financial Year End*</span><FyeCalendarPicker id="client-fye" value={form.fye} onChange={(v) => update("fye", v)} /></label><Field label="Jurisdiction" field="client-jurisdiction"><select className="input" value={form.jurisdiction} onChange={(e) => update("jurisdiction", e.target.value)}><option>Mainland</option><option>Free Zone</option><option>Designated Zone</option><option>Offshore</option></select></Field><Field label="Assigned User" field="client-assigned-user"><input className="input" value={form.assigned} onChange={(e) => update("assigned", e.target.value)} /></Field></div><div className="grid gap-3 md:grid-cols-5"><Field label="Country" field="client-country"><select className="input" value={form.country} onChange={(e) => update("country", e.target.value)}>{countries.map((c) => <option key={c}>{c}</option>)}</select></Field><Field label="Emirate/State" field="client-emirate"><input className="input" value={form.emirate} onChange={(e) => update("emirate", e.target.value)} /></Field><Field label="Street" field="client-street"><input className="input" value={form.street} onChange={(e) => update("street", e.target.value)} /></Field><Field label="PO Box" field="client-po-box"><input className="input" value={form.poBox} onChange={(e) => update("poBox", e.target.value)} /></Field><Field label="Postal Code" field="client-postal-code"><input className="input" value={form.postalCode} onChange={(e) => update("postalCode", e.target.value)} /></Field></div><label className="flex items-center gap-2 font-bold" htmlFor="client-different-address"><input id="client-different-address" name="clientDifferentAddress" type="checkbox" checked={form.differentAddress} onChange={(e) => update("differentAddress", e.target.checked)} /> Actual/Correspondence Address is different</label>{form.differentAddress && <textarea id="client-correspondence-address" name="clientCorrespondenceAddress" className="input textarea" value={form.correspondence} onChange={(e) => update("correspondence", e.target.value)} />}</div>;
 }
 function Repeat({ title, items, setItems, blank, render }) {
   const patch = (i, values) => setItems(items.map((item, idx) => idx === i ? { ...item, ...values } : item));
