@@ -604,29 +604,44 @@ function getFirstDayOfWeek(monthIdx, year) {
 
 function FyeCalendarPicker({ value, onChange, id }) {
   const [open, setOpen] = useState(false);
-  const [view, setView] = useState("cal"); // "cal" | "months" | "years"
+  const [view, setView] = useState("cal");
   const wrapRef = useRef(null);
+  const anchorRef = useRef(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
   const { day: selDay, month: selMonth, year: selYear } = parseFye(value);
   const now = new Date();
   const [navMonth, setNavMonth] = useState(selMonth ? FYE_MONTHS.indexOf(selMonth) : now.getMonth());
   const [navYear, setNavYear] = useState(selYear || now.getFullYear());
 
+  function computePos() {
+    if (anchorRef.current) {
+      const r = anchorRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 6, left: r.left });
+    }
+  }
+
+  function openPicker() {
+    computePos();
+    if (selMonth) setNavMonth(FYE_MONTHS.indexOf(selMonth));
+    if (selYear) setNavYear(selYear);
+    setView("cal");
+    setOpen(true);
+  }
+
   useEffect(() => {
     if (!open) return;
-    function handleClick(e) {
+    function onMouseDown(e) {
       if (wrapRef.current && !wrapRef.current.contains(e.target)) { setOpen(false); setView("cal"); }
     }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
-
-  // Sync nav to selected value when opening
-  useEffect(() => {
-    if (open) {
-      if (selMonth) setNavMonth(FYE_MONTHS.indexOf(selMonth));
-      if (selYear) setNavYear(selYear);
-      setView("cal");
-    }
+    function onScroll() { computePos(); }
+    document.addEventListener("mousedown", onMouseDown);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", computePos);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", computePos);
+    };
   }, [open]);
 
   function prevMonth() {
@@ -637,7 +652,6 @@ function FyeCalendarPicker({ value, onChange, id }) {
     if (navMonth === 11) { setNavMonth(0); setNavYear((y) => y + 1); }
     else setNavMonth((m) => m + 1);
   }
-
   function selectDay(day) {
     onChange(`${day} ${FYE_MONTHS[navMonth]} ${navYear}`);
     setOpen(false); setView("cal");
@@ -653,56 +667,48 @@ function FyeCalendarPicker({ value, onChange, id }) {
 
   const isSelected = (d) => d && selDay === d && selMonth === FYE_MONTHS[navMonth] && selYear === navYear;
   const isToday = (d) => d && d === now.getDate() && navMonth === now.getMonth() && navYear === now.getFullYear();
-
   const yearStart = navYear - (navYear % 12);
   const yearGrid = Array.from({ length: 12 }, (_, i) => yearStart + i);
 
   const S = {
     popup: {
-      position: "absolute", top: "calc(100% + 6px)", left: 0,
-      zIndex: 9999, background: "#fff",
+      position: "fixed", top: pos.top, left: pos.left,
+      zIndex: 99999, background: "#fff",
       border: "1px solid #e2e8f0", borderRadius: 12,
-      boxShadow: "0 8px 28px rgba(30,58,138,.13), 0 2px 8px rgba(0,0,0,.07)",
-      width: 248, padding: "10px",
+      boxShadow: "0 8px 28px rgba(30,58,138,.14), 0 2px 8px rgba(0,0,0,.08)",
+      width: 264, padding: "12px",
       animation: "fye-pop .14s ease",
     },
-    header: {
-      display: "flex", alignItems: "center", justifyContent: "space-between",
-      marginBottom: 8,
-    },
+    header: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
     navBtn: {
-      width: 26, height: 26, borderRadius: 6, border: "none", background: "transparent",
+      width: 28, height: 28, borderRadius: 6, border: "none", background: "transparent",
       cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-      color: "#64748b", fontSize: 14, transition: "all .12s ease",
+      color: "#64748b", fontSize: 16, fontWeight: 700, transition: "all .12s ease",
     },
     headLabel: {
       fontSize: 13, fontWeight: 800, color: "#0f172a", cursor: "pointer",
-      padding: "2px 6px", borderRadius: 6, transition: "background .12s",
+      padding: "2px 7px", borderRadius: 6, transition: "background .12s",
     },
-    dow: {
-      display: "grid", gridTemplateColumns: "repeat(7, 1fr)",
-      marginBottom: 4,
-    },
-    dowCell: {
-      textAlign: "center", fontSize: 10, fontWeight: 700,
-      color: "#94a3b8", padding: "2px 0",
-    },
-    dayGrid: {
-      display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2,
-    },
+    dow: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", marginBottom: 4 },
+    dowCell: { textAlign: "center", fontSize: 10, fontWeight: 700, color: "#94a3b8", padding: "3px 0" },
+    dayGrid: { display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 },
   };
+
+  const navHover = (e) => { e.currentTarget.style.background = "#f1f5f9"; };
+  const navLeave = (e) => { e.currentTarget.style.background = "transparent"; };
 
   return (
     <div ref={wrapRef} style={{ position: "relative" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <div ref={anchorRef} style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <input
           id={id} name={id} className="input" readOnly value={value}
           placeholder="Select date"
-          onClick={() => setOpen((o) => !o)}
-          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen((o) => !o); } }}
+          onClick={() => open ? setOpen(false) : openPicker()}
+          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open ? setOpen(false) : openPicker(); } }}
           style={{ cursor: "pointer" }}
         />
-        <button type="button" aria-label="Open calendar" onClick={() => setOpen((o) => !o)}
+        <button type="button" aria-label="Open calendar"
+          onClick={() => open ? setOpen(false) : openPicker()}
           style={{
             flexShrink: 0, width: 34, height: 34, borderRadius: 8,
             background: open ? "#1e3a8a" : "#f1f5f9",
@@ -721,28 +727,16 @@ function FyeCalendarPicker({ value, onChange, id }) {
       {open && (
         <div style={S.popup}>
 
-          {/* ── Calendar view ── */}
+          {/* Calendar view */}
           {view === "cal" && (<>
             <div style={S.header}>
-              <button type="button" style={S.navBtn}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "#f1f5f9"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                onClick={prevMonth}>‹</button>
+              <button type="button" style={S.navBtn} onMouseEnter={navHover} onMouseLeave={navLeave} onClick={prevMonth}>‹</button>
               <div>
-                <span style={S.headLabel}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "#f1f5f9"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                  onClick={() => setView("months")}>{FYE_MONTHS_SHORT[navMonth]}</span>
+                <span style={S.headLabel} onMouseEnter={(e) => { e.currentTarget.style.background = "#f1f5f9"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }} onClick={() => setView("months")}>{FYE_MONTHS_SHORT[navMonth]}</span>
                 {" "}
-                <span style={S.headLabel}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = "#f1f5f9"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                  onClick={() => setView("years")}>{navYear}</span>
+                <span style={S.headLabel} onMouseEnter={(e) => { e.currentTarget.style.background = "#f1f5f9"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }} onClick={() => setView("years")}>{navYear}</span>
               </div>
-              <button type="button" style={S.navBtn}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "#f1f5f9"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                onClick={nextMonth}>›</button>
+              <button type="button" style={S.navBtn} onMouseEnter={navHover} onMouseLeave={navLeave} onClick={nextMonth}>›</button>
             </div>
             <div style={S.dow}>
               {FYE_DOW.map((d) => <div key={d} style={S.dowCell}>{d}</div>)}
@@ -755,12 +749,12 @@ function FyeCalendarPicker({ value, onChange, id }) {
                   <button key={i} type="button" disabled={!d}
                     onClick={() => d && selectDay(d)}
                     style={{
-                      height: 30, borderRadius: 7, border: sel ? "none" : tod ? "1.5px solid #1e3a8a" : "none",
+                      height: 32, borderRadius: 7,
+                      border: sel ? "none" : tod ? "1.5px solid #1e3a8a" : "none",
                       background: sel ? "#1e3a8a" : "transparent",
                       color: !d ? "transparent" : sel ? "#fff" : tod ? "#1e3a8a" : "#334155",
                       fontSize: 12, fontWeight: sel ? 800 : tod ? 700 : 500,
-                      cursor: d ? "pointer" : "default",
-                      transition: "all .12s ease",
+                      cursor: d ? "pointer" : "default", transition: "all .12s ease",
                     }}
                     onMouseEnter={(e) => { if (d && !sel) { e.currentTarget.style.background = "#eff6ff"; e.currentTarget.style.color = "#1e3a8a"; } }}
                     onMouseLeave={(e) => { if (d && !sel) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = tod ? "#1e3a8a" : "#334155"; } }}
@@ -770,67 +764,42 @@ function FyeCalendarPicker({ value, onChange, id }) {
             </div>
           </>)}
 
-          {/* ── Month picker view ── */}
+          {/* Month picker */}
           {view === "months" && (<>
             <div style={S.header}>
-              <button type="button" style={S.navBtn}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "#f1f5f9"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                onClick={() => setNavYear((y) => y - 1)}>‹</button>
+              <button type="button" style={S.navBtn} onMouseEnter={navHover} onMouseLeave={navLeave} onClick={() => setNavYear((y) => y - 1)}>‹</button>
               <span style={{ ...S.headLabel, cursor: "default" }}>{navYear}</span>
-              <button type="button" style={S.navBtn}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "#f1f5f9"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                onClick={() => setNavYear((y) => y + 1)}>›</button>
+              <button type="button" style={S.navBtn} onMouseEnter={navHover} onMouseLeave={navLeave} onClick={() => setNavYear((y) => y + 1)}>›</button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4 }}>
               {FYE_MONTHS_SHORT.map((m, i) => {
                 const isSel = FYE_MONTHS.indexOf(selMonth) === i && selYear === navYear;
+                const isCur = i === navMonth;
                 return (
-                  <button key={m} type="button"
-                    onClick={() => { setNavMonth(i); setView("cal"); }}
-                    style={{
-                      padding: "7px 0", borderRadius: 8, border: "none", cursor: "pointer",
-                      fontSize: 12, fontWeight: isSel ? 800 : 600,
-                      background: isSel ? "#1e3a8a" : i === navMonth ? "#eff6ff" : "transparent",
-                      color: isSel ? "#fff" : i === navMonth ? "#1e3a8a" : "#334155",
-                      transition: "all .12s ease",
-                    }}
+                  <button key={m} type="button" onClick={() => { setNavMonth(i); setView("cal"); }}
+                    style={{ padding: "8px 0", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontWeight: isSel ? 800 : 600, background: isSel ? "#1e3a8a" : isCur ? "#eff6ff" : "transparent", color: isSel ? "#fff" : isCur ? "#1e3a8a" : "#334155", transition: "all .12s ease" }}
                     onMouseEnter={(e) => { if (!isSel) { e.currentTarget.style.background = "#eff6ff"; e.currentTarget.style.color = "#1e3a8a"; } }}
-                    onMouseLeave={(e) => { if (!isSel) { e.currentTarget.style.background = i === navMonth ? "#eff6ff" : "transparent"; e.currentTarget.style.color = i === navMonth ? "#1e3a8a" : "#334155"; } }}
+                    onMouseLeave={(e) => { if (!isSel) { e.currentTarget.style.background = isCur ? "#eff6ff" : "transparent"; e.currentTarget.style.color = isCur ? "#1e3a8a" : "#334155"; } }}
                   >{m}</button>
                 );
               })}
             </div>
           </>)}
 
-          {/* ── Year picker view ── */}
+          {/* Year picker */}
           {view === "years" && (<>
             <div style={S.header}>
-              <button type="button" style={S.navBtn}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "#f1f5f9"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                onClick={() => setNavYear((y) => y - 12)}>‹</button>
+              <button type="button" style={S.navBtn} onMouseEnter={navHover} onMouseLeave={navLeave} onClick={() => setNavYear((y) => y - 12)}>‹</button>
               <span style={{ ...S.headLabel, cursor: "default" }}>{yearGrid[0]}–{yearGrid[11]}</span>
-              <button type="button" style={S.navBtn}
-                onMouseEnter={(e) => { e.currentTarget.style.background = "#f1f5f9"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                onClick={() => setNavYear((y) => y + 12)}>›</button>
+              <button type="button" style={S.navBtn} onMouseEnter={navHover} onMouseLeave={navLeave} onClick={() => setNavYear((y) => y + 12)}>›</button>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4 }}>
               {yearGrid.map((y) => {
                 const isSel = selYear === y;
                 const isCur = navYear === y;
                 return (
-                  <button key={y} type="button"
-                    onClick={() => { setNavYear(y); setView("cal"); }}
-                    style={{
-                      padding: "7px 0", borderRadius: 8, border: "none", cursor: "pointer",
-                      fontSize: 12, fontWeight: isSel ? 800 : 600,
-                      background: isSel ? "#1e3a8a" : isCur ? "#eff6ff" : "transparent",
-                      color: isSel ? "#fff" : isCur ? "#1e3a8a" : "#334155",
-                      transition: "all .12s ease",
-                    }}
+                  <button key={y} type="button" onClick={() => { setNavYear(y); setView("cal"); }}
+                    style={{ padding: "8px 0", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12, fontWeight: isSel ? 800 : 600, background: isSel ? "#1e3a8a" : isCur ? "#eff6ff" : "transparent", color: isSel ? "#fff" : isCur ? "#1e3a8a" : "#334155", transition: "all .12s ease" }}
                     onMouseEnter={(e) => { if (!isSel) { e.currentTarget.style.background = "#eff6ff"; e.currentTarget.style.color = "#1e3a8a"; } }}
                     onMouseLeave={(e) => { if (!isSel) { e.currentTarget.style.background = isCur ? "#eff6ff" : "transparent"; e.currentTarget.style.color = isCur ? "#1e3a8a" : "#334155"; } }}
                   >{y}</button>
@@ -845,10 +814,6 @@ function FyeCalendarPicker({ value, onChange, id }) {
     </div>
   );
 }
-
-
-
-
 
 
 
