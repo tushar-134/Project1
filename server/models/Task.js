@@ -14,6 +14,9 @@ const taskSchema = new mongoose.Schema({
   isRecurring: { type: Boolean, default: false },
   recurringConfig: {
     frequency: { type: String, enum: ["weekly", "monthly", "quarterly", "semi_annual", "annual", "custom"] },
+    dayOfWeek: { type: String }, // For weekly: "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
+    dateOfMonth: { type: Number }, // For monthly, quarterly, yearly: 1 - 31
+    monthOfYear: { type: Number }, // For yearly: 1 - 12
     nextDueDate: Date,
     endDate: Date,
   },
@@ -33,5 +36,10 @@ taskSchema.index({ dueDate: 1, status: 1 });
 taskSchema.index({ category: 1, status: 1, dueDate: 1 });
 taskSchema.index({ client: 1 });
 taskSchema.index({ isAwaitingFta: 1, category: 1, ftaSubmittedDate: -1, createdAt: -1 });
+taskSchema.index({
+  isRecurring: 1,
+  recurringGeneratedTask: 1,
+  "recurringConfig.nextDueDate": 1
+});
 
 module.exports = mongoose.model("Task", taskSchema);

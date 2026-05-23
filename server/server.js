@@ -12,6 +12,7 @@ const User = require("./models/User");
 const Notification = require("./models/Notification");
 const sendEmail = require("./utils/sendEmail");
 const { notFound, errorMiddleware } = require("./middleware/errorMiddleware");
+const { maybeGenerateNextRecurringTask } = require("./controllers/taskController");
 
 const app = express();
 // The frontend has been opened through both localhost and 127.0.0.1 during local runs,
@@ -103,7 +104,38 @@ async function dailyTaskNotifications() {
   for (const [to, ids] of byEmail) await sendEmail({ to, subject: "Filing Buddy overdue task digest", text: `Overdue tasks: ${ids.join(", ")}` });
 }
 
+async function taskScheduler() { 
+  
+ const now = new Date();
+
+  const today = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate()
+  ));
+
+  console.log("Now running task scheduler for ", today);
+
+  const tasks = await Task.find({
+    isRecurring: true,
+    recurringGeneratedTask: null,
+    "recurringConfig.nextDueDate": today
+  });
+
+   if (!tasks.length) {
+    console.log("No recurring tasks found");
+    return;
+  }
+
+  for (const task of tasks) {
+    await maybeGenerateNextRecurringTask(task);
+  }
+
+}
+
 cron.schedule("0 4 * * *", dailyTaskNotifications, { timezone: "UTC" });
+
+cron.schedule("0 4 * * *", taskScheduler, { timezone: "UTC" });
 
 const port = process.env.PORT || 5000;
 // Boot is intentionally fail-fast: if Mongo is unavailable, we do not start a half-alive API.
