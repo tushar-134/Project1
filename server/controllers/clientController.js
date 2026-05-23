@@ -115,7 +115,7 @@ function validateVatTrn(vatDetails = {}) {
   const status = String(vatDetails?.status || "").trim();
   const trn = String(vatDetails?.trn || "").trim();
   if (status === "registered" && !trn) return "VAT TRN is required when VAT status is registered.";
-  if (trn && !/^1\\d{14}$/.test(trn)) return "VAT TRN must be a 15-digit number starting with 1.";
+  if (trn && !/^1\d{14}$/.test(trn)) return "VAT TRN must be a 15-digit number starting with 1.";
   return null;
 }
 
