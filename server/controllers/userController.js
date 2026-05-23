@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const { validationResult } = require("express-validator");
 const User = require("../models/User");
+const Client = require("../models/Client");
 const sendEmail = require("../utils/sendEmail");
 const { isValidPhone, normalizeDialCode, normalizePhoneNumber } = require("../utils/phoneUtils");
 
@@ -34,15 +35,23 @@ async function findUserDuplicate({ email, mobile, excludeId }) {
 }
 
 exports.listUsers = async (req, res, next) => {
-  try { res.json(await User.find().select("-password").sort({ name: 1 })); } catch (error) { next(error); }
+  try {
+    const users = await User.find().select("-password").sort({ name: 1 }).lean();
+    const usersWithClients = await Promise.all(users.map(async (user) => {
+      const clients = await Client.find({ assignedUser: user._id, isActive: true }).select("legalName").lean();
+      return { ...user, assignedClients: clients };
+    }));
+    res.json(usersWithClients);
+  } catch (error) { next(error); }
 };
 
 
 exports.getUser = async (req, res, next) => {
   try {
-    const user = await User.findById(req.params.id).select("-password");
+    const user = await User.findById(req.params.id).select("-password").lean();
     if (!user) return res.status(404).json({ message: "User not found" });
-    res.json(user);
+    const clients = await Client.find({ assignedUser: user._id, isActive: true }).select("legalName").lean();
+    res.json({ ...user, assignedClients: clients });
   } catch (error) { next(error); }
 };
 
@@ -88,9 +97,10 @@ exports.updateUser = async (req, res, next) => {
     if ("email" in payload) payload.email = String(payload.email || "").trim().toLowerCase();
     if ("mobile" in payload) payload.mobile = normalizeMobile(payload.mobile);
     if ("mobileCountryCode" in payload) payload.mobileCountryCode = normalizeDialCode(payload.mobileCountryCode);
-    const user = await User.findByIdAndUpdate(req.params.id, payload, { new: true }).select("-password");
+    const user = await User.findByIdAndUpdate(req.params.id, payload, { new: true }).select("-password").lean();
     if (!user) return res.status(404).json({ message: "User not found" });
-    res.json(user);
+    const clients = await Client.find({ assignedUser: user._id, isActive: true }).select("legalName").lean();
+    res.json({ ...user, assignedClients: clients });
   } catch (error) {
     if (error?.code === 11000) {
       return res.status(409).json({ message: "User already added with this email or phone number." });
@@ -105,7 +115,10 @@ exports.updateRole = async (req, res, next) => {
     if (String(req.params.id) === String(req.user._id)) {
       return res.status(400).json({ message: "You cannot change your own role." });
     }
-    res.json(await User.findByIdAndUpdate(req.params.id, { role: req.body.role }, { new: true }).select("-password"));
+    const user = await User.findByIdAndUpdate(req.params.id, { role: req.body.role }, { new: true }).select("-password").lean();
+    if (!user) return res.status(404).json({ message: "User not found" });
+    const clients = await Client.find({ assignedUser: user._id, isActive: true }).select("legalName").lean();
+    res.json({ ...user, assignedClients: clients });
   } catch (error) { next(error); }
 };
 
@@ -114,7 +127,10 @@ exports.updateStatus = async (req, res, next) => {
     if (String(req.params.id) === String(req.user._id) && req.body.isActive === false) {
       return res.status(400).json({ message: "You cannot deactivate your own account." });
     }
-    res.json(await User.findByIdAndUpdate(req.params.id, { isActive: req.body.isActive }, { new: true }).select("-password"));
+    const user = await User.findByIdAndUpdate(req.params.id, { isActive: req.body.isActive }, { new: true }).select("-password").lean();
+    if (!user) return res.status(404).json({ message: "User not found" });
+    const clients = await Client.find({ assignedUser: user._id, isActive: true }).select("legalName").lean();
+    res.json({ ...user, assignedClients: clients });
   } catch (error) { next(error); }
 };
 

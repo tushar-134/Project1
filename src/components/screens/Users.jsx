@@ -1,4 +1,4 @@
-import { Plus } from "lucide-react";
+import { Plus, Briefcase, ChevronRight, Search, X } from "lucide-react";
 import { cloneElement, isValidElement, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
@@ -30,7 +30,20 @@ export default function Users() {
   const [form, setForm] = useState({ name: "", email: "", mobileCountryCode: DEFAULT_DIAL_CODE, mobile: "", role: "Task Only" });
   const [mobileError, setMobileError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [clientSearch, setClientSearch] = useState("");
+  const [activeTooltip, setActiveTooltip] = useState(null);
   const savingRef = useRef(false);
+  const tooltipRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (tooltipRef.current && !tooltipRef.current.contains(event.target)) {
+        setActiveTooltip(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     fetchUsers().catch(() => { });
@@ -42,6 +55,7 @@ export default function Users() {
     setEditingUser(null);
     setForm({ name: "", email: "", mobileCountryCode: DEFAULT_DIAL_CODE, mobile: "", role: "Task Only" });
     setMobileError("");
+    setClientSearch("");
   }
 
   function handleAddUser() {
@@ -178,6 +192,7 @@ export default function Users() {
               <th>Name</th>
               <th>Email</th>
               <th>Mobile</th>
+              <th>Assigned Clients</th>
               <th>Role</th>
               <th>Status</th>
               <th>Actions</th>
@@ -196,6 +211,68 @@ export default function Users() {
                 </td>
                 <td>{u.email}</td>
                 <td>{u.mobile}</td>
+                <td>
+                  {u.assignedClients && u.assignedClients.length > 0 ? (
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-50 text-blue-600">
+                        <Briefcase size={12} />
+                      </div>
+                      <span className="text-[13px] font-bold text-slate-700">
+                        {u.assignedClients[0].legalName}
+                      </span>
+                      {u.assignedClients.length > 1 && (
+                        <div className="relative">
+                          <button
+                            type="button"
+                            className={`flex h-5 items-center rounded-full px-1.5 text-[10px] font-black transition-all border ${
+                              activeTooltip === u._id 
+                                ? "bg-blue-600 border-blue-600 text-white shadow-sm shadow-blue-200" 
+                                : "bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200 hover:border-slate-300"
+                            }`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveTooltip(activeTooltip === u._id ? null : u._id);
+                            }}
+                          >
+                            +{u.assignedClients.length - 1}
+                          </button>
+                          
+                          {activeTooltip === u._id && (
+                            <div 
+                              ref={tooltipRef}
+                              className="absolute left-0 bottom-full z-[100] mb-2 w-64 rounded-2xl border border-slate-100 bg-white p-3 shadow-xl shadow-slate-200/50 animate-in fade-in slide-in-from-bottom-2 duration-200"
+                            >
+                              <div className="mb-2 flex items-center justify-between border-b border-slate-50 pb-2">
+                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">Other Assignments</span>
+                                <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-black text-blue-600">{u.assignedClients.length - 1} More</span>
+                              </div>
+                              <div className="max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                                <div className="grid gap-1.5">
+                                  {u.assignedClients.slice(1).map((client, cIdx) => (
+                                    <div key={cIdx} className="flex items-center gap-2 rounded-xl border border-slate-50 bg-slate-50/30 p-2 transition-colors hover:border-blue-100 hover:bg-blue-50/30">
+                                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-white text-[10px] font-black text-slate-400 border border-slate-100 shadow-sm">
+                                        {client.legalName?.[0] || "C"}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="truncate text-[11px] font-extrabold text-slate-700">{client.legalName}</div>
+                                        {client.fileNo && (
+                                          <div className="text-[9px] font-bold text-slate-400">#{client.fileNo}</div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                              <div className="absolute -bottom-1 left-4 h-2 w-2 rotate-45 border-b border-r border-slate-100 bg-white"></div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-[12px] italic text-slate-400">Not assigned</span>
+                  )}
+                </td>
                 <td>
                   <select
                     id={`user-role-${u.id}`}
@@ -298,6 +375,74 @@ export default function Users() {
                     <option>Admin</option>
                   </select>
                 </Field>
+              )}
+              {editingUser && editingUser.assignedClients && editingUser.assignedClients.length > 0 && (
+                <div className="mt-4 border-t border-slate-100 pt-5">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm shadow-blue-200">
+                        <Briefcase size={16} />
+                      </div>
+                      <div>
+                        <div className="text-[14px] font-black text-slate-900 leading-tight">Assigned Clients</div>
+                        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{editingUser.assignedClients.length} Total Records</div>
+                      </div>
+                    </div>
+                    {editingUser.assignedClients.length > 5 && (
+                      <div className="relative">
+                        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input 
+                          type="text" 
+                          placeholder="Search..." 
+                          className="h-8 w-32 rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-2 text-[12px] font-bold transition-all focus:w-48 focus:border-blue-400 focus:bg-white focus:outline-none"
+                          value={clientSearch}
+                          onChange={(e) => setClientSearch(e.target.value)}
+                        />
+                        {clientSearch && (
+                          <button onClick={() => setClientSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                            <X size={12} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="grid gap-2.5 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
+                    {editingUser.assignedClients
+                      .filter(c => !clientSearch || c.legalName?.toLowerCase().includes(clientSearch.toLowerCase()) || c.fileNo?.toLowerCase().includes(clientSearch.toLowerCase()))
+                      .map((client, idx) => (
+                      <div key={idx} className="group flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/50 p-3 transition-all hover:border-blue-100 hover:bg-white hover:shadow-md hover:shadow-blue-500/5">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[13px] font-black text-slate-400 border border-slate-100 shadow-sm transition-colors group-hover:border-blue-100 group-hover:bg-blue-50 group-hover:text-blue-600">
+                            {client.legalName?.[0] || "C"}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="truncate text-[13px] font-black text-slate-700 group-hover:text-slate-900">{client.legalName}</div>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              {client.fileNo && (
+                                <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-500 group-hover:bg-blue-100/50 group-hover:text-blue-500">
+                                  {client.fileNo}
+                                </span>
+                              )}
+                              <span className="text-[10px] font-bold text-slate-300">•</span>
+                              <span className="text-[10px] font-bold text-slate-400 uppercase">Client</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white border border-slate-100 opacity-0 transition-all group-hover:opacity-100 group-hover:border-blue-100">
+                          <ChevronRight size={14} className="text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-blue-500" />
+                        </div>
+                      </div>
+                    ))}
+                    {editingUser.assignedClients.filter(c => !clientSearch || c.legalName?.toLowerCase().includes(clientSearch.toLowerCase())).length === 0 && (
+                      <div className="flex flex-col items-center justify-center py-6 text-center">
+                        <div className="mb-2 rounded-full bg-slate-50 p-3 text-slate-300">
+                          <Search size={20} />
+                        </div>
+                        <div className="text-[12px] font-bold text-slate-400">No clients match your search</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
             <div className="mt-4 flex justify-end gap-2">
