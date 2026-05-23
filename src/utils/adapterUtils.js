@@ -37,39 +37,11 @@ export function mapClient(client) {
     designated_zone: "Designated Zone",
     offshore: "Offshore",
   };
-
-  // Collect all uploaded documents across trade licences and contact persons
-  const documents = [];
-  (client.tradeLicences || []).forEach((lic, i) => {
-    if (lic.documentUrl) {
-      documents.push({
-        label: `Trade Licence${(client.tradeLicences.length > 1) ? ` ${i + 1}` : ""} — ${lic.licenceNumber || "Document"}`,
-        filename: lic.documentUrl.split("/").pop(),
-        url: lic.documentUrl,
-      });
-    }
-  });
-  (client.contactPersons || []).forEach((person, i) => {
-    const suffix = (client.contactPersons.length > 1) ? ` (${person.fullName || `Contact ${i + 1}`})` : "";
-    if (person.emiratesId?.documentUrl) {
-      documents.push({
-        label: `Emirates ID${suffix}`,
-        filename: person.emiratesId.documentUrl.split("/").pop(),
-        url: person.emiratesId.documentUrl,
-      });
-    }
-    if (person.passport?.documentUrl) {
-      documents.push({
-        label: `Passport${suffix}`,
-        filename: person.passport.documentUrl.split("/").pop(),
-        url: person.passport.documentUrl,
-      });
-    }
-  });
-
   return {
     ...client,
     id: client._id,
+    // The original UI was built against a flatter prototype shape, so these adapters keep
+    // the screens stable while the backend returns normalized Mongo documents.
     name: client.legalName,
     type: client.clientType === "natural" ? "Natural Person" : "Legal Person",
     jurisdiction: jurisdictionLabels[client.jurisdiction] || client.jurisdiction,
@@ -79,10 +51,8 @@ export function mapClient(client) {
     contact: client.contactPersons?.find((p) => p.isPrimary)?.fullName || client.contactPersons?.[0]?.fullName || "",
     mobile: client.contactPersons?.[0]?.mobile ? `${client.contactPersons[0].mobile.countryCode || ""} ${client.contactPersons[0].mobile.number || ""}` : "",
     email: client.contactPersons?.[0]?.email || "",
-    documents,
   };
 }
-
 
 export function mapTask(task) {
   const categoryLabels = {

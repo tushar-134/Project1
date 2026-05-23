@@ -123,7 +123,18 @@ export default function TaskDetail() {
           <div>
             <div className="page-kicker">Task Detail</div>
             <h2 className="screen-title flex items-center gap-2">
-              {task.taskId}
+              {canManage ? (
+                <button
+                  type="button"
+                  className="task-id-link"
+                  onClick={() => navigate(`/tasks/edit/${task._id}`)}
+                  title="Edit task"
+                >
+                  {task.taskId}
+                </button>
+              ) : (
+                task.taskId
+              )}
               {overdue > 0 && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-extrabold text-[#dc2626]">
                   <AlertTriangle size={12} /> {overdue}d overdue
@@ -132,13 +143,6 @@ export default function TaskDetail() {
             </h2>
           </div>
         </div>
-        {canManage && (
-          <div className="flex gap-2">
-            <Button variant="ghost" size="sm" onClick={() => navigate(`/tasks/edit/${task._id}`)}>
-              <FileText size={14} /> Edit Task
-            </Button>
-          </div>
-        )}
       </div>
 
       {/* Task Details Card */}

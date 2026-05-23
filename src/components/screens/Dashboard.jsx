@@ -34,7 +34,7 @@ export default function Dashboard() {
   useEffect(() => {
     // Dashboard stats are month-sensitive, so the page refetches whenever the picker changes.
     const selected = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
-    reportService.dashboardStats({ month: selected }).then((data) => dispatch({ type: "SET_DASHBOARD", payload: data })).catch(() => {});
+    reportService.dashboardStats({ month: selected }).then((data) => dispatch({ type: "SET_DASHBOARD", payload: data })).catch(() => { });
   }, [month, dispatch]);
   const stats = state.dashboardStats || {};
   const selectedMonth = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
