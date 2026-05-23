@@ -31,6 +31,20 @@ button { touch-action: manipulation; }
 .app-scroll::-webkit-scrollbar-thumb, .side-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
 .side-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,.28); }
 
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
 .field-label { @apply mb-1.5 block text-[12px] font-semibold text-slate-600; }
 .input {
   @apply h-9 w-full rounded-lg border bg-white px-3 text-[13px] outline-none transition;
