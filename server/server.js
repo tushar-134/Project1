@@ -46,6 +46,7 @@ app.use("/api/contacts", require("./routes/contactRoutes"));
 app.use("/api/categories", require("./routes/categoryRoutes"));
 app.use("/api/reports", require("./routes/reportRoutes"));
 app.use("/api/notifications", require("./routes/notificationRoutes"));
+app.use("/api/custom-fields", require("./routes/customFieldRoutes"));
 app.use(notFound);
 app.use(errorMiddleware);
 

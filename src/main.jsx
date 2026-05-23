@@ -19,6 +19,7 @@ import TaskDetail from "./components/screens/TaskDetail.jsx";
 import FtaTracker from "./components/screens/FtaTracker.jsx";
 import Categories from "./components/screens/Categories.jsx";
 import Users from "./components/screens/Users.jsx";
+import CustomFields from "./components/screens/CustomFields.jsx";
 import ClientGroups from "./components/screens/ClientGroups.jsx";
 import Reports from "./components/screens/Reports.jsx";
 
@@ -47,6 +48,7 @@ createRoot(document.getElementById("root")).render(
               <Route path="/tasks/fta-tracker" element={<ProtectedRoute roles={["admin", "manager", "task_only"]}><FtaTracker /></ProtectedRoute>} />
               <Route path="/tasks/categories" element={<ProtectedRoute roles={["admin"]}><Categories /></ProtectedRoute>} />
               <Route path="/settings/users" element={<ProtectedRoute roles={["admin", "manager"]}><Users /></ProtectedRoute>} />
+              <Route path="/settings/custom-fields" element={<ProtectedRoute roles={["admin"]}><CustomFields /></ProtectedRoute>} />
               <Route path="/settings/groups" element={<ProtectedRoute roles={["admin", "manager"]}><ClientGroups /></ProtectedRoute>} />
               <Route path="/reports" element={<ProtectedRoute roles={["admin", "manager"]}><Reports /></ProtectedRoute>} />
             </Route>

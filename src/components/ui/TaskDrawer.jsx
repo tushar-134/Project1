@@ -1,11 +1,9 @@
 import { AlertTriangle, Briefcase, Calendar, Clock, ExternalLink, FileText, Tag, User, X } from "lucide-react";
-import { useEffect, useState } from "react";
-import toast from "react-hot-toast";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { taskService } from "../../services/taskService.js";
 import { ftaStatusFromApi, statusFromApi, statusToApi } from "../../utils/adapterUtils.js";
-import { canManageTasks } from "../../utils/permissions.js";
 import Badge from "./Badge.jsx";
 import Button from "./Button.jsx";
 import Card from "./Card.jsx";
@@ -17,8 +15,6 @@ const categoryLabels = {
   EInv: "E-Invoicing",
   Refund: "VAT Refund",
 };
-
-const ALL_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed"];
 
 const actionMeta = {
   Created: { color: "#059669", bg: "bg-emerald-50", border: "border-emerald-200", icon: "C" },
@@ -50,15 +46,36 @@ function getActionMeta(action) {
   return actionMeta[action] || { color: "#64748b", bg: "bg-slate-50", border: "border-slate-200", icon: "." };
 }
 
-export default function TaskDrawer({ taskId, canManage: canManageProp, onClose }) {
+const STATUS_OPTIONS = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed"];
+
+export default function TaskDrawer({ taskId, canManage, onClose }) {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const [task, setTask] = useState(null);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [savingStatus, setSavingStatus] = useState(false);
-  const canManage = canManageProp || canManageTasks(currentUser?.role);
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [statusError, setStatusError] = useState("");
+
+  const loadTask = useCallback(async (active = true) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [taskData, logsData] = await Promise.all([
+        taskService.get(taskId),
+        taskService.getLogs(taskId),
+      ]);
+      if (active) {
+        setTask(taskData);
+        setLogs(logsData);
+      }
+    } catch (err) {
+      if (active) setError(err.response?.data?.message || "Failed to load task details");
+    } finally {
+      if (active) setLoading(false);
+    }
+  }, [taskId]);
 
   useEffect(() => {
     if (!taskId) return undefined;
@@ -81,50 +98,49 @@ export default function TaskDrawer({ taskId, canManage: canManageProp, onClose }
     if (!taskId) return undefined;
 
     let active = true;
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const [taskData, logsData] = await Promise.all([
-          taskService.get(taskId),
-          taskService.getLogs(taskId),
-        ]);
-        if (active) {
-          setTask(taskData);
-          setLogs(logsData);
-        }
-      } catch (err) {
-        if (active) setError(err.response?.data?.message || "Failed to load task details");
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
-
-    load();
+    loadTask(active);
     return () => {
       active = false;
     };
-  }, [taskId]);
+  }, [taskId, loadTask]);
 
   if (!taskId) return null;
 
   const displayStatus = statusFromApi[task?.status] || task?.status;
   const displayCategory = categoryLabels[task?.category] || task?.category;
   const overdue = task ? daysOverdue(task.dueDate, task.status) : 0;
+  const canChangeStatus = Boolean(
+    task && (
+      canManage ||
+      (currentUser?.role === "task_only" && String(task.assignedTo?._id) === String(currentUser?._id || currentUser?.id))
+    )
+  );
 
-  async function handleStatusChange(nextStatus) {
-    if (!task || savingStatus || nextStatus === displayStatus) return;
-
-    setSavingStatus(true);
+  async function handleStatusChange(nextLabel) {
+    if (!task || statusSaving || nextLabel === displayStatus) return;
+    setStatusSaving(true);
+    setStatusError("");
+    const previousTask = task;
+    setTask({ ...task, status: statusToApi[nextLabel] || nextLabel });
     try {
-      await taskService.updateStatus(task._id, statusToApi[nextStatus] || nextStatus);
-      toast.success("Task status updated.");
+      await taskService.updateStatus(task._id, statusToApi[nextLabel] || nextLabel);
+      await loadTask(true);
       onClose();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Unable to update task status right now.");
+      setTask(previousTask);
+      setStatusError(err.response?.data?.message || "Failed to update task status");
     } finally {
-      setSavingStatus(false);
+      setStatusSaving(false);
     }
+  }
+
+  function openTaskDestination() {
+    if (!task) return;
+    if (canManage) {
+      navigate(`/tasks/edit/${task._id}`, { state: { task } });
+      return;
+    }
+    navigate(`/tasks/${task._id}`);
   }
 
   return (
@@ -143,18 +159,14 @@ export default function TaskDrawer({ taskId, canManage: canManageProp, onClose }
             <div className="page-kicker">Task Detail</div>
             {task ? (
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                {canManage ? (
-                  <button
-                    type="button"
-                    className="task-id-link text-[18px] font-black"
-                    onClick={() => navigate(`/tasks/edit/${task._id}`, { state: { task } })}
-                    title="Edit task"
-                  >
-                    {task.taskId}
-                  </button>
-                ) : (
-                  <div className="text-[18px] font-black text-slate-900">{task.taskId}</div>
-                )}
+                <button
+                  type="button"
+                  className="task-id-link text-[18px] font-black"
+                  onClick={openTaskDestination}
+                  title={canManage ? "Open edit task page" : "Open task page"}
+                >
+                  {task.taskId}
+                </button>
                 {overdue > 0 && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-extrabold text-[#dc2626]">
                     <AlertTriangle size={12} />
@@ -168,9 +180,9 @@ export default function TaskDrawer({ taskId, canManage: canManageProp, onClose }
           </div>
           <div className="flex items-center gap-2">
             {task && (
-              <Button variant="ghost" size="sm" onClick={() => navigate(`/tasks/${task._id}`)}>
+              <Button variant="ghost" size="sm" onClick={openTaskDestination}>
                 <ExternalLink size={15} />
-                Full page
+                {canManage ? "Edit page" : "Full page"}
               </Button>
             )}
             <button
@@ -207,23 +219,36 @@ export default function TaskDrawer({ taskId, canManage: canManageProp, onClose }
                       <div className="text-[16px] font-extrabold text-slate-900">{task.taskType}</div>
                     </div>
                   </div>
-                  {canManage ? (
-                    <select
-                      id={`task-drawer-status-${task._id}`}
-                      name={`taskDrawerStatus${task._id}`}
-                      className="input h-9 min-w-40"
-                      value={displayStatus}
-                      onChange={(e) => handleStatusChange(e.target.value)}
-                      disabled={savingStatus}
-                    >
-                      {ALL_STATUSES.map((status) => (
-                        <option key={status}>{status}</option>
-                      ))}
-                    </select>
+                  {canChangeStatus ? (
+                    <div className="flex min-w-[220px] flex-col items-end gap-1">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400" htmlFor="task-drawer-status">
+                        Status
+                      </label>
+                      <select
+                        id="task-drawer-status"
+                        name="taskDrawerStatus"
+                        className="input h-9 min-w-[220px]"
+                        value={displayStatus || ""}
+                        onChange={(event) => handleStatusChange(event.target.value)}
+                        disabled={statusSaving}
+                      >
+                        {STATUS_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   ) : (
                     <StatusPill status={displayStatus} />
                   )}
                 </div>
+
+                {statusError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">
+                    {statusError}
+                  </div>
+                )}
 
                 <div className="task-detail-grid">
                   <div className="task-detail-field">
@@ -302,6 +327,10 @@ export default function TaskDrawer({ taskId, canManage: canManageProp, onClose }
                   <span className="text-slate-300">.</span>
                   <span>Updated {formatDateTime(task.updatedAt)}</span>
                 </div>
+
+                {canChangeStatus && statusSaving && (
+                  <div className="text-[12px] font-semibold text-slate-500">Updating status...</div>
+                )}
               </Card>
 
               <div>
