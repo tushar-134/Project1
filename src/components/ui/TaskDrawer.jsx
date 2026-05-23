@@ -2,8 +2,10 @@ import { AlertTriangle, Briefcase, Calendar, Clock, ExternalLink, FileText, Tag,
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext.jsx";
 import { taskService } from "../../services/taskService.js";
 import { ftaStatusFromApi, statusFromApi, statusToApi } from "../../utils/adapterUtils.js";
+import { canManageTasks } from "../../utils/permissions.js";
 import Badge from "./Badge.jsx";
 import Button from "./Button.jsx";
 import Card from "./Card.jsx";
@@ -48,13 +50,15 @@ function getActionMeta(action) {
   return actionMeta[action] || { color: "#64748b", bg: "bg-slate-50", border: "border-slate-200", icon: "." };
 }
 
-export default function TaskDrawer({ taskId, canManage, onClose }) {
+export default function TaskDrawer({ taskId, canManage: canManageProp, onClose }) {
   const navigate = useNavigate();
+  const { currentUser } = useAuth();
   const [task, setTask] = useState(null);
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [savingStatus, setSavingStatus] = useState(false);
+  const canManage = canManageProp || canManageTasks(currentUser?.role);
 
   useEffect(() => {
     if (!taskId) return undefined;
