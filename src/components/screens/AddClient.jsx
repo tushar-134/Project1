@@ -1,18 +1,18 @@
 import { cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Plus, Trash2, UploadCloud, X, Settings2 } from "lucide-react";
+import { Copy, Eye, EyeOff, Plus, Trash2, UploadCloud, X, Settings2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
 import { useClients } from "../../hooks/useClients";
 import { useUsers } from "../../hooks/useUsers";
 import { groupService } from "../../services/groupService";
-import { customFieldService } from "../../services/customFieldService";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import { DIAL_CODE_OPTIONS } from "../../utils/dialCodeOptions.js";
 import { getPhoneNumberSpec, normalizeDialCode, normalizePhoneNumber } from "../../utils/phoneUtils.js";
 
 const tabs = ["Basic Details", "Trade Licences", "Contact Persons", "VAT / CT", "Client Group", "Portal Logins", "Custom Fields", "Attachments"];
+const blankPortal = { name: "", url: "", username: "", password: "", notes: "" };
 const countryCodes = ["AF", "AX", "AL", "DZ", "AS", "AD", "AO", "AI", "AQ", "AG", "AR", "AM", "AW", "AU", "AT", "AZ", "BS", "BH", "BD", "BB", "BY", "BE", "BZ", "BJ", "BM", "BT", "BO", "BQ", "BA", "BW", "BV", "BR", "IO", "BN", "BG", "BF", "BI", "KH", "CM", "CA", "CV", "KY", "CF", "TD", "CL", "CN", "CX", "CC", "CO", "KM", "CG", "CD", "CK", "CR", "CI", "HR", "CU", "CW", "CY", "CZ", "DK", "DJ", "DM", "DO", "EC", "EG", "SV", "GQ", "ER", "EE", "SZ", "ET", "FK", "FO", "FJ", "FI", "FR", "GF", "PF", "TF", "GA", "GM", "GE", "DE", "GH", "GI", "GR", "GL", "GD", "GP", "GU", "GT", "GG", "GN", "GW", "GY", "HT", "HM", "VA", "HN", "HK", "HU", "IS", "IN", "ID", "IR", "IQ", "IE", "IM", "IL", "IT", "JM", "JP", "JE", "JO", "KZ", "KE", "KI", "KP", "KR", "KW", "KG", "LA", "LV", "LB", "LS", "LR", "LY", "LI", "LT", "LU", "MO", "MG", "MW", "MY", "MV", "ML", "MT", "MH", "MQ", "MR", "MU", "YT", "MX", "FM", "MD", "MC", "MN", "ME", "MS", "MA", "MZ", "MM", "NA", "NR", "NP", "NL", "NC", "NZ", "NI", "NE", "NG", "NU", "NF", "MK", "MP", "NO", "OM", "PK", "PW", "PS", "PA", "PG", "PY", "PE", "PH", "PN", "PL", "PT", "PR", "QA", "RE", "RO", "RU", "RW", "BL", "SH", "KN", "LC", "MF", "PM", "VC", "WS", "SM", "ST", "SA", "SN", "RS", "SC", "SL", "SG", "SX", "SK", "SI", "SB", "SO", "ZA", "GS", "SS", "ES", "LK", "SD", "SR", "SJ", "SE", "CH", "SY", "TW", "TJ", "TZ", "TH", "TL", "TG", "TK", "TO", "TT", "TN", "TR", "TM", "TC", "TV", "UG", "UA", "AE", "GB", "US", "UM", "UY", "UZ", "VU", "VE", "VN", "VG", "VI", "WF", "EH", "YE", "ZM", "ZW"];
 
 function getApiErrorMessage(error) {
@@ -42,12 +42,13 @@ export default function AddClient() {
     return ["United Arab Emirates", ...[...new Set(base)].filter((country) => country !== "United Arab Emirates")];
   }, []);
   const [form, setForm] = useState({
-    clientType: "Legal Person", fileNo: "FB-C-0048", legalName: "", tradeName: "", fye: "31 December", jurisdiction: "Mainland", assigned: "Sara Mahmoud",
+    clientType: "Legal Person", fileNo: "", legalName: "", tradeName: "", fye: "31 December", jurisdiction: "Mainland", assigned: "",
     country: "United Arab Emirates", emirate: "Dubai", street: "", poBox: "", postalCode: "", differentAddress: false, correspondence: "",
     vatTrn: "", vatStatus: "Registered", vatDate: "", vatFreq: "Quarterly", ctTin: "", ctStatus: "Not Registered", ctDate: "", group: "", newGroup: "",
     qrmp: "Email", auditFirm: "", bank: "", iban: "",
   });
   const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "Dubai Economy", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null }]);
+
   const [contacts, setContacts] = useState([{
     name: "",
     designation: "",
@@ -71,7 +72,8 @@ export default function AddClient() {
     passportDocumentName: "",
     passportDocumentFile: null,
   }]);
-  const [portals, setPortals] = useState([{ name: "EmaraTax", url: "https://tax.gov.ae", username: "", password: "", notes: "" }]);
+  const [portals, setPortals] = useState([blankPortal]);
+  const [visiblePortalPasswords, setVisiblePortalPasswords] = useState({});
   const [attachments, setAttachments] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -194,9 +196,10 @@ export default function AddClient() {
         name: portal.portalName || "",
         url: portal.portalUrl || "",
         username: portal.username || "",
-        password: "",
+        password: portal.password || "",
         notes: portal.notes || "",
-      })) : [{ name: "EmaraTax", url: "https://tax.gov.ae", username: "", password: "", notes: "" }]);
+      })) : [blankPortal]);
+      setVisiblePortalPasswords({});
       setAttachments((client.attachments || []).map((attachment) => ({
         id: attachment._id,
         name: attachment.name,
@@ -475,7 +478,9 @@ export default function AddClient() {
         registeredAddress: { country: form.country, emirate: form.emirate, street: form.street, poBox: form.poBox, postalCode: form.postalCode },
         correspondenceAddress: form.differentAddress ? { street: form.correspondence } : undefined,
         group: form.group || undefined,
-        portalLogins: portals.map((p) => ({ portalName: p.name, portalUrl: p.url, username: p.username, password: p.password, notes: p.notes })),
+        portalLogins: portals
+          .filter((p) => [p.name, p.url, p.username, p.password, p.notes].some((value) => String(value || "").trim()))
+          .map((p) => ({ portalName: p.name, portalUrl: p.url, username: p.username, password: p.password, notes: p.notes })),
         customFields: { qrmpPreference: form.qrmp, auditFirmName: form.auditFirm, bankName: form.bank, iban: form.iban },
       };
       if (includeVatCt) {
@@ -562,6 +567,18 @@ export default function AddClient() {
 
   const goPrevious = () => setTab((current) => Math.max(current - 1, 0));
   const saveAndContinue = () => saveClient({ continueToNext: true });
+  const togglePortalPassword = (index) => {
+    setVisiblePortalPasswords((current) => ({ ...current, [index]: !current[index] }));
+  };
+  const copyPortalPassword = async (password) => {
+    if (!password) return;
+    try {
+      await navigator.clipboard.writeText(password);
+      toast.success("Password copied.");
+    } catch {
+      toast.error("Unable to copy password.");
+    }
+  };
   const isFirstTab = tab === 0;
   const isLastTab = tab === tabs.length - 1;
 
@@ -633,7 +650,62 @@ export default function AddClient() {
           )}
           {tab === 3 && <div className="grid gap-3 md:grid-cols-2"><Field label="VAT Registration Status" field="client-vat-status"><select className="input" value={form.vatStatus} onChange={(e) => update("vatStatus", e.target.value)}><option>Registered</option><option>Applying / In Progress</option><option>Not Registered</option><option>Exempt</option></select></Field><Field label="VAT TRN" field="client-vat-trn"><input className="input" inputMode="numeric" maxLength={15} placeholder="15 digits starting with 1" value={form.vatTrn} onChange={(e) => update("vatTrn", String(e.target.value || "").replace(/\\D+/g, "").slice(0, 15))} /></Field><Field label="VAT Registration Date" field="client-vat-date"><input className="input" type="date" value={form.vatDate} onChange={(e) => update("vatDate", e.target.value)} /></Field><Field label="VAT Filing Frequency" field="client-vat-frequency"><select className="input" value={form.vatFreq} onChange={(e) => update("vatFreq", e.target.value)}><option>Monthly</option><option>Quarterly</option><option>Annual</option></select></Field><Field label="CT Registration Number (TIN)" field="client-ct-tin"><input className="input" value={form.ctTin} onChange={(e) => update("ctTin", e.target.value)} /></Field><Field label="CT Registration Status" field="client-ct-status"><select className="input" value={form.ctStatus} onChange={(e) => update("ctStatus", e.target.value)}><option>Registered</option><option>Not Registered</option><option>Pending</option></select></Field><Field label="CT Registration Date" field="client-ct-date"><input className="input" type="date" value={form.ctDate} onChange={(e) => update("ctDate", e.target.value)} /></Field><Field label="Financial Year End" field="client-ct-fye"><input className="input" value={form.fye} onChange={(e) => update("fye", e.target.value)} /></Field></div>}
           {tab === 4 && <div className="grid gap-4 md:grid-cols-2"><Field label="Select existing group" field="client-group"><select className="input" value={form.group} onChange={(e) => update("group", e.target.value)}><option value="">No group</option>{state.groups.map((g) => <option key={g.id} value={g._id}>{g.name}</option>)}</select></Field><Field label="Create new group"><div className="flex gap-2"><input id="client-new-group" name="clientNewGroup" className="input" value={form.newGroup} onChange={(e) => update("newGroup", e.target.value)} /><Button onClick={async () => { if (form.newGroup) { const g = await groupService.create({ name: form.newGroup }); dispatch({ type: "SET_RESOURCE", resource: "groups", payload: [...state.groups, { ...g, id: g._id, clients: g.clients || [], clientNames: g.clients?.map((c) => c.legalName) || [] }] }); update("group", g._id); } }}>Create</Button></div></Field><div className="rounded-xl bg-purple-50 p-4 font-bold text-[#7c3aed] md:col-span-2">Current group: {state.groups.find((g) => g._id === form.group)?.name || "Ungrouped"} {form.group && <button onClick={() => update("group", "")} className="ml-3 text-[#dc2626]">Ungroup</button>}</div></div>}
-          {tab === 5 && <Repeat title="Portal" items={portals} setItems={setPortals} blank={{ name: "", url: "", username: "", password: "", notes: "" }} render={(p, i, patch) => <div className="grid gap-3 md:grid-cols-2"><Field label="Portal Name" field={`portal-name-${i}`}><input className="input" value={p.name} onChange={(e) => patch(i, { name: e.target.value })} /></Field><Field label="URL" field={`portal-url-${i}`}><input className="input" value={p.url} onChange={(e) => patch(i, { url: e.target.value })} /></Field><Field label="Username/TRN" field={`portal-username-${i}`}><input className="input" value={p.username} onChange={(e) => patch(i, { username: e.target.value })} /></Field><Field label="Password" field={`portal-password-${i}`}><input className="input" type="password" value={p.password} onChange={(e) => patch(i, { password: e.target.value })} /></Field><Field label="Notes" field={`portal-notes-${i}`}><textarea className="input textarea" value={p.notes} onChange={(e) => patch(i, { notes: e.target.value })} /></Field></div>} />}
+          {tab === 5 && (
+            <Repeat
+              title="Portal"
+              items={portals}
+              setItems={setPortals}
+              blank={blankPortal}
+              render={(p, i, patch) => (
+                <div className="grid gap-3 md:grid-cols-2">
+                  <Field label="Portal Name" field={`portal-name-${i}`}><input className="input" value={p.name} autoComplete="off" onChange={(e) => patch(i, { name: e.target.value })} /></Field>
+                  <Field label="URL" field={`portal-url-${i}`}><input className="input" value={p.url} autoComplete="off" onChange={(e) => patch(i, { url: e.target.value })} /></Field>
+                  <Field label="Username/TRN" field={`portal-username-${i}`}>
+                    <input
+                      className="input"
+                      name={`clientPortalLogin${i}`}
+                      value={p.username}
+                      autoComplete="off"
+                      onChange={(e) => patch(i, { username: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Password" field={`portal-password-${i}`}>
+                    <div className="flex gap-2">
+                      <input
+                        id={`portal-password-${i}`}
+                        name={`clientPortalSecret${i}`}
+                        className="input"
+                        type={visiblePortalPasswords[i] ? "text" : "password"}
+                        value={p.password}
+                        autoComplete="new-password"
+                        onChange={(e) => patch(i, { password: e.target.value })}
+                      />
+                      <button
+                        type="button"
+                        className="grid h-9 w-9 flex-none place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-600 transition hover:bg-slate-50"
+                        title={visiblePortalPasswords[i] ? "Hide password" : "Show password"}
+                        aria-label={visiblePortalPasswords[i] ? "Hide password" : "Show password"}
+                        onClick={() => togglePortalPassword(i)}
+                      >
+                        {visiblePortalPasswords[i] ? <EyeOff size={16} /> : <Eye size={16} />}
+                      </button>
+                      <button
+                        type="button"
+                        className="grid h-9 w-9 flex-none place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
+                        title="Copy password"
+                        aria-label="Copy password"
+                        disabled={!p.password}
+                        onClick={() => copyPortalPassword(p.password)}
+                      >
+                        <Copy size={16} />
+                      </button>
+                    </div>
+                  </Field>
+                  <Field label="Notes" field={`portal-notes-${i}`}><textarea className="input textarea" value={p.notes} autoComplete="off" onChange={(e) => patch(i, { notes: e.target.value })} /></Field>
+                </div>
+              )}
+            />
+          )}
           {tab === 6 && <div className="grid gap-3 md:grid-cols-2"><Field label="QRMP Preference" field="client-qrmp"><input className="input" value={form.qrmp} onChange={(e) => update("qrmp", e.target.value)} /></Field><Field label="Audit Firm Name" field="client-audit-firm"><input className="input" value={form.auditFirm} onChange={(e) => update("auditFirm", e.target.value)} /></Field><Field label="Bank Name" field="client-bank"><input className="input" value={form.bank} onChange={(e) => update("bank", e.target.value)} /></Field><Field label="IBAN" field="client-iban"><input className="input" value={form.iban} onChange={(e) => update("iban", e.target.value)} /></Field><div className="rounded-xl bg-slate-50 p-3 text-[12px] font-semibold text-slate-500 md:col-span-2">You can add custom fields from Settings</div></div>}
           {tab === 7 && <div className="space-y-3"><AttachmentUploadZone onFiles={uploadFiles} isUploading={isUploading} /><div className="overflow-x-auto"><table className="table min-w-max"><thead><tr><th>Name</th><th>Size</th><th>Type</th><th>Description</th><th>Uploaded On</th><th>Uploaded By</th><th>Actions</th></tr></thead><tbody>{attachments.length === 0 && <tr><td colSpan={7} className="text-center text-slate-500">No attachments uploaded yet.</td></tr>}{attachments.map((a) => <tr key={a.id || a.name}><td>{a.name}</td><td>{a.size}</td><td>{a.type}</td><td>{a.description || "-"}</td><td>{a.uploadedOn}</td><td>{a.uploadedBy}</td><td><Button size="sm" variant="ghost" disabled={!a.url} onClick={() => a.url && window.open(a.url, "_blank", "noopener,noreferrer")}>Download</Button> <Button size="sm" variant="danger" onClick={() => removeAttachment(a)}>Delete</Button></td></tr>)}</tbody></table></div></div>}
         </div>

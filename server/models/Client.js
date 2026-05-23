@@ -1,17 +1,5 @@
-const crypto = require("crypto");
 const mongoose = require("mongoose");
 
-const secret = crypto.createHash("sha256").update(process.env.JWT_SECRET || "filing-buddy-dev").digest();
-
-function encrypt(value) {
-  if (!value) return value;
-  const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv("aes-256-cbc", secret, iv);
-  const encrypted = Buffer.concat([cipher.update(String(value), "utf8"), cipher.final()]);
-  return `${iv.toString("hex")}:${encrypted.toString("hex")}`;
-}
-
-// Portal passwords are encrypted before persistence because the UI treats them as operational secrets.
 const clientSchema = new mongoose.Schema({
   fileNo: { type: String, unique: true },
   clientType: { type: String, enum: ["legal", "natural"], required: true },
@@ -55,9 +43,7 @@ const clientSchema = new mongoose.Schema({
     financialYearEnd: String,
   },
   group: { type: mongoose.Schema.Types.ObjectId, ref: "ClientGroup" },
-  // Bug #6 Fix: added _passwordEncrypted flag so we never use a colon-sniff heuristic
-  // that breaks legitimate passwords containing a colon character (e.g. "p:assword").
-  portalLogins: [{ portalName: String, portalUrl: String, username: String, password: String, _passwordEncrypted: { type: Boolean, default: false }, notes: String }],
+  portalLogins: [{ portalName: String, portalUrl: String, username: String, password: String, notes: String }],
   // customFields: { qrmpPreference: String, auditFirmName: String, bankName: String, iban: String },
   customFields: { type: Map, of: String },
   attachments: [{
@@ -72,19 +58,6 @@ const clientSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 }, { timestamps: true });
-
-clientSchema.pre("save", function encryptPortalPasswords() {
-  if (this.isModified("portalLogins")) {
-    this.portalLogins.forEach((portal) => {
-      // Bug #6 Fix: use an explicit _passwordEncrypted flag instead of checking
-      // for a colon, which would break any password that legitimately contains ":".
-      if (portal.password && !portal._passwordEncrypted) {
-        portal.password = encrypt(portal.password);
-        portal._passwordEncrypted = true;
-      }
-    });
-  }
-});
 
 clientSchema.index({ isActive: 1, createdAt: -1 });
 clientSchema.index({ isActive: 1, jurisdiction: 1, createdAt: -1 });
