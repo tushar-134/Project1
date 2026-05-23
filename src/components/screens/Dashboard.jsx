@@ -9,6 +9,7 @@ import Badge from "../ui/Badge.jsx";
 import Card from "../ui/Card.jsx";
 import StatusPill from "../ui/StatusPill.jsx";
 import Table from "../ui/Table.jsx";
+import TaskDrawer from "../ui/TaskDrawer.jsx";
 
 const serviceTiles = [
   ["VAT", 7, 2, "vat"], ["Corporate Tax", 4, 0, "ct"], ["Audit", 3, 1, "audit"],
@@ -28,26 +29,54 @@ export default function Dashboard() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [month, setMonth] = useState(new Date(2026, 4, 1));
-  const monthText = month.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
-  const roleLabel = ROLE_LABELS[currentUser?.role] || currentUser?.role || "User";
-  const moveMonth = (delta) => setMonth(new Date(month.getFullYear(), month.getMonth() + delta, 1));
+  const [drawerTaskId, setDrawerTaskId] = useState(null);
+
+  const monthText  = month.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+  const roleLabel  = ROLE_LABELS[currentUser?.role] || currentUser?.role || "User";
+  const moveMonth  = (delta) => setMonth(new Date(month.getFullYear(), month.getMonth() + delta, 1));
+
+  // Only admin & manager see the drawer
+  const canManage = currentUser?.role === "admin" || currentUser?.role === "manager";
+
   useEffect(() => {
-    // Dashboard stats are month-sensitive, so the page refetches whenever the picker changes.
     const selected = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
-    reportService.dashboardStats({ month: selected }).then((data) => dispatch({ type: "SET_DASHBOARD", payload: data })).catch(() => {});
+    reportService.dashboardStats({ month: selected })
+      .then((data) => dispatch({ type: "SET_DASHBOARD", payload: data }))
+      .catch(() => {});
   }, [month, dispatch]);
+
   const stats = state.dashboardStats || {};
   const selectedMonth = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
   const tiles = stats.categoryBreakdown?.length
     ? stats.categoryBreakdown.map((item) => [categoryLabels[item.category] || item.category, item.pending, item.overdue])
     : serviceTiles.map(([name]) => [name, 0, 0]);
+
   const openTasks = (category) => {
     const params = new URLSearchParams({ category, month: selectedMonth });
     navigate(`/tasks/list?${params.toString()}`);
   };
 
+  function handleTaskIdClick(taskMongoId) {
+    if (!taskMongoId) return;
+    if (canManage) {
+      setDrawerTaskId(taskMongoId);
+    } else {
+      navigate(`/tasks/${taskMongoId}`);
+    }
+  }
+
   return (
     <div className="space-y-5">
+      {/* Task Detail Drawer — admin & manager only */}
+      {drawerTaskId && (
+        <TaskDrawer
+          taskId={drawerTaskId}
+          canManage={canManage}
+          onClose={() => setDrawerTaskId(null)}
+        />
+      )}
+
+      {/* Page header */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="page-kicker">Practice Overview</div>
@@ -61,16 +90,18 @@ export default function Dashboard() {
         <div className="flex h-9 items-center overflow-hidden rounded-lg border border-[#e2e8f0] bg-white">
           <button onClick={() => moveMonth(-1)} className="grid h-9 w-9 place-items-center hover:bg-slate-50"><ChevronLeft size={16} /></button>
           <div className="min-w-36 px-3 text-center text-[12px] font-extrabold">{monthText}</div>
-          <button onClick={() => moveMonth(1)} className="grid h-9 w-9 place-items-center hover:bg-slate-50"><ChevronRight size={16} /></button>
+          <button onClick={() => moveMonth(1)}  className="grid h-9 w-9 place-items-center hover:bg-slate-50"><ChevronRight size={16} /></button>
         </div>
       </div>
 
+      {/* Stat cards */}
       <div className="grid gap-3 md:grid-cols-3">
-        <Stat icon={<FileText size={18} />} label="Total Clients" value={stats.totalClients || 0} color="text-[#1e3a8a]" />
-        <Stat icon={<Clock size={18} />} label="Pending Tasks" value={stats.pendingTasks || 0} color="text-[#eab308]" />
-        <Stat icon={<AlertTriangle size={18} />} label="Overdue" value={stats.overdueTasks || 0} color="text-[#dc2626]" />
+        <Stat icon={<FileText size={18} />}    label="Total Clients"  value={stats.totalClients  || 0} color="text-[#1e3a8a]" />
+        <Stat icon={<Clock size={18} />}       label="Pending Tasks"  value={stats.pendingTasks  || 0} color="text-[#eab308]" />
+        <Stat icon={<AlertTriangle size={18} />} label="Overdue"      value={stats.overdueTasks  || 0} color="text-[#dc2626]" />
       </div>
 
+      {/* Service category tiles */}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {tiles.map(([name, pending, overdue]) => (
           <Card key={name} className="cursor-pointer p-4 transition hover:-translate-y-0.5 hover:shadow-md" onClick={() => openTasks(name)}>
@@ -90,16 +121,30 @@ export default function Dashboard() {
         ))}
       </div>
 
+      {/* Recent Activity table */}
       <Card>
         <div className="flex items-center justify-between border-b border-[#e2e8f0] px-4 py-3">
-          <div><div className="text-[14px] font-extrabold">Recent Activity</div><div className="text-[11px] font-semibold text-slate-500">Latest task movements</div></div>
+          <div>
+            <div className="text-[14px] font-extrabold">Recent Activity</div>
+            <div className="text-[11px] font-semibold text-slate-500">Latest task movements</div>
+          </div>
           <CalendarDays size={18} className="text-slate-400" />
         </div>
         <Table>
-          <thead><tr><th>Task ID</th><th>Client</th><th>Category</th><th>Task Type</th><th>Due Date</th><th>Assigned To</th><th>Status</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Task ID</th>
+              <th>Client</th>
+              <th>Category</th>
+              <th>Task Type</th>
+              <th>Due Date</th>
+              <th>Assigned To</th>
+              <th>Status</th>
+            </tr>
+          </thead>
           <tbody>
             {(state.activity || []).map((item) => {
-              const task = item.task || item;
+              const task        = item.task || item;
               const taskMongoId = task._id || item._id;
               return (
                 <tr key={item._id || item.taskId}>
@@ -107,15 +152,21 @@ export default function Dashboard() {
                     {taskMongoId ? (
                       <button
                         className="task-id-link"
-                        onClick={() => navigate(`/tasks/${taskMongoId}`)}
-                        title="View task details"
+                        onClick={() => handleTaskIdClick(taskMongoId)}
+                        title={canManage ? "View task details" : "Open task page"}
                       >
                         {task.taskId || item.taskId}
                       </button>
                     ) : (
                       task.taskId || item.taskId
                     )}
-                  </td><td>{task.client?.legalName || item.client || "—"}</td><td><Badge>{task.category || item.category || "Other"}</Badge></td><td>{task.taskType || item.task}</td><td>{task.dueDate?.slice?.(0, 10) || item.createdAt?.slice?.(0, 10)}</td><td>{item.user?.name || item.user || "—"}</td><td><StatusPill status={item.newStatus || item.action} /></td>
+                  </td>
+                  <td>{task.client?.legalName || item.client || "—"}</td>
+                  <td><Badge>{task.category || item.category || "Other"}</Badge></td>
+                  <td>{task.taskType || item.task}</td>
+                  <td>{task.dueDate?.slice?.(0, 10) || item.createdAt?.slice?.(0, 10)}</td>
+                  <td>{item.user?.name || item.user || "—"}</td>
+                  <td><StatusPill status={item.newStatus || item.action} /></td>
                 </tr>
               );
             })}
@@ -127,5 +178,13 @@ export default function Dashboard() {
 }
 
 function Stat({ icon, label, value, color }) {
-  return <Card className="flex items-center gap-3 p-4"><div className={`grid h-10 w-10 place-items-center rounded-xl bg-slate-50 ${color}`}>{icon}</div><div><div className="text-[11px] font-extrabold uppercase text-slate-500">{label}</div><div className="text-[24px] font-black">{value}</div></div></Card>;
+  return (
+    <Card className="flex items-center gap-3 p-4">
+      <div className={`grid h-10 w-10 place-items-center rounded-xl bg-slate-50 ${color}`}>{icon}</div>
+      <div>
+        <div className="text-[11px] font-extrabold uppercase text-slate-500">{label}</div>
+        <div className="text-[24px] font-black">{value}</div>
+      </div>
+    </Card>
+  );
 }
