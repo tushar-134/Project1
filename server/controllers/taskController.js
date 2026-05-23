@@ -359,24 +359,31 @@ exports.updateFtaStatus = async (req, res, next) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: "Task not found" });
     const previousStatus = task.ftaStatus;
-    task.ftaStatus = req.body.ftaStatus;
     const previousTaskStatus = task.status;
-    if (task.ftaStatus === "approved") {
-      task.status = "completed";
-      task.isAwaitingFta = false;
+    const nextFtaStatus = req.body.ftaStatus;
+    const updateFields = { ftaStatus: nextFtaStatus };
+    if (nextFtaStatus === "approved") {
+      updateFields.status = "completed";
+      updateFields.isAwaitingFta = false;
     }
-    await task.save();
-    await auditLogger({ task: task._id, user: req.user._id, action: "FTA Status Changed", previousStatus, newStatus: task.ftaStatus });
-    if (previousTaskStatus !== "completed" && task.status === "completed") {
-      await auditLogger({ task: task._id, user: req.user._id, action: "Status Changed", previousStatus: previousTaskStatus, newStatus: task.status, notes: "Auto-completed after FTA approval" });
-      await maybeGenerateNextRecurringTask(task, req.user._id);
+
+    const updated = await Task.findByIdAndUpdate(
+      task._id,
+      { $set: updateFields },
+      { new: true, runValidators: true }
+    ).populate(populateTask);
+
+    await auditLogger({ task: updated._id, user: req.user._id, action: "FTA Status Changed", previousStatus, newStatus: updated.ftaStatus });
+    if (previousTaskStatus !== "completed" && updated.status === "completed") {
+      await auditLogger({ task: updated._id, user: req.user._id, action: "Status Changed", previousStatus: previousTaskStatus, newStatus: updated.status, notes: "Auto-completed after FTA approval" });
+      await maybeGenerateNextRecurringTask(updated, req.user._id);
     }
-    if (previousStatus !== "additional_query" && task.ftaStatus === "additional_query") {
+    if (previousStatus !== "additional_query" && updated.ftaStatus === "additional_query") {
       const admins = await User.find({ role: "admin", isActive: true });
-      const recipients = [...new Set([task.assignedTo, ...admins.map((u) => u._id)].filter(Boolean).map((id) => String(id)))];
-      await Notification.insertMany(recipients.map((recipient) => ({ recipient, title: "FTA query received", message: `${task.taskId} has an additional FTA query.`, type: "fta_query", relatedTask: task._id })));
+      const recipients = [...new Set([updated.assignedTo?._id || updated.assignedTo, ...admins.map((u) => u._id)].filter(Boolean).map((id) => String(id)))];
+      await Notification.insertMany(recipients.map((recipient) => ({ recipient, title: "FTA query received", message: `${updated.taskId} has an additional FTA query.`, type: "fta_query", relatedTask: updated._id })));
     }
-    res.json(await task.populate(populateTask));
+    res.json(updated);
   } catch (error) { next(error); }
 };
 
