@@ -271,6 +271,9 @@ exports.updateStatus = async (req, res, next) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: "Task not found" });
     if (req.user.role === "task_only" && String(task.assignedTo) !== String(req.user._id)) return res.status(403).json({ message: "Forbidden" });
+    if (task.ftaStatus === "approved") {
+      return res.status(400).json({ message: "Approved FTA tasks are locked and cannot have their status changed." });
+    }
 
     const previousStatus = task.status;
     const newStatus = req.body.status;
@@ -354,8 +357,17 @@ exports.updateFtaStatus = async (req, res, next) => {
     if (!task) return res.status(404).json({ message: "Task not found" });
     const previousStatus = task.ftaStatus;
     task.ftaStatus = req.body.ftaStatus;
+    const previousTaskStatus = task.status;
+    if (task.ftaStatus === "approved") {
+      task.status = "completed";
+      task.isAwaitingFta = false;
+    }
     await task.save();
     await auditLogger({ task: task._id, user: req.user._id, action: "FTA Status Changed", previousStatus, newStatus: task.ftaStatus });
+    if (previousTaskStatus !== "completed" && task.status === "completed") {
+      await auditLogger({ task: task._id, user: req.user._id, action: "Status Changed", previousStatus: previousTaskStatus, newStatus: task.status, notes: "Auto-completed after FTA approval" });
+      await maybeGenerateNextRecurringTask(task, req.user._id);
+    }
     if (previousStatus !== "additional_query" && task.ftaStatus === "additional_query") {
       const admins = await User.find({ role: "admin", isActive: true });
       const recipients = [...new Set([task.assignedTo, ...admins.map((u) => u._id)].filter(Boolean).map((id) => String(id)))];
