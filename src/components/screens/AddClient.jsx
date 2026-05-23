@@ -580,7 +580,9 @@ function DocumentUploadZone({ id, title, subtitle, fileName, documentUrl, isUplo
 }
 
 const FYE_MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-const FYE_DAYS_IN_MONTH = [31,29,31,30,31,30,31,31,30,31,30,31];
+const FYE_MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const FYE_DAYS_IN_MONTH = [31,28,31,30,31,30,31,31,30,31,30,31];
+const FYE_DOW = ["Su","Mo","Tu","We","Th","Fr","Sa"];
 
 function parseFye(value) {
   if (!value) return { day: null, month: null, year: null };
@@ -591,60 +593,116 @@ function parseFye(value) {
   return { day: isNaN(day) ? null : day, month, year: isNaN(year) ? null : year };
 }
 
+function getDaysInMonth(monthIdx, year) {
+  if (monthIdx === 1) return (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 29 : 28;
+  return FYE_DAYS_IN_MONTH[monthIdx];
+}
+
+function getFirstDayOfWeek(monthIdx, year) {
+  return new Date(year, monthIdx, 1).getDay();
+}
+
 function FyeCalendarPicker({ value, onChange, id }) {
   const [open, setOpen] = useState(false);
+  const [view, setView] = useState("cal"); // "cal" | "months" | "years"
   const wrapRef = useRef(null);
-  const yearListRef = useRef(null);
   const { day: selDay, month: selMonth, year: selYear } = parseFye(value);
-  const currentYear = new Date().getFullYear();
-  const yearRange = Array.from({ length: 16 }, (_, i) => currentYear - 5 + i);
-  const [hoverMonth, setHoverMonth] = useState(selMonth || "December");
-  const [activeYear, setActiveYear] = useState(selYear || currentYear);
-  const activeMonth = hoverMonth || selMonth || "December";
-  const monthIdx = FYE_MONTHS.indexOf(activeMonth);
-  const maxDay = monthIdx >= 0 ? FYE_DAYS_IN_MONTH[monthIdx] : 31;
+  const now = new Date();
+  const [navMonth, setNavMonth] = useState(selMonth ? FYE_MONTHS.indexOf(selMonth) : now.getMonth());
+  const [navYear, setNavYear] = useState(selYear || now.getFullYear());
 
   useEffect(() => {
     if (!open) return;
     function handleClick(e) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) { setOpen(false); setView("cal"); }
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
+  // Sync nav to selected value when opening
   useEffect(() => {
-    if (open && yearListRef.current) {
-      const el = yearListRef.current.querySelector("[data-sel-year='true']");
-      if (el) el.scrollIntoView({ block: "center", behavior: "auto" });
+    if (open) {
+      if (selMonth) setNavMonth(FYE_MONTHS.indexOf(selMonth));
+      if (selYear) setNavYear(selYear);
+      setView("cal");
     }
   }, [open]);
 
-  function selectDate(month, day, year) {
-    onChange(`${day} ${month} ${year}`);
-    setOpen(false);
+  function prevMonth() {
+    if (navMonth === 0) { setNavMonth(11); setNavYear((y) => y - 1); }
+    else setNavMonth((m) => m - 1);
+  }
+  function nextMonth() {
+    if (navMonth === 11) { setNavMonth(0); setNavYear((y) => y + 1); }
+    else setNavMonth((m) => m + 1);
   }
 
-  const colLabel = { fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em", color: "#94a3b8", marginBottom: 8 };
+  function selectDay(day) {
+    onChange(`${day} ${FYE_MONTHS[navMonth]} ${navYear}`);
+    setOpen(false); setView("cal");
+  }
+
+  const daysInMonth = getDaysInMonth(navMonth, navYear);
+  const firstDow = getFirstDayOfWeek(navMonth, navYear);
+  const totalCells = Math.ceil((firstDow + daysInMonth) / 7) * 7;
+  const cells = Array.from({ length: totalCells }, (_, i) => {
+    const d = i - firstDow + 1;
+    return d >= 1 && d <= daysInMonth ? d : null;
+  });
+
+  const isSelected = (d) => d && selDay === d && selMonth === FYE_MONTHS[navMonth] && selYear === navYear;
+  const isToday = (d) => d && d === now.getDate() && navMonth === now.getMonth() && navYear === now.getFullYear();
+
+  const yearStart = navYear - (navYear % 12);
+  const yearGrid = Array.from({ length: 12 }, (_, i) => yearStart + i);
+
+  const S = {
+    popup: {
+      position: "absolute", top: "calc(100% + 6px)", left: 0,
+      zIndex: 9999, background: "#fff",
+      border: "1px solid #e2e8f0", borderRadius: 12,
+      boxShadow: "0 8px 28px rgba(30,58,138,.13), 0 2px 8px rgba(0,0,0,.07)",
+      width: 248, padding: "10px",
+      animation: "fye-pop .14s ease",
+    },
+    header: {
+      display: "flex", alignItems: "center", justifyContent: "space-between",
+      marginBottom: 8,
+    },
+    navBtn: {
+      width: 26, height: 26, borderRadius: 6, border: "none", background: "transparent",
+      cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+      color: "#64748b", fontSize: 14, transition: "all .12s ease",
+    },
+    headLabel: {
+      fontSize: 13, fontWeight: 800, color: "#0f172a", cursor: "pointer",
+      padding: "2px 6px", borderRadius: 6, transition: "background .12s",
+    },
+    dow: {
+      display: "grid", gridTemplateColumns: "repeat(7, 1fr)",
+      marginBottom: 4,
+    },
+    dowCell: {
+      textAlign: "center", fontSize: 10, fontWeight: 700,
+      color: "#94a3b8", padding: "2px 0",
+    },
+    dayGrid: {
+      display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2,
+    },
+  };
 
   return (
     <div ref={wrapRef} style={{ position: "relative" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
         <input
-          id={id}
-          name={id}
-          className="input"
-          readOnly
-          value={value}
-          placeholder="e.g. 31 December 2025"
+          id={id} name={id} className="input" readOnly value={value}
+          placeholder="Select date"
           onClick={() => setOpen((o) => !o)}
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen((o) => !o); } }}
           style={{ cursor: "pointer" }}
         />
-        <button
-          type="button"
-          aria-label="Open calendar"
-          onClick={() => setOpen((o) => !o)}
+        <button type="button" aria-label="Open calendar" onClick={() => setOpen((o) => !o)}
           style={{
             flexShrink: 0, width: 34, height: 34, borderRadius: 8,
             background: open ? "#1e3a8a" : "#f1f5f9",
@@ -653,114 +711,146 @@ function FyeCalendarPicker({ value, onChange, id }) {
             color: open ? "#fff" : "#64748b", transition: "all .18s ease",
           }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2"/>
-            <line x1="16" y1="2" x2="16" y2="6"/>
-            <line x1="8" y1="2" x2="8" y2="6"/>
-            <line x1="3" y1="10" x2="21" y2="10"/>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
           </svg>
         </button>
       </div>
+
       {open && (
-        <div style={{
-          position: "absolute", top: 0, left: "calc(100% + 10px)",
-          zIndex: 9999, background: "#fff",
-          border: "1px solid #e2e8f0", borderRadius: 14,
-          boxShadow: "0 8px 32px rgba(30,58,138,.13), 0 2px 8px rgba(0,0,0,.07)",
-          padding: "14px", display: "flex", gap: 10,
-          animation: "fye-pop .15s ease",
-        }}>
-          {/* Year column */}
-          <div style={{ width: 70 }}>
-            <div style={{ ...colLabel, paddingLeft: 4 }}>Year</div>
-            <div ref={yearListRef} style={{ display: "flex", flexDirection: "column", gap: 1, maxHeight: 268, overflowY: "auto", scrollbarWidth: "thin" }}>
-              {yearRange.map((y) => {
-                const isSel = activeYear === y;
+        <div style={S.popup}>
+
+          {/* ── Calendar view ── */}
+          {view === "cal" && (<>
+            <div style={S.header}>
+              <button type="button" style={S.navBtn}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "#f1f5f9"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                onClick={prevMonth}>‹</button>
+              <div>
+                <span style={S.headLabel}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "#f1f5f9"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  onClick={() => setView("months")}>{FYE_MONTHS_SHORT[navMonth]}</span>
+                {" "}
+                <span style={S.headLabel}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = "#f1f5f9"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  onClick={() => setView("years")}>{navYear}</span>
+              </div>
+              <button type="button" style={S.navBtn}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "#f1f5f9"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                onClick={nextMonth}>›</button>
+            </div>
+            <div style={S.dow}>
+              {FYE_DOW.map((d) => <div key={d} style={S.dowCell}>{d}</div>)}
+            </div>
+            <div style={S.dayGrid}>
+              {cells.map((d, i) => {
+                const sel = isSelected(d);
+                const tod = isToday(d);
                 return (
-                  <button
-                    key={y}
-                    type="button"
-                    data-sel-year={isSel ? "true" : undefined}
-                    onClick={() => setActiveYear(y)}
+                  <button key={i} type="button" disabled={!d}
+                    onClick={() => d && selectDay(d)}
                     style={{
-                      width: "100%", textAlign: "center", padding: "5px 4px",
-                      borderRadius: 7, border: "none", cursor: "pointer", fontSize: 12,
-                      fontWeight: isSel ? 800 : 600,
-                      background: isSel ? "#1e3a8a" : "transparent",
-                      color: isSel ? "#fff" : "#334155",
-                      transition: "all .12s ease", whiteSpace: "nowrap",
+                      height: 30, borderRadius: 7, border: sel ? "none" : tod ? "1.5px solid #1e3a8a" : "none",
+                      background: sel ? "#1e3a8a" : "transparent",
+                      color: !d ? "transparent" : sel ? "#fff" : tod ? "#1e3a8a" : "#334155",
+                      fontSize: 12, fontWeight: sel ? 800 : tod ? 700 : 500,
+                      cursor: d ? "pointer" : "default",
+                      transition: "all .12s ease",
                     }}
-                    onMouseEnter={(e) => { if (!isSel) { e.currentTarget.style.background = "#eff6ff"; e.currentTarget.style.color = "#1e3a8a"; } }}
-                    onMouseLeave={(e) => { if (!isSel) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#334155"; } }}
-                  >{y}</button>
+                    onMouseEnter={(e) => { if (d && !sel) { e.currentTarget.style.background = "#eff6ff"; e.currentTarget.style.color = "#1e3a8a"; } }}
+                    onMouseLeave={(e) => { if (d && !sel) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = tod ? "#1e3a8a" : "#334155"; } }}
+                  >{d || ""}</button>
                 );
               })}
             </div>
-          </div>
-          {/* Divider */}
-          <div style={{ width: 1, background: "#e2e8f0", borderRadius: 1, margin: "0 2px" }} />
-          {/* Month column */}
-          <div style={{ flex: 1, minWidth: 108 }}>
-            <div style={{ ...colLabel, paddingLeft: 4 }}>Month</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              {FYE_MONTHS.map((m) => {
-                const isSel = selMonth === m && selYear === activeYear;
-                const isHover = hoverMonth === m;
+          </>)}
+
+          {/* ── Month picker view ── */}
+          {view === "months" && (<>
+            <div style={S.header}>
+              <button type="button" style={S.navBtn}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "#f1f5f9"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                onClick={() => setNavYear((y) => y - 1)}>‹</button>
+              <span style={{ ...S.headLabel, cursor: "default" }}>{navYear}</span>
+              <button type="button" style={S.navBtn}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "#f1f5f9"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                onClick={() => setNavYear((y) => y + 1)}>›</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4 }}>
+              {FYE_MONTHS_SHORT.map((m, i) => {
+                const isSel = FYE_MONTHS.indexOf(selMonth) === i && selYear === navYear;
                 return (
-                  <button
-                    key={m}
-                    type="button"
-                    onMouseEnter={() => setHoverMonth(m)}
-                    onClick={() => {
-                      const validDay = selDay && selDay <= FYE_DAYS_IN_MONTH[FYE_MONTHS.indexOf(m)] ? selDay : null;
-                      if (validDay) { selectDate(m, validDay, activeYear); } else { setHoverMonth(m); }
-                    }}
+                  <button key={m} type="button"
+                    onClick={() => { setNavMonth(i); setView("cal"); }}
                     style={{
-                      width: "100%", textAlign: "left", padding: "5px 8px",
-                      borderRadius: 7, border: "none", cursor: "pointer", fontSize: 12,
-                      fontWeight: isSel ? 800 : 600,
-                      background: isSel ? "#1e3a8a" : isHover ? "#eff6ff" : "transparent",
-                      color: isSel ? "#fff" : isHover ? "#1e3a8a" : "#334155",
+                      padding: "7px 0", borderRadius: 8, border: "none", cursor: "pointer",
+                      fontSize: 12, fontWeight: isSel ? 800 : 600,
+                      background: isSel ? "#1e3a8a" : i === navMonth ? "#eff6ff" : "transparent",
+                      color: isSel ? "#fff" : i === navMonth ? "#1e3a8a" : "#334155",
                       transition: "all .12s ease",
                     }}
+                    onMouseEnter={(e) => { if (!isSel) { e.currentTarget.style.background = "#eff6ff"; e.currentTarget.style.color = "#1e3a8a"; } }}
+                    onMouseLeave={(e) => { if (!isSel) { e.currentTarget.style.background = i === navMonth ? "#eff6ff" : "transparent"; e.currentTarget.style.color = i === navMonth ? "#1e3a8a" : "#334155"; } }}
                   >{m}</button>
                 );
               })}
             </div>
-          </div>
-          {/* Divider */}
-          <div style={{ width: 1, background: "#e2e8f0", borderRadius: 1, margin: "0 2px" }} />
-          {/* Day column */}
-          <div style={{ width: 158 }}>
-            <div style={{ ...colLabel, paddingLeft: 2 }}>Day <span style={{ fontWeight: 500, textTransform: "none", color: "#cbd5e1" }}>({activeMonth})</span></div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 3 }}>
-              {Array.from({ length: maxDay }, (_, i) => i + 1).map((d) => {
-                const isSel = selDay === d && selMonth === activeMonth && selYear === activeYear;
+          </>)}
+
+          {/* ── Year picker view ── */}
+          {view === "years" && (<>
+            <div style={S.header}>
+              <button type="button" style={S.navBtn}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "#f1f5f9"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                onClick={() => setNavYear((y) => y - 12)}>‹</button>
+              <span style={{ ...S.headLabel, cursor: "default" }}>{yearGrid[0]}–{yearGrid[11]}</span>
+              <button type="button" style={S.navBtn}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "#f1f5f9"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                onClick={() => setNavYear((y) => y + 12)}>›</button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 4 }}>
+              {yearGrid.map((y) => {
+                const isSel = selYear === y;
+                const isCur = navYear === y;
                 return (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => selectDate(activeMonth, d, activeYear)}
+                  <button key={y} type="button"
+                    onClick={() => { setNavYear(y); setView("cal"); }}
                     style={{
-                      padding: "5px 0", borderRadius: 7, border: "none", cursor: "pointer",
-                      fontSize: 12, fontWeight: isSel ? 800 : 600, textAlign: "center",
-                      background: isSel ? "#1e3a8a" : "transparent",
-                      color: isSel ? "#fff" : "#334155",
+                      padding: "7px 0", borderRadius: 8, border: "none", cursor: "pointer",
+                      fontSize: 12, fontWeight: isSel ? 800 : 600,
+                      background: isSel ? "#1e3a8a" : isCur ? "#eff6ff" : "transparent",
+                      color: isSel ? "#fff" : isCur ? "#1e3a8a" : "#334155",
                       transition: "all .12s ease",
                     }}
                     onMouseEnter={(e) => { if (!isSel) { e.currentTarget.style.background = "#eff6ff"; e.currentTarget.style.color = "#1e3a8a"; } }}
-                    onMouseLeave={(e) => { if (!isSel) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#334155"; } }}
-                  >{d}</button>
+                    onMouseLeave={(e) => { if (!isSel) { e.currentTarget.style.background = isCur ? "#eff6ff" : "transparent"; e.currentTarget.style.color = isCur ? "#1e3a8a" : "#334155"; } }}
+                  >{y}</button>
                 );
               })}
             </div>
-          </div>
+          </>)}
+
         </div>
       )}
-      <style>{`@keyframes fye-pop { from { opacity:0; transform:translateY(-6px) scale(.97); } to { opacity:1; transform:translateY(0) scale(1); } }`}</style>
+      <style>{`@keyframes fye-pop { from { opacity:0; transform:translateY(-4px) scale(.98); } to { opacity:1; transform:translateY(0) scale(1); } }`}</style>
     </div>
   );
 }
+
+
+
+
+
+
 
 function Basic({ form, update, countries }) {
   return <div className="space-y-4"><div className="grid gap-3 md:grid-cols-2">{["Legal Person", "Natural Person"].map((type) => <button key={type} onClick={() => update("clientType", type)} className={`rounded-xl border p-4 text-left ${form.clientType === type ? "border-[#1e3a8a] bg-blue-50" : "border-[#e2e8f0]"}`}><div className="font-extrabold">{type}</div><div className="text-[12px] text-slate-500">{type === "Legal Person" ? "Companies, branches, free zone entities" : "Individual taxable persons"}</div></button>)}</div><div className="grid gap-3 md:grid-cols-3"><Field label="File No." field="client-file-no"><input className="input" value={form.fileNo} onChange={(e) => update("fileNo", e.target.value)} /></Field><Field label="Legal Name*" field="client-legal-name"><input className="input" value={form.legalName} onChange={(e) => update("legalName", e.target.value)} /></Field><Field label="Trade Name" field="client-trade-name"><input className="input" value={form.tradeName} onChange={(e) => update("tradeName", e.target.value)} /></Field><label><span className="field-label">Financial Year End*</span><FyeCalendarPicker id="client-fye" value={form.fye} onChange={(v) => update("fye", v)} /></label><Field label="Jurisdiction" field="client-jurisdiction"><select className="input" value={form.jurisdiction} onChange={(e) => update("jurisdiction", e.target.value)}><option>Mainland</option><option>Free Zone</option><option>Designated Zone</option><option>Offshore</option></select></Field><Field label="Assigned User" field="client-assigned-user"><input className="input" value={form.assigned} onChange={(e) => update("assigned", e.target.value)} /></Field></div><div className="grid gap-3 md:grid-cols-5"><Field label="Country" field="client-country"><select className="input" value={form.country} onChange={(e) => update("country", e.target.value)}>{countries.map((c) => <option key={c}>{c}</option>)}</select></Field><Field label="Emirate/State" field="client-emirate"><input className="input" value={form.emirate} onChange={(e) => update("emirate", e.target.value)} /></Field><Field label="Street" field="client-street"><input className="input" value={form.street} onChange={(e) => update("street", e.target.value)} /></Field><Field label="PO Box" field="client-po-box"><input className="input" value={form.poBox} onChange={(e) => update("poBox", e.target.value)} /></Field><Field label="Postal Code" field="client-postal-code"><input className="input" value={form.postalCode} onChange={(e) => update("postalCode", e.target.value)} /></Field></div><label className="flex items-center gap-2 font-bold" htmlFor="client-different-address"><input id="client-different-address" name="clientDifferentAddress" type="checkbox" checked={form.differentAddress} onChange={(e) => update("differentAddress", e.target.checked)} /> Actual/Correspondence Address is different</label>{form.differentAddress && <textarea id="client-correspondence-address" name="clientCorrespondenceAddress" className="input textarea" value={form.correspondence} onChange={(e) => update("correspondence", e.target.value)} />}</div>;
