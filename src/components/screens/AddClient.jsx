@@ -131,6 +131,7 @@ export default function AddClient() {
   const [portals, setPortals] = useState([blankPortal]);
   const [visiblePortalPasswords, setVisiblePortalPasswords] = useState({});
   const [attachments, setAttachments] = useState([]);
+  const [attachmentDescription, setAttachmentDescription] = useState("");
   const [customFieldModal, setCustomFieldModal] = useState(false);
   const [customFieldValues, setCustomFieldValues] = useState({});
   const [selectedFieldKeys, setSelectedFieldKeys] = useState([]);
@@ -443,9 +444,10 @@ export default function AddClient() {
     }
   }
 
-  async function uploadFiles(files) {
+  async function uploadFiles(files, description = "") {
     const selected = Array.from(files || []);
     if (!selected.length) return;
+    const attachmentNote = String(description || "").trim();
     if (!isEditMode) {
       setAttachments((current) => [
         ...current,
@@ -454,13 +456,14 @@ export default function AddClient() {
           name: file.name,
           size: formatFileSize(file.size),
           type: file.type || file.name.split(".").pop()?.toUpperCase() || "File",
-          description: "",
+          description: attachmentNote,
           uploadedOn: "Pending save",
           uploadedBy: "You",
           file,
           saved: false,
         })),
       ]);
+      setAttachmentDescription("");
       toast.success("File added. Save the client to upload it.");
       return;
     }
@@ -470,10 +473,11 @@ export default function AddClient() {
       for (const file of selected) {
         const formData = new FormData();
         formData.append("file", file);
-        formData.append("description", "");
+        formData.append("description", attachmentNote);
         uploaded = await uploadAttachment(id, formData);
       }
       setAttachments(mapSavedAttachments(uploaded));
+      setAttachmentDescription("");
       toast.success(selected.length === 1 ? "Attachment uploaded." : "Attachments uploaded.");
     } catch (error) {
       toast.error(error.response?.data?.message || "Attachment upload failed.");
@@ -495,12 +499,6 @@ export default function AddClient() {
       toast.error(error.response?.data?.message || "Unable to delete attachment.");
     }
   }
-
-  const updateAttachmentDescription = (attachmentId, description) => {
-    setAttachments((current) => current.map((attachment) => (
-      attachment.id === attachmentId ? { ...attachment, description } : attachment
-    )));
-  };
 
   async function saveClient({ continueToNext = false } = {}) {
     if (isSaving) return false;
@@ -1073,7 +1071,7 @@ export default function AddClient() {
               </div>
             </div>
           )}
-          {tab === 7 && <div className="space-y-3"><AttachmentUploadZone onFiles={uploadFiles} isUploading={isUploading} /><div className="overflow-x-auto"><table className="table min-w-max"><thead><tr><th>Name</th><th>Size</th><th>Type</th><th>Description</th><th>Uploaded On</th><th>Uploaded By</th><th>Actions</th></tr></thead><tbody>{attachments.length === 0 && <tr><td colSpan={7} className="text-center text-slate-500">No attachments uploaded yet.</td></tr>}{attachments.map((a) => <tr key={a.id || a.name}><td>{a.name}</td><td>{a.size}</td><td>{a.type}</td><td className="min-w-[220px]">{a.saved ? (a.description || "-") : <input className="input" value={a.description || ""} placeholder="What is this attachment for?" onChange={(e) => updateAttachmentDescription(a.id, e.target.value)} />}</td><td>{a.uploadedOn}</td><td>{a.uploadedBy}</td><td><Button size="sm" variant="ghost" disabled={!a.url} onClick={() => a.url && window.open(a.url, "_blank", "noopener,noreferrer")}>Download</Button> <Button size="sm" variant="danger" onClick={() => removeAttachment(a)}>Delete</Button></td></tr>)}</tbody></table></div></div>}
+          {tab === 7 && <div className="space-y-3"><AttachmentUploadZone description={attachmentDescription} onDescriptionChange={setAttachmentDescription} onFiles={uploadFiles} isUploading={isUploading} /><div className="overflow-x-auto"><table className="table min-w-max"><thead><tr><th>Name</th><th>Size</th><th>Type</th><th>Description</th><th>Uploaded On</th><th>Uploaded By</th><th>Actions</th></tr></thead><tbody>{attachments.length === 0 && <tr><td colSpan={7} className="text-center text-slate-500">No attachments uploaded yet.</td></tr>}{attachments.map((a) => <tr key={a.id || a.name}><td>{a.name}</td><td>{a.size}</td><td>{a.type}</td><td>{a.description || "-"}</td><td>{a.uploadedOn}</td><td>{a.uploadedBy}</td><td><Button size="sm" variant="ghost" disabled={!a.url} onClick={() => a.url && window.open(a.url, "_blank", "noopener,noreferrer")}>Download</Button> <Button size="sm" variant="danger" onClick={() => removeAttachment(a)}>Delete</Button></td></tr>)}</tbody></table></div></div>}
         </div>
         <div className="flex flex-col gap-3 border-t border-[#e2e8f0] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
           <Button variant="ghost" onClick={goPrevious} disabled={isFirstTab || isSaving}>Previous</Button>
@@ -1095,22 +1093,35 @@ export default function AddClient() {
   );
 }
 
-function AttachmentUploadZone({ onFiles, isUploading }) {
+function AttachmentUploadZone({ description, onDescriptionChange, onFiles, isUploading }) {
   const inputId = "client-attachment-upload";
   const handleDrop = (event) => {
     event.preventDefault();
-    onFiles(event.dataTransfer.files);
+    onFiles(event.dataTransfer.files, description);
   };
   return (
-    <label
-      className={`upload-zone cursor-pointer transition hover:bg-slate-100 ${isUploading ? "pointer-events-none opacity-70" : ""}`}
-      htmlFor={inputId}
+    <div
+      className={`upload-zone transition hover:bg-slate-100 ${isUploading ? "pointer-events-none opacity-70" : ""}`}
       onDragOver={(event) => event.preventDefault()}
       onDrop={handleDrop}
     >
       <UploadCloud className="mb-2 text-[#1e3a8a]" size={28} />
       <div className="text-[15px] font-extrabold text-slate-800">{isUploading ? "Uploading..." : "Upload attachments"}</div>
-      <div className="mt-1 text-[12px] font-semibold text-slate-500">Browse or drag and drop PDF, JPG, PNG, DOCX, or XLSX files</div>
+      <div className="mt-1 text-[12px] font-semibold text-slate-500">Write the description first, then choose the file to upload.</div>
+      <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+        <Field label="Attachment Description" field="client-attachment-description">
+          <input
+            className="input"
+            value={description}
+            placeholder="What is this attachment for?"
+            onChange={(event) => onDescriptionChange(event.target.value)}
+          />
+        </Field>
+        <label htmlFor={inputId} className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#1e3a8a] px-4 text-[14px] font-bold text-white transition hover:bg-[#1d4ed8]">
+          <UploadCloud size={16} />
+          {isUploading ? "Uploading..." : "Upload file"}
+        </label>
+      </div>
       <input
         id={inputId}
         name="clientAttachmentUpload"
@@ -1119,11 +1130,11 @@ function AttachmentUploadZone({ onFiles, isUploading }) {
         multiple
         accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
         onChange={(event) => {
-          onFiles(event.target.files);
+          onFiles(event.target.files, description);
           event.target.value = "";
         }}
       />
-    </label>
+    </div>
   );
 }
 
