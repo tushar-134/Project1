@@ -338,7 +338,8 @@ export default function AddClient() {
       toast.error("Please enter the client legal name.");
       return false;
     }
-    const shouldValidateVat = !continueToNext || tab >= 3;
+    const includeVatCt = !continueToNext || tab >= 3;
+    const shouldValidateVat = includeVatCt;
     if (shouldValidateVat) {
       const vatTrn = String(form.vatTrn || "").trim();
       const vatStatus = String(form.vatStatus || "").trim();
@@ -346,7 +347,7 @@ export default function AddClient() {
         toast.error("VAT TRN is required when VAT status is Registered.");
         return false;
       }
-      if (vatTrn && !/^1\\d{14}$/.test(vatTrn)) {
+      if (vatTrn && !/^1\d{14}$/.test(vatTrn)) {
         toast.error("VAT TRN must be a 15-digit number starting with 1.");
         return false;
       }
@@ -405,12 +406,14 @@ export default function AddClient() {
         assignedUser: state.users.find((u) => u.name === form.assigned)?._id,
         registeredAddress: { country: form.country, emirate: form.emirate, street: form.street, poBox: form.poBox, postalCode: form.postalCode },
         correspondenceAddress: form.differentAddress ? { street: form.correspondence } : undefined,
-        vatDetails: { trn: form.vatTrn, status: form.vatStatus === "Registered" ? "registered" : form.vatStatus === "Pending" ? "applying" : "not_registered", registrationDate: form.vatDate, filingFrequency: form.vatFreq.toLowerCase() },
-        ctDetails: { tin: form.ctTin, status: form.ctStatus === "Registered" ? "registered" : form.ctStatus === "Pending" ? "applying" : "not_registered", registrationDate: form.ctDate, financialYearEnd: form.fye },
         group: form.group || undefined,
         portalLogins: portals.map((p) => ({ portalName: p.name, portalUrl: p.url, username: p.username, password: p.password, notes: p.notes })),
         customFields: { qrmpPreference: form.qrmp, auditFirmName: form.auditFirm, bankName: form.bank, iban: form.iban },
       };
+      if (includeVatCt) {
+        payload.vatDetails = { trn: form.vatTrn, status: form.vatStatus === "Registered" ? "registered" : form.vatStatus === "Pending" ? "applying" : "not_registered", registrationDate: form.vatDate, filingFrequency: form.vatFreq.toLowerCase() };
+        payload.ctDetails = { tin: form.ctTin, status: form.ctStatus === "Registered" ? "registered" : form.ctStatus === "Pending" ? "applying" : "not_registered", registrationDate: form.ctDate, financialYearEnd: form.fye };
+      }
       if (includeTradeLicences) {
         payload.tradeLicences = licences
           .filter((l) => String(l.number || "").trim())
