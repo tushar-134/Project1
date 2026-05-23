@@ -161,6 +161,10 @@ exports.createClient = async (req, res, next) => {
     if (clientAssignError) return res.status(clientAssignError.status).json({ message: clientAssignError.message });
     const invalidContactIndex = findInvalidContactMobile(req.body.contactPersons);
     if (invalidContactIndex >= 0) return res.status(400).json({ message: `Contact person ${invalidContactIndex + 1}: Invalid number.` });
+    const emptyLicenceIndex = (req.body.tradeLicences || []).findIndex((l) => !l?.licenceNumber?.trim());
+    if (req.body.tradeLicences?.length && emptyLicenceIndex >= 0) {
+      return res.status(400).json({ message: `Trade licence ${emptyLicenceIndex + 1}: Licence number is required.` });
+    }
     const customFileNo = normalizeFileNo(req.body.fileNo);
     if (customFileNo) {
       const existingFileNo = await findExistingFileNo(customFileNo);
@@ -193,6 +197,12 @@ exports.updateClient = async (req, res, next) => {
     if ("contactPersons" in req.body) {
       const invalidContactIndex = findInvalidContactMobile(req.body.contactPersons);
       if (invalidContactIndex >= 0) return res.status(400).json({ message: `Contact person ${invalidContactIndex + 1}: Invalid number.` });
+    }
+    if ("tradeLicences" in req.body) {
+      const emptyLicenceIndex = (req.body.tradeLicences || []).findIndex((l) => !l?.licenceNumber?.trim());
+      if (req.body.tradeLicences?.length && emptyLicenceIndex >= 0) {
+        return res.status(400).json({ message: `Trade licence ${emptyLicenceIndex + 1}: Licence number is required.` });
+      }
     }
     const candidate = {
       legalName: "legalName" in req.body ? req.body.legalName : client.legalName,
