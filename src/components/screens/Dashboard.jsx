@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { reportService } from "../../services/reportService";
-import { ROLE_LABELS } from "../../utils/permissions.js";
+import { ROLE_LABELS, canManageTasks } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
 import Card from "../ui/Card.jsx";
 import StatusPill from "../ui/StatusPill.jsx";
@@ -35,8 +35,7 @@ export default function Dashboard() {
   const roleLabel  = ROLE_LABELS[currentUser?.role] || currentUser?.role || "User";
   const moveMonth  = (delta) => setMonth(new Date(month.getFullYear(), month.getMonth() + delta, 1));
 
-  // Only admin & manager see the drawer
-  const canManage = currentUser?.role === "admin" || currentUser?.role === "manager";
+  const canManage = canManageTasks(currentUser?.role);
 
   useEffect(() => {
     const selected = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
@@ -58,11 +57,8 @@ export default function Dashboard() {
 
   function handleTaskIdClick(taskMongoId) {
     if (!taskMongoId) return;
-    if (canManage) {
-      setDrawerTaskId(taskMongoId);
-    } else {
-      navigate(`/tasks/${taskMongoId}`);
-    }
+    // Open drawer for everyone — same behaviour as TaskList
+    setDrawerTaskId(taskMongoId);
   }
 
   return (
@@ -144,9 +140,11 @@ export default function Dashboard() {
           </thead>
           <tbody>
             {(state.activity || []).map((item) => {
-              const taskObj     = typeof item.task === "object" && item.task ? item.task : null;
-              const taskMongoId = taskObj?._id || (typeof item.task === "string" ? item.task : null);
-              const displayId   = taskObj?.taskId || item.taskId || item.task?.taskId;
+              // API always populates item.task — use it directly
+              const taskObj     = item.task || null;
+              const taskMongoId = taskObj?._id?.toString() || null;
+              const displayId   = taskObj?.taskId || item.taskId || "—";
+
 
               return (
                 <tr key={item._id || item.taskId}>
