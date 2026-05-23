@@ -11,6 +11,7 @@ import {
   AlertTriangle, Briefcase, Calendar, Clock,
   ExternalLink, FileText, Pencil, RotateCw, Tag, User, X,
 } from "lucide-react";
+// (Pencil kept for potential future use — used in edit link below)
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { taskService } from "../../services/taskService.js";
@@ -132,7 +133,19 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".06em" }}>Task Detail</div>
             <div style={{ fontSize: 17, fontWeight: 800, color: "#0f172a", display: "flex", alignItems: "center", gap: 8 }}>
-              {task?.taskId || "Loading…"}
+              {/* Task ID — click to go directly to edit page */}
+              {task && canManage ? (
+                <button
+                  onClick={() => navigate(`/tasks/edit/${task._id}`, { state: { task } })}
+                  title="Click to edit this task"
+                  style={{ background: "none", border: "none", cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center", gap: 6, color: "#1e3a8a", fontWeight: 800, fontSize: 17, textDecoration: "underline", textDecorationStyle: "dotted", textUnderlineOffset: 3 }}
+                >
+                  {task.taskId}
+                  <Pencil size={13} style={{ color: "#64748b", flexShrink: 0 }} />
+                </button>
+              ) : (
+                <span>{task?.taskId || "Loading…"}</span>
+              )}
               {overdue > 0 && (
                 <span style={{ fontSize: 11, fontWeight: 700, color: "#dc2626", background: "#fef2f2", borderRadius: 20, padding: "2px 8px", display: "inline-flex", alignItems: "center", gap: 4 }}>
                   <AlertTriangle size={11} /> {overdue}d overdue
@@ -234,15 +247,7 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
                 <span>Updated {formatDateTime(task.updatedAt)}</span>
               </div>
 
-              {/* Edit button */}
-              {canManage && (
-                <button
-                  onClick={() => navigate(`/tasks/edit/${task._id}`, { state: { task } })}
-                  style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "10px", borderRadius: 10, border: "1.5px solid #c7d7f8", background: "#eff6ff", color: "#1e3a8a", fontSize: 13, fontWeight: 700, cursor: "pointer" }}
-                >
-                  <Pencil size={14} /> Edit Task
-                </button>
-              )}
+
 
               {/* Activity Log */}
               <div>
