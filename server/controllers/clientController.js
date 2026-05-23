@@ -317,6 +317,7 @@ exports.uploadAttachment = async (req, res, next) => {
       name: uploadedFile.name,
       size: uploadedFile.size,
       fileType: uploadedFile.fileType,
+      documentType: req.body.documentType,
       description: req.body.description,
       url: uploadedFile.url,
       uploadedBy: req.user._id,
@@ -341,10 +342,14 @@ exports.uploadClientDocument = async (req, res, next) => {
     if (section === "tradeLicences") {
       if (!client.tradeLicences[index]) return res.status(404).json({ message: "Trade licence not found" });
       client.tradeLicences[index].documentUrl = uploadedFile.url;
-    } else if (section === "emiratesId") {
+    } else if (section === "emiratesIdFront") {
       if (!client.contactPersons[index]) return res.status(404).json({ message: "Contact person not found" });
       client.contactPersons[index].emiratesId = client.contactPersons[index].emiratesId || {};
-      client.contactPersons[index].emiratesId.documentUrl = uploadedFile.url;
+      client.contactPersons[index].emiratesId.frontDocumentUrl = uploadedFile.url;
+    } else if (section === "emiratesIdBack") {
+      if (!client.contactPersons[index]) return res.status(404).json({ message: "Contact person not found" });
+      client.contactPersons[index].emiratesId = client.contactPersons[index].emiratesId || {};
+      client.contactPersons[index].emiratesId.backDocumentUrl = uploadedFile.url;
     } else if (section === "passport") {
       if (!client.contactPersons[index]) return res.status(404).json({ message: "Contact person not found" });
       client.contactPersons[index].passport = client.contactPersons[index].passport || {};
@@ -357,6 +362,7 @@ exports.uploadClientDocument = async (req, res, next) => {
       name: uploadedFile.name,
       size: uploadedFile.size,
       fileType: uploadedFile.fileType,
+      documentType: req.body.documentType,
       description,
       url: uploadedFile.url,
       uploadedBy: req.user._id,
