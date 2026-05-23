@@ -347,6 +347,14 @@ export default function AddClient() {
       toast.error(`Contact person ${invalidContactIndex + 1}: mobile number must be exactly ${min} digits.`);
       return false;
     }
+    if (tab >= 1) {
+      const emptyLicenceIndex = licences.findIndex((l) => !l.number.trim());
+      if (emptyLicenceIndex >= 0) {
+        toast.error(`Trade licence ${emptyLicenceIndex + 1}: Licence number is required.`);
+        setTab(1);
+        return false;
+      }
+    }
     setIsSaving(true);
     try {
       // The screen state is intentionally tab-oriented and user-friendly; this transform is
