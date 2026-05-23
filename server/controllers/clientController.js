@@ -27,6 +27,20 @@ function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function normalizeFileNo(value) {
+  const trimmed = String(value || "").trim();
+  return trimmed || undefined;
+}
+
+async function findExistingFileNo(fileNo, excludeId) {
+  const normalized = normalizeFileNo(fileNo);
+  if (!normalized) return null;
+
+  const query = { fileNo: new RegExp(`^${escapeRegex(normalized)}$`, "i") };
+  if (excludeId) query._id = { $ne: excludeId };
+  return Client.findOne(query).select("fileNo");
+}
+
 function buildDuplicateClauses(data) {
   const clauses = [];
   const legalName = data.legalName?.trim();
@@ -151,9 +165,18 @@ exports.createClient = async (req, res, next) => {
     if (req.body.tradeLicences?.length && emptyLicenceIndex >= 0) {
       return res.status(400).json({ message: `Trade licence ${emptyLicenceIndex + 1}: Licence number is required.` });
     }
+    const customFileNo = normalizeFileNo(req.body.fileNo);
+    if (customFileNo) {
+      const existingFileNo = await findExistingFileNo(customFileNo);
+      if (existingFileNo) return res.status(409).json({ message: `Client file number "${customFileNo}" already exists.` });
+    }
     const duplicate = await findDuplicateClient(req.body);
     if (duplicate) return res.status(409).json({ message: duplicateMessage(duplicate, req.body) });
-    const client = await Client.create({ ...req.body, fileNo: await nextClientFileNo(), createdBy: req.user._id });
+    const client = await Client.create({
+      ...req.body,
+      fileNo: customFileNo || await nextClientFileNo(),
+      createdBy: req.user._id,
+    });
     const admins = await User.find({ role: "admin", isActive: true });
     await Notification.insertMany(admins.map((admin) => ({
       recipient: admin._id, title: "New client added", message: `${client.legalName} was added.`, type: "client_added", relatedClient: client._id,
@@ -166,6 +189,7 @@ exports.updateClient = async (req, res, next) => {
   try {
     const client = await Client.findById(req.params.id);
     if (!client || !client.isActive) return res.status(404).json({ message: "Client not found" });
+    const originalFileNo = client.fileNo;
     if ("assignedUser" in req.body) {
       const clientAssignError = await ensureManagerCanAssignClient(req, req.body.assignedUser);
       if (clientAssignError) return res.status(clientAssignError.status).json({ message: clientAssignError.message });
@@ -185,11 +209,21 @@ exports.updateClient = async (req, res, next) => {
       vatDetails: "vatDetails" in req.body ? req.body.vatDetails : client.vatDetails,
       tradeLicences: "tradeLicences" in req.body ? req.body.tradeLicences : client.tradeLicences,
     };
+    if ("fileNo" in req.body) {
+      const customFileNo = normalizeFileNo(req.body.fileNo);
+      if (customFileNo) {
+        const existingFileNo = await findExistingFileNo(customFileNo, client._id);
+        if (existingFileNo) return res.status(409).json({ message: `Client file number "${customFileNo}" already exists.` });
+      }
+    }
     const duplicate = await findDuplicateClient(candidate, client._id);
     if (duplicate) return res.status(409).json({ message: duplicateMessage(duplicate, candidate) });
     // Bug #4 Fix: whitelist editable fields to prevent mass-assignment of fileNo, createdBy, isActive, etc.
-    const ALLOWED = ["legalName", "tradeName", "clientType", "jurisdiction", "financialYearEnd", "assignedUser", "group", "registeredAddress", "correspondenceAddress", "tradeLicences", "contactPersons", "vatDetails", "ctDetails", "portalLogins", "customFields"];
+    const ALLOWED = ["fileNo", "legalName", "tradeName", "clientType", "jurisdiction", "financialYearEnd", "assignedUser", "group", "registeredAddress", "correspondenceAddress", "tradeLicences", "contactPersons", "vatDetails", "ctDetails", "portalLogins", "customFields"];
     ALLOWED.forEach((key) => { if (key in req.body) client[key] = req.body[key]; });
+    if ("fileNo" in req.body) {
+      client.fileNo = normalizeFileNo(req.body.fileNo) || originalFileNo;
+    }
     await client.save();
     res.json(client);
   } catch (error) { next(error); }

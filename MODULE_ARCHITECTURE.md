@@ -748,6 +748,41 @@ Screen Component
 - Task/client ID generation
 - Email delivery
 
+### File Number Auto-Generation Logic
+
+**Primary file**
+- [server/utils/autoId.js](C:/Users/ritik/OneDrive/Desktop/project1/server/utils/autoId.js)
+
+**Responsibility**
+- Generates stable business identifiers for clients and tasks
+- Prevents duplicate ID generation during concurrent requests
+- Keeps the counter in sync with existing production or imported records
+
+**Generated formats**
+- Client file number: `FB-CLIENT-0001`
+- Task ID: `FB/YYYY/T001`
+
+**How client file numbers are generated**
+1. The utility reads the latest client with a matching `fileNo` pattern
+2. It extracts the numeric suffix from that file number
+3. It updates the MongoDB counter floor if the stored counter is behind
+4. It atomically increments the counter document with `_id = "clientFileNo"`
+5. It returns the next client file number padded to 4 digits
+
+**How task IDs are generated**
+1. The utility uses the current UTC year, unless a year is passed in
+2. It reads the latest task whose `taskId` matches that year pattern
+3. It extracts the numeric suffix from the existing task ID
+4. It updates the year-specific counter floor, for example `taskId-2026`
+5. It atomically increments that counter
+6. It returns the next task ID padded to 3 digits for that year
+
+**Why this design is important**
+- avoids duplicate IDs under concurrent create requests
+- survives application restarts because the sequence lives in MongoDB
+- recovers safely when old seeded or imported records already exist
+- keeps task numbering independent per calendar year
+
 **Connectivity**
 - Reused by controllers and boot-time cron logic
 
