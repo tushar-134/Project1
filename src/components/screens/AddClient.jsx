@@ -421,6 +421,12 @@ export default function AddClient() {
     }
   }
 
+  const updateAttachmentDescription = (attachmentId, description) => {
+    setAttachments((current) => current.map((attachment) => (
+      attachment.id === attachmentId ? { ...attachment, description } : attachment
+    )));
+  };
+
   async function saveClient({ continueToNext = false } = {}) {
     if (isSaving) return false;
     if (!form.legalName) {
@@ -971,7 +977,7 @@ export default function AddClient() {
               </div>
             </div>
           )}
-          {tab === 7 && <div className="space-y-3"><AttachmentUploadZone onFiles={uploadFiles} isUploading={isUploading} /><div className="overflow-x-auto"><table className="table min-w-max"><thead><tr><th>Name</th><th>Size</th><th>Type</th><th>Description</th><th>Uploaded On</th><th>Uploaded By</th><th>Actions</th></tr></thead><tbody>{attachments.length === 0 && <tr><td colSpan={7} className="text-center text-slate-500">No attachments uploaded yet.</td></tr>}{attachments.map((a) => <tr key={a.id || a.name}><td>{a.name}</td><td>{a.size}</td><td>{a.type}</td><td>{a.description || "-"}</td><td>{a.uploadedOn}</td><td>{a.uploadedBy}</td><td><Button size="sm" variant="ghost" disabled={!a.url} onClick={() => a.url && window.open(a.url, "_blank", "noopener,noreferrer")}>Download</Button> <Button size="sm" variant="danger" onClick={() => removeAttachment(a)}>Delete</Button></td></tr>)}</tbody></table></div></div>}
+          {tab === 7 && <div className="space-y-3"><AttachmentUploadZone onFiles={uploadFiles} isUploading={isUploading} /><div className="overflow-x-auto"><table className="table min-w-max"><thead><tr><th>Name</th><th>Size</th><th>Type</th><th>Description</th><th>Uploaded On</th><th>Uploaded By</th><th>Actions</th></tr></thead><tbody>{attachments.length === 0 && <tr><td colSpan={7} className="text-center text-slate-500">No attachments uploaded yet.</td></tr>}{attachments.map((a) => <tr key={a.id || a.name}><td>{a.name}</td><td>{a.size}</td><td>{a.type}</td><td className="min-w-[220px]">{a.saved ? (a.description || "-") : <input className="input" value={a.description || ""} placeholder="What is this attachment for?" onChange={(e) => updateAttachmentDescription(a.id, e.target.value)} />}</td><td>{a.uploadedOn}</td><td>{a.uploadedBy}</td><td><Button size="sm" variant="ghost" disabled={!a.url} onClick={() => a.url && window.open(a.url, "_blank", "noopener,noreferrer")}>Download</Button> <Button size="sm" variant="danger" onClick={() => removeAttachment(a)}>Delete</Button></td></tr>)}</tbody></table></div></div>}
         </div>
         <div className="flex flex-col gap-3 border-t border-[#e2e8f0] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
           <Button variant="ghost" onClick={goPrevious} disabled={isFirstTab || isSaving}>Previous</Button>
