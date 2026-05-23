@@ -17,6 +17,7 @@ const initialState = {
   clients: [],
   tasks: [],
   users: [],
+  customFields: [],
   groups: [],
   ftaItems: [],
   categories: categoriesSeed,

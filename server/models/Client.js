@@ -58,7 +58,8 @@ const clientSchema = new mongoose.Schema({
   // Bug #6 Fix: added _passwordEncrypted flag so we never use a colon-sniff heuristic
   // that breaks legitimate passwords containing a colon character (e.g. "p:assword").
   portalLogins: [{ portalName: String, portalUrl: String, username: String, password: String, _passwordEncrypted: { type: Boolean, default: false }, notes: String }],
-  customFields: { qrmpPreference: String, auditFirmName: String, bankName: String, iban: String },
+  // customFields: { qrmpPreference: String, auditFirmName: String, bankName: String, iban: String },
+  customFields: { type: Map, of: String },
   attachments: [{
     name: String,
     size: String,
