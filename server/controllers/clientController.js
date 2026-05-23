@@ -111,6 +111,14 @@ function findInvalidEmiratesId(contactPersons = []) {
   });
 }
 
+function validateVatTrn(vatDetails = {}) {
+  const status = String(vatDetails?.status || "").trim();
+  const trn = String(vatDetails?.trn || "").trim();
+  if (status === "registered" && !trn) return "VAT TRN is required when VAT status is registered.";
+  if (trn && !/^1\\d{14}$/.test(trn)) return "VAT TRN must be a 15-digit number starting with 1.";
+  return null;
+}
+
 function buildUploadedFile(req) {
   if (!req.file) return null;
   const url = req.file.path?.startsWith?.("http")
@@ -172,6 +180,8 @@ exports.createClient = async (req, res, next) => {
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
     const clientAssignError = await ensureManagerCanAssignClient(req, req.body.assignedUser);
     if (clientAssignError) return res.status(clientAssignError.status).json({ message: clientAssignError.message });
+    const vatTrnError = validateVatTrn(req.body.vatDetails);
+    if (vatTrnError) return res.status(400).json({ message: vatTrnError });
     const invalidEidIndex = findInvalidEmiratesId(req.body.contactPersons);
     if (invalidEidIndex >= 0) return res.status(400).json({ message: `Contact person ${invalidEidIndex + 1}: Emirates ID must match 784-XXXX-XXXXXXX-X.` });
     if (req.body.group) {
@@ -217,6 +227,10 @@ exports.updateClient = async (req, res, next) => {
     if ("assignedUser" in req.body) {
       const clientAssignError = await ensureManagerCanAssignClient(req, req.body.assignedUser);
       if (clientAssignError) return res.status(clientAssignError.status).json({ message: clientAssignError.message });
+    }
+    if ("vatDetails" in req.body) {
+      const vatTrnError = validateVatTrn({ ...(client.vatDetails || {}), ...(req.body.vatDetails || {}) });
+      if (vatTrnError) return res.status(400).json({ message: vatTrnError });
     }
     if ("group" in req.body && req.body.group) {
       const groupExists = await ClientGroup.exists({ _id: req.body.group });
