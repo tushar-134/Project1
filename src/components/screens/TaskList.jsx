@@ -38,7 +38,6 @@ function StatusPill({ status }) {
     </span>
   );
 }
-
 export default function TaskList() {
   const { state } = useApp();
   const { currentUser } = useAuth();
