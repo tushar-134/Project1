@@ -528,7 +528,15 @@ export default function AddClient() {
       if (includeTradeLicences) {
         payload.tradeLicences = licences
           .filter((l) => String(l.number || "").trim())
-          .map((l) => ({ licenceNumber: l.number, issueDate: l.issue, expiryDate: l.expiry, issuingAuthority: l.authority, licenceType: l.type?.toLowerCase() || "commercial", officialEmail: l.email }));
+          .map((l) => ({
+            licenceNumber: l.number,
+            issueDate: l.issue,
+            expiryDate: l.expiry,
+            issuingAuthority: l.authority,
+            licenceType: l.type?.toLowerCase() || "commercial",
+            officialEmail: l.email,
+            documentUrl: l.documentUrl || undefined,
+          }));
       }
       if (includeContactPersons) {
         payload.contactPersons = contacts.map((c) => ({
@@ -539,8 +547,19 @@ export default function AddClient() {
           whatsapp: c.whatsapp,
           alternateEmail: c.alternate,
           isPrimary: c.primary,
-          emiratesId: { number: c.eid, issueDate: c.eidIssue, expiryDate: c.eidExpiry },
-          passport: { number: c.passport, issuingCountry: c.issuingCountry, issueDate: c.passportIssue, expiryDate: c.passportExpiry },
+          emiratesId: {
+            number: c.eid,
+            issueDate: c.eidIssue,
+            expiryDate: c.eidExpiry,
+            documentUrl: c.eidDocumentUrl || undefined,
+          },
+          passport: {
+            number: c.passport,
+            issuingCountry: c.issuingCountry,
+            issueDate: c.passportIssue,
+            expiryDate: c.passportExpiry,
+            documentUrl: c.passportDocumentUrl || undefined,
+          },
         }));
       }
       payload.customFields = Object.fromEntries(Object.entries(customFieldValues).filter(([k]) => selectedFieldKeys.includes(k)));
