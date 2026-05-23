@@ -125,12 +125,22 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
     try {
       await taskService.updateStatus(task._id, statusToApi[nextLabel] || nextLabel);
       await loadTask(true);
+      onClose();
     } catch (err) {
       setTask(previousTask);
       setStatusError(err.response?.data?.message || "Failed to update task status");
     } finally {
       setStatusSaving(false);
     }
+  }
+
+  function openTaskDestination() {
+    if (!task) return;
+    if (canManage) {
+      navigate(`/tasks/edit/${task._id}`, { state: { task } });
+      return;
+    }
+    navigate(`/tasks/${task._id}`);
   }
 
   return (
@@ -149,7 +159,14 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
             <div className="page-kicker">Task Detail</div>
             {task ? (
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                <div className="text-[18px] font-black text-slate-900">{task.taskId}</div>
+                <button
+                  type="button"
+                  className="task-id-link text-[18px] font-black"
+                  onClick={openTaskDestination}
+                  title={canManage ? "Open edit task page" : "Open task page"}
+                >
+                  {task.taskId}
+                </button>
                 {overdue > 0 && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-extrabold text-[#dc2626]">
                     <AlertTriangle size={12} />
@@ -163,9 +180,9 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
           </div>
           <div className="flex items-center gap-2">
             {task && (
-              <Button variant="ghost" size="sm" onClick={() => navigate(`/tasks/${task._id}`)}>
+              <Button variant="ghost" size="sm" onClick={openTaskDestination}>
                 <ExternalLink size={15} />
-                Full page
+                {canManage ? "Edit page" : "Full page"}
               </Button>
             )}
             <button
