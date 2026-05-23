@@ -9,6 +9,9 @@ const counterSchema = new mongoose.Schema({
 });
 const Counter = mongoose.models.Counter || mongoose.model("Counter", counterSchema);
 
+// Keeps the stored counter aligned with existing records in MongoDB.
+// This matters when seed data, imports, or manual DB edits already created IDs
+// before the counter document existed or before it was updated.
 async function syncCounterFloor(name, floor) {
   if (!floor) return;
   await Counter.updateOne(
@@ -23,6 +26,18 @@ function numberFromMatch(value, regex) {
   return match ? Number(match[1]) : 0;
 }
 
+// Client file number format:
+//   FB-CLIENT-0001
+//
+// Flow:
+// 1. Find the latest existing client file number.
+// 2. Parse its numeric suffix.
+// 3. Raise the MongoDB counter floor if needed.
+// 4. Atomically increment the counter document.
+// 5. Return the next zero-padded file number.
+//
+// Counter document:
+//   _id: "clientFileNo"
 async function nextClientFileNo() {
   const Client = require("../models/Client");
   const latest = await Client.findOne({ fileNo: /^FB-CLIENT-\d+$/ }).sort({ fileNo: -1 }).select("fileNo").lean();
@@ -35,6 +50,22 @@ async function nextClientFileNo() {
   return `FB-CLIENT-${String(doc.seq).padStart(4, "0")}`;
 }
 
+// Task ID format:
+//   FB/YYYY/T001
+//
+// Example:
+//   FB/2026/T001
+//
+// Flow:
+// 1. Use the current UTC year unless a year is passed in.
+// 2. Find the latest task ID for that year.
+// 3. Parse its numeric suffix.
+// 4. Raise the year-specific counter floor if needed.
+// 5. Atomically increment the counter document.
+// 6. Return the next zero-padded task ID for that year.
+//
+// Counter document example:
+//   _id: "taskId-2026"
 async function nextTaskId(year = new Date().getUTCFullYear()) {
   const Task = require("../models/Task");
   const name = `taskId-${year}`;
