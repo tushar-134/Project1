@@ -23,7 +23,7 @@ const clientSchema = new mongoose.Schema({
   registeredAddress: { country: String, emirate: String, street: String, poBox: String, postalCode: String },
   correspondenceAddress: { country: String, emirate: String, street: String },
   tradeLicences: [{
-    licenceNumber: String,
+    licenceNumber: { type: String, required: true, trim: true },
     issuingAuthority: String,
     officialEmail: String,
     licenceType: { type: String, enum: ["commercial", "professional", "industrial", "tourism"], default: "commercial" },
@@ -91,7 +91,7 @@ clientSchema.index({ isActive: 1, group: 1, createdAt: -1 });
 clientSchema.index({ isActive: 1, assignedUser: 1, createdAt: -1 });
 clientSchema.index({ legalName: 1 });
 clientSchema.index({ "vatDetails.trn": 1 });
-clientSchema.index({ "tradeLicences.licenceNumber": 1 });
+clientSchema.index({ "tradeLicences.licenceNumber": 1 }, { unique: true, sparse: true });
 clientSchema.index({ group: 1 });
 
 module.exports = mongoose.model("Client", clientSchema);

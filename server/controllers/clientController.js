@@ -147,6 +147,10 @@ exports.createClient = async (req, res, next) => {
     if (clientAssignError) return res.status(clientAssignError.status).json({ message: clientAssignError.message });
     const invalidContactIndex = findInvalidContactMobile(req.body.contactPersons);
     if (invalidContactIndex >= 0) return res.status(400).json({ message: `Contact person ${invalidContactIndex + 1}: Invalid number.` });
+    const emptyLicenceIndex = (req.body.tradeLicences || []).findIndex((l) => !l?.licenceNumber?.trim());
+    if (req.body.tradeLicences?.length && emptyLicenceIndex >= 0) {
+      return res.status(400).json({ message: `Trade licence ${emptyLicenceIndex + 1}: Licence number is required.` });
+    }
     const duplicate = await findDuplicateClient(req.body);
     if (duplicate) return res.status(409).json({ message: duplicateMessage(duplicate, req.body) });
     const client = await Client.create({ ...req.body, fileNo: await nextClientFileNo(), createdBy: req.user._id });
@@ -169,6 +173,12 @@ exports.updateClient = async (req, res, next) => {
     if ("contactPersons" in req.body) {
       const invalidContactIndex = findInvalidContactMobile(req.body.contactPersons);
       if (invalidContactIndex >= 0) return res.status(400).json({ message: `Contact person ${invalidContactIndex + 1}: Invalid number.` });
+    }
+    if ("tradeLicences" in req.body) {
+      const emptyLicenceIndex = (req.body.tradeLicences || []).findIndex((l) => !l?.licenceNumber?.trim());
+      if (req.body.tradeLicences?.length && emptyLicenceIndex >= 0) {
+        return res.status(400).json({ message: `Trade licence ${emptyLicenceIndex + 1}: Licence number is required.` });
+      }
     }
     const candidate = {
       legalName: "legalName" in req.body ? req.body.legalName : client.legalName,
