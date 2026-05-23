@@ -215,6 +215,9 @@ exports.updateTask = async (req, res, next) => {
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
     }
+    if (task.ftaStatus === "approved" && ("status" in req.body || "ftaStatus" in req.body || "isAwaitingFta" in req.body)) {
+      return res.status(400).json({ message: "Approved FTA tasks are locked and cannot have their status changed." });
+    }
     const assignmentError = await ensureManagerCanAssign(
       req,
       "assignedTo" in req.body ? req.body.assignedTo : task.assignedTo,
