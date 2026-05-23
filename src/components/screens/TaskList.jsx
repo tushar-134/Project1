@@ -151,6 +151,7 @@ export default function TaskList() {
               const canChangeStatus =
                 canManage ||
                 (isTaskOnly && String(task.assignedId) === String(currentUser?._id || currentUser?.id));
+              const isStatusLocked = task.ftaStatus === "approved" || task.status === "Completed";
 
               // BRD 5.4: "Submitted to FTA" available for all tasks — backend auto-routes to FTA Tracker
               const availableStatuses = ALL_STATUSES;
@@ -201,7 +202,7 @@ export default function TaskList() {
                     )}
                   </td>
                   <td>
-                    {canChangeStatus ? (
+                    {canChangeStatus && !isStatusLocked ? (
                       <select
                         id={`task-status-${task.id}`}
                         name={`taskStatus${task.id}`}
