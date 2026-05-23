@@ -17,6 +17,18 @@ function hasValidMobile(countryCode, value) {
   return isValidPhone(countryCode, value);
 }
 
+function escapeRegex(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function parsePagination(query) {
+  const page = Math.max(Number.parseInt(query.page, 10) || 1, 1);
+  const limit = Math.min(Math.max(Number.parseInt(query.limit, 10) || 20, 1), 100);
+  const search = String(query.search || "").trim();
+  const requested = ["page", "limit", "search"].some((key) => Object.prototype.hasOwnProperty.call(query, key));
+  return { page, limit, search, requested };
+}
+
 async function findUserDuplicate({ email, mobile, excludeId }) {
   const normalizedEmail = normalize(email);
   const normalizedMobile = normalizeMobile(mobile);
@@ -36,12 +48,28 @@ async function findUserDuplicate({ email, mobile, excludeId }) {
 
 exports.listUsers = async (req, res, next) => {
   try {
-    const users = await User.find().select("-password").sort({ name: 1 }).lean();
+    const { page, limit, search, requested } = parsePagination(req.query);
+    const query = search
+      ? {
+          $or: [
+            { name: new RegExp(escapeRegex(search), "i") },
+            { email: new RegExp(escapeRegex(search), "i") },
+            { mobile: new RegExp(escapeRegex(search), "i") },
+          ],
+        }
+      : {};
+    const usersQuery = User.find(query).select("-password").sort({ name: 1 });
+    if (requested) usersQuery.skip((page - 1) * limit).limit(limit);
+    const [users, total] = await Promise.all([
+      usersQuery.lean(),
+      requested ? User.countDocuments(query) : User.countDocuments(),
+    ]);
     const usersWithClients = await Promise.all(users.map(async (user) => {
       const clients = await Client.find({ assignedUser: user._id, isActive: true }).select("legalName").lean();
       return { ...user, assignedClients: clients };
     }));
-    res.json(usersWithClients);
+    if (!requested) return res.json(usersWithClients);
+    res.json({ items: usersWithClients, total, page, limit, pages: Math.ceil(total / limit) });
   } catch (error) { next(error); }
 };
 
