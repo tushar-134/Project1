@@ -93,8 +93,12 @@ function duplicateMessage(client, payload) {
 
 function findInvalidContactMobile(contactPersons = []) {
   return contactPersons.findIndex((contact) => {
+    const countryCode = String(contact?.mobile?.countryCode || "").trim();
     const digits = String(contact?.mobile?.number || "").replace(/\D+/g, "");
-    return digits.length > 0 && digits.length !== 10;
+    if (!digits.length) return false;
+    if (!countryCode) return true;
+    // E.164 max length is 15 digits; keep a sane minimum to avoid junk input.
+    return digits.length < 6 || digits.length > 15;
   });
 }
 
