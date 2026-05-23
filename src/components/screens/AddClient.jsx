@@ -378,6 +378,8 @@ export default function AddClient() {
     }
     setIsSaving(true);
     try {
+      const includeTradeLicences = !continueToNext || tab >= 1;
+      const includeContactPersons = !continueToNext || tab >= 2;
       // The screen state is intentionally tab-oriented and user-friendly; this transform is
       // where we fold it back into the nested API contract expected by the Mongo model.
       const payload = {
@@ -390,8 +392,19 @@ export default function AddClient() {
         assignedUser: state.users.find((u) => u.name === form.assigned)?._id,
         registeredAddress: { country: form.country, emirate: form.emirate, street: form.street, poBox: form.poBox, postalCode: form.postalCode },
         correspondenceAddress: form.differentAddress ? { street: form.correspondence } : undefined,
-        tradeLicences: licences.map((l) => ({ licenceNumber: l.number, issueDate: l.issue, expiryDate: l.expiry, issuingAuthority: l.authority, licenceType: l.type?.toLowerCase() || "commercial", officialEmail: l.email })),
-        contactPersons: contacts.map((c) => ({
+        vatDetails: { trn: form.vatTrn, status: form.vatStatus === "Registered" ? "registered" : form.vatStatus === "Pending" ? "applying" : "not_registered", registrationDate: form.vatDate, filingFrequency: form.vatFreq.toLowerCase() },
+        ctDetails: { tin: form.ctTin, status: form.ctStatus === "Registered" ? "registered" : form.ctStatus === "Pending" ? "applying" : "not_registered", registrationDate: form.ctDate, financialYearEnd: form.fye },
+        group: form.group || undefined,
+        portalLogins: portals.map((p) => ({ portalName: p.name, portalUrl: p.url, username: p.username, password: p.password, notes: p.notes })),
+        customFields: { qrmpPreference: form.qrmp, auditFirmName: form.auditFirm, bankName: form.bank, iban: form.iban },
+      };
+      if (includeTradeLicences) {
+        payload.tradeLicences = licences
+          .filter((l) => String(l.number || "").trim())
+          .map((l) => ({ licenceNumber: l.number, issueDate: l.issue, expiryDate: l.expiry, issuingAuthority: l.authority, licenceType: l.type?.toLowerCase() || "commercial", officialEmail: l.email }));
+      }
+      if (includeContactPersons) {
+        payload.contactPersons = contacts.map((c) => ({
           fullName: c.name,
           designation: c.designation,
           email: c.email,
@@ -401,13 +414,8 @@ export default function AddClient() {
           isPrimary: c.primary,
           emiratesId: { number: c.eid },
           passport: { number: c.passport, issuingCountry: c.issuingCountry },
-        })),
-        vatDetails: { trn: form.vatTrn, status: form.vatStatus === "Registered" ? "registered" : form.vatStatus === "Pending" ? "applying" : "not_registered", registrationDate: form.vatDate, filingFrequency: form.vatFreq.toLowerCase() },
-        ctDetails: { tin: form.ctTin, status: form.ctStatus === "Registered" ? "registered" : form.ctStatus === "Pending" ? "applying" : "not_registered", registrationDate: form.ctDate, financialYearEnd: form.fye },
-        group: form.group || undefined,
-        portalLogins: portals.map((p) => ({ portalName: p.name, portalUrl: p.url, username: p.username, password: p.password, notes: p.notes })),
-        customFields: { qrmpPreference: form.qrmp, auditFirmName: form.auditFirm, bankName: form.bank, iban: form.iban },
-      };
+        }));
+      }
       const pendingAttachments = attachments.filter((attachment) => !attachment.saved && attachment.file);
       const pendingLicenceDocuments = licences
         .map((licence, index) => ({ index, file: licence.documentFile }))
