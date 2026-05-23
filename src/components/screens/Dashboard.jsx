@@ -33,6 +33,7 @@ export default function Dashboard() {
   const monthText = month.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
   const roleLabel = ROLE_LABELS[currentUser?.role] || currentUser?.role || "User";
   const canManage = canManageTasks(currentUser?.role);
+  const canQuickViewTask = canManage || currentUser?.role === "task_only";
   const moveMonth = (delta) => setMonth(new Date(month.getFullYear(), month.getMonth() + delta, 1));
   useEffect(() => {
     // Dashboard stats are month-sensitive, so the page refetches whenever the picker changes.
@@ -110,8 +111,8 @@ export default function Dashboard() {
                     {taskMongoId ? (
                       <button
                         className="task-id-link"
-                        onClick={() => (canManage ? setDrawerTaskId(taskMongoId) : navigate(`/tasks/${taskMongoId}`))}
-                        title={canManage ? "Open task details" : "View task details"}
+                        onClick={() => (canQuickViewTask ? setDrawerTaskId(taskMongoId) : navigate(`/tasks/${taskMongoId}`))}
+                        title={canQuickViewTask ? "Open task details" : "View task details"}
                       >
                         {task.taskId || item.taskId}
                       </button>
@@ -126,7 +127,7 @@ export default function Dashboard() {
         </Table>
       </Card>
 
-      {canManage && drawerTaskId && (
+      {canQuickViewTask && drawerTaskId && (
         <TaskDrawer taskId={drawerTaskId} canManage={canManage} onClose={() => setDrawerTaskId(null)} />
       )}
     </div>

@@ -53,6 +53,7 @@ export default function TaskList() {
 
   const canManage = canManageTasks(currentUser?.role);
   const isTaskOnly = currentUser?.role === "task_only";
+  const canQuickViewTask = canManage || isTaskOnly;
   const { fetchUsers } = useUsers();
 
   // Load users list for the inline assignee dropdown
@@ -161,8 +162,8 @@ export default function TaskList() {
                   <td className="font-extrabold text-[#1e3a8a]">
                     <button
                       className="task-id-link"
-                      onClick={() => (canManage ? setDrawerTaskId(task.id) : navigate(`/tasks/${task.id}`))}
-                      title={canManage ? "Open task details" : "View task details"}
+                      onClick={() => (canQuickViewTask ? setDrawerTaskId(task.id) : navigate(`/tasks/${task.id}`))}
+                      title={canQuickViewTask ? "Open task details" : "View task details"}
                     >
                       {task.taskId}
                     </button>
@@ -238,7 +239,7 @@ export default function TaskList() {
         </Table>
       </Card>
 
-      {canManage && drawerTaskId && (
+      {canQuickViewTask && drawerTaskId && (
         <TaskDrawer taskId={drawerTaskId} canManage={canManage} onClose={() => setDrawerTaskId(null)} />
       )}
     </div>
