@@ -144,7 +144,6 @@ export default function TaskList() {
               <th>Assigned</th>
               <th>Status</th>
               <th>Recurring</th>
-              {canManage && <th>Edit</th>}
             </tr>
           </thead>
           <tbody>
@@ -232,17 +231,6 @@ export default function TaskList() {
                       </span>
                     )}
                   </td>
-                  {canManage && (
-                    <td>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => navigate(`/tasks/edit/${task.id}`, { state: { task } })}
-                      >
-                        Edit
-                      </Button>
-                    </td>
-                  )}
                 </tr>
               );
             })}

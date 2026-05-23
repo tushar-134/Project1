@@ -322,6 +322,11 @@ export default function AddClient() {
       toast.error("Please enter the client legal name.");
       return false;
     }
+    const missingContactNameIndex = contacts.findIndex((contact) => !String(contact.name || "").trim());
+    if (missingContactNameIndex >= 0) {
+      toast.error(`Contact person ${missingContactNameIndex + 1}: full name is required.`);
+      return false;
+    }
     const missingContactCodeIndex = contacts.findIndex((contact) => {
       const phoneDigits = normalizePhoneNumber(contact.mobile);
       if (!phoneDigits) return false;

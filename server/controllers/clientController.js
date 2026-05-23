@@ -98,6 +98,10 @@ function findInvalidContactMobile(contactPersons = []) {
   });
 }
 
+function findMissingContactName(contactPersons = []) {
+  return contactPersons.findIndex((contact) => !String(contact?.fullName || "").trim());
+}
+
 function buildUploadedFile(req) {
   if (!req.file) return null;
   const url = req.file.path?.startsWith?.("http")
@@ -159,6 +163,8 @@ exports.createClient = async (req, res, next) => {
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
     const clientAssignError = await ensureManagerCanAssignClient(req, req.body.assignedUser);
     if (clientAssignError) return res.status(clientAssignError.status).json({ message: clientAssignError.message });
+    const missingContactNameIndex = findMissingContactName(req.body.contactPersons);
+    if (missingContactNameIndex >= 0) return res.status(400).json({ message: `Contact person ${missingContactNameIndex + 1}: Full name is required.` });
     const invalidContactIndex = findInvalidContactMobile(req.body.contactPersons);
     if (invalidContactIndex >= 0) return res.status(400).json({ message: `Contact person ${invalidContactIndex + 1}: Invalid number.` });
     const emptyLicenceIndex = (req.body.tradeLicences || []).findIndex((l) => !l?.licenceNumber?.trim());
@@ -195,6 +201,8 @@ exports.updateClient = async (req, res, next) => {
       if (clientAssignError) return res.status(clientAssignError.status).json({ message: clientAssignError.message });
     }
     if ("contactPersons" in req.body) {
+      const missingContactNameIndex = findMissingContactName(req.body.contactPersons);
+      if (missingContactNameIndex >= 0) return res.status(400).json({ message: `Contact person ${missingContactNameIndex + 1}: Full name is required.` });
       const invalidContactIndex = findInvalidContactMobile(req.body.contactPersons);
       if (invalidContactIndex >= 0) return res.status(400).json({ message: `Contact person ${invalidContactIndex + 1}: Invalid number.` });
     }
