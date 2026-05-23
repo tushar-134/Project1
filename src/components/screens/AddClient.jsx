@@ -327,9 +327,19 @@ export default function AddClient() {
       toast.error("Please enter the client legal name.");
       return false;
     }
+    const emiratesIdPattern = /^\d{3}-\d{4}-\d{7}-\d$/;
     const missingContactNameIndex = contacts.findIndex((contact) => !String(contact.name || "").trim());
     if (missingContactNameIndex >= 0) {
       toast.error(`Contact person ${missingContactNameIndex + 1}: full name is required.`);
+      return false;
+    }
+    const invalidEidIndex = contacts.findIndex((contact) => {
+      const value = String(contact.eid || "").trim();
+      if (!value) return false;
+      return !emiratesIdPattern.test(value);
+    });
+    if (invalidEidIndex >= 0) {
+      toast.error(`Contact person ${invalidEidIndex + 1}: Emirates ID must match 784-XXXX-XXXXXXX-X.`);
       return false;
     }
     const missingContactCodeIndex = contacts.findIndex((contact) => {
@@ -497,7 +507,7 @@ export default function AddClient() {
                   <Field label="WhatsApp" field={`contact-whatsapp-${i}`}><input className="input" value={c.whatsapp} onChange={(e) => patch(i, { whatsapp: e.target.value })} /></Field>
                   <Field label="Alternate Email" field={`contact-alternate-${i}`}><input className="input" value={c.alternate} onChange={(e) => patch(i, { alternate: e.target.value })} /></Field>
                   <label className="flex items-center gap-2 font-bold" htmlFor={`contact-primary-${i}`}><input id={`contact-primary-${i}`} name={`contactPrimary${i}`} type="checkbox" checked={c.primary} onChange={(e) => patch(i, { primary: e.target.checked })} /> Primary Contact</label>
-                  <Field label="Emirates ID Number" field={`contact-eid-${i}`}><input className="input" value={c.eid} onChange={(e) => patch(i, { eid: e.target.value })} /></Field>
+                  <Field label="Emirates ID Number" field={`contact-eid-${i}`}><input className="input" placeholder="784-XXXX-XXXXXXX-X" value={c.eid} onChange={(e) => patch(i, { eid: e.target.value })} /></Field>
                   <Field label="Passport Number" field={`contact-passport-${i}`}><input className="input" value={c.passport} onChange={(e) => patch(i, { passport: e.target.value })} /></Field>
                   <div className="md:col-span-3 grid gap-3 md:grid-cols-2">
                     <DocumentUploadZone id={`contact-eid-upload-${i}`} title="Upload Emirates ID" subtitle="PDF, JPG, PNG, DOCX, XLSX" fileName={c.eidDocumentName} documentUrl={c.eidDocumentUrl} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "emiratesId")} />

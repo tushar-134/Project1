@@ -102,6 +102,15 @@ function findMissingContactName(contactPersons = []) {
   return contactPersons.findIndex((contact) => !String(contact?.fullName || "").trim());
 }
 
+function findInvalidEmiratesId(contactPersons = []) {
+  const pattern = /^\d{3}-\d{4}-\d{7}-\d$/;
+  return contactPersons.findIndex((contact) => {
+    const value = String(contact?.emiratesId?.number || "").trim();
+    if (!value) return false;
+    return !pattern.test(value);
+  });
+}
+
 function buildUploadedFile(req) {
   if (!req.file) return null;
   const url = req.file.path?.startsWith?.("http")
@@ -163,6 +172,8 @@ exports.createClient = async (req, res, next) => {
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
     const clientAssignError = await ensureManagerCanAssignClient(req, req.body.assignedUser);
     if (clientAssignError) return res.status(clientAssignError.status).json({ message: clientAssignError.message });
+    const invalidEidIndex = findInvalidEmiratesId(req.body.contactPersons);
+    if (invalidEidIndex >= 0) return res.status(400).json({ message: `Contact person ${invalidEidIndex + 1}: Emirates ID must match 784-XXXX-XXXXXXX-X.` });
     if (req.body.group) {
       const groupExists = await ClientGroup.exists({ _id: req.body.group });
       if (!groupExists) return res.status(400).json({ message: "Selected group not found." });
@@ -212,6 +223,8 @@ exports.updateClient = async (req, res, next) => {
       if (!groupExists) return res.status(400).json({ message: "Selected group not found." });
     }
     if ("contactPersons" in req.body) {
+      const invalidEidIndex = findInvalidEmiratesId(req.body.contactPersons);
+      if (invalidEidIndex >= 0) return res.status(400).json({ message: `Contact person ${invalidEidIndex + 1}: Emirates ID must match 784-XXXX-XXXXXXX-X.` });
       const missingContactNameIndex = findMissingContactName(req.body.contactPersons);
       if (missingContactNameIndex >= 0) return res.status(400).json({ message: `Contact person ${missingContactNameIndex + 1}: Full name is required.` });
       const invalidContactIndex = findInvalidContactMobile(req.body.contactPersons);
