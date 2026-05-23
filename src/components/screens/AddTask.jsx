@@ -12,26 +12,66 @@ import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import Toggle from "../ui/Toggle.jsx";
 
+function buildEditDraft(task) {
+  if (!task) return null;
+
+  const categoryMap = {
+    VAT: "vat",
+    CT: "ct",
+    "Corporate Tax": "ct",
+    Audit: "audit",
+    Accounting: "accounting",
+    MIS: "mis",
+    "MIS Reporting": "mis",
+    EInv: "einv",
+    "E-Invoicing": "einv",
+    Refund: "refund",
+    "VAT Refund": "refund",
+    Other: "other",
+  };
+
+  return {
+    categoryId: categoryMap[task.category] || String(task.category || "").toLowerCase() || "vat",
+    categoryName: task.category || "VAT",
+    type: task.taskType || task.type || "",
+    recurring: Boolean(task.isRecurring ?? task.recurring),
+    fta: Boolean(task.isAwaitingFta),
+    savedStatus: task.apiStatus || task.status || "not_started",
+    details: {
+      client: task.client?._id || task.clientId || (typeof task.client === "string" ? "" : task.client) || "",
+      assigned: task.assignedTo?._id || task.assignedId || (typeof task.assignedTo === "string" ? task.assignedTo : "") || "",
+      dueDate: task.dueDate?.slice?.(0, 10) || "",
+      period: task.period || "",
+      description: task.description || "",
+      frequency: task.recurringConfig?.frequency || "monthly",
+      nextDue: task.recurringConfig?.nextDueDate?.slice?.(0, 10) || "",
+      endDate: task.recurringConfig?.endDate?.slice?.(0, 10) || "",
+    },
+  };
+}
+
 export default function AddTask() {
   const { state, dispatch } = useApp();
   const navigate = useNavigate();
   const { id } = useParams();
   const location = useLocation();
   const isEditMode = Boolean(id);
+  const prefetchedTask = isEditMode ? location.state?.task : null;
+  const prefetchedDraft = buildEditDraft(prefetchedTask);
   const { fetchClients } = useClients();
   const { fetchUsers } = useUsers();
   const { createTask, getTask, updateTask } = useTasks();
   // If navigated from TaskList with prefetched task data, start directly at step 3 (no flash).
-  const [step, setStep] = useState(() => (isEditMode && location.state?.task) ? 3 : 1);
-  const [categoryId, setCategoryId] = useState("vat");
-  const [categoryName, setCategoryName] = useState("VAT");
+  const [step, setStep] = useState(() => (prefetchedDraft ? 3 : 1));
+  const [categoryId, setCategoryId] = useState(() => prefetchedDraft?.categoryId || "vat");
+  const [categoryName, setCategoryName] = useState(() => prefetchedDraft?.categoryName || "VAT");
   const category = state.categories.find((cat) => cat.id === categoryId);
-  const [type, setType] = useState("VAT Return");
-  const [recurring, setRecurring] = useState(false);
-  const [fta, setFta] = useState(false);
-  const [savedStatus, setSavedStatus] = useState("not_started");
+  const [type, setType] = useState(() => prefetchedDraft?.type || "VAT Return");
+  const [recurring, setRecurring] = useState(() => prefetchedDraft?.recurring || false);
+  const [fta, setFta] = useState(() => prefetchedDraft?.fta || false);
+  const [savedStatus, setSavedStatus] = useState(() => prefetchedDraft?.savedStatus || "not_started");
   const [submitting, setSubmitting] = useState(false);
-  const [details, setDetails] = useState({ client: "", assigned: "", dueDate: "2026-05-31", period: "Q2 2026", description: "", frequency: "monthly", nextDue: "2026-06-30", endDate: "" });
+  const [details, setDetails] = useState(() => prefetchedDraft?.details || { client: "", assigned: "", dueDate: "2026-05-31", period: "Q2 2026", description: "", frequency: "monthly", nextDue: "2026-06-30", endDate: "" });
   const chips = useMemo(() => category?.taskTypes || [], [category]);
   useEffect(() => {
     // The task wizard needs lookup data up front so each step can stay synchronous and snappy.
@@ -43,55 +83,28 @@ export default function AddTask() {
     if (!isEditMode) return;
 
     function populate(task) {
-      const categoryMap = {
-        VAT: "vat",
-        CT: "ct",
-        "Corporate Tax": "ct",
-        Audit: "audit",
-        Accounting: "accounting",
-        MIS: "mis",
-        "MIS Reporting": "mis",
-        EInv: "einv",
-        "E-Invoicing": "einv",
-        Refund: "refund",
-        "VAT Refund": "refund",
-        Other: "other",
-      };
-      const nextCategoryId = categoryMap[task.category] || String(task.category || "").toLowerCase();
-      setCategoryId(nextCategoryId);
-      setCategoryName(task.category || "VAT");
-      setType(task.taskType || task.type || "");
-      setRecurring(Boolean(task.isRecurring ?? task.recurring));
-      setFta(Boolean(task.isAwaitingFta));
-      // Handle both mapped shape (apiStatus) and raw API shape (status enum)
-      setSavedStatus(task.apiStatus || task.status || "not_started");
-      setDetails({
-        // Handle both mapped shape (clientId) and raw API shape (client._id)
-        client: task.client?._id || task.clientId || (typeof task.client === "string" ? "" : task.client) || "",
-        // Handle both mapped shape (assignedId) and raw API shape (assignedTo._id)
-        assigned: task.assignedTo?._id || task.assignedId || (typeof task.assignedTo === "string" ? task.assignedTo : "") || "",
-        dueDate: task.dueDate?.slice?.(0, 10) || "",
-        period: task.period || "",
-        description: task.description || "",
-        frequency: task.recurringConfig?.frequency || "monthly",
-        nextDue: task.recurringConfig?.nextDueDate?.slice?.(0, 10) || "",
-        endDate: task.recurringConfig?.endDate?.slice?.(0, 10) || "",
-      });
+      const draft = buildEditDraft(task);
+      setCategoryId(draft?.categoryId || "vat");
+      setCategoryName(draft?.categoryName || "VAT");
+      setType(draft?.type || "");
+      setRecurring(Boolean(draft?.recurring));
+      setFta(Boolean(draft?.fta));
+      setSavedStatus(draft?.savedStatus || "not_started");
+      setDetails(draft?.details || { client: "", assigned: "", dueDate: "", period: "", description: "", frequency: "monthly", nextDue: "", endDate: "" });
       setStep(3);
     }
 
-    // If TaskList passed the task row via router state, use it immediately (instant open).
+    // If the previous screen passed the task data via router state, the page can paint instantly.
     // Fall back to a fresh API call only when navigating directly via URL.
-    const prefetched = location.state?.task;
-    if (prefetched) {
-      populate(prefetched);
+    if (prefetchedTask) {
+      populate(prefetchedTask);
     } else {
       getTask(id).then(populate).catch(() => {
         toast.error("Unable to load this task for editing.");
         navigate("/tasks/list");
       });
     }
-  }, [id, isEditMode]);
+  }, [id, isEditMode, prefetchedTask, getTask, navigate]);
 
   useEffect(() => {
     if (!state.categories.length || !categoryName) return;
