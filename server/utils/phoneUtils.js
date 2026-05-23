@@ -14,7 +14,13 @@ function normalizePhoneNumber(value) {
 }
 
 function getPhoneNumberSpec(countryCode) {
-  void countryCode;
+  const normalizedCode = normalizeDialCode(countryCode);
+  if (normalizedCode === "+971") {
+    return { min: 9, max: 9 };
+  }
+  if (normalizedCode === "+91") {
+    return { min: 10, max: 10 };
+  }
   return { min: 10, max: 10 };
 }
 
