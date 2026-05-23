@@ -1,17 +1,18 @@
-import { Download } from "lucide-react";
+import { AlertTriangle, Briefcase, Calendar, Clock, Download, ExternalLink, FileText, Pencil, RotateCw, Tag, User, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useUsers } from "../../hooks/useUsers.js";
 import { useTasks } from "../../hooks/useTasks";
-import { downloadBlob } from "../../utils/adapterUtils";
+import { taskService } from "../../services/taskService.js";
+import { downloadBlob, statusFromApi, ftaStatusFromApi } from "../../utils/adapterUtils";
 import { canManageTasks } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import Table from "../ui/Table.jsx";
-import TaskDrawer from "../ui/TaskDrawer.jsx";
+import StatusPill from "../ui/StatusPill.jsx";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
