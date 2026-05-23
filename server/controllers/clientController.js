@@ -228,7 +228,14 @@ exports.updateClient = async (req, res, next) => {
     if (duplicate) return res.status(409).json({ message: duplicateMessage(duplicate, candidate) });
     // Bug #4 Fix: whitelist editable fields to prevent mass-assignment of fileNo, createdBy, isActive, etc.
     const ALLOWED = ["fileNo", "legalName", "tradeName", "clientType", "jurisdiction", "financialYearEnd", "assignedUser", "group", "registeredAddress", "correspondenceAddress", "tradeLicences", "contactPersons", "vatDetails", "ctDetails", "portalLogins", "customFields"];
-    ALLOWED.forEach((key) => { if (key in req.body) client[key] = req.body[key]; });
+    // Handle explicit ungroup: remove client from its current group and unset the reference.
+    if ("group" in req.body && (req.body.group === null || req.body.group === "")) {
+      if (client.group) {
+        await ClientGroup.updateMany({ clients: client._id }, { $pull: { clients: client._id } });
+      }
+      client.group = undefined;
+    }
+    ALLOWED.forEach((key) => { if (key in req.body && !(key === "group" && (req.body.group === null || req.body.group === ""))) client[key] = req.body[key]; });
     if ("fileNo" in req.body) {
       client.fileNo = normalizeFileNo(req.body.fileNo) || originalFileNo;
     }
