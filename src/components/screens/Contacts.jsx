@@ -140,8 +140,8 @@ export default function Contacts() {
 
       <Card className="p-3">
         <div className="relative">
-          <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
-          <input id="contact-search" name="contactSearch" className="input pl-9" placeholder="Search contacts by name, client, phone, email" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <Search className="absolute left-5 top-2.5 text-slate-400" size={16} />
+          <input id="contact-search" name="contactSearch" type="search" className="input pl-12" placeholder="Search contacts by name, email, or mobile..." value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
       </Card>
 

@@ -36,6 +36,9 @@ button { touch-action: manipulation; }
   @apply h-9 w-full rounded-lg border bg-white px-3 text-[13px] outline-none transition;
   border-color: var(--border);
 }
+.input[type="search"] {
+  @apply px-10;
+}
 .input:focus { @apply ring-2; border-color: var(--navy); --tw-ring-color: rgb(30 58 138 / .16); }
 .textarea { @apply min-h-24 py-2; }
 .screen-title { @apply text-[20px] font-extrabold leading-tight text-slate-900 sm:text-[22px]; }
