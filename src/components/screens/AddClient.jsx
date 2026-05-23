@@ -23,6 +23,34 @@ function getApiErrorMessage(error) {
   return "";
 }
 
+const FINANCIAL_YEAR_OPTIONS = [
+  "Jan - Dec",
+  "Feb - Jan",
+  "Mar - Feb",
+  "Apr - Mar",
+  "May - Apr",
+  "Jun - May",
+  "Jul - Jun",
+  "Aug - Jul",
+  "Sep - Aug",
+  "Oct - Sep",
+  "Nov - Oct",
+  "Dec - Nov",
+];
+
+function normalizeFinancialYearEnd(value) {
+  if (!value) return "Jan - Dec";
+  if (FINANCIAL_YEAR_OPTIONS.includes(value)) return value;
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "31 december" || normalized === "december") return "Jan - Dec";
+  if (normalized === "31 march" || normalized === "march") return "Apr - Mar";
+  if (normalized === "30 june" || normalized === "june") return "Jul - Jun";
+  if (normalized === "30 september" || normalized === "september") return "Oct - Sep";
+
+  return "Jan - Dec";
+}
+
 export default function AddClient() {
   const { state, dispatch } = useApp();
   const navigate = useNavigate();
@@ -43,7 +71,7 @@ export default function AddClient() {
     return ["United Arab Emirates", ...[...new Set(base)].filter((country) => country !== "United Arab Emirates")];
   }, []);
   const [form, setForm] = useState({
-    clientType: "Legal Person", fileNo: "", legalName: "", tradeName: "", fye: "31 December", jurisdiction: "Mainland", assigned: "",
+    clientType: "Legal Person", fileNo: "", legalName: "", tradeName: "", fye: "Jan - Dec", jurisdiction: "Mainland", assigned: "",
     country: "United Arab Emirates", emirate: "Dubai", street: "", poBox: "", postalCode: "", differentAddress: false, correspondence: "",
     vatTrn: "", vatStatus: "Registered", vatDate: "", vatFreq: "Quarterly", ctTin: "", ctStatus: "Not Registered", ctDate: "", group: "", newGroup: "",
   });
@@ -119,7 +147,7 @@ export default function AddClient() {
         fileNo: client.fileNo || "",
         legalName: client.legalName || "",
         tradeName: client.tradeName || "",
-        fye: client.financialYearEnd || client.ctDetails?.financialYearEnd || "",
+        fye: normalizeFinancialYearEnd(client.financialYearEnd || client.ctDetails?.financialYearEnd || ""),
         jurisdiction: jurisdictionLabels[client.jurisdiction] || "Mainland",
         assigned: client.assignedUser?.name || "",
         country: client.registeredAddress?.country || "United Arab Emirates",
@@ -696,7 +724,11 @@ export default function AddClient() {
                 <input className="input" type="date" value={form.ctDate} onChange={(e) => update("ctDate", e.target.value)} />
               </Field>
               <Field label="Financial Year End" field="client-ct-fye">
-                <input className="input" value={form.fye} onChange={(e) => update("fye", e.target.value)} />
+                <select className="input" value={form.fye} onChange={(e) => update("fye", e.target.value)}>
+                  {FINANCIAL_YEAR_OPTIONS.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
               </Field>
             </div>
           )}
@@ -1007,7 +1039,7 @@ function DocumentUploadZone({ id, title, subtitle, fileName, documentUrl, isUplo
 }
 
 function Basic({ form, update, countries, users }) {
-  return <div className="space-y-4"><div className="grid gap-3 md:grid-cols-2">{["Legal Person", "Natural Person"].map((type) => <button key={type} onClick={() => update("clientType", type)} className={`rounded-xl border p-4 text-left ${form.clientType === type ? "border-[#1e3a8a] bg-blue-50" : "border-[#e2e8f0]"}`}><div className="font-extrabold">{type}</div><div className="text-[12px] text-slate-500">{type === "Legal Person" ? "Companies, branches, free zone entities" : "Individual taxable persons"}</div></button>)}</div><div className="grid gap-3 md:grid-cols-3"><Field label="File No." field="client-file-no"><input className="input" value={form.fileNo} onChange={(e) => update("fileNo", e.target.value)} /></Field><Field label="Legal Name*" field="client-legal-name"><input className="input" value={form.legalName} onChange={(e) => update("legalName", e.target.value)} /></Field><Field label="Trade Name" field="client-trade-name"><input className="input" value={form.tradeName} onChange={(e) => update("tradeName", e.target.value)} /></Field><Field label="Financial Year End*" field="client-fye"><input className="input" value={form.fye} onChange={(e) => update("fye", e.target.value)} /></Field><Field label="Jurisdiction" field="client-jurisdiction"><select className="input" value={form.jurisdiction} onChange={(e) => update("jurisdiction", e.target.value)}><option>Mainland</option><option>Free Zone</option><option>Designated Zone</option><option>Offshore</option></select></Field><Field label="Assigned User" field="client-assigned-user"><select className="input" value={form.assigned} onChange={(e) => update("assigned", e.target.value)}><option value="">Select User</option>{users.map((u) => <option key={u.id || u._id} value={u.name}>{u.name}</option>)}</select></Field></div><div className="grid gap-3 md:grid-cols-5"><Field label="Country" field="client-country"><select className="input" value={form.country} onChange={(e) => update("country", e.target.value)}>{countries.map((c) => <option key={c}>{c}</option>)}</select></Field><Field label="Emirate/State" field="client-emirate"><input className="input" value={form.emirate} onChange={(e) => update("emirate", e.target.value)} /></Field><Field label="Street" field="client-street"><input className="input" value={form.street} onChange={(e) => update("street", e.target.value)} /></Field><Field label="PO Box" field="client-po-box"><input className="input" value={form.poBox} onChange={(e) => update("poBox", e.target.value)} /></Field><Field label="Postal Code" field="client-postal-code"><input className="input" value={form.postalCode} onChange={(e) => update("postalCode", e.target.value)} /></Field></div><label className="flex items-center gap-2 font-bold" htmlFor="client-different-address"><input id="client-different-address" name="clientDifferentAddress" type="checkbox" checked={form.differentAddress} onChange={(e) => update("differentAddress", e.target.checked)} /> Actual/Correspondence Address is different</label>{form.differentAddress && <textarea id="client-correspondence-address" name="clientCorrespondenceAddress" className="input textarea" value={form.correspondence} onChange={(e) => update("correspondence", e.target.value)} />}</div>;
+  return <div className="space-y-4"><div className="grid gap-3 md:grid-cols-2">{["Legal Person", "Natural Person"].map((type) => <button key={type} onClick={() => update("clientType", type)} className={`rounded-xl border p-4 text-left ${form.clientType === type ? "border-[#1e3a8a] bg-blue-50" : "border-[#e2e8f0]"}`}><div className="font-extrabold">{type}</div><div className="text-[12px] text-slate-500">{type === "Legal Person" ? "Companies, branches, free zone entities" : "Individual taxable persons"}</div></button>)}</div><div className="grid gap-3 md:grid-cols-3"><Field label="File No." field="client-file-no"><input className="input" value={form.fileNo} onChange={(e) => update("fileNo", e.target.value)} /></Field><Field label="Legal Name*" field="client-legal-name"><input className="input" value={form.legalName} onChange={(e) => update("legalName", e.target.value)} /></Field><Field label="Trade Name" field="client-trade-name"><input className="input" value={form.tradeName} onChange={(e) => update("tradeName", e.target.value)} /></Field><Field label="Financial Year End*" field="client-fye"><select className="input" value={form.fye} onChange={(e) => update("fye", e.target.value)}>{FINANCIAL_YEAR_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}</select></Field><Field label="Jurisdiction" field="client-jurisdiction"><select className="input" value={form.jurisdiction} onChange={(e) => update("jurisdiction", e.target.value)}><option>Mainland</option><option>Free Zone</option><option>Designated Zone</option><option>Offshore</option></select></Field><Field label="Assigned User" field="client-assigned-user"><select className="input" value={form.assigned} onChange={(e) => update("assigned", e.target.value)}><option value="">Select User</option>{users.map((u) => <option key={u.id || u._id} value={u.name}>{u.name}</option>)}</select></Field></div><div className="grid gap-3 md:grid-cols-5"><Field label="Country" field="client-country"><select className="input" value={form.country} onChange={(e) => update("country", e.target.value)}>{countries.map((c) => <option key={c}>{c}</option>)}</select></Field><Field label="Emirate/State" field="client-emirate"><input className="input" value={form.emirate} onChange={(e) => update("emirate", e.target.value)} /></Field><Field label="Street" field="client-street"><input className="input" value={form.street} onChange={(e) => update("street", e.target.value)} /></Field><Field label="PO Box" field="client-po-box"><input className="input" value={form.poBox} onChange={(e) => update("poBox", e.target.value)} /></Field><Field label="Postal Code" field="client-postal-code"><input className="input" value={form.postalCode} onChange={(e) => update("postalCode", e.target.value)} /></Field></div><label className="flex items-center gap-2 font-bold" htmlFor="client-different-address"><input id="client-different-address" name="clientDifferentAddress" type="checkbox" checked={form.differentAddress} onChange={(e) => update("differentAddress", e.target.checked)} /> Actual/Correspondence Address is different</label>{form.differentAddress && <textarea id="client-correspondence-address" name="clientCorrespondenceAddress" className="input textarea" value={form.correspondence} onChange={(e) => update("correspondence", e.target.value)} />}</div>;
 }
 function Repeat({ title, items, setItems, blank, render }) {
   const patch = (i, values) => setItems(items.map((item, idx) => idx === i ? { ...item, ...values } : item));
