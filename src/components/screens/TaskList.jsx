@@ -1,17 +1,17 @@
-import { AlertTriangle, Briefcase, Calendar, Clock, Download, ExternalLink, FileText, Pencil, RotateCw, Tag, User, X } from "lucide-react";
+import { Download } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useUsers } from "../../hooks/useUsers.js";
 import { useTasks } from "../../hooks/useTasks";
-import { taskService } from "../../services/taskService.js";
-import { downloadBlob, statusFromApi, ftaStatusFromApi } from "../../utils/adapterUtils";
+import { downloadBlob } from "../../utils/adapterUtils";
 import { canManageTasks } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import Table from "../ui/Table.jsx";
+import TaskDrawer from "../ui/TaskDrawer.jsx";
 
 // BRD 5.4 — all four statuses; "Submitted to FTA" is gated to FTA-tracked tasks only
 // Order: Not Yet Started → WIP → Submitted to FTA → Completed
@@ -49,6 +49,7 @@ export default function TaskList() {
   const [status, setStatus] = useState("All");
   const [scope, setScope] = useState("By Month");
   const [month, setMonth] = useState(searchParams.get("month") || "2026-05");
+  const [drawerTaskId, setDrawerTaskId] = useState(null);
 
   const canManage = canManageTasks(currentUser?.role);
   const isTaskOnly = currentUser?.role === "task_only";
@@ -160,8 +161,8 @@ export default function TaskList() {
                   <td className="font-extrabold text-[#1e3a8a]">
                     <button
                       className="task-id-link"
-                      onClick={() => navigate(`/tasks/${task.id}`)}
-                      title="View task details"
+                      onClick={() => (canManage ? setDrawerTaskId(task.id) : navigate(`/tasks/${task.id}`))}
+                      title={canManage ? "Open task details" : "View task details"}
                     >
                       {task.taskId}
                     </button>
@@ -236,6 +237,10 @@ export default function TaskList() {
           </tbody>
         </Table>
       </Card>
+
+      {canManage && drawerTaskId && (
+        <TaskDrawer taskId={drawerTaskId} canManage={canManage} onClose={() => setDrawerTaskId(null)} />
+      )}
     </div>
   );
 }

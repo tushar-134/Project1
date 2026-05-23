@@ -4,11 +4,12 @@ import { useNavigate } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { reportService } from "../../services/reportService";
-import { ROLE_LABELS } from "../../utils/permissions.js";
+import { canManageTasks, ROLE_LABELS } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
 import Card from "../ui/Card.jsx";
 import StatusPill from "../ui/StatusPill.jsx";
 import Table from "../ui/Table.jsx";
+import TaskDrawer from "../ui/TaskDrawer.jsx";
 
 const serviceTiles = [
   ["VAT", 7, 2, "vat"], ["Corporate Tax", 4, 0, "ct"], ["Audit", 3, 1, "audit"],
@@ -28,8 +29,10 @@ export default function Dashboard() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [month, setMonth] = useState(new Date(2026, 4, 1));
+  const [drawerTaskId, setDrawerTaskId] = useState(null);
   const monthText = month.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
   const roleLabel = ROLE_LABELS[currentUser?.role] || currentUser?.role || "User";
+  const canManage = canManageTasks(currentUser?.role);
   const moveMonth = (delta) => setMonth(new Date(month.getFullYear(), month.getMonth() + delta, 1));
   useEffect(() => {
     // Dashboard stats are month-sensitive, so the page refetches whenever the picker changes.
@@ -107,8 +110,8 @@ export default function Dashboard() {
                     {taskMongoId ? (
                       <button
                         className="task-id-link"
-                        onClick={() => navigate(`/tasks/${taskMongoId}`)}
-                        title="View task details"
+                        onClick={() => (canManage ? setDrawerTaskId(taskMongoId) : navigate(`/tasks/${taskMongoId}`))}
+                        title={canManage ? "Open task details" : "View task details"}
                       >
                         {task.taskId || item.taskId}
                       </button>
@@ -122,6 +125,10 @@ export default function Dashboard() {
           </tbody>
         </Table>
       </Card>
+
+      {canManage && drawerTaskId && (
+        <TaskDrawer taskId={drawerTaskId} canManage={canManage} onClose={() => setDrawerTaskId(null)} />
+      )}
     </div>
   );
 }
