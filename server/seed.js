@@ -37,6 +37,12 @@ async function seed() {
   const admin = await upsertUser({ name: "Hamad Siddiqui", email: "admin@filingbuddy.ae", password: "Admin@123", role: "admin" });
   const sara = await upsertUser({ name: "Sara Mahmoud", email: "sara@filingbuddy.ae", password: "Sara@123", role: "manager" });
   const omar = await upsertUser({ name: "Omar Khalid", email: "omar@filingbuddy.ae", password: "Omar@123", role: "task_only" });
+  await upsertUser({ name: "Admin One", email: "admin1@test.com", password: "Admin@123", role: "admin" });
+  await upsertUser({ name: "Admin Two", email: "admin2@test.com", password: "Admin@123", role: "admin" });
+  await upsertUser({ name: "Manager One", email: "manager1@test.com", password: "Manager@123", role: "manager" });
+  await upsertUser({ name: "Manager Two", email: "manager2@test.com", password: "Manager@123", role: "manager" });
+  await upsertUser({ name: "Task User One", email: "task1@test.com", password: "Task@123", role: "task_only" });
+  await upsertUser({ name: "Task User Two", email: "task2@test.com", password: "Task@123", role: "task_only" });
 
   for (const [name, icon, color, taskTypes] of categories) {
     await Category.updateOne({ name }, { $setOnInsert: { name, icon, color, isDefault: true, taskTypes: taskTypes.map((type) => ({ name: type })) } }, { upsert: true });

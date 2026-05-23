@@ -135,6 +135,12 @@ connectDB().then(async () => {
       const admin = await User.create({ name: "Hamad Siddiqui", email: "admin@filingbuddy.ae", password: "Admin@123", role: "admin" });
       const sara  = await User.create({ name: "Sara Mahmoud",   email: "sara@filingbuddy.ae",  password: "Sara@123",  role: "manager" });
       const omar  = await User.create({ name: "Omar Khalid",    email: "omar@filingbuddy.ae",  password: "Omar@123",  role: "task_only" });
+      await User.create({ name: "Admin One", email: "admin1@test.com", password: "Admin@123", role: "admin" });
+      await User.create({ name: "Admin Two", email: "admin2@test.com", password: "Admin@123", role: "admin" });
+      await User.create({ name: "Manager One", email: "manager1@test.com", password: "Manager@123", role: "manager" });
+      await User.create({ name: "Manager Two", email: "manager2@test.com", password: "Manager@123", role: "manager" });
+      await User.create({ name: "Task User One", email: "task1@test.com", password: "Task@123", role: "task_only" });
+      await User.create({ name: "Task User Two", email: "task2@test.com", password: "Task@123", role: "task_only" });
 
       for (const [name, icon, color, taskTypes] of categories) {
         await Category.create({ name, icon, color, isDefault: true, taskTypes: taskTypes.map((t) => ({ name: t })) });
