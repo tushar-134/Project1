@@ -1,6 +1,6 @@
 import { NavLink } from "react-router-dom";
 import { useEffect } from "react";
-import { X, Boxes, ClipboardList, ContactRound, FilePlus2, Files, LayoutDashboard, LogOut, Upload, Users, UserRoundPlus, Folders, PieChart, Landmark } from "lucide-react";
+import { X, Boxes, ClipboardList, ContactRound, FilePlus2, Files, LayoutDashboard, LogOut, Upload, Users, UserRoundPlus, Folders, PieChart, Landmark, Settings2 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useApp } from "../../context/AppContext";
 import { useTasks } from "../../hooks/useTasks";
@@ -21,6 +21,7 @@ export const navItems = [
   ]},
   { section: "Settings", links: [
     { label: "Users", to: "/settings/users", icon: Users },
+    { label: "Custom Fields", to: "/settings/custom-fields", icon: Settings2 },
     { label: "Client Groups", to: "/settings/groups", icon: Folders },
     { label: "Reports", to: "/reports", icon: PieChart },
   ]},
@@ -56,6 +57,8 @@ export default function Sidebar({ open = false, onClose = () => {}, mobile = fal
             return canManageCategories(role);
           case "/settings/users":
             return canViewUsers(role);
+          case "/settings/custom-fields":
+            return canManageCategories(role); // Admins only
           case "/settings/groups":
             return canManageGroups(role);
           case "/reports":
