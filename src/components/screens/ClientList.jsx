@@ -1,4 +1,4 @@
-import { Download, Pencil, Search, Trash2, Upload } from "lucide-react";
+import { Download, FileText, Pencil, Search, Trash2, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -104,25 +104,33 @@ export default function ClientList() {
                   <td className="min-w-56">
                     {client.documents?.length ? (
                       <details className="group rounded-xl border border-[#e2e8f0] bg-slate-50 px-3 py-2">
-                        <summary className="cursor-pointer list-none font-bold text-[#1e3a8a]">
-                          {client.documents.length} document{client.documents.length === 1 ? "" : "s"}
+                        <summary className="flex cursor-pointer select-none list-none items-center gap-1.5 font-bold text-[#1e3a8a]">
+                          <FileText size={13} className="shrink-0" />
+                          <span className="rounded-full bg-[#1e3a8a] px-2 py-0.5 text-[11px] text-white">
+                            {client.documents.length}
+                          </span>
+                          <span className="text-[12px]">
+                            doc{client.documents.length === 1 ? "" : "s"}
+                          </span>
                         </summary>
-                        <div className="mt-2 space-y-1 text-[12px] font-semibold">
+                        <ul className="mt-2 space-y-1 text-[12px] font-medium">
                           {client.documents.map((document, index) => (
-                            <a
-                              key={`${document.label}-${index}`}
-                              className="block text-slate-600 underline hover:text-[#1e3a8a]"
-                              href={document.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              {document.label}
-                            </a>
+                            <li key={`${document.label}-${index}`}>
+                              <a
+                                className="flex items-center gap-1 text-slate-600 underline hover:text-[#1e3a8a]"
+                                href={document.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
+                                <FileText size={11} className="shrink-0 text-slate-400" />
+                                {document.label}
+                              </a>
+                            </li>
                           ))}
-                        </div>
+                        </ul>
                       </details>
                     ) : (
-                      <span className="text-slate-400">0 documents</span>
+                      <span className="text-slate-400 text-[12px]">No documents</span>
                     )}
                   </td>
                 )}

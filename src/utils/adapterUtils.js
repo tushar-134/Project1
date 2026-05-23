@@ -46,26 +46,29 @@ export function mapClient(client) {
         }]
         : []
     )),
-    ...(client.contactPersons || []).flatMap((contact, index) => ([
-      contact?.emiratesId?.frontDocumentUrl
-        ? {
-          label: `Contact ${index + 1} Emirates ID Front`,
-          url: contact.emiratesId.frontDocumentUrl,
-        }
-        : null,
-      contact?.emiratesId?.backDocumentUrl
-        ? {
-          label: `Contact ${index + 1} Emirates ID Back`,
-          url: contact.emiratesId.backDocumentUrl,
-        }
-        : null,
-      contact?.passport?.documentUrl
-        ? {
-          label: `Contact ${index + 1} Passport`,
-          url: contact.passport.documentUrl,
-        }
-        : null,
-    ].filter(Boolean))),
+    ...(client.contactPersons || []).flatMap((contact, index) => {
+      const contactLabel = contact?.fullName?.trim() || `Contact ${index + 1}`;
+      return [
+        contact?.emiratesId?.frontDocumentUrl
+          ? {
+            label: `${contactLabel} – Emirates ID (Front)`,
+            url: contact.emiratesId.frontDocumentUrl,
+          }
+          : null,
+        contact?.emiratesId?.backDocumentUrl
+          ? {
+            label: `${contactLabel} – Emirates ID (Back)`,
+            url: contact.emiratesId.backDocumentUrl,
+          }
+          : null,
+        contact?.passport?.documentUrl
+          ? {
+            label: `${contactLabel} – Passport`,
+            url: contact.passport.documentUrl,
+          }
+          : null,
+      ].filter(Boolean);
+    }),
     ...(client.attachments || []).flatMap((attachment, index) => (
       attachment?.url
         ? [{
