@@ -22,7 +22,7 @@ export default function ClientList() {
 
   useEffect(() => {
     // Search is debounced so the list does not issue a request on every keystroke.
-    const timer = setTimeout(() => fetchClients({ search: query, page: 1, limit: 20 }).catch(() => {}), 400);
+    const timer = setTimeout(() => fetchClients({ search: query, page: 1, limit: 20 }).catch(() => { }), 400);
     return () => clearTimeout(timer);
   }, [query]);
 
@@ -78,6 +78,7 @@ export default function ClientList() {
               <th>Primary Contact</th>
               <th>Mobile</th>
               <th>Email</th>
+              {canManage && <th>Documents</th>}
               {canManage && <th>Actions</th>}
             </tr>
           </thead>
@@ -99,6 +100,32 @@ export default function ClientList() {
                 <td>{client.contact}</td>
                 <td>{client.mobile}</td>
                 <td>{client.email}</td>
+                {canManage && (
+                  <td className="min-w-56">
+                    {client.documents?.length ? (
+                      <details className="group rounded-xl border border-[#e2e8f0] bg-slate-50 px-3 py-2">
+                        <summary className="cursor-pointer list-none font-bold text-[#1e3a8a]">
+                          {client.documents.length} document{client.documents.length === 1 ? "" : "s"}
+                        </summary>
+                        <div className="mt-2 space-y-1 text-[12px] font-semibold">
+                          {client.documents.map((document, index) => (
+                            <a
+                              key={`${document.label}-${index}`}
+                              className="block text-slate-600 underline hover:text-[#1e3a8a]"
+                              href={document.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {document.label}
+                            </a>
+                          ))}
+                        </div>
+                      </details>
+                    ) : (
+                      <span className="text-slate-400">0 documents</span>
+                    )}
+                  </td>
+                )}
                 {canManage && (
                   <td>
                     <div className="flex gap-1">

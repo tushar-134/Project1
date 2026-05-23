@@ -37,6 +37,44 @@ export function mapClient(client) {
     designated_zone: "Designated Zone",
     offshore: "Offshore",
   };
+  const documents = [
+    ...(client.tradeLicences || []).flatMap((licence, index) => (
+      licence?.documentUrl
+        ? [{
+          label: `Trade Licence ${index + 1}`,
+          url: licence.documentUrl,
+        }]
+        : []
+    )),
+    ...(client.contactPersons || []).flatMap((contact, index) => ([
+      contact?.emiratesId?.frontDocumentUrl
+        ? {
+          label: `Contact ${index + 1} Emirates ID Front`,
+          url: contact.emiratesId.frontDocumentUrl,
+        }
+        : null,
+      contact?.emiratesId?.backDocumentUrl
+        ? {
+          label: `Contact ${index + 1} Emirates ID Back`,
+          url: contact.emiratesId.backDocumentUrl,
+        }
+        : null,
+      contact?.passport?.documentUrl
+        ? {
+          label: `Contact ${index + 1} Passport`,
+          url: contact.passport.documentUrl,
+        }
+        : null,
+    ].filter(Boolean))),
+    ...(client.attachments || []).flatMap((attachment, index) => (
+      attachment?.url
+        ? [{
+          label: attachment.documentType || attachment.name || `Attachment ${index + 1}`,
+          url: attachment.url,
+        }]
+        : []
+    )),
+  ];
   return {
     ...client,
     id: client._id,
@@ -51,6 +89,7 @@ export function mapClient(client) {
     contact: client.contactPersons?.find((p) => p.isPrimary)?.fullName || client.contactPersons?.[0]?.fullName || "",
     mobile: client.contactPersons?.[0]?.mobile ? `${client.contactPersons[0].mobile.countryCode || ""} ${client.contactPersons[0].mobile.number || ""}` : "",
     email: client.contactPersons?.[0]?.email || "",
+    documents,
   };
 }
 

@@ -1,5 +1,5 @@
 import { cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { Check, Send } from "lucide-react";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
@@ -12,23 +12,66 @@ import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import Toggle from "../ui/Toggle.jsx";
 
+function buildEditDraft(task) {
+  if (!task) return null;
+
+  const categoryMap = {
+    VAT: "vat",
+    CT: "ct",
+    "Corporate Tax": "ct",
+    Audit: "audit",
+    Accounting: "accounting",
+    MIS: "mis",
+    "MIS Reporting": "mis",
+    EInv: "einv",
+    "E-Invoicing": "einv",
+    Refund: "refund",
+    "VAT Refund": "refund",
+    Other: "other",
+  };
+
+  return {
+    categoryId: categoryMap[task.category] || String(task.category || "").toLowerCase() || "vat",
+    categoryName: task.category || "VAT",
+    type: task.taskType || task.type || "",
+    recurring: Boolean(task.isRecurring ?? task.recurring),
+    fta: Boolean(task.isAwaitingFta),
+    savedStatus: task.apiStatus || task.status || "not_started",
+    details: {
+      client: task.client?._id || task.clientId || (typeof task.client === "string" ? "" : task.client) || "",
+      assigned: task.assignedTo?._id || task.assignedId || (typeof task.assignedTo === "string" ? task.assignedTo : "") || "",
+      dueDate: task.dueDate?.slice?.(0, 10) || "",
+      period: task.period || "",
+      description: task.description || "",
+      frequency: task.recurringConfig?.frequency || "monthly",
+      nextDue: task.recurringConfig?.nextDueDate?.slice?.(0, 10) || "",
+      endDate: task.recurringConfig?.endDate?.slice?.(0, 10) || "",
+    },
+  };
+}
+
 export default function AddTask() {
   const { state, dispatch } = useApp();
   const navigate = useNavigate();
   const { id } = useParams();
+  const location = useLocation();
   const isEditMode = Boolean(id);
+  const prefetchedTask = isEditMode ? location.state?.task : null;
+  const prefetchedDraft = buildEditDraft(prefetchedTask);
   const { fetchClients } = useClients();
   const { fetchUsers } = useUsers();
   const { createTask, getTask, updateTask } = useTasks();
-  const [step, setStep] = useState(1);
-  const [categoryId, setCategoryId] = useState("vat");
-  const [categoryName, setCategoryName] = useState("VAT");
+  // If navigated from TaskList with prefetched task data, start directly at step 3 (no flash).
+  const [step, setStep] = useState(() => (prefetchedDraft ? 3 : 1));
+  const [categoryId, setCategoryId] = useState(() => prefetchedDraft?.categoryId || "vat");
+  const [categoryName, setCategoryName] = useState(() => prefetchedDraft?.categoryName || "VAT");
   const category = state.categories.find((cat) => cat.id === categoryId);
-  const [type, setType] = useState("VAT Return");
-  const [recurring, setRecurring] = useState(false);
-  const [fta, setFta] = useState(false);
-  const [savedStatus, setSavedStatus] = useState("not_started");
-  const [details, setDetails] = useState({ client: "", assigned: "", dueDate: "2026-05-31", period: "Q2 2026", description: "", frequency: "monthly", nextDue: "2026-06-30", endDate: "" });
+  const [type, setType] = useState(() => prefetchedDraft?.type || "VAT Return");
+  const [recurring, setRecurring] = useState(() => prefetchedDraft?.recurring || false);
+  const [fta, setFta] = useState(() => prefetchedDraft?.fta || false);
+  const [savedStatus, setSavedStatus] = useState(() => prefetchedDraft?.savedStatus || "not_started");
+  const [submitting, setSubmitting] = useState(false);
+  const [details, setDetails] = useState(() => prefetchedDraft?.details || { client: "", assigned: "", dueDate: "2026-05-31", period: "Q2 2026", description: "", frequency: "monthly", nextDue: "2026-06-30", endDate: "" });
   const chips = useMemo(() => category?.taskTypes || [], [category]);
   useEffect(() => {
     // The task wizard needs lookup data up front so each step can stay synchronous and snappy.
@@ -38,44 +81,30 @@ export default function AddTask() {
   }, []);
   useEffect(() => {
     if (!isEditMode) return;
-    getTask(id).then((task) => {
-      const categoryMap = {
-        VAT: "vat",
-        CT: "ct",
-        "Corporate Tax": "ct",
-        Audit: "audit",
-        Accounting: "accounting",
-        MIS: "mis",
-        "MIS Reporting": "mis",
-        EInv: "einv",
-        "E-Invoicing": "einv",
-        Refund: "refund",
-        "VAT Refund": "refund",
-        Other: "other",
-      };
-      const nextCategoryId = categoryMap[task.category] || String(task.category || "").toLowerCase();
-      setCategoryId(nextCategoryId);
-      setCategoryName(task.category || "VAT");
-      setType(task.taskType || "");
-      setRecurring(Boolean(task.isRecurring));
-      setFta(Boolean(task.isAwaitingFta));
-      setSavedStatus(task.status || "not_started");
-      setDetails({
-        client: task.client?._id || task.client || "",
-        assigned: task.assignedTo?._id || task.assignedTo || "",
-        dueDate: task.dueDate?.slice?.(0, 10) || "",
-        period: task.period || "",
-        description: task.description || "",
-        frequency: task.recurringConfig?.frequency || "monthly",
-        nextDue: task.recurringConfig?.nextDueDate?.slice?.(0, 10) || "",
-        endDate: task.recurringConfig?.endDate?.slice?.(0, 10) || "",
-      });
+
+    function populate(task) {
+      const draft = buildEditDraft(task);
+      setCategoryId(draft?.categoryId || "vat");
+      setCategoryName(draft?.categoryName || "VAT");
+      setType(draft?.type || "");
+      setRecurring(Boolean(draft?.recurring));
+      setFta(Boolean(draft?.fta));
+      setSavedStatus(draft?.savedStatus || "not_started");
+      setDetails(draft?.details || { client: "", assigned: "", dueDate: "", period: "", description: "", frequency: "monthly", nextDue: "", endDate: "" });
       setStep(3);
-    }).catch(() => {
-      toast.error("Unable to load this task for editing.");
-      navigate("/tasks/list");
-    });
-  }, [id, isEditMode]);
+    }
+
+    // If the previous screen passed the task data via router state, the page can paint instantly.
+    // Fall back to a fresh API call only when navigating directly via URL.
+    if (prefetchedTask) {
+      populate(prefetchedTask);
+    } else {
+      getTask(id).then(populate).catch(() => {
+        toast.error("Unable to load this task for editing.");
+        navigate("/tasks/list");
+      });
+    }
+  }, [id, isEditMode, prefetchedTask, getTask, navigate]);
 
   useEffect(() => {
     if (!state.categories.length || !categoryName) return;
@@ -92,6 +121,7 @@ export default function AddTask() {
     setStep(2);
   }
   async function submit() {
+    if (submitting) return; // guard against double-clicks
     if (!details.client) {
       toast.error("Please select a client before submitting the task.");
       return;
@@ -100,6 +130,7 @@ export default function AddTask() {
       toast.error("Please choose a due date before submitting the task.");
       return;
     }
+    setSubmitting(true);
     try {
       const resolvedCategory = state.categories.find((cat) => cat.id === categoryId)
         || state.categories.find((cat) => cat.name === categoryName);
@@ -119,12 +150,14 @@ export default function AddTask() {
         isRecurring: recurring,
         recurringConfig: recurring ? { frequency: details.frequency, nextDueDate: details.nextDue, endDate: details.endDate || undefined } : undefined,
         isAwaitingFta: fta,
-        status: fta ? "submitted_to_fta" : savedStatus,
+        // In edit mode, preserve the current status — don't override it just because FTA toggle is on.
+        // In create mode, auto-set to submitted_to_fta if FTA toggle is on, else not_started.
+        status: isEditMode ? savedStatus : (fta ? "submitted_to_fta" : "not_started"),
       };
       if (isEditMode) {
         await updateTask(id, payload);
       } else {
-        await createTask({ ...payload, status: fta ? "submitted_to_fta" : "not_started" });
+        await createTask(payload);
       }
       toast.success(isEditMode ? "Task updated successfully." : "Task created successfully.");
       navigate("/tasks/list");
@@ -132,6 +165,8 @@ export default function AddTask() {
       const fallback = isEditMode ? "Unable to save task right now." : "Unable to create task right now.";
       const message = error?.response?.data?.errors?.[0]?.msg || error?.response?.data?.message || error?.message || fallback;
       toast.error(message);
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -161,7 +196,7 @@ export default function AddTask() {
           <div className={`smooth-panel overflow-hidden ${recurring ? "max-h-44 opacity-100" : "max-h-0 opacity-0"}`}><div className="mt-3 grid gap-3 rounded-xl bg-slate-50 p-3 md:grid-cols-3"><Field label="Frequency" field="taskRecurringFrequency"><select className="input" value={details.frequency} onChange={(e) => setDetails({ ...details, frequency: e.target.value })}><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="annual">Annually</option></select></Field><Field label="Next Due Date" field="taskNextDueDate"><input className="input" type="date" value={details.nextDue} onChange={(e) => setDetails({ ...details, nextDue: e.target.value })} /></Field><Field label="End Date" field="taskRecurringEndDate"><input className="input" type="date" value={details.endDate} onChange={(e) => setDetails({ ...details, endDate: e.target.value })} /></Field></div></div>
           <ToggleRow label="Awaiting FTA Response" checked={fta} onChange={setFta} />
           <div className={`smooth-panel overflow-hidden ${fta ? "max-h-20 opacity-100" : "max-h-0 opacity-0"}`}><div className="mt-3 rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-[12px] font-semibold text-yellow-800">This task will be routed to FTA Tracker when submitted.</div></div>
-          <div className="mt-5 flex gap-2"><Button variant="ghost" onClick={() => setStep(2)}>Back</Button><Button onClick={submit}><Send size={16} />{isEditMode ? "Save Task" : "Submit Task"}</Button></div>
+          <div className="mt-5 flex gap-2"><Button variant="ghost" onClick={() => setStep(2)}>Back</Button><Button onClick={submit} disabled={submitting}><Send size={16} />{submitting ? (isEditMode ? "Saving..." : "Submitting...") : (isEditMode ? "Save Task" : "Submit Task")}</Button></div>
         </Card>
       )}
     </div>

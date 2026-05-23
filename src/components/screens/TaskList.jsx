@@ -1,8 +1,9 @@
 import { Download } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { useUsers } from "../../hooks/useUsers.js";
 import { useTasks } from "../../hooks/useTasks";
 import { downloadBlob } from "../../utils/adapterUtils";
 import { canManageTasks } from "../../utils/permissions.js";
@@ -10,21 +11,22 @@ import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import Table from "../ui/Table.jsx";
+import TaskDrawer from "../ui/TaskDrawer.jsx";
 
 // BRD 5.4 — all four statuses; "Submitted to FTA" is gated to FTA-tracked tasks only
 // Order: Not Yet Started → WIP → Submitted to FTA → Completed
 const ALL_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed"];
 const BASE_STATUSES = ["Not Yet Started", "WIP", "Completed"]; // for non-FTA tasks
 const FILTER_STATUSES = ["All", "Not Yet Started", "WIP", "Submitted to FTA", "Completed"];
-
-const cats = ["All", "VAT", "Corporate Tax", "Audit", "Accounting", "MIS Reporting", "E-Invoicing", "VAT Refund", "Other"];
+// Category order for stable display
+const CAT_ORDER = ["VAT", "Corporate Tax", "Audit", "Accounting", "MIS Reporting", "E-Invoicing", "VAT Refund", "Other"];
 
 // Colour map for the status pill shown in read-only states
 const STATUS_PILL = {
   "Not Yet Started": { bg: "bg-slate-100", text: "text-slate-600" },
-  WIP:               { bg: "bg-blue-50",   text: "text-blue-700" },
-  Completed:         { bg: "bg-green-100", text: "text-green-700" },
-  "Submitted to FTA":{ bg: "bg-purple-50", text: "text-purple-700" },
+  WIP: { bg: "bg-blue-50", text: "text-blue-700" },
+  Completed: { bg: "bg-green-100", text: "text-green-700" },
+  "Submitted to FTA": { bg: "bg-purple-50", text: "text-purple-700" },
 };
 
 /** Read-only coloured pill used when the user cannot change a status */
@@ -42,24 +44,44 @@ export default function TaskList() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { fetchTasks, updateStatus, exportTasks } = useTasks();
+  const { fetchTasks, updateStatus, updateAssignee, exportTasks } = useTasks();
   const [cat, setCat] = useState(searchParams.get("category") || "All");
   const [status, setStatus] = useState("All");
   const [scope, setScope] = useState("By Month");
   const [month, setMonth] = useState(searchParams.get("month") || "2026-05");
+  const [drawerTaskId, setDrawerTaskId] = useState(null);
 
   const canManage = canManageTasks(currentUser?.role);
-  // BRD 5.4: Admin/Manager can change status for any task.
-  // Task Only can only change status for tasks assigned to them.
   const isTaskOnly = currentUser?.role === "task_only";
+  const canQuickViewTask = canManage || isTaskOnly;
+  const { fetchUsers } = useUsers();
+
+  // Load users list for the inline assignee dropdown
+  useEffect(() => { if (canManage) fetchUsers().catch(() => { }); }, [canManage]);
+
+  // Keep a ref to current filter params so refetch after status-change always uses fresh values.
+  const filterRef = useRef({});
+  filterRef.current = { category: cat, status, month: scope === "By Month" ? month : undefined, overdue: scope === "Overdue" ? "true" : undefined };
+
+  const refetchTasks = useCallback(() => fetchTasks(filterRef.current).catch(() => { }), [fetchTasks]);
+
+  // Track which categories actually have tasks in the current scope/month.
+  // We update this only when fetching with category=All so the filter buttons
+  // don't disappear when the user drills into a specific category.
+  const [availableCats, setAvailableCats] = useState(["All"]);
 
   useEffect(() => {
-    fetchTasks({
-      category: cat,
-      status,
-      month: scope === "By Month" ? month : undefined,
-      overdue: scope === "Overdue" ? "true" : undefined,
-    }).catch(() => {});
+    const params = filterRef.current;
+    fetchTasks(params)
+      .then((tasks) => {
+        if (cat === "All") {
+          // Derive unique categories from actual tasks, in canonical order
+          const found = new Set(tasks.map((t) => t.category));
+          const ordered = ["All", ...CAT_ORDER.filter((c) => found.has(c))];
+          setAvailableCats(ordered);
+        }
+      })
+      .catch(() => { });
   }, [cat, status, scope, month]);
 
   const rows = state.tasks;
@@ -89,7 +111,7 @@ export default function TaskList() {
         )}
       </div>
 
-      <Filter label="Category" items={cats} value={cat} setValue={setCat} />
+      <Filter label="Category" items={availableCats} value={cat} setValue={setCat} />
       <Filter label="Status" items={FILTER_STATUSES} value={status} setValue={setStatus} />
 
       <div className="flex flex-wrap items-center gap-2">
@@ -123,7 +145,6 @@ export default function TaskList() {
               <th>Assigned</th>
               <th>Status</th>
               <th>Recurring</th>
-              {canManage && <th>Edit</th>}
             </tr>
           </thead>
           <tbody>
@@ -141,8 +162,8 @@ export default function TaskList() {
                   <td className="font-extrabold text-[#1e3a8a]">
                     <button
                       className="task-id-link"
-                      onClick={() => navigate(`/tasks/${task.id}`)}
-                      title="View task details"
+                      onClick={() => (canQuickViewTask ? setDrawerTaskId(task.id) : navigate(`/tasks/${task.id}`))}
+                      title={canQuickViewTask ? "Open task details" : "View task details"}
                     >
                       {task.taskId}
                     </button>
@@ -160,7 +181,27 @@ export default function TaskList() {
                       </span>
                     )}
                   </td>
-                  <td>{task.assigned}</td>
+                  <td>
+                    {canManage ? (
+                      // Admin/Manager: inline assignee dropdown
+                      <select
+                        id={`task-assignee-${task.id}`}
+                        className="input h-8 min-w-36"
+                        value={task.assignedId || ""}
+                        onChange={(e) => {
+                          const selected = state.users.find((u) => u._id === e.target.value || u.id === e.target.value);
+                          updateAssignee(task.id, e.target.value || null, selected?.name || "Unassigned").catch(() => fetchTasks());
+                        }}
+                      >
+                        <option value="">Unassigned</option>
+                        {state.users.map((u) => (
+                          <option key={u._id || u.id} value={u._id || u.id}>{u.name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span>{task.assigned}</span>
+                    )}
+                  </td>
                   <td>
                     {canChangeStatus ? (
                       <select
@@ -171,7 +212,8 @@ export default function TaskList() {
                         // select doesn't revert to the first option while the API request is in flight.
                         value={task.displayStatus ?? task.status}
                         onChange={(e) =>
-                          updateStatus(task.id, e.target.value).catch(() => fetchTasks())
+                          // Always re-fetch after update (success or fail) to guarantee DB sync.
+                          updateStatus(task.id, e.target.value).then(() => refetchTasks()).catch(() => refetchTasks())
                         }
                       >
                         {availableStatuses.map((s) => (
@@ -190,23 +232,16 @@ export default function TaskList() {
                       </span>
                     )}
                   </td>
-                  {canManage && (
-                    <td>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => navigate(`/tasks/edit/${task.id}`)}
-                      >
-                        Edit
-                      </Button>
-                    </td>
-                  )}
                 </tr>
               );
             })}
           </tbody>
         </Table>
       </Card>
+
+      {canQuickViewTask && drawerTaskId && (
+        <TaskDrawer taskId={drawerTaskId} canManage={canManage} onClose={() => setDrawerTaskId(null)} />
+      )}
     </div>
   );
 }
@@ -219,9 +254,8 @@ function Filter({ label, items, value, setValue, compact }) {
         <button
           key={item}
           onClick={() => setValue(item)}
-          className={`rounded-full px-3 py-1.5 text-[12px] font-extrabold ${
-            value === item ? "bg-[#1e3a8a] text-white" : "bg-slate-100 text-slate-600"
-          }`}
+          className={`rounded-full px-3 py-1.5 text-[12px] font-extrabold ${value === item ? "bg-[#1e3a8a] text-white" : "bg-slate-100 text-slate-600"
+            }`}
         >
           {item}
         </button>

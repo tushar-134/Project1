@@ -21,9 +21,9 @@ const clientSchema = new mongoose.Schema({
   jurisdiction: { type: String, enum: ["mainland", "freezone", "designated_zone", "offshore"] },
   assignedUser: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   registeredAddress: { country: String, emirate: String, street: String, poBox: String, postalCode: String },
-  correspondenceAddress: { country: String, emirate: String, street: String },
+  correspondenceAddress: { country: String, emirate: String, street: String, poBox: String, postalCode: String },
   tradeLicences: [{
-    licenceNumber: String,
+    licenceNumber: { type: String, required: true, trim: true },
     issuingAuthority: String,
     officialEmail: String,
     licenceType: { type: String, enum: ["commercial", "professional", "industrial", "tourism"], default: "commercial" },
@@ -39,7 +39,7 @@ const clientSchema = new mongoose.Schema({
     alternateEmail: String,
     mobile: { countryCode: String, number: String },
     isPrimary: { type: Boolean, default: false },
-    emiratesId: { number: String, issueDate: Date, expiryDate: Date, documentUrl: String },
+    emiratesId: { number: String, issueDate: Date, expiryDate: Date, frontDocumentUrl: String, backDocumentUrl: String },
     passport: { number: String, issuingCountry: String, issueDate: Date, expiryDate: Date, documentUrl: String },
   }],
   vatDetails: {
@@ -58,11 +58,23 @@ const clientSchema = new mongoose.Schema({
   // Bug #6 Fix: added _passwordEncrypted flag so we never use a colon-sniff heuristic
   // that breaks legitimate passwords containing a colon character (e.g. "p:assword").
   portalLogins: [{ portalName: String, portalUrl: String, username: String, password: String, _passwordEncrypted: { type: Boolean, default: false }, notes: String }],
-  customFields: { qrmpPreference: String, auditFirmName: String, bankName: String, iban: String },
+  customFields: {
+    qrmpPreference: String,
+    auditFirmName: String,
+    bankName: String,
+    iban: String,
+    extraFields: [{
+      label: String,
+      type: { type: String, enum: ["text", "number", "date", "dropdown", "checkbox"], default: "text" },
+      value: mongoose.Schema.Types.Mixed,
+      options: [String],
+    }],
+  },
   attachments: [{
     name: String,
     size: String,
     fileType: String,
+    documentType: String,
     description: String,
     url: String,
     uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
@@ -91,7 +103,7 @@ clientSchema.index({ isActive: 1, group: 1, createdAt: -1 });
 clientSchema.index({ isActive: 1, assignedUser: 1, createdAt: -1 });
 clientSchema.index({ legalName: 1 });
 clientSchema.index({ "vatDetails.trn": 1 });
-clientSchema.index({ "tradeLicences.licenceNumber": 1 });
+clientSchema.index({ "tradeLicences.licenceNumber": 1 }, { unique: true, sparse: true });
 clientSchema.index({ group: 1 });
 
 module.exports = mongoose.model("Client", clientSchema);

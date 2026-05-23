@@ -9,6 +9,7 @@ import Badge from "../ui/Badge.jsx";
 import Card from "../ui/Card.jsx";
 import StatusPill from "../ui/StatusPill.jsx";
 import Table from "../ui/Table.jsx";
+import TaskDrawer from "../ui/TaskDrawer.jsx";
 
 const serviceTiles = [
   ["VAT", 7, 2, "vat"], ["Corporate Tax", 4, 0, "ct"], ["Audit", 3, 1, "audit"],
@@ -28,13 +29,16 @@ export default function Dashboard() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [month, setMonth] = useState(new Date(2026, 4, 1));
+  const [drawerTaskId, setDrawerTaskId] = useState(null);
   const monthText = month.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
   const roleLabel = ROLE_LABELS[currentUser?.role] || currentUser?.role || "User";
+  const canManage = canManageTasks(currentUser?.role);
+  const canQuickViewTask = canManage || currentUser?.role === "task_only";
   const moveMonth = (delta) => setMonth(new Date(month.getFullYear(), month.getMonth() + delta, 1));
   useEffect(() => {
     // Dashboard stats are month-sensitive, so the page refetches whenever the picker changes.
     const selected = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
-    reportService.dashboardStats({ month: selected }).then((data) => dispatch({ type: "SET_DASHBOARD", payload: data })).catch(() => {});
+    reportService.dashboardStats({ month: selected }).then((data) => dispatch({ type: "SET_DASHBOARD", payload: data })).catch(() => { });
   }, [month, dispatch]);
   const stats = state.dashboardStats || {};
   const selectedMonth = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
@@ -101,15 +105,14 @@ export default function Dashboard() {
             {(state.activity || []).map((item) => {
               const task = item.task || item;
               const taskMongoId = task._id || item._id;
-              const canManage = canManageTasks(currentUser?.role);
               return (
                 <tr key={item._id || item.taskId}>
                   <td className="font-extrabold text-[#1e3a8a]">
-                    {canManage && taskMongoId ? (
+                    {taskMongoId ? (
                       <button
                         className="task-id-link"
-                        onClick={() => navigate(`/tasks/${taskMongoId}`)}
-                        title="View task details"
+                        onClick={() => (canQuickViewTask ? setDrawerTaskId(taskMongoId) : navigate(`/tasks/${taskMongoId}`))}
+                        title={canQuickViewTask ? "Open task details" : "View task details"}
                       >
                         {task.taskId || item.taskId}
                       </button>
@@ -123,6 +126,10 @@ export default function Dashboard() {
           </tbody>
         </Table>
       </Card>
+
+      {canQuickViewTask && drawerTaskId && (
+        <TaskDrawer taskId={drawerTaskId} canManage={canManage} onClose={() => setDrawerTaskId(null)} />
+      )}
     </div>
   );
 }

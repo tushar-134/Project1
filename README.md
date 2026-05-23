@@ -38,6 +38,15 @@ project1/
 - Reports
 - Notification polling
 
+## File Number Auto-Generation
+
+The project auto-generates business identifiers through [server/utils/autoId.js](C:/Users/ritik/OneDrive/Desktop/project1/server/utils/autoId.js).
+
+- Client file number format: `FB-CLIENT-0001`
+- Task ID format: `FB/YYYY/T001`
+
+These values are generated with MongoDB-backed atomic counters so concurrent requests do not create duplicate IDs. Before incrementing a counter, the utility checks the latest existing matching record and raises the counter floor if imported, seeded, or manually inserted data already exists.
+
 ## Local Setup
 
 ### 1. Frontend

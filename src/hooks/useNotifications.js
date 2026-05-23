@@ -5,24 +5,47 @@ import { notificationService } from "../services/notificationService";
 export function useNotifications() {
   const { dispatch } = useApp();
   const latestRequestRef = useRef(0);
+  // Track IDs that are being dismissed so polling doesn't resurrect them.
+  const dismissingRef = useRef(new Set());
+
   async function fetchNotifications() {
     // The API returns both the latest items and the unread count in one call for the bell badge.
     const requestId = ++latestRequestRef.current;
     const data = await notificationService.list();
     if (requestId !== latestRequestRef.current) return data;
-    dispatch({ type: "SET_RESOURCE", resource: "notifications", payload: data.notifications });
+    // Only keep unread notifications in state — read ones should not appear in the panel.
+    // Filter out any IDs that are in the middle of being dismissed to avoid flickering.
+    const unreadOnly = (data.notifications || []).filter(
+      (n) => !n.isRead && !dismissingRef.current.has(n._id)
+    );
+    dispatch({ type: "SET_RESOURCE", resource: "notifications", payload: unreadOnly });
     dispatch({ type: "SET_RESOURCE", resource: "unreadCount", payload: data.unreadCount });
     return data;
   }
+
   async function markRead(id) {
-    await notificationService.markRead(id);
-    dispatch({ type: "MARK_NOTIFICATION_READ", id });
-    return fetchNotifications();
+    // Track that this ID is being dismissed so polling doesn't bring it back.
+    dismissingRef.current.add(id);
+    // Remove from panel immediately so it disappears after the user reads it.
+    dispatch({ type: "REMOVE_NOTIFICATION", id });
+    try {
+      await notificationService.markRead(id);
+    } catch {
+      // If the API fails, the next poll will re-sync
+    } finally {
+      dismissingRef.current.delete(id);
+    }
   }
+
   async function markAllRead() {
-    await notificationService.markAllRead();
+    // Clear the panel immediately, then tell the server.
     dispatch({ type: "MARK_ALL_NOTIFICATIONS_READ" });
-    return fetchNotifications();
+    try {
+      await notificationService.markAllRead();
+    } catch {
+      // If the API fails, the next poll will re-sync
+    }
   }
+
   return { fetchNotifications, markRead, markAllRead };
 }

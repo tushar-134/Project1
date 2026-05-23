@@ -43,5 +43,13 @@ export function useTasks() {
     dispatch({ type: "UPDATE_FTA_STATUS", id, status: ftaStatusToApi[label], displayStatus: label });
     return taskService.updateFtaStatus(id, ftaStatusToApi[label] || label);
   }
-  return { fetchTasks, fetchFtaTracker, getTask: taskService.get, createTask: taskService.create, updateTask: taskService.update, updateStatus, updateFtaStatus, exportTasks: (params) => taskService.export(normalizeTaskParams(params)) };
+  async function updateAssignee(id, assignedTo, assignedName) {
+    // Optimistic update — show new name immediately
+    dispatch({ type: "UPDATE_TASK_ASSIGNEE", id, assignedTo, assigned: assignedName });
+    const task = await taskService.updateAssignee(id, assignedTo);
+    const mapped = mapTask(task);
+    dispatch({ type: "UPDATE_TASK_ASSIGNEE", id, assignedTo: mapped.assignedId, assigned: mapped.assigned });
+    return task;
+  }
+  return { fetchTasks, fetchFtaTracker, getTask: taskService.get, createTask: taskService.create, updateTask: taskService.update, updateStatus, updateAssignee, updateFtaStatus, exportTasks: (params) => taskService.export(normalizeTaskParams(params)) };
 }
