@@ -1,6 +1,6 @@
 import { cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Plus, Trash2, UploadCloud } from "lucide-react";
+import { ChevronDown, ChevronUp, Plus, Trash2, UploadCloud } from "lucide-react";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
 import { useClients } from "../../hooks/useClients";
@@ -28,6 +28,16 @@ function getApiErrorMessage(error) {
   if (data?.message) return data.message;
   if (Array.isArray(data?.errors) && data.errors[0]?.msg) return data.errors[0].msg;
   return "";
+}
+
+function formatEmiratesId(value) {
+  const digits = String(value || "").replace(/\D/g, "").slice(0, 15);
+  const parts = [];
+  if (digits.slice(0, 3)) parts.push(digits.slice(0, 3));
+  if (digits.slice(3, 7)) parts.push(digits.slice(3, 7));
+  if (digits.slice(7, 14)) parts.push(digits.slice(7, 14));
+  if (digits.slice(14, 15)) parts.push(digits.slice(14, 15));
+  return parts.join("-");
 }
 
 export default function AddClient() {
@@ -58,12 +68,16 @@ export default function AddClient() {
   });
   const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null }]);
   const [contacts, setContacts] = useState([{ name: "", designation: "", email: "", code: "", mobile: "", whatsapp: "", alternate: "", primary: true, eid: "", eidIssue: "", eidExpiry: "", eidFrontDocumentUrl: "", eidFrontDocumentName: "", eidFrontDocumentFile: null, eidBackDocumentUrl: "", eidBackDocumentName: "", eidBackDocumentFile: null, passport: "", passportIssue: "", passportExpiry: "", issuingCountry: "United Arab Emirates", passportDocumentUrl: "", passportDocumentName: "", passportDocumentFile: null }]);
+  const [contactOpen, setContactOpen] = useState([true]);
   const [portals, setPortals] = useState([{ name: "FTA EmaraTax", url: "https://tax.gov.ae", username: "", password: "", notes: "", showPassword: false }]);
   const [customFields, setCustomFields] = useState([EMPTY_CUSTOM_FIELD]);
   const [attachments, setAttachments] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const update = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+  useEffect(() => {
+    setContactOpen((current) => contacts.map((_, index) => current[index] ?? true));
+  }, [contacts.length]);
   useEffect(() => {
     fetchUsers().catch(() => { });
     groupService.list().then((groups) => dispatch({ type: "SET_RESOURCE", resource: "groups", payload: groups.map((g) => ({ ...g, id: g._id, clients: g.clients?.map((c) => c.legalName) || [] })) })).catch(() => { });
@@ -209,6 +223,14 @@ export default function AddClient() {
       if (values.primary) return { ...item, primary: false };
       return item;
     }));
+  };
+  const addContact = () => {
+    setContacts((current) => [...current, { name: "", designation: "", email: "", code: "", mobile: "", whatsapp: "", alternate: "", primary: false, eid: "", eidIssue: "", eidExpiry: "", eidFrontDocumentUrl: "", eidFrontDocumentName: "", eidFrontDocumentFile: null, eidBackDocumentUrl: "", eidBackDocumentName: "", eidBackDocumentFile: null, passport: "", passportIssue: "", passportExpiry: "", issuingCountry: "United Arab Emirates", passportDocumentUrl: "", passportDocumentName: "", passportDocumentFile: null }]);
+    setContactOpen((current) => [...current, true]);
+  };
+  const removeContact = (index) => {
+    setContacts((current) => current.filter((_, itemIndex) => itemIndex !== index));
+    setContactOpen((current) => current.filter((_, itemIndex) => itemIndex !== index));
   };
 
   async function uploadTradeLicenceFile(clientId, licenceIndex, file) {
@@ -402,6 +424,14 @@ export default function AddClient() {
       toast.error(`Contact person ${invalidContactIndex + 1}: mobile number must be exactly ${min} digits.`);
       return false;
     }
+    const invalidEidIndex = contacts.findIndex((contact) => {
+      if (!String(contact.eid || "").trim()) return false;
+      return !/^784-\d{4}-\d{7}-\d$/.test(String(contact.eid).trim());
+    });
+    if (invalidEidIndex >= 0) {
+      toast.error(`Contact person ${invalidEidIndex + 1}: Emirates ID must match 784-XXXX-XXXXXXX-X.`);
+      return false;
+    }
     setIsSaving(true);
     try {
       // The screen state is intentionally tab-oriented and user-friendly; this transform is
@@ -526,57 +556,65 @@ export default function AddClient() {
           {tab === 0 && <Basic form={form} update={update} countries={countries} users={state.users} />}
           {tab === 1 && <Repeat title="Trade Licence" items={licences} setItems={setLicences} blank={{ number: "", issue: "", expiry: "", authority: "", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null }} render={(lic, i, patch) => <div className="grid gap-3 md:grid-cols-3"><Field label="Trade Licence Number*" field={`licence-number-${i}`}><input className="input" value={lic.number} onChange={(e) => patch(i, { number: e.target.value })} /></Field><Field label="Issue Date" field={`licence-issue-${i}`}><input className="input" type="date" value={lic.issue} onChange={(e) => patch(i, { issue: e.target.value })} /></Field><Field label="Expiry Date" field={`licence-expiry-${i}`}><input className="input" type="date" value={lic.expiry} onChange={(e) => patch(i, { expiry: e.target.value })} /></Field><Field label="Issuing Authority" field={`licence-authority-${i}`}><input className="input" value={lic.authority} onChange={(e) => patch(i, { authority: e.target.value })} /></Field><Field label="Licence Type" field={`licence-type-${i}`}><select className="input" value={lic.type} onChange={(e) => patch(i, { type: e.target.value })}>{LICENCE_TYPES.map((type) => <option key={type}>{type}</option>)}</select></Field><Field label="Official Email" field={`licence-email-${i}`}><input className="input" type="email" value={lic.email} onChange={(e) => patch(i, { email: e.target.value })} /></Field><div className="md:col-span-3"><DocumentUploadZone id={`trade-licence-upload-${i}`} title="Upload trade licence document" subtitle="PDF, JPG, PNG" fileName={lic.documentName} documentUrl={lic.documentUrl} isUploading={isUploading} onFiles={(files) => handleTradeLicenceFile(i, files)} /></div></div>} />}
           {tab === 2 && (
-            <Repeat
-              title="Contact Person"
-              items={contacts}
-              setItems={setContacts}
-              blank={{ name: "", designation: "", email: "", code: "", mobile: "", whatsapp: "", alternate: "", primary: false, eid: "", eidIssue: "", eidExpiry: "", eidFrontDocumentUrl: "", eidFrontDocumentName: "", eidFrontDocumentFile: null, eidBackDocumentUrl: "", eidBackDocumentName: "", eidBackDocumentFile: null, passport: "", passportIssue: "", passportExpiry: "", issuingCountry: "United Arab Emirates", passportDocumentUrl: "", passportDocumentName: "", passportDocumentFile: null }}
-              render={(c, i, patch) => (
-                <div className="grid gap-3 md:grid-cols-3">
-                  <Field label="Full Name*" field={`contact-name-${i}`}><input className="input" value={c.name} onChange={(e) => patch(i, { name: e.target.value })} /></Field>
-                  <Field label="Designation" field={`contact-designation-${i}`}><input className="input" value={c.designation} onChange={(e) => patch(i, { designation: e.target.value })} /></Field>
-                  <Field label="Email ID" field={`contact-email-${i}`}><input className="input" type="email" value={c.email} onChange={(e) => patch(i, { email: e.target.value })} /></Field>
-                  <Field label="Mobile">
-                    <div className="flex gap-2">
-                      <select id={`contact-code-${i}`} name={`contactCode${i}`} className="input w-44" value={c.code} onChange={(e) => patch(i, { code: e.target.value })}>
-                        <option value="">Code</option>
-                        {DIAL_CODE_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
-                      <input
-                        id={`contact-mobile-${i}`}
-                        name={`contactMobile${i}`}
-                        className="input"
-                        value={c.mobile}
-                        onChange={(e) => {
-                          const { max } = getPhoneNumberSpec(c.code);
-                          patch(i, { mobile: normalizePhoneNumber(e.target.value).slice(0, max) });
-                        }}
-                        placeholder={getPhoneNumberSpec(c.code).placeholder}
-                        inputMode="numeric"
-                        maxLength={getPhoneNumberSpec(c.code).max}
-                      />
-                    </div>
-                  </Field>
-                  <Field label="WhatsApp Number" field={`contact-whatsapp-${i}`}><input className="input" value={c.whatsapp} onChange={(e) => patch(i, { whatsapp: e.target.value })} /></Field>
-                  <Field label="Alternate Email" field={`contact-alternate-${i}`}><input className="input" type="email" value={c.alternate} onChange={(e) => patch(i, { alternate: e.target.value })} /></Field>
-                  <label className="flex items-center gap-2 font-bold" htmlFor={`contact-primary-${i}`}><input id={`contact-primary-${i}`} name={`contactPrimary${i}`} type="checkbox" checked={c.primary} onChange={(e) => patch(i, { primary: e.target.checked })} /> Select as Primary Contact</label>
-                  <Field label="Emirates ID Number" field={`contact-eid-${i}`}><input className="input" value={c.eid} onChange={(e) => patch(i, { eid: e.target.value })} /></Field>
-                  <Field label="Emirates ID Issue Date" field={`contact-eid-issue-${i}`}><input className="input" type="date" value={c.eidIssue} onChange={(e) => patch(i, { eidIssue: e.target.value })} /></Field>
-                  <Field label="Emirates ID Expiry" field={`contact-eid-expiry-${i}`}><input className="input" type="date" value={c.eidExpiry} onChange={(e) => patch(i, { eidExpiry: e.target.value })} /></Field>
-                  <Field label="Passport Number" field={`contact-passport-${i}`}><input className="input" value={c.passport} onChange={(e) => patch(i, { passport: e.target.value })} /></Field>
-                  <Field label="Passport Issue Date" field={`contact-passport-issue-${i}`}><input className="input" type="date" value={c.passportIssue} onChange={(e) => patch(i, { passportIssue: e.target.value })} /></Field>
-                  <Field label="Passport Expiry" field={`contact-passport-expiry-${i}`}><input className="input" type="date" value={c.passportExpiry} onChange={(e) => patch(i, { passportExpiry: e.target.value })} /></Field>
-                  <Field label="Passport Issuing Country" field={`contact-passport-country-${i}`}><CountryField field={`contact-passport-country-${i}`} value={c.issuingCountry} options={countries} onChange={(value) => patch(i, { issuingCountry: value })} /></Field>
-                  <div className="md:col-span-3 grid gap-3 md:grid-cols-3">
-                    <DocumentUploadZone id={`contact-eid-front-upload-${i}`} title="Upload Emirates ID Front" subtitle="PDF, JPG, PNG" fileName={c.eidFrontDocumentName} documentUrl={c.eidFrontDocumentUrl} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "emiratesIdFront")} />
-                    <DocumentUploadZone id={`contact-eid-back-upload-${i}`} title="Upload Emirates ID Back" subtitle="PDF, JPG, PNG" fileName={c.eidBackDocumentName} documentUrl={c.eidBackDocumentUrl} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "emiratesIdBack")} />
-                    <DocumentUploadZone id={`contact-passport-upload-${i}`} title="Upload Passport" subtitle="PDF, JPG, PNG" fileName={c.passportDocumentName} documentUrl={c.passportDocumentUrl} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "passport")} />
+            <div className="space-y-4">
+              {contacts.map((c, i) => (
+                <div key={`contact-${i}`} className="rounded-xl border border-[#e2e8f0] p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <button type="button" className="flex items-center gap-2 text-left" onClick={() => setContactOpen((current) => current.map((item, itemIndex) => itemIndex === i ? !item : item))}>
+                      <span className="font-extrabold">{c.name?.trim() || `Contact Person ${i + 1}`}</span>
+                      {contactOpen[i] ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
+                    </button>
+                    {contacts.length > 1 && <button type="button" onClick={() => removeContact(i)} className="text-[#dc2626]"><Trash2 size={16} /></button>}
                   </div>
+                  {contactOpen[i] && (
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <Field label="Full Name*" field={`contact-name-${i}`}><input className="input" value={c.name} onChange={(e) => patchContact(i, { name: e.target.value })} /></Field>
+                      <Field label="Designation" field={`contact-designation-${i}`}><input className="input" value={c.designation} onChange={(e) => patchContact(i, { designation: e.target.value })} /></Field>
+                      <Field label="Email ID" field={`contact-email-${i}`}><input className="input" type="email" value={c.email} onChange={(e) => patchContact(i, { email: e.target.value })} /></Field>
+                      <Field label="Mobile Number">
+                        <div className="flex gap-2">
+                          <select id={`contact-code-${i}`} name={`contactCode${i}`} className="input w-44" value={c.code} onChange={(e) => patchContact(i, { code: e.target.value })}>
+                            <option value="">Code</option>
+                            {DIAL_CODE_OPTIONS.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
+                          <input
+                            id={`contact-mobile-${i}`}
+                            name={`contactMobile${i}`}
+                            className="input"
+                            value={c.mobile}
+                            onChange={(e) => {
+                              const { max } = getPhoneNumberSpec(c.code);
+                              patchContact(i, { mobile: normalizePhoneNumber(e.target.value).slice(0, max) });
+                            }}
+                            placeholder={getPhoneNumberSpec(c.code).placeholder}
+                            inputMode="numeric"
+                            maxLength={getPhoneNumberSpec(c.code).max}
+                          />
+                        </div>
+                      </Field>
+                      <Field label="WhatsApp Number" field={`contact-whatsapp-${i}`}><input className="input" value={c.whatsapp} onChange={(e) => patchContact(i, { whatsapp: e.target.value })} /></Field>
+                      <Field label="Alternate Email" field={`contact-alternate-${i}`}><input className="input" type="email" value={c.alternate} onChange={(e) => patchContact(i, { alternate: e.target.value })} /></Field>
+                      <label className="flex items-center gap-2 font-bold" htmlFor={`contact-primary-${i}`}><input id={`contact-primary-${i}`} name={`contactPrimary${i}`} type="checkbox" checked={c.primary} onChange={(e) => patchContact(i, { primary: e.target.checked })} /> Select as Primary Contact</label>
+                      <Field label="Emirates ID Number" field={`contact-eid-${i}`}><input className="input" value={c.eid} onChange={(e) => patchContact(i, { eid: formatEmiratesId(e.target.value) })} placeholder="784-1234-1234567-1" maxLength={18} /></Field>
+                      <Field label="Emirates ID Issue Date" field={`contact-eid-issue-${i}`}><input className="input" type="date" value={c.eidIssue} onChange={(e) => patchContact(i, { eidIssue: e.target.value })} /></Field>
+                      <Field label="Emirates ID Expiry" field={`contact-eid-expiry-${i}`}><input className="input" type="date" value={c.eidExpiry} onChange={(e) => patchContact(i, { eidExpiry: e.target.value })} /></Field>
+                      <Field label="Passport Number" field={`contact-passport-${i}`}><input className="input" value={c.passport} onChange={(e) => patchContact(i, { passport: e.target.value })} /></Field>
+                      <Field label="Passport Issue Date" field={`contact-passport-issue-${i}`}><input className="input" type="date" value={c.passportIssue} onChange={(e) => patchContact(i, { passportIssue: e.target.value })} /></Field>
+                      <Field label="Passport Expiry" field={`contact-passport-expiry-${i}`}><input className="input" type="date" value={c.passportExpiry} onChange={(e) => patchContact(i, { passportExpiry: e.target.value })} /></Field>
+                      <Field label="Passport Issuing Country" field={`contact-passport-country-${i}`}><CountryField field={`contact-passport-country-${i}`} value={c.issuingCountry} options={countries} onChange={(value) => patchContact(i, { issuingCountry: value })} /></Field>
+                      <div className="md:col-span-3 grid gap-3 md:grid-cols-3">
+                        <DocumentUploadZone id={`contact-eid-front-upload-${i}`} title="Upload Emirates ID Front" subtitle="PDF, JPG, PNG" fileName={c.eidFrontDocumentName} documentUrl={c.eidFrontDocumentUrl} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "emiratesIdFront")} />
+                        <DocumentUploadZone id={`contact-eid-back-upload-${i}`} title="Upload Emirates ID Back" subtitle="PDF, JPG, PNG" fileName={c.eidBackDocumentName} documentUrl={c.eidBackDocumentUrl} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "emiratesIdBack")} />
+                        <DocumentUploadZone id={`contact-passport-upload-${i}`} title="Upload Passport" subtitle="PDF, JPG, PNG" fileName={c.passportDocumentName} documentUrl={c.passportDocumentUrl} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "passport")} />
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            />
+              ))}
+              <Button variant="ghost" onClick={addContact}><Plus size={16} />Add Contact Person</Button>
+            </div>
           )}
           {tab === 3 && <div className="grid gap-3 md:grid-cols-2"><Field label="VAT TRN" field="client-vat-trn"><input className="input" value={form.vatTrn} onChange={(e) => update("vatTrn", e.target.value.replace(/\D/g, "").slice(0, 15))} /></Field><Field label="VAT Registration Status" field="client-vat-status"><select className="input" value={form.vatStatus} onChange={(e) => update("vatStatus", e.target.value)}>{VAT_CT_STATUSES.map((status) => <option key={status}>{status}</option>)}</select></Field><Field label="VAT Registration Date" field="client-vat-date"><input className="input" type="date" value={form.vatDate} onChange={(e) => update("vatDate", e.target.value)} /></Field><Field label="VAT Filing Frequency" field="client-vat-frequency"><select className="input" value={form.vatFreq} onChange={(e) => update("vatFreq", e.target.value)}>{VAT_FREQUENCIES.map((frequency) => <option key={frequency}>{frequency}</option>)}</select></Field><Field label="CT Registration No. (TIN)" field="client-ct-tin"><input className="input" value={form.ctTin} onChange={(e) => update("ctTin", e.target.value)} /></Field><Field label="CT Registration Status" field="client-ct-status"><select className="input" value={form.ctStatus} onChange={(e) => update("ctStatus", e.target.value)}>{VAT_CT_STATUSES.map((status) => <option key={status}>{status}</option>)}</select></Field><Field label="CT Registration Date" field="client-ct-date"><input className="input" type="date" value={form.ctDate} onChange={(e) => update("ctDate", e.target.value)} /></Field><Field label="CT Financial Year End" field="client-ct-fye"><select className="input" value={form.ctFye} onChange={(e) => update("ctFye", e.target.value)}>{FYE_OPTIONS.map((option) => <option key={option}>{option}</option>)}</select></Field></div>}
           {tab === 4 && <div className="grid gap-4 md:grid-cols-2"><Field label="Select existing group" field="client-group"><select className="input" value={form.group} onChange={(e) => update("group", e.target.value)}><option value="">No group</option>{state.groups.map((g) => <option key={g.id} value={g._id}>{g.name}</option>)}</select></Field><Field label="Create new group"><div className="flex gap-2"><input id="client-new-group" name="clientNewGroup" className="input" value={form.newGroup} onChange={(e) => update("newGroup", e.target.value)} /><Button onClick={async () => { if (form.newGroup) { const g = await groupService.create({ name: form.newGroup }); dispatch({ type: "SET_RESOURCE", resource: "groups", payload: [...state.groups, { ...g, id: g._id }] }); update("group", g._id); } }}>Create</Button></div></Field><div className="rounded-xl bg-purple-50 p-4 font-bold text-[#7c3aed] md:col-span-2">Current group: {state.groups.find((g) => g._id === form.group)?.name || "Ungrouped"} {form.group && <button onClick={() => update("group", "")} className="ml-3 text-[#dc2626]">Ungroup</button>}</div></div>}
