@@ -144,8 +144,10 @@ export default function Dashboard() {
           </thead>
           <tbody>
             {(state.activity || []).map((item) => {
-              const task        = item.task || item;
-              const taskMongoId = task._id || item._id;
+              const taskObj     = typeof item.task === "object" && item.task ? item.task : null;
+              const taskMongoId = taskObj?._id || (typeof item.task === "string" ? item.task : null);
+              const displayId   = taskObj?.taskId || item.taskId || item.task?.taskId;
+
               return (
                 <tr key={item._id || item.taskId}>
                   <td className="font-extrabold text-[#1e3a8a]">
@@ -155,16 +157,16 @@ export default function Dashboard() {
                         onClick={() => handleTaskIdClick(taskMongoId)}
                         title={canManage ? "View task details" : "Open task page"}
                       >
-                        {task.taskId || item.taskId}
+                        {displayId || "—"}
                       </button>
                     ) : (
-                      task.taskId || item.taskId
+                      displayId || "—"
                     )}
                   </td>
-                  <td>{task.client?.legalName || item.client || "—"}</td>
-                  <td><Badge>{task.category || item.category || "Other"}</Badge></td>
-                  <td>{task.taskType || item.task}</td>
-                  <td>{task.dueDate?.slice?.(0, 10) || item.createdAt?.slice?.(0, 10)}</td>
+                  <td>{taskObj?.client?.legalName || item.client || "—"}</td>
+                  <td><Badge>{taskObj?.category || item.category || "Other"}</Badge></td>
+                  <td>{taskObj?.taskType || item.task}</td>
+                  <td>{taskObj?.dueDate?.slice?.(0, 10) || item.createdAt?.slice?.(0, 10)}</td>
                   <td>{item.user?.name || item.user || "—"}</td>
                   <td><StatusPill status={item.newStatus || item.action} /></td>
                 </tr>
@@ -176,6 +178,7 @@ export default function Dashboard() {
     </div>
   );
 }
+
 
 function Stat({ icon, label, value, color }) {
   return (
