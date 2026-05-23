@@ -8,6 +8,7 @@ import { useUsers } from "../../hooks/useUsers";
 import { groupService } from "../../services/groupService";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
+import CustomFieldModal from "../ui/CustomFieldModal.jsx";
 import { DIAL_CODE_OPTIONS } from "../../utils/dialCodeOptions.js";
 import { getPhoneNumberSpec, normalizeDialCode, normalizePhoneNumber } from "../../utils/phoneUtils.js";
 
@@ -45,7 +46,6 @@ export default function AddClient() {
     clientType: "Legal Person", fileNo: "", legalName: "", tradeName: "", fye: "31 December", jurisdiction: "Mainland", assigned: "",
     country: "United Arab Emirates", emirate: "Dubai", street: "", poBox: "", postalCode: "", differentAddress: false, correspondence: "",
     vatTrn: "", vatStatus: "Registered", vatDate: "", vatFreq: "Quarterly", ctTin: "", ctStatus: "Not Registered", ctDate: "", group: "", newGroup: "",
-    qrmp: "Email", auditFirm: "", bank: "", iban: "",
   });
   const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "Dubai Economy", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null }]);
 
@@ -75,6 +75,10 @@ export default function AddClient() {
   const [portals, setPortals] = useState([blankPortal]);
   const [visiblePortalPasswords, setVisiblePortalPasswords] = useState({});
   const [attachments, setAttachments] = useState([]);
+  const [customFieldModal, setCustomFieldModal] = useState(false);
+  const [customFieldValues, setCustomFieldValues] = useState({});
+  const [selectedFieldKeys, setSelectedFieldKeys] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const update = (key, value) => setForm((f) => ({ ...f, [key]: value }));
@@ -96,6 +100,9 @@ export default function AddClient() {
       resource: "groups",
       payload: groups.map((g) => ({ ...g, id: g._id, clients: g.clients || [], clientNames: g.clients?.map((c) => c.legalName) || [] })),
     })).catch(() => { });
+    import("../../services/customFieldService").then(({ customFieldService }) => {
+      customFieldService.list().then((fields) => dispatch({ type: "SET_RESOURCE", resource: "customFields", payload: fields })).catch(() => { });
+    });
   }, []);
   useEffect(() => {
     if (!isEditMode) return;
@@ -131,11 +138,14 @@ export default function AddClient() {
         ctDate: client.ctDetails?.registrationDate?.slice?.(0, 10) || "",
         group: client.group?._id || client.group || "",
         newGroup: "",
-        qrmp: client.customFields?.qrmpPreference || "Email",
-        auditFirm: client.customFields?.auditFirmName || "",
-        bank: client.customFields?.bankName || "",
-        iban: client.customFields?.iban || "",
       });
+      const clientFields = client.customFields || {};
+      setCustomFieldValues(clientFields);
+      
+      // Identify which dynamic fields have values and should be "selected"
+      const dynamicKeys = Object.keys(clientFields);
+      setSelectedFieldKeys(dynamicKeys);
+
       setLicences((client.tradeLicences || []).length ? client.tradeLicences.map((licence) => ({
         number: licence.licenceNumber || "",
         issue: licence.issueDate?.slice?.(0, 10) || "",
@@ -505,6 +515,7 @@ export default function AddClient() {
           passport: { number: c.passport, issuingCountry: c.issuingCountry, issueDate: c.passportIssue, expiryDate: c.passportExpiry },
         }));
       }
+      payload.customFields = Object.fromEntries(Object.entries(customFieldValues).filter(([k]) => selectedFieldKeys.includes(k)));
       const pendingAttachments = attachments.filter((attachment) => !attachment.saved && attachment.file);
       const pendingLicenceDocuments = licences
         .map((licence, index) => ({ index, file: licence.documentFile }))
@@ -648,8 +659,76 @@ export default function AddClient() {
               )}
             />
           )}
-          {tab === 3 && <div className="grid gap-3 md:grid-cols-2"><Field label="VAT Registration Status" field="client-vat-status"><select className="input" value={form.vatStatus} onChange={(e) => update("vatStatus", e.target.value)}><option>Registered</option><option>Applying / In Progress</option><option>Not Registered</option><option>Exempt</option></select></Field><Field label="VAT TRN" field="client-vat-trn"><input className="input" inputMode="numeric" maxLength={15} placeholder="15 digits starting with 1" value={form.vatTrn} onChange={(e) => update("vatTrn", String(e.target.value || "").replace(/\\D+/g, "").slice(0, 15))} /></Field><Field label="VAT Registration Date" field="client-vat-date"><input className="input" type="date" value={form.vatDate} onChange={(e) => update("vatDate", e.target.value)} /></Field><Field label="VAT Filing Frequency" field="client-vat-frequency"><select className="input" value={form.vatFreq} onChange={(e) => update("vatFreq", e.target.value)}><option>Monthly</option><option>Quarterly</option><option>Annual</option></select></Field><Field label="CT Registration Number (TIN)" field="client-ct-tin"><input className="input" value={form.ctTin} onChange={(e) => update("ctTin", e.target.value)} /></Field><Field label="CT Registration Status" field="client-ct-status"><select className="input" value={form.ctStatus} onChange={(e) => update("ctStatus", e.target.value)}><option>Registered</option><option>Not Registered</option><option>Pending</option></select></Field><Field label="CT Registration Date" field="client-ct-date"><input className="input" type="date" value={form.ctDate} onChange={(e) => update("ctDate", e.target.value)} /></Field><Field label="Financial Year End" field="client-ct-fye"><input className="input" value={form.fye} onChange={(e) => update("fye", e.target.value)} /></Field></div>}
-          {tab === 4 && <div className="grid gap-4 md:grid-cols-2"><Field label="Select existing group" field="client-group"><select className="input" value={form.group} onChange={(e) => update("group", e.target.value)}><option value="">No group</option>{state.groups.map((g) => <option key={g.id} value={g._id}>{g.name}</option>)}</select></Field><Field label="Create new group"><div className="flex gap-2"><input id="client-new-group" name="clientNewGroup" className="input" value={form.newGroup} onChange={(e) => update("newGroup", e.target.value)} /><Button onClick={async () => { if (form.newGroup) { const g = await groupService.create({ name: form.newGroup }); dispatch({ type: "SET_RESOURCE", resource: "groups", payload: [...state.groups, { ...g, id: g._id, clients: g.clients || [], clientNames: g.clients?.map((c) => c.legalName) || [] }] }); update("group", g._id); } }}>Create</Button></div></Field><div className="rounded-xl bg-purple-50 p-4 font-bold text-[#7c3aed] md:col-span-2">Current group: {state.groups.find((g) => g._id === form.group)?.name || "Ungrouped"} {form.group && <button onClick={() => update("group", "")} className="ml-3 text-[#dc2626]">Ungroup</button>}</div></div>}
+          {tab === 3 && (
+            <div className="grid gap-3 md:grid-cols-2">
+              <Field label="VAT Registration Status" field="client-vat-status">
+                <select className="input" value={form.vatStatus} onChange={(e) => update("vatStatus", e.target.value)}>
+                  <option>Registered</option>
+                  <option>Applying / In Progress</option>
+                  <option>Not Registered</option>
+                  <option>Exempt</option>
+                </select>
+              </Field>
+              <Field label="VAT TRN" field="client-vat-trn">
+                <input className="input" inputMode="numeric" maxLength={15} placeholder="15 digits starting with 1" value={form.vatTrn} onChange={(e) => update("vatTrn", String(e.target.value || "").replace(/\D+/g, "").slice(0, 15))} />
+              </Field>
+              <Field label="VAT Registration Date" field="client-vat-date">
+                <input className="input" type="date" value={form.vatDate} onChange={(e) => update("vatDate", e.target.value)} />
+              </Field>
+              <Field label="VAT Filing Frequency" field="client-vat-frequency">
+                <select className="input" value={form.vatFreq} onChange={(e) => update("vatFreq", e.target.value)}>
+                  <option>Monthly</option>
+                  <option>Quarterly</option>
+                  <option>Annual</option>
+                </select>
+              </Field>
+              <Field label="CT Registration Number (TIN)" field="client-ct-tin">
+                <input className="input" value={form.ctTin} onChange={(e) => update("ctTin", e.target.value)} />
+              </Field>
+              <Field label="CT Registration Status" field="client-ct-status">
+                <select className="input" value={form.ctStatus} onChange={(e) => update("ctStatus", e.target.value)}>
+                  <option>Registered</option>
+                  <option>Not Registered</option>
+                  <option>Pending</option>
+                </select>
+              </Field>
+              <Field label="CT Registration Date" field="client-ct-date">
+                <input className="input" type="date" value={form.ctDate} onChange={(e) => update("ctDate", e.target.value)} />
+              </Field>
+              <Field label="Financial Year End" field="client-ct-fye">
+                <input className="input" value={form.fye} onChange={(e) => update("fye", e.target.value)} />
+              </Field>
+            </div>
+          )}
+          {tab === 4 && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field label="Select existing group" field="client-group">
+                <select className="input" value={form.group} onChange={(e) => update("group", e.target.value)}>
+                  <option value="">No group</option>
+                  {state.groups.map((g) => <option key={g.id} value={g._id}>{g.name}</option>)}
+                </select>
+              </Field>
+              <Field label="Create new group">
+                <div className="flex gap-2">
+                  <input id="client-new-group" name="clientNewGroup" className="input" value={form.newGroup} onChange={(e) => update("newGroup", e.target.value)} />
+                  <Button onClick={async () => {
+                    if (form.newGroup) {
+                      const g = await groupService.create({ name: form.newGroup });
+                      dispatch({
+                        type: "SET_RESOURCE",
+                        resource: "groups",
+                        payload: [...state.groups, { ...g, id: g._id, clients: g.clients || [], clientNames: g.clients?.map((c) => c.legalName) || [] }]
+                      });
+                      update("group", g._id);
+                    }
+                  }}>Create</Button>
+                </div>
+              </Field>
+              <div className="rounded-xl bg-purple-50 p-4 font-bold text-[#7c3aed] md:col-span-2">
+                Current group: {state.groups.find((g) => g._id === form.group)?.name || "Ungrouped"} {form.group && <button onClick={() => update("group", "")} className="ml-3 text-[#dc2626]">Ungroup</button>}
+              </div>
+            </div>
+          )}
           {tab === 5 && (
             <Repeat
               title="Portal"
@@ -706,7 +785,141 @@ export default function AddClient() {
               )}
             />
           )}
-          {tab === 6 && <div className="grid gap-3 md:grid-cols-2"><Field label="QRMP Preference" field="client-qrmp"><input className="input" value={form.qrmp} onChange={(e) => update("qrmp", e.target.value)} /></Field><Field label="Audit Firm Name" field="client-audit-firm"><input className="input" value={form.auditFirm} onChange={(e) => update("auditFirm", e.target.value)} /></Field><Field label="Bank Name" field="client-bank"><input className="input" value={form.bank} onChange={(e) => update("bank", e.target.value)} /></Field><Field label="IBAN" field="client-iban"><input className="input" value={form.iban} onChange={(e) => update("iban", e.target.value)} /></Field><div className="rounded-xl bg-slate-50 p-3 text-[12px] font-semibold text-slate-500 md:col-span-2">You can add custom fields from Settings</div></div>}
+          {tab === 6 && (
+            <div className="space-y-6">
+              <div>
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-900">Custom Fields</h3>
+                    <p className="text-[11px] font-bold text-slate-400">Configure custom data points for this client</p>
+                  </div>
+                  <Button variant="ghost" className="h-9 gap-2 border-slate-200 text-blue-600 hover:bg-blue-50" onClick={() => setCustomFieldModal(true)}>
+                    <Plus size={14} /> Create New Field
+                  </Button>
+                </div>
+
+                <div className="relative mb-6">
+                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400">
+                    <Settings2 size={16} />
+                  </div>
+                  <input
+                    type="search"
+                    className="input pl-13"
+                    placeholder="Search available fields to add..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                  {searchQuery && (
+                    <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl ring-1 ring-slate-900/5">
+                      {(state.customFields || [])
+                        .filter(f => !selectedFieldKeys.includes(f.key))
+                        .filter(f => f.label.toLowerCase().includes(searchQuery.toLowerCase()) || f.key.toLowerCase().includes(searchQuery.toLowerCase()))
+                        .map(f => (
+                          <button
+                            key={f._id}
+                            className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left transition hover:bg-slate-50"
+                            onClick={() => {
+                              setSelectedFieldKeys([...selectedFieldKeys, f.key]);
+                              setSearchQuery("");
+                            }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="grid h-8 w-8 place-items-center rounded-lg bg-blue-50 text-blue-600">
+                                <Settings2 size={16} />
+                              </div>
+                              <div>
+                                <div className="text-[13px] font-extrabold text-slate-900">{f.label}</div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{f.type}</div>
+                              </div>
+                            </div>
+                            <Plus size={16} className="text-slate-300" />
+                          </button>
+                        ))}
+                      {(state.customFields || [])
+                        .filter(f => !selectedFieldKeys.includes(f.key))
+                        .filter(f => f.label.toLowerCase().includes(searchQuery.toLowerCase()) || f.key.toLowerCase().includes(searchQuery.toLowerCase()))
+                        .length === 0 && (
+                          <div className="py-4 text-center text-[12px] font-bold text-slate-400">
+                            No matching fields found
+                          </div>
+                        )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  {(state.customFields || [])
+                    .filter(f => selectedFieldKeys.includes(f.key))
+                    .map((f) => (
+                      <div key={f._id} className="rounded-xl border border-slate-200 p-4 transition-all hover:border-blue-200 hover:bg-slate-50/50 relative group">
+                        <button
+                          className="absolute right-3 top-3 p-1 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => setSelectedFieldKeys(selectedFieldKeys.filter(k => k !== f.key))}
+                        >
+                          <X size={14} />
+                        </button>
+                        <div className="mb-3 flex items-center justify-between pr-6">
+                          <div className="flex items-center gap-2.5">
+                            <div className="grid h-8 w-8 place-items-center rounded-lg bg-blue-50 text-blue-600">
+                              <Settings2 size={16} />
+                            </div>
+                            <div>
+                              <div className="text-[13px] font-extrabold text-slate-900">{f.label}</div>
+                              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{f.type}</div>
+                            </div>
+                          </div>
+                          {f.required && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-600 border border-amber-100 uppercase">Required</span>}
+                        </div>
+
+                        {f.type === "select" ? (
+                          <select
+                            className="input"
+                            value={customFieldValues[f.key] || ""}
+                            onChange={(e) => setCustomFieldValues({ ...customFieldValues, [f.key]: e.target.value })}
+                          >
+                            <option value="">Select option</option>
+                            {f.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                          </select>
+                        ) : f.type === "number" ? (
+                          <input
+                            type="number"
+                            className="input"
+                            value={customFieldValues[f.key] || ""}
+                            onChange={(e) => setCustomFieldValues({ ...customFieldValues, [f.key]: e.target.value })}
+                          />
+                        ) : f.type === "date" ? (
+                          <input
+                            type="date"
+                            className="input"
+                            value={customFieldValues[f.key] || ""}
+                            onChange={(e) => setCustomFieldValues({ ...customFieldValues, [f.key]: e.target.value })}
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            className="input"
+                            value={customFieldValues[f.key] || ""}
+                            onChange={(e) => setCustomFieldValues({ ...customFieldValues, [f.key]: e.target.value })}
+                          />
+                        )}
+                      </div>
+                    ))}
+                </div>
+
+                {(state.customFields || []).length === 0 ? (
+                  <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 py-8 text-slate-400">
+                    <Settings2 size={32} strokeWidth={1.5} className="mb-2 opacity-20" />
+                    <div className="text-xs font-bold">No additional custom fields found in settings</div>
+                  </div>
+                ) : selectedFieldKeys.length === 0 && (
+                  <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 py-8 text-slate-400">
+                    <Settings2 size={32} strokeWidth={1.5} className="mb-2 opacity-20" />
+                    <div className="text-xs font-bold">Search and select fields to add to this client</div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           {tab === 7 && <div className="space-y-3"><AttachmentUploadZone onFiles={uploadFiles} isUploading={isUploading} /><div className="overflow-x-auto"><table className="table min-w-max"><thead><tr><th>Name</th><th>Size</th><th>Type</th><th>Description</th><th>Uploaded On</th><th>Uploaded By</th><th>Actions</th></tr></thead><tbody>{attachments.length === 0 && <tr><td colSpan={7} className="text-center text-slate-500">No attachments uploaded yet.</td></tr>}{attachments.map((a) => <tr key={a.id || a.name}><td>{a.name}</td><td>{a.size}</td><td>{a.type}</td><td>{a.description || "-"}</td><td>{a.uploadedOn}</td><td>{a.uploadedBy}</td><td><Button size="sm" variant="ghost" disabled={!a.url} onClick={() => a.url && window.open(a.url, "_blank", "noopener,noreferrer")}>Download</Button> <Button size="sm" variant="danger" onClick={() => removeAttachment(a)}>Delete</Button></td></tr>)}</tbody></table></div></div>}
         </div>
         <div className="flex flex-col gap-3 border-t border-[#e2e8f0] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -717,6 +930,14 @@ export default function AddClient() {
           </div>
         </div>
       </Card>
+      <CustomFieldModal
+        isOpen={customFieldModal}
+        onClose={() => setCustomFieldModal(false)}
+        onSave={(newField) => {
+          dispatch({ type: "SET_RESOURCE", resource: "customFields", payload: [...(state.customFields || []), newField] });
+          setSelectedFieldKeys([...selectedFieldKeys, newField.key]);
+        }}
+      />
     </div>
   );
 }

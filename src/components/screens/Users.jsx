@@ -390,11 +390,11 @@ export default function Users() {
                     </div>
                     {editingUser.assignedClients.length > 5 && (
                       <div className="relative">
-                        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input 
-                          type="text" 
+                          type="search" 
                           placeholder="Search..." 
-                          className="h-8 w-32 rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-2 text-[12px] font-bold transition-all focus:w-48 focus:border-blue-400 focus:bg-white focus:outline-none"
+                          className="h-8 w-32 rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-2 text-[12px] font-bold transition-all focus:w-48 focus:border-blue-400 focus:bg-white focus:outline-none"
                           value={clientSearch}
                           onChange={(e) => setClientSearch(e.target.value)}
                         />
