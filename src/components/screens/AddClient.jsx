@@ -48,7 +48,29 @@ export default function AddClient() {
     qrmp: "Email", auditFirm: "", bank: "", iban: "",
   });
   const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "Dubai Economy", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null }]);
-  const [contacts, setContacts] = useState([{ name: "", designation: "", email: "", code: "", mobile: "", whatsapp: "", alternate: "", primary: true, eid: "", passport: "", issuingCountry: "United Arab Emirates", eidDocumentUrl: "", eidDocumentName: "", eidDocumentFile: null, passportDocumentUrl: "", passportDocumentName: "", passportDocumentFile: null }]);
+  const [contacts, setContacts] = useState([{
+    name: "",
+    designation: "",
+    email: "",
+    code: "",
+    mobile: "",
+    whatsapp: "",
+    alternate: "",
+    primary: true,
+    eid: "",
+    eidIssue: "",
+    eidExpiry: "",
+    passport: "",
+    passportIssue: "",
+    passportExpiry: "",
+    issuingCountry: "United Arab Emirates",
+    eidDocumentUrl: "",
+    eidDocumentName: "",
+    eidDocumentFile: null,
+    passportDocumentUrl: "",
+    passportDocumentName: "",
+    passportDocumentFile: null,
+  }]);
   const [portals, setPortals] = useState([{ name: "EmaraTax", url: "https://tax.gov.ae", username: "", password: "", notes: "" }]);
   const [attachments, setAttachments] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -133,7 +155,11 @@ export default function AddClient() {
         alternate: person.alternateEmail || "",
         primary: Boolean(person.isPrimary),
         eid: person.emiratesId?.number || "",
+        eidIssue: person.emiratesId?.issueDate?.slice?.(0, 10) || "",
+        eidExpiry: person.emiratesId?.expiryDate?.slice?.(0, 10) || "",
         passport: person.passport?.number || "",
+        passportIssue: person.passport?.issueDate?.slice?.(0, 10) || "",
+        passportExpiry: person.passport?.expiryDate?.slice?.(0, 10) || "",
         issuingCountry: person.passport?.issuingCountry || primaryContact.passport?.issuingCountry || "United Arab Emirates",
         eidDocumentUrl: person.emiratesId?.documentUrl || "",
         eidDocumentName: person.emiratesId?.documentUrl ? person.emiratesId.documentUrl.split("/").pop() : "",
@@ -141,7 +167,29 @@ export default function AddClient() {
         passportDocumentUrl: person.passport?.documentUrl || "",
         passportDocumentName: person.passport?.documentUrl ? person.passport.documentUrl.split("/").pop() : "",
         passportDocumentFile: null,
-      })) : [{ name: "", designation: "", email: "", code: "", mobile: "", whatsapp: "", alternate: "", primary: true, eid: "", passport: "", issuingCountry: "United Arab Emirates", eidDocumentUrl: "", eidDocumentName: "", eidDocumentFile: null, passportDocumentUrl: "", passportDocumentName: "", passportDocumentFile: null }]);
+      })) : [{
+        name: "",
+        designation: "",
+        email: "",
+        code: "",
+        mobile: "",
+        whatsapp: "",
+        alternate: "",
+        primary: true,
+        eid: "",
+        eidIssue: "",
+        eidExpiry: "",
+        passport: "",
+        passportIssue: "",
+        passportExpiry: "",
+        issuingCountry: "United Arab Emirates",
+        eidDocumentUrl: "",
+        eidDocumentName: "",
+        eidDocumentFile: null,
+        passportDocumentUrl: "",
+        passportDocumentName: "",
+        passportDocumentFile: null,
+      }]);
       setPortals((client.portalLogins || []).length ? client.portalLogins.map((portal) => ({
         name: portal.portalName || "",
         url: portal.portalUrl || "",
@@ -355,9 +403,29 @@ export default function AddClient() {
     const shouldValidateContacts = !continueToNext || tab >= 2;
     if (shouldValidateContacts) {
       const emiratesIdPattern = /^\d{3}-\d{4}-\d{7}-\d$/;
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       const missingContactNameIndex = contacts.findIndex((contact) => !String(contact.name || "").trim());
       if (missingContactNameIndex >= 0) {
         toast.error(`Contact person ${missingContactNameIndex + 1}: full name is required.`);
+        return false;
+      }
+      const missingContactEmailIndex = contacts.findIndex((contact) => !String(contact.email || "").trim());
+      if (missingContactEmailIndex >= 0) {
+        toast.error(`Contact person ${missingContactEmailIndex + 1}: email is required.`);
+        return false;
+      }
+      const invalidContactEmailIndex = contacts.findIndex((contact) => {
+        const value = String(contact.email || "").trim();
+        if (!value) return false;
+        return !emailPattern.test(value);
+      });
+      if (invalidContactEmailIndex >= 0) {
+        toast.error(`Contact person ${invalidContactEmailIndex + 1}: invalid email address.`);
+        return false;
+      }
+      const missingMobileIndex = contacts.findIndex((contact) => !normalizePhoneNumber(contact.mobile));
+      if (missingMobileIndex >= 0) {
+        toast.error(`Contact person ${missingMobileIndex + 1}: mobile number is required.`);
         return false;
       }
       const invalidEidIndex = contacts.findIndex((contact) => {
@@ -428,8 +496,8 @@ export default function AddClient() {
           whatsapp: c.whatsapp,
           alternateEmail: c.alternate,
           isPrimary: c.primary,
-          emiratesId: { number: c.eid },
-          passport: { number: c.passport, issuingCountry: c.issuingCountry },
+          emiratesId: { number: c.eid, issueDate: c.eidIssue, expiryDate: c.eidExpiry },
+          passport: { number: c.passport, issuingCountry: c.issuingCountry, issueDate: c.passportIssue, expiryDate: c.passportExpiry },
         }));
       }
       const pendingAttachments = attachments.filter((attachment) => !attachment.saved && attachment.file);
@@ -513,13 +581,13 @@ export default function AddClient() {
               title="Contact Person"
               items={contacts}
               setItems={setContacts}
-              blank={{ name: "", designation: "", email: "", code: "", mobile: "", whatsapp: "", alternate: "", primary: false, eid: "", passport: "", issuingCountry: "United Arab Emirates", eidDocumentUrl: "", eidDocumentName: "", eidDocumentFile: null, passportDocumentUrl: "", passportDocumentName: "", passportDocumentFile: null }}
+              blank={{ name: "", designation: "", email: "", code: "", mobile: "", whatsapp: "", alternate: "", primary: false, eid: "", eidIssue: "", eidExpiry: "", passport: "", passportIssue: "", passportExpiry: "", issuingCountry: "United Arab Emirates", eidDocumentUrl: "", eidDocumentName: "", eidDocumentFile: null, passportDocumentUrl: "", passportDocumentName: "", passportDocumentFile: null }}
               render={(c, i, patch) => (
                 <div className="grid gap-3 md:grid-cols-3">
                   <Field label="Full Name*" field={`contact-name-${i}`}><input className="input" value={c.name} onChange={(e) => patch(i, { name: e.target.value })} /></Field>
                   <Field label="Designation" field={`contact-designation-${i}`}><input className="input" value={c.designation} onChange={(e) => patch(i, { designation: e.target.value })} /></Field>
-                  <Field label="Email" field={`contact-email-${i}`}><input className="input" value={c.email} onChange={(e) => patch(i, { email: e.target.value })} /></Field>
-                  <Field label="Mobile">
+                  <Field label="Email*" field={`contact-email-${i}`}><input className="input" type="email" inputMode="email" value={c.email} onChange={(e) => patch(i, { email: e.target.value })} /></Field>
+                  <Field label="Mobile*">
                     <div className="flex gap-2">
                       <select id={`contact-code-${i}`} name={`contactCode${i}`} className="input w-44" value={c.code} onChange={(e) => patch(i, { code: e.target.value })}>
                         <option value="">Code</option>
@@ -542,11 +610,19 @@ export default function AddClient() {
                       />
                     </div>
                   </Field>
-                  <Field label="WhatsApp" field={`contact-whatsapp-${i}`}><input className="input" value={c.whatsapp} onChange={(e) => patch(i, { whatsapp: e.target.value })} /></Field>
+                  <Field label="WhatsApp Number" field={`contact-whatsapp-${i}`}><input className="input" value={c.whatsapp} onChange={(e) => patch(i, { whatsapp: e.target.value })} /></Field>
                   <Field label="Alternate Email" field={`contact-alternate-${i}`}><input className="input" value={c.alternate} onChange={(e) => patch(i, { alternate: e.target.value })} /></Field>
-                  <label className="flex items-center gap-2 font-bold" htmlFor={`contact-primary-${i}`}><input id={`contact-primary-${i}`} name={`contactPrimary${i}`} type="checkbox" checked={c.primary} onChange={(e) => patch(i, { primary: e.target.checked })} /> Primary Contact</label>
+                  <label className="flex items-center gap-2 font-bold" htmlFor={`contact-primary-${i}`}><input id={`contact-primary-${i}`} name={`contactPrimary${i}`} type="checkbox" checked={c.primary} onChange={(e) => {
+                    const checked = e.target.checked;
+                    setContacts((current) => current.map((entry, idx) => idx === i ? { ...entry, primary: checked } : checked ? { ...entry, primary: false } : entry));
+                  }} /> Primary Contact</label>
                   <Field label="Emirates ID Number" field={`contact-eid-${i}`}><input className="input" placeholder="784-XXXX-XXXXXXX-X" value={c.eid} onChange={(e) => patch(i, { eid: formatEmiratesIdInput(e.target.value) })} /></Field>
+                  <Field label="Emirates ID Issue Date" field={`contact-eid-issue-${i}`}><input className="input" type="date" value={c.eidIssue} onChange={(e) => patch(i, { eidIssue: e.target.value })} /></Field>
+                  <Field label="Emirates ID Expiry" field={`contact-eid-expiry-${i}`}><input className="input" type="date" value={c.eidExpiry} onChange={(e) => patch(i, { eidExpiry: e.target.value })} /></Field>
                   <Field label="Passport Number" field={`contact-passport-${i}`}><input className="input" value={c.passport} onChange={(e) => patch(i, { passport: e.target.value })} /></Field>
+                  <Field label="Passport Issue Date" field={`contact-passport-issue-${i}`}><input className="input" type="date" value={c.passportIssue} onChange={(e) => patch(i, { passportIssue: e.target.value })} /></Field>
+                  <Field label="Passport Expiry" field={`contact-passport-expiry-${i}`}><input className="input" type="date" value={c.passportExpiry} onChange={(e) => patch(i, { passportExpiry: e.target.value })} /></Field>
+                  <Field label="Passport Issuing Country" field={`contact-passport-country-${i}`}><><input className="input" list="passport-issuing-countries" value={c.issuingCountry} onChange={(e) => patch(i, { issuingCountry: e.target.value })} /><datalist id="passport-issuing-countries">{countries.map((country) => <option key={country} value={country} />)}</datalist></></Field>
                   <div className="md:col-span-3 grid gap-3 md:grid-cols-2">
                     <DocumentUploadZone id={`contact-eid-upload-${i}`} title="Upload Emirates ID" subtitle="PDF, JPG, PNG, DOCX, XLSX" fileName={c.eidDocumentName} documentUrl={c.eidDocumentUrl} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "emiratesId")} />
                     <DocumentUploadZone id={`contact-passport-upload-${i}`} title="Upload passport" subtitle="PDF, JPG, PNG, DOCX, XLSX" fileName={c.passportDocumentName} documentUrl={c.passportDocumentUrl} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "passport")} />
