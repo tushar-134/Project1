@@ -8,7 +8,14 @@ export function mapUser(user) {
   const dial = String(user.mobileCountryCode || "").trim();
   const num = String(user.mobile || "").trim();
   const mobile = [dial, num].filter(Boolean).join(" ").trim();
-  return { ...user, id: user._id, mobile, role: roleLabel[user.role] || user.role, status: user.isActive ? "Active" : "Inactive" };
+  return {
+    ...user,
+    id: user._id,
+    mobile,
+    role: roleLabel[user.role] || user.role,
+    status: user.isActive ? "Active" : "Inactive",
+    assignedClients: user.assignedClients || [],
+  };
 }
 
 export function useUsers() {
