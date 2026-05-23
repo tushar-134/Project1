@@ -583,19 +583,23 @@ const FYE_MONTHS = ["January","February","March","April","May","June","July","Au
 const FYE_DAYS_IN_MONTH = [31,29,31,30,31,30,31,31,30,31,30,31];
 
 function parseFye(value) {
-  if (!value) return { day: null, month: null };
+  if (!value) return { day: null, month: null, year: null };
   const parts = value.trim().split(" ");
-  if (parts.length < 2) return { day: null, month: null };
   const day = parseInt(parts[0], 10);
   const month = FYE_MONTHS.find((m) => m.toLowerCase() === parts[1]?.toLowerCase()) || null;
-  return { day: isNaN(day) ? null : day, month };
+  const year = parts[2] ? parseInt(parts[2], 10) : null;
+  return { day: isNaN(day) ? null : day, month, year: isNaN(year) ? null : year };
 }
 
 function FyeCalendarPicker({ value, onChange, id }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
-  const { day: selDay, month: selMonth } = parseFye(value);
+  const yearListRef = useRef(null);
+  const { day: selDay, month: selMonth, year: selYear } = parseFye(value);
+  const currentYear = new Date().getFullYear();
+  const yearRange = Array.from({ length: 16 }, (_, i) => currentYear - 5 + i);
   const [hoverMonth, setHoverMonth] = useState(selMonth || "December");
+  const [activeYear, setActiveYear] = useState(selYear || currentYear);
   const activeMonth = hoverMonth || selMonth || "December";
   const monthIdx = FYE_MONTHS.indexOf(activeMonth);
   const maxDay = monthIdx >= 0 ? FYE_DAYS_IN_MONTH[monthIdx] : 31;
@@ -609,10 +613,19 @@ function FyeCalendarPicker({ value, onChange, id }) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
-  function selectDate(month, day) {
-    onChange(`${day} ${month}`);
+  useEffect(() => {
+    if (open && yearListRef.current) {
+      const el = yearListRef.current.querySelector("[data-sel-year='true']");
+      if (el) el.scrollIntoView({ block: "center", behavior: "auto" });
+    }
+  }, [open]);
+
+  function selectDate(month, day, year) {
+    onChange(`${day} ${month} ${year}`);
     setOpen(false);
   }
+
+  const colLabel = { fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em", color: "#94a3b8", marginBottom: 8 };
 
   return (
     <div ref={wrapRef} style={{ position: "relative" }}>
@@ -623,7 +636,7 @@ function FyeCalendarPicker({ value, onChange, id }) {
           className="input"
           readOnly
           value={value}
-          placeholder="e.g. 31 December"
+          placeholder="e.g. 31 December 2025"
           onClick={() => setOpen((o) => !o)}
           onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen((o) => !o); } }}
           style={{ cursor: "pointer" }}
@@ -654,28 +667,60 @@ function FyeCalendarPicker({ value, onChange, id }) {
           zIndex: 9999, background: "#fff",
           border: "1px solid #e2e8f0", borderRadius: 14,
           boxShadow: "0 8px 32px rgba(30,58,138,.13), 0 2px 8px rgba(0,0,0,.07)",
-          padding: "12px", minWidth: 340, display: "flex", gap: 10,
+          padding: "14px", display: "flex", gap: 10,
           animation: "fye-pop .15s ease",
         }}>
+          {/* Year column */}
+          <div style={{ width: 70 }}>
+            <div style={{ ...colLabel, paddingLeft: 4 }}>Year</div>
+            <div ref={yearListRef} style={{ display: "flex", flexDirection: "column", gap: 1, maxHeight: 268, overflowY: "auto", scrollbarWidth: "thin" }}>
+              {yearRange.map((y) => {
+                const isSel = activeYear === y;
+                return (
+                  <button
+                    key={y}
+                    type="button"
+                    data-sel-year={isSel ? "true" : undefined}
+                    onClick={() => setActiveYear(y)}
+                    style={{
+                      width: "100%", textAlign: "center", padding: "5px 4px",
+                      borderRadius: 7, border: "none", cursor: "pointer", fontSize: 12,
+                      fontWeight: isSel ? 800 : 600,
+                      background: isSel ? "#1e3a8a" : "transparent",
+                      color: isSel ? "#fff" : "#334155",
+                      transition: "all .12s ease", whiteSpace: "nowrap",
+                    }}
+                    onMouseEnter={(e) => { if (!isSel) { e.currentTarget.style.background = "#eff6ff"; e.currentTarget.style.color = "#1e3a8a"; } }}
+                    onMouseLeave={(e) => { if (!isSel) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#334155"; } }}
+                  >{y}</button>
+                );
+              })}
+            </div>
+          </div>
+          {/* Divider */}
+          <div style={{ width: 1, background: "#e2e8f0", borderRadius: 1, margin: "0 2px" }} />
           {/* Month column */}
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em", color: "#94a3b8", marginBottom: 8, paddingLeft: 4 }}>Month</div>
+          <div style={{ flex: 1, minWidth: 108 }}>
+            <div style={{ ...colLabel, paddingLeft: 4 }}>Month</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {FYE_MONTHS.map((m) => {
-                const isSelected = selMonth === m;
+                const isSel = selMonth === m && selYear === activeYear;
                 const isHover = hoverMonth === m;
                 return (
                   <button
                     key={m}
                     type="button"
                     onMouseEnter={() => setHoverMonth(m)}
-                    onClick={() => { if (selDay && selDay <= FYE_DAYS_IN_MONTH[FYE_MONTHS.indexOf(m)]) { selectDate(m, selDay); } else { setHoverMonth(m); } }}
+                    onClick={() => {
+                      const validDay = selDay && selDay <= FYE_DAYS_IN_MONTH[FYE_MONTHS.indexOf(m)] ? selDay : null;
+                      if (validDay) { selectDate(m, validDay, activeYear); } else { setHoverMonth(m); }
+                    }}
                     style={{
                       width: "100%", textAlign: "left", padding: "5px 8px",
                       borderRadius: 7, border: "none", cursor: "pointer", fontSize: 12,
-                      fontWeight: isSelected ? 800 : 600,
-                      background: isSelected ? "#1e3a8a" : isHover ? "#eff6ff" : "transparent",
-                      color: isSelected ? "#fff" : isHover ? "#1e3a8a" : "#334155",
+                      fontWeight: isSel ? 800 : 600,
+                      background: isSel ? "#1e3a8a" : isHover ? "#eff6ff" : "transparent",
+                      color: isSel ? "#fff" : isHover ? "#1e3a8a" : "#334155",
                       transition: "all .12s ease",
                     }}
                   >{m}</button>
@@ -686,25 +731,25 @@ function FyeCalendarPicker({ value, onChange, id }) {
           {/* Divider */}
           <div style={{ width: 1, background: "#e2e8f0", borderRadius: 1, margin: "0 2px" }} />
           {/* Day column */}
-          <div style={{ width: 160 }}>
-            <div style={{ fontSize: 10, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".06em", color: "#94a3b8", marginBottom: 8, paddingLeft: 2 }}>Day <span style={{ fontWeight: 500, textTransform: "none", color: "#cbd5e1" }}>({activeMonth})</span></div>
+          <div style={{ width: 158 }}>
+            <div style={{ ...colLabel, paddingLeft: 2 }}>Day <span style={{ fontWeight: 500, textTransform: "none", color: "#cbd5e1" }}>({activeMonth})</span></div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 3 }}>
               {Array.from({ length: maxDay }, (_, i) => i + 1).map((d) => {
-                const isSelected = selDay === d && selMonth === activeMonth;
+                const isSel = selDay === d && selMonth === activeMonth && selYear === activeYear;
                 return (
                   <button
                     key={d}
                     type="button"
-                    onClick={() => selectDate(activeMonth, d)}
+                    onClick={() => selectDate(activeMonth, d, activeYear)}
                     style={{
                       padding: "5px 0", borderRadius: 7, border: "none", cursor: "pointer",
-                      fontSize: 12, fontWeight: isSelected ? 800 : 600, textAlign: "center",
-                      background: isSelected ? "#1e3a8a" : "transparent",
-                      color: isSelected ? "#fff" : "#334155",
+                      fontSize: 12, fontWeight: isSel ? 800 : 600, textAlign: "center",
+                      background: isSel ? "#1e3a8a" : "transparent",
+                      color: isSel ? "#fff" : "#334155",
                       transition: "all .12s ease",
                     }}
-                    onMouseEnter={(e) => { if (!isSelected) { e.currentTarget.style.background = "#eff6ff"; e.currentTarget.style.color = "#1e3a8a"; } }}
-                    onMouseLeave={(e) => { if (!isSelected) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#334155"; } }}
+                    onMouseEnter={(e) => { if (!isSel) { e.currentTarget.style.background = "#eff6ff"; e.currentTarget.style.color = "#1e3a8a"; } }}
+                    onMouseLeave={(e) => { if (!isSel) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#334155"; } }}
                   >{d}</button>
                 );
               })}
