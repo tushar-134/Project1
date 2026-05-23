@@ -1,8 +1,9 @@
 import { AlertTriangle, Briefcase, Calendar, Clock, ExternalLink, FileText, Tag, User, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { taskService } from "../../services/taskService.js";
-import { ftaStatusFromApi, statusFromApi } from "../../utils/adapterUtils.js";
+import { ftaStatusFromApi, statusFromApi, statusToApi } from "../../utils/adapterUtils.js";
 import Badge from "./Badge.jsx";
 import Button from "./Button.jsx";
 import Card from "./Card.jsx";
@@ -14,6 +15,8 @@ const categoryLabels = {
   EInv: "E-Invoicing",
   Refund: "VAT Refund",
 };
+
+const ALL_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed"];
 
 const actionMeta = {
   Created: { color: "#059669", bg: "bg-emerald-50", border: "border-emerald-200", icon: "C" },
@@ -51,6 +54,7 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [savingStatus, setSavingStatus] = useState(false);
 
   useEffect(() => {
     if (!taskId) return undefined;
@@ -103,6 +107,21 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
   const displayStatus = statusFromApi[task?.status] || task?.status;
   const displayCategory = categoryLabels[task?.category] || task?.category;
   const overdue = task ? daysOverdue(task.dueDate, task.status) : 0;
+
+  async function handleStatusChange(nextStatus) {
+    if (!task || savingStatus || nextStatus === displayStatus) return;
+
+    setSavingStatus(true);
+    try {
+      await taskService.updateStatus(task._id, statusToApi[nextStatus] || nextStatus);
+      toast.success("Task status updated.");
+      onClose();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Unable to update task status right now.");
+    } finally {
+      setSavingStatus(false);
+    }
+  }
 
   return (
     <>
@@ -184,7 +203,22 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
                       <div className="text-[16px] font-extrabold text-slate-900">{task.taskType}</div>
                     </div>
                   </div>
-                  <StatusPill status={displayStatus} />
+                  {canManage ? (
+                    <select
+                      id={`task-drawer-status-${task._id}`}
+                      name={`taskDrawerStatus${task._id}`}
+                      className="input h-9 min-w-40"
+                      value={displayStatus}
+                      onChange={(e) => handleStatusChange(e.target.value)}
+                      disabled={savingStatus}
+                    >
+                      {ALL_STATUSES.map((status) => (
+                        <option key={status}>{status}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <StatusPill status={displayStatus} />
+                  )}
                 </div>
 
                 <div className="task-detail-grid">
