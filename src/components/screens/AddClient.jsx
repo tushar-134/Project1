@@ -1,10 +1,11 @@
-import { cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
+import { cloneElement, isValidElement, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Copy, Eye, EyeOff, Plus, Trash2, UploadCloud, X, Settings2 } from "lucide-react";
+import { Check, ChevronDown, Copy, Eye, EyeOff, Plus, Search, Trash2, UploadCloud, X, Settings2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
 import { useClients } from "../../hooks/useClients";
-import { useUsers } from "../../hooks/useUsers";
+import { mapUser } from "../../hooks/useUsers";
+import { userService } from "../../services/userService";
 import { groupService } from "../../services/groupService";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
@@ -14,6 +15,7 @@ import { getPhoneNumberSpec, normalizeDialCode, normalizePhoneNumber } from "../
 
 const tabs = ["Basic Details", "Trade Licences", "Contact Persons", "VAT / CT", "Client Group", "Portal Logins", "Custom Fields", "Attachments"];
 const blankPortal = { name: "", url: "", username: "", password: "", notes: "" };
+const DROPDOWN_PAGE_SIZE = 5;
 const countryCodes = ["AF", "AX", "AL", "DZ", "AS", "AD", "AO", "AI", "AQ", "AG", "AR", "AM", "AW", "AU", "AT", "AZ", "BS", "BH", "BD", "BB", "BY", "BE", "BZ", "BJ", "BM", "BT", "BO", "BQ", "BA", "BW", "BV", "BR", "IO", "BN", "BG", "BF", "BI", "KH", "CM", "CA", "CV", "KY", "CF", "TD", "CL", "CN", "CX", "CC", "CO", "KM", "CG", "CD", "CK", "CR", "CI", "HR", "CU", "CW", "CY", "CZ", "DK", "DJ", "DM", "DO", "EC", "EG", "SV", "GQ", "ER", "EE", "SZ", "ET", "FK", "FO", "FJ", "FI", "FR", "GF", "PF", "TF", "GA", "GM", "GE", "DE", "GH", "GI", "GR", "GL", "GD", "GP", "GU", "GT", "GG", "GN", "GW", "GY", "HT", "HM", "VA", "HN", "HK", "HU", "IS", "IN", "ID", "IR", "IQ", "IE", "IM", "IL", "IT", "JM", "JP", "JE", "JO", "KZ", "KE", "KI", "KP", "KR", "KW", "KG", "LA", "LV", "LB", "LS", "LR", "LY", "LI", "LT", "LU", "MO", "MG", "MW", "MY", "MV", "ML", "MT", "MH", "MQ", "MR", "MU", "YT", "MX", "FM", "MD", "MC", "MN", "ME", "MS", "MA", "MZ", "MM", "NA", "NR", "NP", "NL", "NC", "NZ", "NI", "NE", "NG", "NU", "NF", "MK", "MP", "NO", "OM", "PK", "PW", "PS", "PA", "PG", "PY", "PE", "PH", "PN", "PL", "PT", "PR", "QA", "RE", "RO", "RU", "RW", "BL", "SH", "KN", "LC", "MF", "PM", "VC", "WS", "SM", "ST", "SA", "SN", "RS", "SC", "SL", "SG", "SX", "SK", "SI", "SB", "SO", "ZA", "GS", "SS", "ES", "LK", "SD", "SR", "SJ", "SE", "CH", "SY", "TW", "TJ", "TZ", "TH", "TL", "TG", "TK", "TO", "TT", "TN", "TR", "TM", "TC", "TV", "UG", "UA", "AE", "GB", "US", "UM", "UY", "UZ", "VU", "VE", "VN", "VG", "VI", "WF", "EH", "YE", "ZM", "ZW"];
 
 function getApiErrorMessage(error) {
@@ -21,6 +23,33 @@ function getApiErrorMessage(error) {
   if (data?.message) return data.message;
   if (Array.isArray(data?.errors) && data.errors[0]?.msg) return data.errors[0].msg;
   return "";
+}
+
+function listItems(data) {
+  return Array.isArray(data) ? data : data?.items || [];
+}
+
+function optionId(option) {
+  return option?.id || option?._id || "";
+}
+
+function mergeOptions(primary, extra) {
+  const seen = new Set();
+  return [...primary, ...extra].filter((item) => {
+    const id = optionId(item);
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
+function mapGroup(group) {
+  return {
+    ...group,
+    id: group._id,
+    clients: group.clients || [],
+    clientNames: group.clients?.map((client) => client.legalName) || [],
+  };
 }
 
 const FINANCIAL_YEAR_OPTIONS = [
@@ -57,7 +86,6 @@ export default function AddClient() {
   const { id } = useParams();
   const isEditMode = Boolean(id);
   const { createClient, getClient, updateClient, uploadAttachment, uploadDocument, deleteAttachment } = useClients();
-  const { fetchUsers } = useUsers();
   const [tab, setTab] = useState(0);
   const countries = useMemo(() => {
     const names = new Intl.DisplayNames(["en"], { type: "region" });
@@ -107,9 +135,36 @@ export default function AddClient() {
   const [customFieldValues, setCustomFieldValues] = useState({});
   const [selectedFieldKeys, setSelectedFieldKeys] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [userOptions, setUserOptions] = useState([]);
+  const [groupOptions, setGroupOptions] = useState([]);
+  const [userSearch, setUserSearch] = useState("");
+  const [groupSearch, setGroupSearch] = useState("");
+  const [isUserSearchLoading, setIsUserSearchLoading] = useState(false);
+  const [isGroupSearchLoading, setIsGroupSearchLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const update = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+
+  const loadUserOptions = useCallback(async (search = "") => {
+    setIsUserSearchLoading(true);
+    try {
+      const users = listItems(await userService.list({ page: 1, limit: DROPDOWN_PAGE_SIZE, search })).map(mapUser);
+      setUserOptions((current) => mergeOptions(users, current.filter((user) => optionId(user) === form.assigned)));
+    } finally {
+      setIsUserSearchLoading(false);
+    }
+  }, [form.assigned]);
+
+  const loadGroupOptions = useCallback(async (search = "") => {
+    setIsGroupSearchLoading(true);
+    try {
+      const groups = listItems(await groupService.list({ page: 1, limit: DROPDOWN_PAGE_SIZE, search })).map(mapGroup);
+      setGroupOptions((current) => mergeOptions(groups, current.filter((group) => optionId(group) === form.group)));
+      dispatch({ type: "SET_RESOURCE", resource: "groups", payload: groups });
+    } finally {
+      setIsGroupSearchLoading(false);
+    }
+  }, [dispatch, form.group]);
 
   const formatEmiratesIdInput = (rawValue) => {
     const digits = String(rawValue || "").replace(/\D+/g, "").slice(0, 15);
@@ -122,16 +177,28 @@ export default function AddClient() {
   };
 
   useEffect(() => {
-    fetchUsers().catch(() => { });
-    groupService.list().then((groups) => dispatch({
-      type: "SET_RESOURCE",
-      resource: "groups",
-      payload: groups.map((g) => ({ ...g, id: g._id, clients: g.clients || [], clientNames: g.clients?.map((c) => c.legalName) || [] })),
-    })).catch(() => { });
     import("../../services/customFieldService").then(({ customFieldService }) => {
       customFieldService.list().then((fields) => dispatch({ type: "SET_RESOURCE", resource: "customFields", payload: fields })).catch(() => { });
     });
-  }, []);
+  }, [dispatch]);
+
+  useEffect(() => {
+    const query = userSearch.trim();
+    const delay = !query ? 0 : query.length >= 3 ? 400 : 2000;
+    const timer = window.setTimeout(() => {
+      loadUserOptions(query).catch(() => { });
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [loadUserOptions, userSearch]);
+
+  useEffect(() => {
+    const query = groupSearch.trim();
+    const delay = !query ? 0 : query.length >= 3 ? 400 : 2000;
+    const timer = window.setTimeout(() => {
+      loadGroupOptions(query).catch(() => { });
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [groupSearch, loadGroupOptions]);
   useEffect(() => {
     if (!isEditMode) return;
     getClient(id).then((client) => {
@@ -149,7 +216,7 @@ export default function AddClient() {
         tradeName: client.tradeName || "",
         fye: normalizeFinancialYearEnd(client.financialYearEnd || client.ctDetails?.financialYearEnd || ""),
         jurisdiction: jurisdictionLabels[client.jurisdiction] || "Mainland",
-        assigned: client.assignedUser?.name || "",
+        assigned: client.assignedUser?._id || client.assignedUser || "",
         country: client.registeredAddress?.country || "United Arab Emirates",
         emirate: client.registeredAddress?.emirate || "",
         street: client.registeredAddress?.street || "",
@@ -167,6 +234,14 @@ export default function AddClient() {
         group: client.group?._id || client.group || "",
         newGroup: "",
       });
+      if (client.assignedUser?._id) {
+        setUserOptions((current) => mergeOptions(current, [mapUser(client.assignedUser)]));
+      }
+      if (client.group?._id) {
+        const selectedGroup = mapGroup(client.group);
+        setGroupOptions((current) => mergeOptions(current, [selectedGroup]));
+        dispatch({ type: "SET_RESOURCE", resource: "groups", payload: mergeOptions(state.groups || [], [selectedGroup]) });
+      }
       const clientFields = client.customFields || {};
       setCustomFieldValues(clientFields);
       
@@ -518,7 +593,7 @@ export default function AddClient() {
         tradeName: form.tradeName,
         financialYearEnd: form.fye,
         jurisdiction: form.jurisdiction === "Free Zone" ? "freezone" : form.jurisdiction === "Designated Zone" ? "designated_zone" : form.jurisdiction.toLowerCase(),
-        assignedUser: state.users.find((u) => u.name === form.assigned)?._id,
+        assignedUser: form.assigned || undefined,
         registeredAddress: { country: form.country, emirate: form.emirate, street: form.street, poBox: form.poBox, postalCode: form.postalCode },
         correspondenceAddress: form.differentAddress ? { street: form.correspondence } : undefined,
         group: form.group || undefined,
@@ -652,10 +727,20 @@ export default function AddClient() {
         <div className="page-kicker">Client Master</div>
         <h2 className="screen-title">{isEditMode ? "Edit Client" : "Add Client"}</h2>
       </div>
-      <Card className="overflow-hidden">
-        <div className="flex overflow-x-auto border-b border-[#e2e8f0] bg-slate-50 p-2">{tabs.map((t, i) => <button key={t} onClick={() => setTab(i)} className={`mr-1 whitespace-nowrap rounded-lg px-3 py-2 text-[12px] font-extrabold ${tab === i ? "bg-[#1e3a8a] text-white" : "text-slate-600 hover:bg-white"}`}>{t}</button>)}</div>
+      <Card>
+        <div className="flex overflow-x-auto rounded-t-xl border-b border-[#e2e8f0] bg-slate-50 p-2">{tabs.map((t, i) => <button key={t} onClick={() => setTab(i)} className={`mr-1 whitespace-nowrap rounded-lg px-3 py-2 text-[12px] font-extrabold ${tab === i ? "bg-[#1e3a8a] text-white" : "text-slate-600 hover:bg-white"}`}>{t}</button>)}</div>
         <div className="p-4">
-          {tab === 0 && <Basic form={form} update={update} countries={countries} users={state.users} />}
+          {tab === 0 && (
+            <Basic
+              form={form}
+              update={update}
+              countries={countries}
+              users={userOptions}
+              userSearch={userSearch}
+              setUserSearch={setUserSearch}
+              isUserSearchLoading={isUserSearchLoading}
+            />
+          )}
           {tab === 1 && <Repeat title="Trade Licence" items={licences} setItems={setLicences} blank={{ number: "", issue: "", expiry: "", authority: "", type: "", email: "", documentUrl: "", documentName: "", documentFile: null }} render={(lic, i, patch) => <div className="grid gap-3 md:grid-cols-3"><Field label="Licence Number*" field={`licence-number-${i}`}><input className="input" value={lic.number} onChange={(e) => patch(i, { number: e.target.value })} /></Field><Field label="Issue Date" field={`licence-issue-${i}`}><input className="input" type="date" value={lic.issue} onChange={(e) => patch(i, { issue: e.target.value })} /></Field><Field label="Expiry Date" field={`licence-expiry-${i}`}><input className="input" type="date" value={lic.expiry} onChange={(e) => patch(i, { expiry: e.target.value })} /></Field><Field label="Issuing Authority" field={`licence-authority-${i}`}><input className="input" value={lic.authority} onChange={(e) => patch(i, { authority: e.target.value })} /></Field><Field label="Licence Type" field={`licence-type-${i}`}><input className="input" value={lic.type} onChange={(e) => patch(i, { type: e.target.value })} /></Field><Field label="Official Email" field={`licence-email-${i}`}><input className="input" value={lic.email} onChange={(e) => patch(i, { email: e.target.value })} /></Field><div className="md:col-span-3"><DocumentUploadZone id={`trade-licence-upload-${i}`} title="Upload trade licence" subtitle="PDF, JPG, PNG, DOCX, XLSX" fileName={lic.documentName} documentUrl={lic.documentUrl} isUploading={isUploading} onFiles={(files) => handleTradeLicenceFile(i, files)} /></div></div>} />}
           {tab === 2 && (
             <Repeat
@@ -760,10 +845,19 @@ export default function AddClient() {
           {tab === 4 && (
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Select existing group" field="client-group">
-                <select className="input" value={form.group} onChange={(e) => update("group", e.target.value)}>
-                  <option value="">No group</option>
-                  {state.groups.map((g) => <option key={g.id} value={g._id}>{g.name}</option>)}
-                </select>
+                <SearchableSelect
+                  id="client-group"
+                  value={form.group}
+                  options={groupOptions}
+                  searchValue={groupSearch}
+                  onSearchChange={setGroupSearch}
+                  onChange={(value) => update("group", value)}
+                  getLabel={(group) => group.name}
+                  placeholder="No group"
+                  searchPlaceholder="Search groups..."
+                  loading={isGroupSearchLoading}
+                  emptyLabel="No matching groups"
+                />
               </Field>
               <Field label="Create new group">
                 <div className="flex gap-2">
@@ -774,15 +868,16 @@ export default function AddClient() {
                       dispatch({
                         type: "SET_RESOURCE",
                         resource: "groups",
-                        payload: [...state.groups, { ...g, id: g._id, clients: g.clients || [], clientNames: g.clients?.map((c) => c.legalName) || [] }]
+                        payload: [...state.groups, mapGroup(g)]
                       });
+                      setGroupOptions((current) => mergeOptions([mapGroup(g)], current));
                       update("group", g._id);
                     }
                   }}>Create</Button>
                 </div>
               </Field>
               <div className="rounded-xl bg-purple-50 p-4 font-bold text-[#7c3aed] md:col-span-2">
-                Current group: {state.groups.find((g) => g._id === form.group)?.name || "Ungrouped"} {form.group && <button onClick={() => update("group", "")} className="ml-3 text-[#dc2626]">Ungroup</button>}
+                Current group: {groupOptions.find((g) => optionId(g) === form.group)?.name || "Ungrouped"} {form.group && <button onClick={() => update("group", "")} className="ml-3 text-[#dc2626]">Ungroup</button>}
               </div>
             </div>
           )}
@@ -861,7 +956,8 @@ export default function AddClient() {
                   </div>
                   <input
                     type="search"
-                    className="input pl-13"
+                    className="input"
+                    style={{ paddingLeft: "3.25rem" }}
                     placeholder="Search available fields to add..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -1063,8 +1159,151 @@ function DocumentUploadZone({ id, title, subtitle, fileName, documentUrl, isUplo
   );
 }
 
-function Basic({ form, update, countries, users }) {
-  return <div className="space-y-4"><div className="grid gap-3 md:grid-cols-2">{["Legal Person", "Natural Person"].map((type) => <button key={type} onClick={() => update("clientType", type)} className={`rounded-xl border p-4 text-left ${form.clientType === type ? "border-[#1e3a8a] bg-blue-50" : "border-[#e2e8f0]"}`}><div className="font-extrabold">{type}</div><div className="text-[12px] text-slate-500">{type === "Legal Person" ? "Companies, branches, free zone entities" : "Individual taxable persons"}</div></button>)}</div><div className="grid gap-3 md:grid-cols-3"><Field label="File No." field="client-file-no"><input className="input" value={form.fileNo} onChange={(e) => update("fileNo", e.target.value)} /></Field><Field label="Legal Name*" field="client-legal-name"><input className="input" value={form.legalName} onChange={(e) => update("legalName", e.target.value)} /></Field><Field label="Trade Name" field="client-trade-name"><input className="input" value={form.tradeName} onChange={(e) => update("tradeName", e.target.value)} /></Field><Field label="Financial Year End*" field="client-fye"><select className="input" value={form.fye} onChange={(e) => update("fye", e.target.value)}>{FINANCIAL_YEAR_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}</select></Field><Field label="Jurisdiction" field="client-jurisdiction"><select className="input" value={form.jurisdiction} onChange={(e) => update("jurisdiction", e.target.value)}><option>Mainland</option><option>Free Zone</option><option>Designated Zone</option><option>Offshore</option></select></Field><Field label="Assigned User" field="client-assigned-user"><select className="input" value={form.assigned} onChange={(e) => update("assigned", e.target.value)}><option value="">Select User</option>{users.map((u) => <option key={u.id || u._id} value={u.name}>{u.name}</option>)}</select></Field></div><div className="grid gap-3 md:grid-cols-5"><Field label="Country" field="client-country"><select className="input" value={form.country} onChange={(e) => update("country", e.target.value)}>{countries.map((c) => <option key={c}>{c}</option>)}</select></Field><Field label="Emirate/State" field="client-emirate"><input className="input" value={form.emirate} onChange={(e) => update("emirate", e.target.value)} /></Field><Field label="Street" field="client-street"><input className="input" value={form.street} onChange={(e) => update("street", e.target.value)} /></Field><Field label="PO Box" field="client-po-box"><input className="input" value={form.poBox} onChange={(e) => update("poBox", e.target.value)} /></Field><Field label="Postal Code" field="client-postal-code"><input className="input" value={form.postalCode} onChange={(e) => update("postalCode", e.target.value)} /></Field></div><label className="flex items-center gap-2 font-bold" htmlFor="client-different-address"><input id="client-different-address" name="clientDifferentAddress" type="checkbox" checked={form.differentAddress} onChange={(e) => update("differentAddress", e.target.checked)} /> Actual/Correspondence Address is different</label>{form.differentAddress && <textarea id="client-correspondence-address" name="clientCorrespondenceAddress" className="input textarea" value={form.correspondence} onChange={(e) => update("correspondence", e.target.value)} />}</div>;
+function SearchableSelect({ id, value, options, searchValue, onSearchChange, onChange, getLabel, placeholder, searchPlaceholder, loading, emptyLabel }) {
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
+  const selected = options.find((option) => optionId(option) === value);
+  const selectedLabel = selected ? getLabel(selected) : placeholder;
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(event) {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [open]);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <button
+        id={id}
+        name={id}
+        type="button"
+        className="input flex items-center justify-between text-left"
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span className={selected ? "truncate text-slate-900" : "truncate text-slate-400"}>{selectedLabel}</span>
+        <ChevronDown size={16} className={`ml-2 shrink-0 text-slate-400 transition ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 w-full rounded-xl border border-slate-200 bg-white p-2 shadow-xl ring-1 ring-slate-900/5">
+          <div className="relative mb-2">
+            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              className="input h-9"
+              style={{ paddingLeft: "2.25rem" }}
+              value={searchValue}
+              autoComplete="off"
+              placeholder={searchPlaceholder}
+              onChange={(event) => onSearchChange(event.target.value)}
+            />
+          </div>
+          <div className="max-h-56 overflow-auto">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[13px] text-slate-600 hover:bg-slate-50 font-medium"
+              onClick={() => {
+                onChange("");
+                setOpen(false);
+              }}
+            >
+              {placeholder}
+              {!value && <Check size={15} className="text-[#1e3a8a]" />}
+            </button>
+            {options.map((option) => {
+              const idValue = optionId(option);
+              const active = idValue === value;
+              return (
+                <button
+                  key={idValue}
+                  type="button"
+                  className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[13px] hover:bg-slate-50 font-medium ${active ? "text-[#1e3a8a]" : "text-slate-700"}`}
+                  onClick={() => {
+                    onChange(idValue);
+                    setOpen(false);
+                  }}
+                >
+                  <span className="truncate">{getLabel(option)}</span>
+                  {active && <Check size={15} className="ml-2 shrink-0" />}
+                </button>
+              );
+            })}
+            {loading && <div className="px-3 py-3 text-center text-[12px] text-slate-400 font-medium">Searching...</div>}
+            {!loading && options.length === 0 && <div className="px-3 py-3 text-center text-[12px] text-slate-400 font-medium">{emptyLabel}</div>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Basic({ form, update, countries, users, userSearch, setUserSearch, isUserSearchLoading }) {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-2">
+        {["Legal Person", "Natural Person"].map((type) => (
+          <button key={type} type="button" onClick={() => update("clientType", type)} className={`rounded-xl border p-4 text-left ${form.clientType === type ? "border-[#1e3a8a] bg-blue-50" : "border-[#e2e8f0]"}`}>
+            <div className="font-extrabold">{type}</div>
+            <div className="text-[12px] text-slate-500">{type === "Legal Person" ? "Companies, branches, free zone entities" : "Individual taxable persons"}</div>
+          </button>
+        ))}
+      </div>
+      <div className="grid gap-3 md:grid-cols-3">
+        <Field label="File No." field="client-file-no"><input className="input" value={form.fileNo} onChange={(e) => update("fileNo", e.target.value)} /></Field>
+        <Field label="Legal Name*" field="client-legal-name"><input className="input" value={form.legalName} onChange={(e) => update("legalName", e.target.value)} /></Field>
+        <Field label="Trade Name" field="client-trade-name"><input className="input" value={form.tradeName} onChange={(e) => update("tradeName", e.target.value)} /></Field>
+        <Field label="Financial Year End*" field="client-fye">
+          <select className="input" value={form.fye} onChange={(e) => update("fye", e.target.value)}>
+            {FINANCIAL_YEAR_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+          </select>
+        </Field>
+        <Field label="Jurisdiction" field="client-jurisdiction">
+          <select className="input" value={form.jurisdiction} onChange={(e) => update("jurisdiction", e.target.value)}>
+            <option>Mainland</option>
+            <option>Free Zone</option>
+            <option>Designated Zone</option>
+            <option>Offshore</option>
+          </select>
+        </Field>
+        <Field label="Assigned User" field="client-assigned-user">
+          <SearchableSelect
+            id="client-assigned-user"
+            value={form.assigned}
+            options={users}
+            searchValue={userSearch}
+            onSearchChange={setUserSearch}
+            onChange={(value) => update("assigned", value)}
+            getLabel={(user) => user.name}
+            placeholder="Select User"
+            searchPlaceholder="Search users..."
+            loading={isUserSearchLoading}
+            emptyLabel="No matching users"
+          />
+        </Field>
+      </div>
+      <div className="grid gap-3 md:grid-cols-5">
+        <Field label="Country" field="client-country">
+          <select className="input" value={form.country} onChange={(e) => update("country", e.target.value)}>
+            {countries.map((country) => <option key={country}>{country}</option>)}
+          </select>
+        </Field>
+        <Field label="Emirate/State" field="client-emirate"><input className="input" value={form.emirate} onChange={(e) => update("emirate", e.target.value)} /></Field>
+        <Field label="Street" field="client-street"><input className="input" value={form.street} onChange={(e) => update("street", e.target.value)} /></Field>
+        <Field label="PO Box" field="client-po-box"><input className="input" value={form.poBox} onChange={(e) => update("poBox", e.target.value)} /></Field>
+        <Field label="Postal Code" field="client-postal-code"><input className="input" value={form.postalCode} onChange={(e) => update("postalCode", e.target.value)} /></Field>
+      </div>
+      <label className="flex items-center gap-2 font-bold" htmlFor="client-different-address">
+        <input id="client-different-address" name="clientDifferentAddress" type="checkbox" checked={form.differentAddress} onChange={(e) => update("differentAddress", e.target.checked)} />
+        Actual/Correspondence Address is different
+      </label>
+      {form.differentAddress && <textarea id="client-correspondence-address" name="clientCorrespondenceAddress" className="input textarea" value={form.correspondence} onChange={(e) => update("correspondence", e.target.value)} />}
+    </div>
+  );
 }
 function Repeat({ title, items, setItems, blank, render }) {
   const patch = (i, values) => setItems(items.map((item, idx) => idx === i ? { ...item, ...values } : item));
@@ -1078,4 +1317,12 @@ function Field({ label, field, children }) {
     })
     : children;
   return <label htmlFor={field}><span className="field-label">{label}</span>{control}</label>;
+  // return (
+  //   <div className="block">
+  //     <label htmlFor={field} className="field-label">
+  //       {label}
+  //     </label>
+  //     {control}
+  //   </div>
+  // );
 }
