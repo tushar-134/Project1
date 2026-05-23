@@ -179,22 +179,6 @@ exports.updateClient = async (req, res, next) => {
     if (duplicate) return res.status(409).json({ message: duplicateMessage(duplicate, candidate) });
     // Bug #4 Fix: whitelist editable fields to prevent mass-assignment of fileNo, createdBy, isActive, etc.
     const ALLOWED = ["legalName", "tradeName", "clientType", "jurisdiction", "financialYearEnd", "assignedUser", "group", "registeredAddress", "correspondenceAddress", "tradeLicences", "contactPersons", "vatDetails", "ctDetails", "portalLogins", "customFields"];
-    
-    // If portalLogins array is updated, preserve existing passwords for unchanged logins
-    if ("portalLogins" in req.body && Array.isArray(req.body.portalLogins)) {
-      req.body.portalLogins.forEach((updatedPortal) => {
-        if (!updatedPortal.password) {
-          const existing = client.portalLogins.find(
-            (p) => p.portalName === updatedPortal.portalName && p.username === updatedPortal.username
-          );
-          if (existing) {
-            updatedPortal.password = existing.password;
-            updatedPortal._passwordEncrypted = existing._passwordEncrypted;
-          }
-        }
-      });
-    }
-
     ALLOWED.forEach((key) => { if (key in req.body) client[key] = req.body[key]; });
     await client.save();
     res.json(client);
