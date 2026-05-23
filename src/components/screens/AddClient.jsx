@@ -600,9 +600,3 @@ function Field({ label, field, children }) {
     : children;
   return <label htmlFor={field}><span className="field-label">{label}</span>{control}</label>;
 }
-id: children.props.id || field,
-  name: children.props.name || field,
-      })
-    : children;
-return <label htmlFor={field}><span className="field-label">{label}</span>{control}</label>;
-}

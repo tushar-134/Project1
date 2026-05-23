@@ -12,7 +12,6 @@ import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import Table from "../ui/Table.jsx";
-import StatusPill from "../ui/StatusPill.jsx";
 
 // BRD 5.4 — all four statuses; "Submitted to FTA" is gated to FTA-tracked tasks only
 // Order: Not Yet Started → WIP → Submitted to FTA → Completed
