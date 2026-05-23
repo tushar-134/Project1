@@ -124,7 +124,7 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
                   <button
                     type="button"
                     className="task-id-link text-[18px] font-black"
-                    onClick={() => navigate(`/tasks/edit/${task._id}`)}
+                    onClick={() => navigate(`/tasks/edit/${task._id}`, { state: { task } })}
                     title="Edit task"
                   >
                     {task.taskId}

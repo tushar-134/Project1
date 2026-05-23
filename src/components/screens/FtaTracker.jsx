@@ -253,7 +253,7 @@ export default function FtaTracker() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => navigate(`/tasks/edit/${item.id}`)}
+                        onClick={() => navigate(`/tasks/edit/${item.id}`, { state: { task: item } })}
                       >
                         Edit
                       </Button>

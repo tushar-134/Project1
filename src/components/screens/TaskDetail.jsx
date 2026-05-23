@@ -127,7 +127,7 @@ export default function TaskDetail() {
                 <button
                   type="button"
                   className="task-id-link"
-                  onClick={() => navigate(`/tasks/edit/${task._id}`)}
+                  onClick={() => navigate(`/tasks/edit/${task._id}`, { state: { task } })}
                   title="Edit task"
                 >
                   {task.taskId}
