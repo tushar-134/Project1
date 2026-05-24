@@ -5,12 +5,16 @@ function csvEscape(value) {
   return `"${String(value ?? "").replaceAll('"', '""')}"`;
 }
 
+function csvRow(values) {
+  return values.map(csvEscape).join(",");
+}
+
 function sendCsv(res, filename, csv) {
   // Express 5 removed res.attachment(); set headers explicitly.
   res
     .setHeader("Content-Disposition", `attachment; filename="${filename}"`)
-    .setHeader("Content-Type", "text/csv")
-    .send(csv);
+    .setHeader("Content-Type", "text/csv; charset=utf-8")
+    .send(`\uFEFF${csv}`);
 }
 
 function escapeRegex(value) {
@@ -24,6 +28,40 @@ function parsePagination(query) {
   const requested = ["page", "limit", "search"].some((key) => Object.prototype.hasOwnProperty.call(query, key));
   return { page, limit, search, requested };
 }
+
+function formatMobile(contact) {
+  if (!contact?.mobile) return "";
+  return [contact.mobile.countryCode, contact.mobile.number].filter(Boolean).join(" ");
+}
+
+function clientExportRow(client, groupName = client.group?.name || "") {
+  const primaryContact = client.contactPersons?.find((person) => person.isPrimary) || client.contactPersons?.[0] || {};
+  return [
+    client.fileNo || "",
+    client.legalName || "",
+    client.clientType || "",
+    client.jurisdiction || "",
+    groupName,
+    client.tradeLicences?.[0]?.licenceNumber || "",
+    client.vatDetails?.trn || "",
+    primaryContact.fullName || "",
+    formatMobile(primaryContact),
+    primaryContact.email || "",
+  ];
+}
+
+const CLIENT_EXPORT_HEADERS = [
+  "File No",
+  "Client Name",
+  "Client Type",
+  "Jurisdiction",
+  "Group",
+  "Trade Licence No.",
+  "VAT TRN",
+  "Primary Contact",
+  "Mobile",
+  "Email",
+];
 
 exports.listGroups = async (req, res, next) => {
   try {
@@ -71,54 +109,44 @@ exports.deleteGroup = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-// Export options:
-// - mode=group (default): group-wise export (one row per group)
-// - mode=client: client-wise export, optionally filtered by groupId
 exports.exportGroups = async (req, res, next) => {
   try {
     const mode = String(req.query.mode || "group").toLowerCase();
+    const groupId = req.query.groupId ? String(req.query.groupId) : null;
+    const clientId = req.query.clientId ? String(req.query.clientId) : null;
 
     if (mode === "client" || mode === "clients") {
-      const groupId = req.query.groupId ? String(req.query.groupId) : null;
       const query = { isActive: true };
       if (groupId) query.group = groupId;
+      if (clientId) query._id = clientId;
 
       const clients = await Client.find(query).populate("group", "name").sort({ fileNo: 1 });
-      const csv = ["File No,Name,Jurisdiction,Group,VAT TRN"]
-        .concat(
-          clients.map((c) =>
-            [
-              c.fileNo,
-              c.legalName,
-              c.jurisdiction,
-              c.group?.name || "",
-              c.vatDetails?.trn || "",
-            ]
-              .map(csvEscape)
-              .join(","),
-          ),
-        )
-        .join("\n");
+      const csv = [CLIENT_EXPORT_HEADERS, ...clients.map((client) => clientExportRow(client))]
+        .map(csvRow)
+        .join("\r\n");
 
-      return sendCsv(res, groupId ? "group-clients.csv" : "clients.csv", csv);
+      return sendCsv(res, clientId ? "client.csv" : groupId ? "group-clients.csv" : "clients.csv", csv);
     }
 
-    const groups = await ClientGroup.find()
-      .populate("clients", "legalName fileNo")
+    const groupQuery = groupId ? { _id: groupId } : {};
+    const groups = await ClientGroup.find(groupQuery)
+      .populate("clients")
       .sort({ name: 1 });
 
-    const csv = ["Group Name,Client Count,Clients (File No - Name)"]
-      .concat(
-        groups.map((g) => {
-          const clientList = (g.clients || [])
-            .map((c) => `${c.fileNo || "-"} - ${c.legalName || "-"}`)
-            .join("; ");
-          return [g.name, (g.clients || []).length, clientList].map(csvEscape).join(",");
-        }),
-      )
-      .join("\n");
+    const rows = groups.flatMap((group) => {
+      const clients = group.clients || [];
+      if (!clients.length) return [[group.name, 0, ...Array(CLIENT_EXPORT_HEADERS.length).fill("")]];
+      return clients.map((client) => [
+        group.name,
+        clients.length,
+        ...clientExportRow(client, group.name),
+      ]);
+    });
+    const csv = [["Group Name", "Client Count", ...CLIENT_EXPORT_HEADERS], ...rows]
+      .map(csvRow)
+      .join("\r\n");
 
-    return sendCsv(res, "client-groups.csv", csv);
+    return sendCsv(res, groupId ? "client-group.csv" : "client-groups.csv", csv);
   } catch (error) {
     next(error);
   }
