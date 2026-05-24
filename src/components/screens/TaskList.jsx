@@ -83,6 +83,8 @@ export default function TaskList() {
   }, [cat, status, scope, month]);
 
   const rows = state.tasks;
+  const activeRows = rows.filter((task) => task.status !== "Completed");
+  const completedRows = rows.filter((task) => task.status === "Completed");
   const exportCsv = async () =>
     downloadBlob(
       await exportTasks({
@@ -93,6 +95,90 @@ export default function TaskList() {
       }),
       "tasks.csv"
     );
+
+  const renderTaskRow = (task) => {
+    // BRD 5.4: task_only can only change status for tasks assigned to them
+    const canChangeStatus =
+      canManage ||
+      (isTaskOnly && String(task.assignedId) === String(currentUser?._id || currentUser?.id));
+    const isStatusLocked = task.ftaStatus === "approved" || task.status === "Completed";
+
+    // BRD 5.4: "Submitted to FTA" available for all tasks — backend auto-routes to FTA Tracker
+    const availableStatuses = ALL_STATUSES;
+
+    return (
+      <tr key={task.id}>
+        <td className="font-extrabold text-[#1e3a8a]">
+          <button
+            className="task-id-link"
+            onClick={() => (canManage ? setDrawerTaskId(task.id) : navigate(`/tasks/${task.id}`))}
+            title={canManage ? "Open task details" : "View task details"}
+          >
+            {task.taskId}
+          </button>
+        </td>
+        <td>{task.client}</td>
+        <td>
+          <Badge>{task.category}</Badge>
+        </td>
+        <td>{task.type}</td>
+        <td>
+          <div>{task.dueDate}</div>
+          {task.overdueDays > 0 && (
+            <span className="mt-1 inline-flex rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-extrabold text-[#dc2626]">
+              {task.overdueDays}d overdue
+            </span>
+          )}
+        </td>
+        <td>
+          {canManage ? (
+            <select
+              id={`task-assignee-${task.id}`}
+              className="input h-8 min-w-36"
+              value={task.assignedId || ""}
+              onChange={(e) => {
+                const selected = state.users.find((u) => u._id === e.target.value || u.id === e.target.value);
+                updateAssignee(task.id, e.target.value || null, selected?.name || "Unassigned").catch(() => fetchTasks());
+              }}
+            >
+              <option value="">Unassigned</option>
+              {state.users.map((u) => (
+                <option key={u._id || u.id} value={u._id || u.id}>{u.name}</option>
+              ))}
+            </select>
+          ) : (
+            <span>{task.assigned}</span>
+          )}
+        </td>
+        <td>
+          {canChangeStatus && !isStatusLocked ? (
+            <select
+              id={`task-status-${task.id}`}
+              name={`taskStatus${task.id}`}
+              className="input h-8 min-w-40"
+              value={task.displayStatus ?? task.status}
+              onChange={(e) =>
+                updateStatus(task.id, e.target.value).then(() => refetchTasks()).catch(() => refetchTasks())
+              }
+            >
+              {availableStatuses.map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            </select>
+          ) : (
+            <StatusPill status={task.status} />
+          )}
+        </td>
+        <td>
+          {task.recurring && (
+            <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-extrabold text-[#1e3a8a]">
+              Recurring
+            </span>
+          )}
+        </td>
+      </tr>
+    );
+  };
 
   return (
     <div className="space-y-5">
@@ -131,6 +217,11 @@ export default function TaskList() {
         </div>
       )}
 
+      <div>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h3 className="text-[15px] font-extrabold text-slate-900">Active Tasks</h3>
+          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-extrabold text-slate-500">{activeRows.length}</span>
+        </div>
       <Card>
         <Table>
           <thead>
@@ -146,97 +237,51 @@ export default function TaskList() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((task) => {
-              // BRD 5.4: task_only can only change status for tasks assigned to them
-              const canChangeStatus =
-                canManage ||
-                (isTaskOnly && String(task.assignedId) === String(currentUser?._id || currentUser?.id));
-              const isStatusLocked = task.ftaStatus === "approved" || task.status === "Completed";
-
-              // BRD 5.4: "Submitted to FTA" available for all tasks — backend auto-routes to FTA Tracker
-              const availableStatuses = ALL_STATUSES;
-
-              return (
-                <tr key={task.id}>
-                  <td className="font-extrabold text-[#1e3a8a]">
-                    <button
-                      className="task-id-link"
-                      onClick={() => (canManage ? setDrawerTaskId(task.id) : navigate(`/tasks/${task.id}`))}
-                      title={canManage ? "Open task details" : "View task details"}
-                    >
-                      {task.taskId}
-                    </button>
-                  </td>
-                  <td>{task.client}</td>
-                  <td>
-                    <Badge>{task.category}</Badge>
-                  </td>
-                  <td>{task.type}</td>
-                  <td>
-                    <div>{task.dueDate}</div>
-                    {task.overdueDays > 0 && (
-                      <span className="mt-1 inline-flex rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-extrabold text-[#dc2626]">
-                        {task.overdueDays}d overdue
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    {canManage ? (
-                      // Admin/Manager: inline assignee dropdown
-                      <select
-                        id={`task-assignee-${task.id}`}
-                        className="input h-8 min-w-36"
-                        value={task.assignedId || ""}
-                        onChange={(e) => {
-                          const selected = state.users.find((u) => u._id === e.target.value || u.id === e.target.value);
-                          updateAssignee(task.id, e.target.value || null, selected?.name || "Unassigned").catch(() => fetchTasks());
-                        }}
-                      >
-                        <option value="">Unassigned</option>
-                        {state.users.map((u) => (
-                          <option key={u._id || u.id} value={u._id || u.id}>{u.name}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span>{task.assigned}</span>
-                    )}
-                  </td>
-                  <td>
-                    {canChangeStatus && !isStatusLocked ? (
-                      <select
-                        id={`task-status-${task.id}`}
-                        name={`taskStatus${task.id}`}
-                        className="input h-8 min-w-40"
-                        // Use displayStatus when available (set by optimistic update) so the
-                        // select doesn't revert to the first option while the API request is in flight.
-                        value={task.displayStatus ?? task.status}
-                        onChange={(e) =>
-                          // Always re-fetch after update (success or fail) to guarantee DB sync.
-                          updateStatus(task.id, e.target.value).then(() => refetchTasks()).catch(() => refetchTasks())
-                        }
-                      >
-                        {availableStatuses.map((s) => (
-                          <option key={s}>{s}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      // BRD 5.4: task_only sees a locked pill for tasks not assigned to them
-                      <StatusPill status={task.status} />
-                    )}
-                  </td>
-                  <td>
-                    {task.recurring && (
-                      <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-extrabold text-[#1e3a8a]">
-                        Recurring
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
+            {!activeRows.length && (
+              <tr>
+                <td colSpan={8} className="py-8 text-center font-semibold text-slate-500">
+                  No active tasks in the selected view.
+                </td>
+              </tr>
+            )}
+            {activeRows.map(renderTaskRow)}
           </tbody>
         </Table>
       </Card>
+      </div>
+
+      <div>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h3 className="text-[15px] font-extrabold text-slate-900">Completed Tasks</h3>
+          <span className="rounded-full bg-green-50 px-2.5 py-1 text-[11px] font-extrabold text-green-700">{completedRows.length}</span>
+        </div>
+        <Card>
+          <Table>
+            <thead>
+              <tr>
+                <th>Task ID</th>
+                <th>Client</th>
+                <th>Category</th>
+                <th>Task Type</th>
+                <th>Due Date</th>
+                <th>Assigned</th>
+                <th>Status</th>
+                <th>Recurring</th>
+              </tr>
+            </thead>
+            <tbody>
+              {!completedRows.length && (
+                <tr>
+                  <td colSpan={8} className="py-8 text-center font-semibold text-slate-500">
+                    No completed tasks in the selected view.
+                  </td>
+                </tr>
+              )}
+              {completedRows.map(renderTaskRow)}
+            </tbody>
+          </Table>
+        </Card>
+      </div>
 
       {canManage && drawerTaskId && (
         <TaskDrawer taskId={drawerTaskId} canManage={canManage} onClose={() => setDrawerTaskId(null)} />
