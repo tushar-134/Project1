@@ -1,4 +1,4 @@
-import { Download } from "lucide-react";
+import { Download, MessageSquare } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -43,12 +43,16 @@ export default function TaskList() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { fetchTasks, updateStatus, updateAssignee, exportTasks } = useTasks();
+  const { fetchTasks, updateStatus, updateAssignee, updateRemarks, exportTasks } = useTasks();
   const [cat, setCat] = useState(searchParams.get("category") || "All");
   const [status, setStatus] = useState("All");
   const [scope, setScope] = useState("By Month");
   const [month, setMonth] = useState(searchParams.get("month") || "2026-05");
   const [drawerTaskId, setDrawerTaskId] = useState(null);
+  const [remarkTask, setRemarkTask] = useState(null);
+  const [remarkText, setRemarkText] = useState("");
+  const [remarkSaving, setRemarkSaving] = useState(false);
+  const [remarkError, setRemarkError] = useState("");
 
   const canManage = canManageTasks(currentUser?.role);
   const isTaskOnly = currentUser?.role === "task_only";
@@ -93,6 +97,43 @@ export default function TaskList() {
       }),
       "tasks.csv"
     );
+
+  function openRemark(task) {
+    setRemarkTask(task);
+    setRemarkText(task.remarks || "");
+    setRemarkError("");
+  }
+
+  function closeRemark() {
+    if (remarkSaving) return;
+    setRemarkTask(null);
+    setRemarkText("");
+    setRemarkError("");
+  }
+
+  async function saveRemark() {
+    if (!remarkTask) return;
+    setRemarkSaving(true);
+    setRemarkError("");
+    try {
+      await updateRemarks(remarkTask.id, remarkText);
+      setRemarkTask(null);
+      setRemarkText("");
+    } catch (error) {
+      setRemarkError(error?.response?.data?.message || "Unable to save remark.");
+    } finally {
+      setRemarkSaving(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!remarkTask) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") closeRemark();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [remarkTask, remarkSaving]);
 
   return (
     <div className="space-y-5">
@@ -142,6 +183,7 @@ export default function TaskList() {
               <th>Due Date</th>
               <th>Assigned</th>
               <th>Status</th>
+              <th>Remarks</th>
               <th>Recurring</th>
             </tr>
           </thead>
@@ -225,6 +267,21 @@ export default function TaskList() {
                     )}
                   </td>
                   <td>
+                    <div className="flex min-w-44 flex-col gap-2">
+                      {task.remarks && (
+                        <div className="line-clamp-2 text-[12px] font-semibold text-slate-600" title={task.remarks}>
+                          {task.remarks}
+                        </div>
+                      )}
+                      {canChangeStatus && (
+                        <Button size="sm" variant="ghost" onClick={() => openRemark(task)}>
+                          <MessageSquare size={14} />
+                          {task.remarks ? "Edit" : "Add"}
+                        </Button>
+                      )}
+                    </div>
+                  </td>
+                  <td>
                     {task.recurring && (
                       <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-extrabold text-[#1e3a8a]">
                         Recurring
@@ -240,6 +297,54 @@ export default function TaskList() {
 
       {canManage && drawerTaskId && (
         <TaskDrawer taskId={drawerTaskId} canManage={canManage} onClose={() => setDrawerTaskId(null)} />
+      )}
+
+      {remarkTask && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/35 p-4">
+          <Card className="w-full max-w-lg p-4">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <div className="page-kicker">Task Remark</div>
+                <div className="text-[16px] font-extrabold text-slate-900">{remarkTask.taskId}</div>
+              </div>
+              <button
+                type="button"
+                onClick={closeRemark}
+                disabled={remarkSaving}
+                className="text-slate-500 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Close
+              </button>
+            </div>
+
+            <label htmlFor="task-remark">
+              <span className="field-label">Remark</span>
+              <textarea
+                id="task-remark"
+                name="taskRemark"
+                className="input min-h-32"
+                value={remarkText}
+                onChange={(event) => setRemarkText(event.target.value)}
+                disabled={remarkSaving}
+              />
+            </label>
+
+            {remarkError && (
+              <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">
+                {remarkError}
+              </div>
+            )}
+
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="ghost" onClick={closeRemark} disabled={remarkSaving}>
+                Cancel
+              </Button>
+              <Button onClick={saveRemark} disabled={remarkSaving}>
+                {remarkSaving ? "Saving..." : "Save Remark"}
+              </Button>
+            </div>
+          </Card>
+        </div>
       )}
     </div>
   );
