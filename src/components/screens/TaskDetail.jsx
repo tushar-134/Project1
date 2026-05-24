@@ -288,11 +288,11 @@ export default function TaskDetail() {
           )}
         </div>
 
-        {/* Description */}
+        {/* Remarks */}
         {task.description && (
           <div className="task-detail-description">
             <div className="task-detail-field-label mb-2">
-              <FileText size={13} /> Description
+              <FileText size={13} /> Remarks
             </div>
             <p className="text-[13px] leading-relaxed text-slate-700">{task.description}</p>
           </div>

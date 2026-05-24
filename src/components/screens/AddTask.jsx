@@ -32,7 +32,7 @@ export default function AddTask() {
   const [fta, setFta] = useState(false);
   const [savedStatus, setSavedStatus] = useState("not_started");
   const [submitting, setSubmitting] = useState(false);
-  const [details, setDetails] = useState({ client: "", assigned: "", dueDate: "2026-05-31", periodFY: "", periodQuarter: "", description: "", frequency: "monthly", dayOfWeek: "Sun", dateOfMonth: 1, monthOfYear: 1, nextDue: "2026-06-30", endDate: "" });
+  const [details, setDetails] = useState(() => getDefaultTaskDetails());
   const chips = useMemo(() => category?.taskTypes || [], [category]);
 
   // Derive field-visibility config from the selected task type's saved toggles.
@@ -237,7 +237,7 @@ export default function AddTask() {
             <Field label="Client*" field="taskClient"><select className="input" value={details.client} onChange={(e) => setDetails({ ...details, client: e.target.value })}><option value="">Select client</option>{state.clients.map((c) => <option key={c.id} value={c._id}>{c.name}</option>)}</select></Field>
             <Field label="Assign To" field="taskAssignedTo"><select className="input" value={details.assigned} onChange={(e) => setDetails({ ...details, assigned: e.target.value })}><option value="">Unassigned</option>{state.users.map((u) => <option key={u.id} value={u._id}>{u.name}</option>)}</select></Field>
             <Field label="Due Date*" field="taskDueDate"><input className="input" type="date" value={details.dueDate} onChange={(e) => handleRecurrenceChange({ dueDate: e.target.value })} /></Field>
-            <Field label="Description / Notes" field="taskDescription"><textarea className="input textarea" value={details.description} onChange={(e) => setDetails({ ...details, description: e.target.value })} /></Field>
+            <Field label="Remarks" field="taskDescription"><textarea className="input textarea" value={details.description} onChange={(e) => setDetails({ ...details, description: e.target.value })} /></Field>
           </div>
 
           {/* ── Period section ─────────────────────────────────────────── */}
@@ -511,4 +511,28 @@ function calculateFrontendNextDue(dueDateStr, frequency, dayOfWeek, dateOfMonth,
   } catch (e) {
     return "";
   }
+}
+
+function getDefaultTaskDetails() {
+  const today = new Date();
+  const dueDate = formatDateInputValue(new Date(today.getFullYear(), today.getMonth() + 1, 0));
+  const nextDue = formatDateInputValue(new Date(today.getFullYear(), today.getMonth() + 2, 0));
+  return {
+    client: "",
+    assigned: "",
+    dueDate,
+    periodFY: "",
+    periodQuarter: "",
+    description: "",
+    frequency: "monthly",
+    dayOfWeek: "Sun",
+    dateOfMonth: 1,
+    monthOfYear: 1,
+    nextDue,
+    endDate: "",
+  };
+}
+
+function formatDateInputValue(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }

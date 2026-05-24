@@ -1,4 +1,4 @@
-import { AlertTriangle, Briefcase, Calendar, Clock, ExternalLink, FileText, Tag, User, X } from "lucide-react";
+import { AlertTriangle, Briefcase, Calendar, Clock, ExternalLink, FileText, LoaderCircle, Tag, User, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -57,6 +57,10 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
   const [error, setError] = useState(null);
   const [statusSaving, setStatusSaving] = useState(false);
   const [statusError, setStatusError] = useState("");
+  const [remarkDraft, setRemarkDraft] = useState("");
+  const [remarkSaving, setRemarkSaving] = useState(false);
+  const [remarkError, setRemarkError] = useState("");
+  const [remarkNotice, setRemarkNotice] = useState("");
 
   const loadTask = useCallback(async (active = true) => {
     setLoading(true);
@@ -104,6 +108,12 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
     };
   }, [taskId, loadTask]);
 
+  useEffect(() => {
+    setRemarkDraft(task?.description || "");
+    setRemarkError("");
+    setRemarkNotice("");
+  }, [task?.description, task?._id]);
+
   if (!taskId) return null;
 
   const displayStatus = statusFromApi[task?.status] || task?.status;
@@ -115,6 +125,7 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
       (currentUser?.role === "task_only" && String(task.assignedTo?._id) === String(currentUser?._id || currentUser?.id))
     )
   );
+  const canEditRemark = canChangeStatus || Boolean(task && canManage);
 
   async function handleStatusChange(nextLabel) {
     if (!task || statusSaving || nextLabel === displayStatus) return;
@@ -131,6 +142,29 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
       setStatusError(err.response?.data?.message || "Failed to update task status");
     } finally {
       setStatusSaving(false);
+    }
+  }
+
+  async function handleRemarkSave() {
+    if (!task || !canEditRemark || remarkSaving) return;
+    const nextRemark = remarkDraft.trim();
+    const currentRemark = String(task.description || "").trim();
+    if (nextRemark === currentRemark) return;
+
+    setRemarkSaving(true);
+    setRemarkError("");
+    setRemarkNotice("");
+    try {
+      const updatedTask = await taskService.update(task._id, { description: nextRemark });
+      const logsData = await taskService.getLogs(task._id);
+      setTask(updatedTask);
+      setLogs(logsData);
+      setRemarkDraft(updatedTask.description || "");
+      setRemarkNotice(nextRemark ? "Remarks saved." : "Remarks cleared.");
+    } catch (err) {
+      setRemarkError(err.response?.data?.message || "Failed to save remarks");
+    } finally {
+      setRemarkSaving(false);
     }
   }
 
@@ -188,7 +222,7 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
             <button
               type="button"
               onClick={onClose}
-              className="grid h-10 w-10 place-items-center rounded-xl border border-[#dbe4f0] bg-slate-50 text-slate-500 transition hover:bg-slate-100"
+              className="grid h-10 w-10 place-items-center rounded-xl border border-[#dbe4f0] bg-slate-50 text-slate-500 transition-colors duration-150 ease-out hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1e3a8a]/20 focus-visible:ring-offset-2"
               title="Close"
             >
               <X size={18} />
@@ -313,12 +347,52 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
                   )}
                 </div>
 
-                {task.description && (
+                {(task.description || canEditRemark) && (
                   <div className="task-detail-description">
-                    <div className="mb-2 task-detail-field-label">
-                      <FileText size={13} /> Description
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <div className="mb-1 task-detail-field-label">
+                          <FileText size={13} /> Remarks
+                        </div>
+                        <p className="text-[12px] text-slate-500">
+                          Capture updates, blockers, or next steps for the team.
+                        </p>
+                      </div>
+                      {canEditRemark && (
+                        <Button
+                          size="sm"
+                          onClick={handleRemarkSave}
+                          disabled={remarkSaving || String(task.description || "").trim() === remarkDraft.trim()}
+                        >
+                          {remarkSaving ? <LoaderCircle size={14} className="animate-spin" /> : <FileText size={14} />}
+                          {remarkSaving ? "Saving..." : "Save remarks"}
+                        </Button>
+                      )}
                     </div>
-                    <p className="text-[13px] leading-relaxed text-slate-700">{task.description}</p>
+
+                    {canEditRemark ? (
+                      <textarea
+                        className="input textarea mt-3 min-h-28"
+                        value={remarkDraft}
+                        onChange={(event) => setRemarkDraft(event.target.value)}
+                        placeholder="Add a clear remark for this task..."
+                        aria-busy={remarkSaving}
+                      />
+                    ) : (
+                      <p className="mt-3 text-[13px] leading-relaxed text-slate-700">{task.description}</p>
+                    )}
+
+                    {remarkError && (
+                      <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">
+                        {remarkError}
+                      </div>
+                    )}
+
+                    {remarkNotice && !remarkError && (
+                      <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-[12px] font-semibold text-emerald-700">
+                        {remarkNotice}
+                      </div>
+                    )}
                   </div>
                 )}
 

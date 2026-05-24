@@ -90,9 +90,12 @@ button { touch-action: manipulation; }
   cursor: pointer;
   padding: 2px 6px;
   border-radius: 6px;
-  transition: all 0.2s ease;
   text-decoration: none;
   position: relative;
+}
+.task-id-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.16);
 }
 .task-id-link::after {
   content: "";
@@ -105,7 +108,6 @@ button { touch-action: manipulation; }
   border-radius: 1px;
   opacity: 0;
   transform: scaleX(0);
-  transition: all 0.2s ease;
 }
 .task-id-link:hover {
   background: rgba(30, 58, 138, 0.06);
@@ -114,6 +116,140 @@ button { touch-action: manipulation; }
 .task-id-link:hover::after {
   opacity: 1;
   transform: scaleX(1);
+}
+
+.task-filter-panel {
+  border: 1px solid #dbe4f0;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at top right, rgba(59, 130, 246, 0.12), transparent 28%),
+    linear-gradient(180deg, rgba(255,255,255,.98), rgba(248,250,252,.96));
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.06);
+}
+.task-filter-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: space-between;
+}
+.task-filter-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 170px;
+}
+.task-filter-chip-row {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.task-filter-chip {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: rgba(255,255,255,.92);
+  color: #475569;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 800;
+  box-shadow: inset 0 0 0 1px rgba(226, 232, 240, 0.85);
+}
+.task-filter-chip:hover {
+  border-color: rgba(148, 163, 184, 0.4);
+  color: #0f172a;
+  background: #ffffff;
+}
+.task-filter-chip.is-active {
+  border-color: rgba(30, 58, 138, 0.14);
+  background: linear-gradient(135deg, #1e3a8a, #2563eb);
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.22);
+}
+.task-filter-chip:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.14);
+}
+.task-filter-month {
+  min-width: 170px;
+}
+.task-filter-month[disabled] {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+.task-stat-card {
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,250,252,.94));
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.04);
+}
+.task-stat-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: rgba(30, 58, 138, 0.08);
+  color: #1e3a8a;
+}
+.task-remark-preview {
+  display: -webkit-box;
+  max-width: 280px;
+  overflow: hidden;
+  color: #334155;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.task-remark-placeholder {
+  color: #94a3b8;
+}
+.task-remark-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px dashed rgba(148, 163, 184, 0.65);
+  border-radius: 999px;
+  background: rgba(255,255,255,.9);
+  color: #1e3a8a;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 800;
+}
+.task-remark-action:hover {
+  border-color: rgba(30, 58, 138, 0.35);
+  background: rgba(239, 246, 255, 0.92);
+}
+.task-remark-action:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.14);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .task-id-link {
+    transition: background-color 150ms ease-out, color 150ms ease-out;
+  }
+  .task-id-link::after {
+    transition: transform 150ms ease-out, opacity 150ms ease-out;
+  }
+  .task-filter-chip,
+  .task-remark-action {
+    transition:
+      transform 150ms ease-out,
+      color 150ms ease-out,
+      background-color 150ms ease-out,
+      border-color 150ms ease-out,
+      box-shadow 150ms ease-out;
+  }
+  .task-filter-chip:hover,
+  .task-remark-action:hover {
+    transform: translateY(-1px);
+  }
+}
+@media (max-width: 640px) {
+  .task-filter-heading {
+    min-width: 100%;
+  }
+  .task-remark-preview {
+    max-width: 100%;
+  }
 }
 
 /* ── Task Detail Page ── */
@@ -294,4 +430,3 @@ button { touch-action: manipulation; }
     align-items: flex-start;
   }
 }
-

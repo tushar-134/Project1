@@ -8,5 +8,5 @@ export default function Button({ children, type = "button", variant = "primary",
     success: "bg-[#059669] text-white hover:brightness-95",
   };
   const sizes = { sm: "min-h-8 px-3 text-[12px]", md: "min-h-9 px-4 text-[13px]", lg: "min-h-10 px-5 text-[14px]" };
-  return <button type={type} className={`inline-flex items-center justify-center gap-2 rounded-lg py-1.5 font-bold leading-tight transition disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${sizes[size]} ${className}`} {...props}>{children}</button>;
+  return <button type={type} className={`inline-flex items-center justify-center gap-2 rounded-lg py-1.5 font-bold leading-tight transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1e3a8a]/20 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${sizes[size]} ${className}`} {...props}>{children}</button>;
 }
