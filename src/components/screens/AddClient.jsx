@@ -99,7 +99,7 @@ export default function AddClient() {
     return ["United Arab Emirates", ...[...new Set(base)].filter((country) => country !== "United Arab Emirates")];
   }, []);
   const [form, setForm] = useState({
-    clientType: "Legal Person", fileNo: "", legalName: "", tradeName: "", fye: "Jan - Dec", jurisdiction: "Mainland", assigned: "",
+    clientType: "", fileNo: "", legalName: "", tradeName: "", fye: "Jan - Dec", jurisdiction: "Mainland", assigned: "",
     country: "United Arab Emirates", emirate: "Dubai", street: "", poBox: "", postalCode: "", differentAddress: false, correspondence: "",
     vatTrn: "", vatStatus: "Registered", vatDate: "", vatFreq: "Quarterly", ctTin: "", ctStatus: "Not Registered", ctDate: "", group: "", newGroup: "",
   });
@@ -502,6 +502,10 @@ export default function AddClient() {
 
   async function saveClient({ continueToNext = false } = {}) {
     if (isSaving) return false;
+    if (!form.clientType) {
+      toast.error("Please select the client type.");
+      return false;
+    }
     if (!form.legalName) {
       toast.error("Please enter the client legal name.");
       return false;
@@ -1256,15 +1260,14 @@ function SearchableSelect({ id, value, options, searchValue, onSearchChange, onC
 function Basic({ form, update, countries, users, userSearch, setUserSearch, isUserSearchLoading }) {
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 md:grid-cols-2">
-        {["Legal Person", "Natural Person"].map((type) => (
-          <button key={type} type="button" onClick={() => update("clientType", type)} className={`rounded-xl border p-4 text-left ${form.clientType === type ? "border-[#1e3a8a] bg-blue-50" : "border-[#e2e8f0]"}`}>
-            <div className="font-extrabold">{type}</div>
-            <div className="text-[12px] text-slate-500">{type === "Legal Person" ? "Companies, branches, free zone entities" : "Individual taxable persons"}</div>
-          </button>
-        ))}
-      </div>
       <div className="grid gap-3 md:grid-cols-3">
+        <Field label="Select Type*" field="client-type">
+          <select className="input" required value={form.clientType} onChange={(e) => update("clientType", e.target.value)}>
+            <option value="">Select type</option>
+            <option value="Legal Person">Legal Person</option>
+            <option value="Natural Person">Natural Person</option>
+          </select>
+        </Field>
         <Field label="File No." field="client-file-no"><input className="input" value={form.fileNo} onChange={(e) => update("fileNo", e.target.value)} /></Field>
         <Field label="Legal Name*" field="client-legal-name"><input className="input" value={form.legalName} onChange={(e) => update("legalName", e.target.value)} /></Field>
         <Field label="Trade Name" field="client-trade-name"><input className="input" value={form.tradeName} onChange={(e) => update("tradeName", e.target.value)} /></Field>
