@@ -9,6 +9,7 @@ export const taskService = {
   remove: (id) => api.delete(`/tasks/${id}`).then((res) => res.data),
   updateStatus: (id, status) => api.patch(`/tasks/${id}/status`, { status }).then((res) => res.data),
   updateAssignee: (id, assignedTo) => api.patch(`/tasks/${id}/assignee`, { assignedTo }).then((res) => res.data),
+  updateRemarks: (id, remarks) => api.patch(`/tasks/${id}/remarks`, { remarks }).then((res) => res.data),
   ftaTracker: (params) => api.get("/tasks/fta-tracker", { params }).then((res) => res.data),
   updateFtaStatus: (id, ftaStatus) => api.patch(`/tasks/${id}/fta-status`, { ftaStatus }).then((res) => res.data),
   export: (params) => api.get("/tasks/export", { params, responseType: "blob" }).then((res) => res.data),

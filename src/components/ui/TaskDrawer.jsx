@@ -322,6 +322,15 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
                   </div>
                 )}
 
+                {task.remarks && (
+                  <div className="task-detail-description">
+                    <div className="mb-2 task-detail-field-label">
+                      <FileText size={13} /> Remarks
+                    </div>
+                    <p className="text-[13px] leading-relaxed text-slate-700">{task.remarks}</p>
+                  </div>
+                )}
+
                 <div className="task-detail-timestamps">
                   <span>Created {formatDateTime(task.createdAt)}</span>
                   <span className="text-slate-300">.</span>
