@@ -5,6 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useApp } from "../../context/AppContext";
 import { useTasks } from "../../hooks/useTasks";
 import { canCreateClients, canManageCategories, canManageClients, canManageGroups, canManageUsers, canManageTasks, canViewContacts, canViewFtaTracker, canViewReports, canViewUsers, ROLE_LABELS } from "../../utils/permissions.js";
+import UserAvatar from "../ui/UserAvatar.jsx";
 
 export const navItems = [
   { section: "Main", links: [{ label: "Dashboard", to: "/dashboard", icon: LayoutDashboard }] },
@@ -40,7 +41,6 @@ export default function Sidebar({ open = false, onClose = () => {}, mobile = fal
     if ((!mobile || open) && canViewFtaTracker(role)) fetchFtaTracker().catch(() => {});
   }, [mobile, open, role]);
   const ftaCount = state.ftaItems.filter((task) => task.ftaStatus !== "approved" && task.status !== "Approved").length;
-  const initials = (currentUser?.name || "User").split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
   const visibleNavItems = navItems
     .map((group) => ({
       ...group,
@@ -105,7 +105,7 @@ export default function Sidebar({ open = false, onClose = () => {}, mobile = fal
       </nav>
       <div className="m-3 rounded-xl bg-white/10 p-3">
         <div className="flex items-center gap-2">
-          <div className="grid h-9 w-9 place-items-center rounded-full bg-[#eab308] text-[12px] font-black text-white">{initials}</div>
+          <UserAvatar user={currentUser} size="sm" />
           <div className="min-w-0">
             <div className="truncate text-[12px] font-extrabold">{currentUser?.name}</div>
             <div className="text-[10px] font-bold text-white/60">{ROLE_LABELS[currentUser?.role] || currentUser?.role}</div>

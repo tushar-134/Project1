@@ -1,22 +1,28 @@
 import { useEffect, useRef, useState } from "react";
-import { Bell, Menu } from "lucide-react";
+import { Bell, ChevronDown, Menu, Settings, UserCircle2 } from "lucide-react";
 import NotificationPanel from "./NotificationPanel.jsx";
+import ProfilePanel from "./ProfilePanel.jsx";
 import { useAuth } from "../../context/AuthContext";
 import { useApp } from "../../context/AppContext";
 import { ROLE_LABELS } from "../../utils/permissions.js";
+import UserAvatar from "../ui/UserAvatar.jsx";
 
 export default function TopBar({ title, onMenuClick }) {
   const [open, setOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [profileTab, setProfileTab] = useState("profile");
   const wrapRef = useRef(null);
+  const menuRef = useRef(null);
   const { currentUser } = useAuth();
   const { state } = useApp();
-  const initials = (currentUser?.name || "User").split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
   const roleLabel = ROLE_LABELS[currentUser?.role] || currentUser?.role || "User";
 
   useEffect(() => {
     // Clicking outside the bell/panel cluster should close notifications without affecting the rest of the page.
     function onPointerDown(event) {
       if (wrapRef.current && !wrapRef.current.contains(event.target)) setOpen(false);
+      if (menuRef.current && !menuRef.current.contains(event.target)) setMenuOpen(false);
     }
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
@@ -39,9 +45,49 @@ export default function TopBar({ title, onMenuClick }) {
           <div className="text-[12px] font-extrabold">{currentUser?.name || "Signed In User"}</div>
           <div className="text-[10px] font-bold text-slate-500">{roleLabel}</div>
         </div>
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#1e3a8a] text-[12px] font-black text-white">{initials}</div>
+        <div ref={menuRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setMenuOpen((value) => !value)}
+            className="flex items-center gap-1 rounded-full border border-[#e2e8f0] bg-white p-1 pr-2 text-slate-700 hover:bg-slate-50"
+            aria-label="Open profile menu"
+            aria-expanded={menuOpen}
+          >
+            <UserAvatar user={currentUser} size="sm" />
+            <ChevronDown size={14} className={`transition ${menuOpen ? "rotate-180" : ""}`} />
+          </button>
+          {menuOpen && (
+            <div className="absolute right-0 top-full z-50 mt-2 w-56 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-200">
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setProfileTab("profile");
+                  setProfileOpen(true);
+                }}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <UserCircle2 size={16} />
+                My Profile
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  setProfileTab("settings");
+                  setProfileOpen(true);
+                }}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <Settings size={16} />
+                Settings
+              </button>
+            </div>
+          )}
+        </div>
         <NotificationPanel open={open} onClose={() => setOpen(false)} />
       </div>
+      <ProfilePanel open={profileOpen} initialTab={profileTab} onClose={() => setProfileOpen(false)} />
     </header>
   );
 }

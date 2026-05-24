@@ -67,6 +67,16 @@ export function AuthProvider({ children }) {
     throw new Error("Login response was incomplete.");
   }, []);
 
+  const setSessionUser = useCallback((user) => {
+    if (!user) {
+      localStorage.removeItem("filingBuddyUser");
+      setCurrentUser(null);
+      return;
+    }
+    localStorage.setItem("filingBuddyUser", JSON.stringify(user));
+    setCurrentUser(user);
+  }, []);
+
   const logout = useCallback(async () => {
     try { await authService.logout(); } catch {}
     clearStoredSession();
@@ -75,7 +85,10 @@ export function AuthProvider({ children }) {
     window.location.assign("/login");
   }, []);
 
-  const value = useMemo(() => ({ currentUser, token, loading, login, logout, isAuthenticated: Boolean(token && currentUser) }), [currentUser, token, loading, login, logout]);
+  const value = useMemo(
+    () => ({ currentUser, token, loading, login, logout, setSessionUser, isAuthenticated: Boolean(token && currentUser) }),
+    [currentUser, token, loading, login, logout, setSessionUser],
+  );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

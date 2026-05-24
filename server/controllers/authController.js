@@ -1,10 +1,36 @@
+const fs = require("fs");
+const path = require("path");
 const { validationResult } = require("express-validator");
 const User = require("../models/User");
 const generateToken = require("../utils/generateToken");
 const jwt = require("jsonwebtoken");
 
+function resolveStoredProfilePhotoUrl(value) {
+  const url = String(value || "").trim();
+  if (!url) return "";
+  try {
+    const parsed = new URL(url);
+    if (!parsed.pathname.startsWith("/uploads/")) return url;
+    const filename = path.basename(parsed.pathname);
+    const filePath = path.join(__dirname, "..", "uploads", filename);
+    return fs.existsSync(filePath) ? url : "";
+  } catch {
+    return url;
+  }
+}
+
 function publicUser(user) {
-  return { id: user._id, name: user.name, email: user.email, role: user.role, mobile: user.mobile, mobileCountryCode: user.mobileCountryCode, isActive: user.isActive };
+  const profilePhotoUrl = resolveStoredProfilePhotoUrl(user.profilePhotoUrl);
+  return {
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    mobile: user.mobile,
+    mobileCountryCode: user.mobileCountryCode,
+    isActive: user.isActive,
+    profilePhotoUrl,
+  };
 }
 
 function applyStoredToken(user, token) {
