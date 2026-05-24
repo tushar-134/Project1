@@ -1,6 +1,18 @@
 const ClientGroup = require("../models/ClientGroup");
 const Client = require("../models/Client");
 
+function csvEscape(value) {
+  return `"${String(value ?? "").replaceAll('"', '""')}"`;
+}
+
+function sendCsv(res, filename, csv) {
+  // Express 5 removed res.attachment(); set headers explicitly.
+  res
+    .setHeader("Content-Disposition", `attachment; filename="${filename}"`)
+    .setHeader("Content-Type", "text/csv")
+    .send(csv);
+}
+
 function escapeRegex(value) {
   return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -57,4 +69,57 @@ exports.deleteGroup = async (req, res, next) => {
     await ClientGroup.findByIdAndDelete(req.params.id);
     res.json({ message: "Group deleted" });
   } catch (error) { next(error); }
+};
+
+// Export options:
+// - mode=group (default): group-wise export (one row per group)
+// - mode=client: client-wise export, optionally filtered by groupId
+exports.exportGroups = async (req, res, next) => {
+  try {
+    const mode = String(req.query.mode || "group").toLowerCase();
+
+    if (mode === "client" || mode === "clients") {
+      const groupId = req.query.groupId ? String(req.query.groupId) : null;
+      const query = { isActive: true };
+      if (groupId) query.group = groupId;
+
+      const clients = await Client.find(query).populate("group", "name").sort({ fileNo: 1 });
+      const csv = ["File No,Name,Jurisdiction,Group,VAT TRN"]
+        .concat(
+          clients.map((c) =>
+            [
+              c.fileNo,
+              c.legalName,
+              c.jurisdiction,
+              c.group?.name || "",
+              c.vatDetails?.trn || "",
+            ]
+              .map(csvEscape)
+              .join(","),
+          ),
+        )
+        .join("\n");
+
+      return sendCsv(res, groupId ? "group-clients.csv" : "clients.csv", csv);
+    }
+
+    const groups = await ClientGroup.find()
+      .populate("clients", "legalName fileNo")
+      .sort({ name: 1 });
+
+    const csv = ["Group Name,Client Count,Clients (File No - Name)"]
+      .concat(
+        groups.map((g) => {
+          const clientList = (g.clients || [])
+            .map((c) => `${c.fileNo || "-"} - ${c.legalName || "-"}`)
+            .join("; ");
+          return [g.name, (g.clients || []).length, clientList].map(csvEscape).join(",");
+        }),
+      )
+      .join("\n");
+
+    return sendCsv(res, "client-groups.csv", csv);
+  } catch (error) {
+    next(error);
+  }
 };

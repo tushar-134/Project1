@@ -7,4 +7,12 @@ export const groupService = {
   update: (id, payload) => api.put(`/groups/${id}`, payload).then((res) => res.data),
   updateClients: (id, payload) => api.patch(`/groups/${id}/clients`, payload).then((res) => res.data),
   remove: (id) => api.delete(`/groups/${id}`).then((res) => res.data),
+  exportGroups: () => api.get("/groups/export", { responseType: "blob" }).then((res) => res.data),
+  exportClients: (groupId) =>
+    api
+      .get("/groups/export", {
+        params: { mode: "client", ...(groupId ? { groupId } : {}) },
+        responseType: "blob",
+      })
+      .then((res) => res.data),
 };
