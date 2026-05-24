@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Check, ChevronDown, Copy, Eye, EyeOff, Plus, Search, Trash2, UploadCloud, X, Settings2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
+import { useAuth } from "../../context/AuthContext.jsx";
 import { useClients } from "../../hooks/useClients";
 import { mapUser } from "../../hooks/useUsers";
 import { userService } from "../../services/userService";
@@ -82,10 +83,11 @@ function normalizeFinancialYearEnd(value) {
 
 export default function AddClient() {
   const { state, dispatch } = useApp();
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditMode = Boolean(id);
-  const { createClient, getClient, updateClient, uploadAttachment, uploadDocument, deleteAttachment } = useClients();
+  const { createClient, getClient, updateClient, uploadAttachment, uploadDocument, deleteAttachment, deleteDocument } = useClients();
   const [tab, setTab] = useState(0);
   const countries = useMemo(() => {
     const names = new Intl.DisplayNames(["en"], { type: "region" });
@@ -103,7 +105,7 @@ export default function AddClient() {
     country: "United Arab Emirates", emirate: "Dubai", street: "", poBox: "", postalCode: "", differentAddress: false, correspondence: "",
     vatTrn: "", vatStatus: "Registered", vatDate: "", vatFreq: "Quarterly", ctTin: "", ctStatus: "Not Registered", ctDate: "", group: "", newGroup: "",
   });
-  const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "Dubai Economy", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null }]);
+  const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "Dubai Economy", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }]);
 
   const [contacts, setContacts] = useState([{
     name: "",
@@ -124,9 +126,11 @@ export default function AddClient() {
     eidDocumentUrl: "",
     eidDocumentName: "",
     eidDocumentFile: null,
+    eidDocuments: [],
     passportDocumentUrl: "",
     passportDocumentName: "",
     passportDocumentFile: null,
+    passportDocuments: [],
   }]);
   const [portals, setPortals] = useState([blankPortal]);
   const [visiblePortalPasswords, setVisiblePortalPasswords] = useState({});
@@ -260,7 +264,8 @@ export default function AddClient() {
         documentUrl: licence.documentUrl || "",
         documentName: licence.documentUrl ? licence.documentUrl.split("/").pop() : "",
         documentFile: null,
-      })) : [{ number: "", issue: "", expiry: "", authority: "Dubai Economy", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null }]);
+        documents: mapExistingDocuments(licence.documents, licence.documentUrl),
+      })) : [{ number: "", issue: "", expiry: "", authority: "Dubai Economy", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }]);
       setContacts((client.contactPersons || []).length ? client.contactPersons.map((person) => ({
         name: person.fullName || "",
         designation: person.designation || "",
@@ -280,9 +285,11 @@ export default function AddClient() {
         eidDocumentUrl: person.emiratesId?.documentUrl || "",
         eidDocumentName: person.emiratesId?.documentUrl ? person.emiratesId.documentUrl.split("/").pop() : "",
         eidDocumentFile: null,
+        eidDocuments: mapExistingDocuments(person.emiratesId?.documents, person.emiratesId?.documentUrl),
         passportDocumentUrl: person.passport?.documentUrl || "",
         passportDocumentName: person.passport?.documentUrl ? person.passport.documentUrl.split("/").pop() : "",
         passportDocumentFile: null,
+        passportDocuments: mapExistingDocuments(person.passport?.documents, person.passport?.documentUrl),
       })) : [{
         name: "",
         designation: "",
@@ -302,9 +309,11 @@ export default function AddClient() {
         eidDocumentUrl: "",
         eidDocumentName: "",
         eidDocumentFile: null,
+        eidDocuments: [],
         passportDocumentUrl: "",
         passportDocumentName: "",
         passportDocumentFile: null,
+        passportDocuments: [],
       }]);
       setPortals((client.portalLogins || []).length ? client.portalLogins.map((portal) => ({
         name: portal.portalName || "",
@@ -314,17 +323,7 @@ export default function AddClient() {
         notes: portal.notes || "",
       })) : [blankPortal]);
       setVisiblePortalPasswords({});
-      setAttachments((client.attachments || []).map((attachment) => ({
-        id: attachment._id,
-        name: attachment.name,
-        size: attachment.size,
-        type: attachment.fileType,
-        description: attachment.description,
-        uploadedOn: attachment.uploadedAt?.slice?.(0, 10) || "",
-        uploadedBy: attachment.uploadedBy?.name || "",
-        url: attachment.url,
-        saved: true,
-      })));
+      setAttachments(mapAttachmentRows(client.attachments || []));
     }).catch(() => {
       toast.error("Unable to load this client for editing.");
       navigate("/clients/list");
@@ -336,7 +335,47 @@ export default function AddClient() {
     return `${(size / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const mapSavedAttachments = (items) => items.map((attachment) => ({
+  const mapExistingDocuments = (documents = [], fallbackUrl = "") => {
+    if (Array.isArray(documents) && documents.length) {
+      return documents.map((document) => ({
+        id: document._id,
+        name: document.name || document.url?.split("/").pop() || "Document",
+        size: document.size || "",
+        type: document.fileType || "",
+        url: document.url || "",
+        uploadedOn: document.uploadedAt?.slice?.(0, 10) || "",
+        uploadedBy: document.uploadedBy?.name || "",
+        description: document.description || "",
+        saved: true,
+      }));
+    }
+    if (!fallbackUrl) return [];
+    return [{
+      id: fallbackUrl,
+      name: fallbackUrl.split("/").pop() || "Document",
+      size: "",
+      type: "",
+      url: fallbackUrl,
+      uploadedOn: "",
+      uploadedBy: "",
+      description: "",
+      saved: true,
+    }];
+  };
+
+  const toPendingDocument = (file) => ({
+    id: `${file.name}-${file.lastModified}-${file.size}`,
+    name: file.name,
+    size: formatFileSize(file.size),
+    type: file.type || file.name.split(".").pop()?.toUpperCase() || "File",
+    uploadedOn: "Pending save",
+    uploadedBy: "You",
+    file,
+    url: "",
+    saved: false,
+  });
+
+  const mapAttachmentRows = (items = []) => items.map((attachment) => ({
     id: attachment._id,
     name: attachment.name,
     size: attachment.size,
@@ -348,6 +387,43 @@ export default function AddClient() {
     saved: true,
   }));
 
+  const applyClientDocuments = (client) => {
+    if (client.tradeLicences) {
+      setLicences((current) => current.map((licence, index) => {
+        const uploadedLicence = client.tradeLicences?.[index];
+        if (!uploadedLicence) return licence;
+        const documents = mapExistingDocuments(uploadedLicence.documents, uploadedLicence.documentUrl);
+        return {
+          ...licence,
+          documentUrl: uploadedLicence.documentUrl || documents.at(-1)?.url || "",
+          documentName: documents.at(-1)?.name || "",
+          documentFile: null,
+          documents,
+        };
+      }));
+    }
+    if (client.contactPersons) {
+      setContacts((current) => current.map((contact, index) => {
+        const uploadedContact = client.contactPersons?.[index];
+        if (!uploadedContact) return contact;
+        const eidDocuments = mapExistingDocuments(uploadedContact.emiratesId?.documents, uploadedContact.emiratesId?.documentUrl);
+        const passportDocuments = mapExistingDocuments(uploadedContact.passport?.documents, uploadedContact.passport?.documentUrl);
+        return {
+          ...contact,
+          eidDocumentUrl: uploadedContact.emiratesId?.documentUrl || eidDocuments.at(-1)?.url || "",
+          eidDocumentName: eidDocuments.at(-1)?.name || "",
+          eidDocumentFile: null,
+          eidDocuments,
+          passportDocumentUrl: uploadedContact.passport?.documentUrl || passportDocuments.at(-1)?.url || "",
+          passportDocumentName: passportDocuments.at(-1)?.name || "",
+          passportDocumentFile: null,
+          passportDocuments,
+        };
+      }));
+    }
+    if (client.attachments) setAttachments(mapAttachmentRows(client.attachments));
+  };
+
   const patchLicence = (index, values) => {
     setLicences((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...values } : item));
   };
@@ -356,88 +432,71 @@ export default function AddClient() {
     setContacts((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...values } : item));
   };
 
-  async function uploadTradeLicenceFile(clientId, licenceIndex, file) {
+  async function uploadTradeLicenceFiles(clientId, licenceIndex, files) {
     const formData = new FormData();
-    formData.append("file", file);
+    files.forEach((file) => formData.append("files", file));
     formData.append("section", "tradeLicences");
     formData.append("index", String(licenceIndex));
     formData.append("description", `Trade Licence ${licenceIndex + 1} document`);
     const updatedClient = await uploadDocument(clientId, formData);
-    const uploadedLicence = updatedClient.tradeLicences?.[licenceIndex];
-    patchLicence(licenceIndex, {
-      documentUrl: uploadedLicence?.documentUrl || "",
-      documentName: file.name,
-      documentFile: null,
-    });
-    if (updatedClient.attachments) setAttachments(mapSavedAttachments(updatedClient.attachments));
+    applyClientDocuments(updatedClient);
   }
 
   async function handleTradeLicenceFile(licenceIndex, files) {
-    const file = files?.[0];
-    if (!file) return;
-    patchLicence(licenceIndex, { documentName: file.name, documentFile: isEditMode ? null : file });
+    const selected = Array.from(files || []);
+    if (!selected.length) return;
     if (!isEditMode) {
-      toast.success("Trade licence file added. Save the client to upload it.");
+      setLicences((current) => current.map((item, index) => index === licenceIndex ? {
+        ...item,
+        documents: [...(item.documents || []), ...selected.map(toPendingDocument)],
+      } : item));
+      toast.success(selected.length === 1 ? "Trade licence file added. Save the client to upload it." : "Trade licence files added. Save the client to upload them.");
       return;
     }
     setIsUploading(true);
     try {
-      await uploadTradeLicenceFile(id, licenceIndex, file);
-      toast.success("Trade licence document uploaded.");
+      await uploadTradeLicenceFiles(id, licenceIndex, selected);
+      toast.success(selected.length === 1 ? "Trade licence document uploaded." : "Trade licence documents uploaded.");
     } catch (error) {
-      patchLicence(licenceIndex, { documentFile: null });
       toast.error(error.response?.data?.message || "Trade licence upload failed.");
     } finally {
       setIsUploading(false);
     }
   }
 
-  async function uploadContactDocument(clientId, contactIndex, file, section) {
+  async function uploadContactDocuments(clientId, contactIndex, files, section) {
     const formData = new FormData();
-    formData.append("file", file);
+    files.forEach((file) => formData.append("files", file));
     formData.append("section", section);
     formData.append("index", String(contactIndex));
     formData.append("description", `Contact ${contactIndex + 1} ${section} document`);
     const updatedClient = await uploadDocument(clientId, formData);
-    const uploadedContact = updatedClient.contactPersons?.[contactIndex];
-    if (section === "passport") {
-      patchContact(contactIndex, {
-        passportDocumentUrl: uploadedContact?.passport?.documentUrl || "",
-        passportDocumentName: file.name,
-        passportDocumentFile: null,
-      });
-    } else {
-      patchContact(contactIndex, {
-        eidDocumentUrl: uploadedContact?.emiratesId?.documentUrl || "",
-        eidDocumentName: file.name,
-        eidDocumentFile: null,
-      });
-    }
-    if (updatedClient.attachments) setAttachments(mapSavedAttachments(updatedClient.attachments));
+    applyClientDocuments(updatedClient);
   }
 
   async function handleContactDocument(contactIndex, files, section) {
-    const file = files?.[0];
-    if (!file) return;
+    const selected = Array.from(files || []);
+    if (!selected.length) return;
     if (section === "passport") {
-      patchContact(contactIndex, { passportDocumentName: file.name, passportDocumentFile: isEditMode ? null : file });
+      setContacts((current) => current.map((item, index) => index === contactIndex ? {
+        ...item,
+        passportDocuments: !isEditMode ? [...(item.passportDocuments || []), ...selected.map(toPendingDocument)] : item.passportDocuments,
+      } : item));
     } else {
-      patchContact(contactIndex, { eidDocumentName: file.name, eidDocumentFile: isEditMode ? null : file });
+      setContacts((current) => current.map((item, index) => index === contactIndex ? {
+        ...item,
+        eidDocuments: !isEditMode ? [...(item.eidDocuments || []), ...selected.map(toPendingDocument)] : item.eidDocuments,
+      } : item));
     }
     if (!isEditMode) {
-      toast.success(`${section === "passport" ? "Passport" : "Emirates ID"} file added. Save the client to upload it.`);
+      toast.success(`${section === "passport" ? "Passport" : "Emirates ID"} ${selected.length === 1 ? "file" : "files"} added. Save the client to upload ${selected.length === 1 ? "it" : "them"}.`);
       return;
     }
     setIsUploading(true);
     try {
-      await uploadContactDocument(id, contactIndex, file, section);
-      toast.success(`${section === "passport" ? "Passport" : "Emirates ID"} document uploaded.`);
+      await uploadContactDocuments(id, contactIndex, selected, section);
+      toast.success(`${section === "passport" ? "Passport" : "Emirates ID"} ${selected.length === 1 ? "document" : "documents"} uploaded.`);
     } catch (error) {
-      if (section === "passport") {
-        patchContact(contactIndex, { passportDocumentFile: null });
-      } else {
-        patchContact(contactIndex, { eidDocumentFile: null });
-      }
       toast.error(error.response?.data?.message || "Contact document upload failed.");
     } finally {
       setIsUploading(false);
@@ -476,7 +535,7 @@ export default function AddClient() {
         formData.append("description", attachmentNote);
         uploaded = await uploadAttachment(id, formData);
       }
-      setAttachments(mapSavedAttachments(uploaded));
+      setAttachments(mapAttachmentRows(uploaded.attachments || []));
       setAttachmentDescription("");
       toast.success(selected.length === 1 ? "Attachment uploaded." : "Attachments uploaded.");
     } catch (error) {
@@ -492,11 +551,48 @@ export default function AddClient() {
       return;
     }
     try {
-      const remaining = await deleteAttachment(id, attachment.id);
-      setAttachments(mapSavedAttachments(remaining));
+      const updatedClient = await deleteAttachment(id, attachment.id);
+      setAttachments(mapAttachmentRows(updatedClient.attachments || []));
       toast.success("Attachment deleted.");
     } catch (error) {
       toast.error(error.response?.data?.message || "Unable to delete attachment.");
+    }
+  }
+
+  async function removeTradeLicenceDocument(licenceIndex, document) {
+    if (!document.saved) {
+      setLicences((current) => current.map((item, index) => index === licenceIndex ? {
+        ...item,
+        documents: (item.documents || []).filter((entry) => entry.id !== document.id),
+      } : item));
+      return;
+    }
+    try {
+      const updatedClient = await deleteDocument(id, "tradeLicences", licenceIndex, document.id);
+      applyClientDocuments(updatedClient);
+      toast.success("Trade licence document deleted.");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Unable to delete trade licence document.");
+    }
+  }
+
+  async function removeContactDocument(contactIndex, section, document) {
+    if (!document.saved) {
+      setContacts((current) => current.map((item, index) => {
+        if (index !== contactIndex) return item;
+        if (section === "passport") {
+          return { ...item, passportDocuments: (item.passportDocuments || []).filter((entry) => entry.id !== document.id) };
+        }
+        return { ...item, eidDocuments: (item.eidDocuments || []).filter((entry) => entry.id !== document.id) };
+      }));
+      return;
+    }
+    try {
+      const updatedClient = await deleteDocument(id, section, contactIndex, document.id);
+      applyClientDocuments(updatedClient);
+      toast.success(`${section === "passport" ? "Passport" : "Emirates ID"} document deleted.`);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Unable to delete document.");
     }
   }
 
@@ -637,22 +733,22 @@ export default function AddClient() {
       payload.customFields = Object.fromEntries(Object.entries(customFieldValues).filter(([k]) => selectedFieldKeys.includes(k)));
       const pendingAttachments = attachments.filter((attachment) => !attachment.saved && attachment.file);
       const pendingLicenceDocuments = licences
-        .map((licence, index) => ({ index, file: licence.documentFile }))
-        .filter((item) => item.file);
+        .map((licence, index) => ({ index, files: (licence.documents || []).filter((document) => !document.saved && document.file).map((document) => document.file) }))
+        .filter((item) => item.files.length);
       const pendingContactDocuments = contacts.flatMap((contact, index) => ([
-        contact.eidDocumentFile ? { index, file: contact.eidDocumentFile, section: "emiratesId" } : null,
-        contact.passportDocumentFile ? { index, file: contact.passportDocumentFile, section: "passport" } : null,
+        contact.eidDocuments?.some((document) => !document.saved && document.file) ? { index, files: contact.eidDocuments.filter((document) => !document.saved && document.file).map((document) => document.file), section: "emiratesId" } : null,
+        contact.passportDocuments?.some((document) => !document.saved && document.file) ? { index, files: contact.passportDocuments.filter((document) => !document.saved && document.file).map((document) => document.file), section: "passport" } : null,
       ].filter(Boolean)));
       if (isEditMode) {
         await updateClient(id, payload);
         if (pendingLicenceDocuments.length) {
           for (const licenceDocument of pendingLicenceDocuments) {
-            await uploadTradeLicenceFile(id, licenceDocument.index, licenceDocument.file);
+            await uploadTradeLicenceFiles(id, licenceDocument.index, licenceDocument.files);
           }
         }
         if (pendingContactDocuments.length) {
           for (const document of pendingContactDocuments) {
-            await uploadContactDocument(id, document.index, document.file, document.section);
+            await uploadContactDocuments(id, document.index, document.files, document.section);
           }
         }
         toast.success(continueToNext ? "Progress saved." : "Client updated successfully.");
@@ -660,23 +756,29 @@ export default function AddClient() {
         const created = await createClient(payload);
         if (pendingLicenceDocuments.length) {
           for (const licenceDocument of pendingLicenceDocuments) {
-            await uploadTradeLicenceFile(created._id, licenceDocument.index, licenceDocument.file);
+            await uploadTradeLicenceFiles(created._id, licenceDocument.index, licenceDocument.files);
           }
         }
         if (pendingContactDocuments.length) {
           for (const document of pendingContactDocuments) {
-            await uploadContactDocument(created._id, document.index, document.file, document.section);
+            await uploadContactDocuments(created._id, document.index, document.files, document.section);
           }
         }
         if (pendingAttachments.length) {
-          let uploadedAttachments = [];
-          for (const attachment of pendingAttachments) {
+          const groupedByDescription = pendingAttachments.reduce((acc, attachment) => {
+            const key = attachment.description || "";
+            acc[key] = acc[key] || [];
+            acc[key].push(attachment.file);
+            return acc;
+          }, {});
+          let updatedClient = null;
+          for (const [description, files] of Object.entries(groupedByDescription)) {
             const formData = new FormData();
-            formData.append("file", attachment.file);
-            formData.append("description", attachment.description || "");
-            uploadedAttachments = await uploadAttachment(created._id, formData);
+            files.forEach((file) => formData.append("files", file));
+            formData.append("description", description);
+            updatedClient = await uploadAttachment(created._id, formData);
           }
-          if (uploadedAttachments.length) setAttachments(mapSavedAttachments(uploadedAttachments));
+          if (updatedClient?.attachments) setAttachments(mapAttachmentRows(updatedClient.attachments));
         }
         toast.success(continueToNext ? "Progress saved." : (pendingAttachments.length || pendingLicenceDocuments.length || pendingContactDocuments.length ? "Client created and documents uploaded." : "Client created successfully."));
         if (continueToNext) navigate(`/clients/edit/${created._id}`, { replace: true });
@@ -732,13 +834,13 @@ export default function AddClient() {
               isUserSearchLoading={isUserSearchLoading}
             />
           )}
-          {tab === 1 && <Repeat title="Trade Licence" items={licences} setItems={setLicences} blank={{ number: "", issue: "", expiry: "", authority: "", type: "", email: "", documentUrl: "", documentName: "", documentFile: null }} render={(lic, i, patch) => <div className="grid gap-3 md:grid-cols-3"><Field label="Licence Number*" field={`licence-number-${i}`}><input className="input" value={lic.number} onChange={(e) => patch(i, { number: e.target.value })} /></Field><Field label="Issue Date" field={`licence-issue-${i}`}><input className="input" type="date" value={lic.issue} onChange={(e) => patch(i, { issue: e.target.value })} /></Field><Field label="Expiry Date" field={`licence-expiry-${i}`}><input className="input" type="date" value={lic.expiry} onChange={(e) => patch(i, { expiry: e.target.value })} /></Field><Field label="Issuing Authority" field={`licence-authority-${i}`}><input className="input" value={lic.authority} onChange={(e) => patch(i, { authority: e.target.value })} /></Field><Field label="Licence Type" field={`licence-type-${i}`}><input className="input" value={lic.type} onChange={(e) => patch(i, { type: e.target.value })} /></Field><Field label="Official Email" field={`licence-email-${i}`}><input className="input" value={lic.email} onChange={(e) => patch(i, { email: e.target.value })} /></Field><div className="md:col-span-3"><DocumentUploadZone id={`trade-licence-upload-${i}`} title="Upload trade licence" subtitle="PDF, JPG, PNG, DOCX, XLSX" fileName={lic.documentName} documentUrl={lic.documentUrl} isUploading={isUploading} onFiles={(files) => handleTradeLicenceFile(i, files)} /></div></div>} />}
+          {tab === 1 && <Repeat title="Trade Licence" items={licences} setItems={setLicences} blank={{ number: "", issue: "", expiry: "", authority: "", type: "", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }} render={(lic, i, patch) => <div className="grid gap-3 md:grid-cols-3"><Field label="Licence Number*" field={`licence-number-${i}`}><input className="input" value={lic.number} onChange={(e) => patch(i, { number: e.target.value })} /></Field><Field label="Issue Date" field={`licence-issue-${i}`}><input className="input" type="date" value={lic.issue} onChange={(e) => patch(i, { issue: e.target.value })} /></Field><Field label="Expiry Date" field={`licence-expiry-${i}`}><input className="input" type="date" value={lic.expiry} onChange={(e) => patch(i, { expiry: e.target.value })} /></Field><Field label="Issuing Authority" field={`licence-authority-${i}`}><input className="input" value={lic.authority} onChange={(e) => patch(i, { authority: e.target.value })} /></Field><Field label="Licence Type" field={`licence-type-${i}`}><input className="input" value={lic.type} onChange={(e) => patch(i, { type: e.target.value })} /></Field><Field label="Official Email" field={`licence-email-${i}`}><input className="input" value={lic.email} onChange={(e) => patch(i, { email: e.target.value })} /></Field><div className="md:col-span-3"><DocumentUploadZone id={`trade-licence-upload-${i}`} title="Upload trade licence documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={lic.documents || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleTradeLicenceFile(i, files)} onDeleteDocument={(document) => removeTradeLicenceDocument(i, document)} /></div></div>} />}
           {tab === 2 && (
             <Repeat
               title="Contact Person"
               items={contacts}
               setItems={setContacts}
-              blank={{ name: "", designation: "", email: "", code: "", mobile: "", whatsapp: "", alternate: "", primary: false, eid: "", eidIssue: "", eidExpiry: "", passport: "", passportIssue: "", passportExpiry: "", issuingCountry: "United Arab Emirates", eidDocumentUrl: "", eidDocumentName: "", eidDocumentFile: null, passportDocumentUrl: "", passportDocumentName: "", passportDocumentFile: null }}
+              blank={{ name: "", designation: "", email: "", code: "", mobile: "", whatsapp: "", alternate: "", primary: false, eid: "", eidIssue: "", eidExpiry: "", passport: "", passportIssue: "", passportExpiry: "", issuingCountry: "United Arab Emirates", eidDocumentUrl: "", eidDocumentName: "", eidDocumentFile: null, eidDocuments: [], passportDocumentUrl: "", passportDocumentName: "", passportDocumentFile: null, passportDocuments: [] }}
               render={(c, i, patch) => (
                 <div className="grid gap-3 md:grid-cols-3">
                   <Field label="Full Name*" field={`contact-name-${i}`}><input className="input" value={c.name} onChange={(e) => patch(i, { name: e.target.value })} /></Field>
@@ -777,8 +879,8 @@ export default function AddClient() {
                   <Field label="Passport Expiry" field={`contact-passport-expiry-${i}`}><input className="input" type="date" value={c.passportExpiry} onChange={(e) => patch(i, { passportExpiry: e.target.value })} /></Field>
                   <Field label="Passport Issuing Country" field={`contact-passport-country-${i}`}><><input className="input" list="passport-issuing-countries" value={c.issuingCountry} onChange={(e) => patch(i, { issuingCountry: e.target.value })} /><datalist id="passport-issuing-countries">{countries.map((country) => <option key={country} value={country} />)}</datalist></></Field>
                   <div className="md:col-span-3 grid gap-3 md:grid-cols-2">
-                    <DocumentUploadZone id={`contact-eid-upload-${i}`} title="Upload Emirates ID" subtitle="PDF, JPG, PNG, DOCX, XLSX" fileName={c.eidDocumentName} documentUrl={c.eidDocumentUrl} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "emiratesId")} />
-                    <DocumentUploadZone id={`contact-passport-upload-${i}`} title="Upload passport" subtitle="PDF, JPG, PNG, DOCX, XLSX" fileName={c.passportDocumentName} documentUrl={c.passportDocumentUrl} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "passport")} />
+                    <DocumentUploadZone id={`contact-eid-upload-${i}`} title="Upload Emirates ID documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.eidDocuments || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "emiratesId")} onDeleteDocument={(document) => removeContactDocument(i, "emiratesId", document)} />
+                    <DocumentUploadZone id={`contact-passport-upload-${i}`} title="Upload passport documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.passportDocuments || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "passport")} onDeleteDocument={(document) => removeContactDocument(i, "passport", document)} />
                   </div>
                 </div>
               )}
@@ -1060,7 +1162,7 @@ export default function AddClient() {
               </div>
             </div>
           )}
-          {tab === 7 && <div className="space-y-3"><AttachmentUploadZone description={attachmentDescription} onDescriptionChange={setAttachmentDescription} onFiles={uploadFiles} isUploading={isUploading} /><div className="overflow-x-auto"><table className="table min-w-max"><thead><tr><th>Name</th><th>Size</th><th>Type</th><th>Description</th><th>Uploaded On</th><th>Uploaded By</th><th>Actions</th></tr></thead><tbody>{attachments.length === 0 && <tr><td colSpan={7} className="text-center text-slate-500">No attachments uploaded yet.</td></tr>}{attachments.map((a) => <tr key={a.id || a.name}><td>{a.name}</td><td>{a.size}</td><td>{a.type}</td><td>{a.description || "-"}</td><td>{a.uploadedOn}</td><td>{a.uploadedBy}</td><td><Button size="sm" variant="ghost" disabled={!a.url} onClick={() => a.url && window.open(a.url, "_blank", "noopener,noreferrer")}>Download</Button> <Button size="sm" variant="danger" onClick={() => removeAttachment(a)}>Delete</Button></td></tr>)}</tbody></table></div></div>}
+          {tab === 7 && <div className="space-y-3"><AttachmentUploadZone description={attachmentDescription} onDescriptionChange={setAttachmentDescription} onFiles={uploadFiles} isUploading={isUploading} /><div className="overflow-x-auto"><table className="table min-w-max"><thead><tr><th>Name</th><th>Size</th><th>Type</th><th>Description</th><th>Uploaded On</th><th>Uploaded By</th><th>Actions</th></tr></thead><tbody>{attachments.length === 0 && <tr><td colSpan={7} className="text-center text-slate-500">No attachments uploaded yet.</td></tr>}{attachments.map((a) => <tr key={a.id || a.name}><td>{a.name}</td><td>{a.size}</td><td>{a.type}</td><td>{a.description || "-"}</td><td>{a.uploadedOn}</td><td>{a.uploadedBy}</td><td><Button size="sm" variant="ghost" disabled={!a.url} onClick={() => a.url && window.open(a.url, "_blank", "noopener,noreferrer")}>Open</Button> {(currentUser?.role === "admin" || !a.saved) && <Button size="sm" variant="danger" onClick={() => removeAttachment(a)}>Delete</Button>}</td></tr>)}</tbody></table></div></div>}
         </div>
         <div className="flex flex-col gap-3 border-t border-[#e2e8f0] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
           <Button variant="ghost" onClick={goPrevious} disabled={isFirstTab || isSaving}>Previous</Button>
@@ -1096,7 +1198,7 @@ function AttachmentUploadZone({ description, onDescriptionChange, onFiles, isUpl
     >
       <UploadCloud className="mb-2 text-[#1e3a8a]" size={28} />
       <div className="text-[15px] font-extrabold text-slate-800">{isUploading ? "Uploading..." : "Upload attachments"}</div>
-      <div className="mt-1 text-[12px] font-semibold text-slate-500">Write the description first, then choose the file to upload.</div>
+      <div className="mt-1 text-[12px] font-semibold text-slate-500">Write the description first, then choose one or more files to upload.</div>
       <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
         <Field label="Attachment Description" field="client-attachment-description">
           <input
@@ -1108,7 +1210,7 @@ function AttachmentUploadZone({ description, onDescriptionChange, onFiles, isUpl
         </Field>
         <label htmlFor={inputId} className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#1e3a8a] px-4 text-[14px] font-bold text-white transition hover:bg-[#1d4ed8]">
           <UploadCloud size={16} />
-          {isUploading ? "Uploading..." : "Upload file"}
+          {isUploading ? "Uploading..." : "Upload files"}
         </label>
       </div>
       <input
@@ -1127,35 +1229,60 @@ function AttachmentUploadZone({ description, onDescriptionChange, onFiles, isUpl
   );
 }
 
-function DocumentUploadZone({ id, title, subtitle, fileName, documentUrl, isUploading, onFiles }) {
+function DocumentUploadZone({ id, title, subtitle, documents, isUploading, onFiles, onDeleteDocument, canDelete }) {
   const handleDrop = (event) => {
     event.preventDefault();
     onFiles(event.dataTransfer.files);
   };
   return (
-    <label
-      className={`upload-zone cursor-pointer transition hover:bg-slate-100 ${isUploading ? "pointer-events-none opacity-70" : ""}`}
-      htmlFor={id}
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={handleDrop}
-    >
-      <UploadCloud className="mb-2 text-[#64748b]" size={28} />
-      <div className="text-[15px] font-extrabold text-slate-800">{isUploading ? "Uploading..." : title}</div>
-      <div className="mt-1 text-[12px] font-semibold text-slate-500">{subtitle}</div>
-      {fileName && <div className="mt-3 text-[13px] font-bold text-[#1e3a8a]">{fileName}</div>}
-      {documentUrl && <button type="button" className="mt-3 text-[12px] font-bold text-slate-600 underline" onClick={(event) => { event.preventDefault(); window.open(documentUrl, "_blank", "noopener,noreferrer"); }}>Open current file</button>}
-      <input
-        id={id}
-        name={id}
-        className="hidden"
-        type="file"
-        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
-        onChange={(event) => {
-          onFiles(event.target.files);
-          event.target.value = "";
-        }}
-      />
-    </label>
+    <div className="space-y-3">
+      <label
+        className={`upload-zone cursor-pointer transition hover:bg-slate-100 ${isUploading ? "pointer-events-none opacity-70" : ""}`}
+        htmlFor={id}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={handleDrop}
+      >
+        <UploadCloud className="mb-2 text-[#64748b]" size={28} />
+        <div className="text-[15px] font-extrabold text-slate-800">{isUploading ? "Uploading..." : title}</div>
+        <div className="mt-1 text-[12px] font-semibold text-slate-500">{subtitle}</div>
+        <div className="mt-2 text-[12px] font-semibold text-slate-500">You can upload multiple files here.</div>
+        <input
+          id={id}
+          name={id}
+          className="hidden"
+          type="file"
+          accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+          multiple
+          onChange={(event) => {
+            onFiles(event.target.files);
+            event.target.value = "";
+          }}
+        />
+      </label>
+      <DocumentList documents={documents} canDelete={canDelete} onDeleteDocument={onDeleteDocument} />
+    </div>
+  );
+}
+
+function DocumentList({ documents, canDelete, onDeleteDocument }) {
+  if (!documents?.length) {
+    return <div className="rounded-xl border border-dashed border-slate-200 px-3 py-4 text-[12px] font-semibold text-slate-500">No files uploaded yet.</div>;
+  }
+  return (
+    <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+      {documents.map((document) => (
+        <div key={document.id || document.name} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-3 py-2">
+          <div className="min-w-0">
+            <div className="truncate text-[13px] font-bold text-slate-800">{document.name}</div>
+            <div className="text-[11px] font-semibold text-slate-500">{[document.size, document.uploadedOn, document.uploadedBy].filter(Boolean).join(" • ") || (document.saved ? "Uploaded" : "Pending save")}</div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="ghost" disabled={!document.url} onClick={() => document.url && window.open(document.url, "_blank", "noopener,noreferrer")}>Open</Button>
+            {((canDelete && !String(document.id || "").includes("/")) || !document.saved) && <Button size="sm" variant="danger" onClick={() => onDeleteDocument(document)}>Delete</Button>}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 

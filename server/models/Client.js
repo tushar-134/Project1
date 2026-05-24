@@ -1,5 +1,15 @@
 const mongoose = require("mongoose");
 
+const uploadedFileSchema = new mongoose.Schema({
+  name: String,
+  size: String,
+  fileType: String,
+  description: String,
+  url: String,
+  uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  uploadedAt: { type: Date, default: Date.now },
+}, { _id: true });
+
 const clientSchema = new mongoose.Schema({
   fileNo: { type: String, unique: true },
   clientType: { type: String, enum: ["legal", "natural"], required: true },
@@ -18,6 +28,7 @@ const clientSchema = new mongoose.Schema({
     issueDate: Date,
     expiryDate: Date,
     documentUrl: String,
+    documents: [uploadedFileSchema],
   }],
   contactPersons: [{
     fullName: String,
@@ -27,8 +38,8 @@ const clientSchema = new mongoose.Schema({
     alternateEmail: String,
     mobile: { countryCode: String, number: String },
     isPrimary: { type: Boolean, default: false },
-    emiratesId: { number: String, issueDate: Date, expiryDate: Date, documentUrl: String },
-    passport: { number: String, issuingCountry: String, issueDate: Date, expiryDate: Date, documentUrl: String },
+    emiratesId: { number: String, issueDate: Date, expiryDate: Date, documentUrl: String, documents: [uploadedFileSchema] },
+    passport: { number: String, issuingCountry: String, issueDate: Date, expiryDate: Date, documentUrl: String, documents: [uploadedFileSchema] },
   }],
   vatDetails: {
     trn: String,
@@ -46,15 +57,7 @@ const clientSchema = new mongoose.Schema({
   portalLogins: [{ portalName: String, portalUrl: String, username: String, password: String, notes: String }],
   // customFields: { qrmpPreference: String, auditFirmName: String, bankName: String, iban: String },
   customFields: { type: Map, of: String },
-  attachments: [{
-    name: String,
-    size: String,
-    fileType: String,
-    description: String,
-    url: String,
-    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    uploadedAt: { type: Date, default: Date.now },
-  }],
+  attachments: [uploadedFileSchema],
   isActive: { type: Boolean, default: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 }, { timestamps: true });
