@@ -400,7 +400,7 @@ exports.updateTask = async (req, res, next) => {
     }
     const previousStatus = task.status;
     // Bug #4 Fix: whitelist editable fields to block mass-assignment of taskId, createdBy, etc.
-    const ALLOWED = ["category", "taskType", "client", "assignedTo", "dueDate", "status", "description", "isAwaitingFta", "ftaStatus", "period", "periodFY", "periodQuarter"];
+    const ALLOWED = ["category", "taskType", "client", "assignedTo", "dueDate", "status", "description", "remarks", "isAwaitingFta", "ftaStatus", "period", "periodFY", "periodQuarter"];
     ALLOWED.forEach((key) => { if (key in req.body) task[key] = req.body[key]; });
 
     if ("isRecurring" in req.body || "recurringConfig" in req.body || "dueDate" in req.body) {
@@ -513,6 +513,19 @@ exports.updateAssignee = async (req, res, next) => {
       await Notification.create({ recipient: updated.assignedTo._id || updated.assignedTo, title: "Task reassigned to you", message: `${updated.taskId} — ${updated.taskType} (${statusLabel(updated.status)})`, type: "task_update", relatedTask: updated._id });
     }
     res.json(updated);
+  } catch (error) { next(error); }
+};
+
+exports.updateRemarks = async (req, res, next) => {
+  try {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ message: "Task not found" });
+    if (req.user.role === "task_only" && String(task.assignedTo) !== String(req.user._id)) return res.status(403).json({ message: "Forbidden" });
+
+    task.remarks = String(req.body.remarks || "").trim();
+    await task.save();
+    await auditLogger({ task: task._id, user: req.user._id, action: "Updated", newStatus: task.status, notes: task.remarks ? "Remarks updated" : "Remarks cleared" });
+    res.json(await task.populate(populateTask));
   } catch (error) { next(error); }
 };
 

@@ -237,7 +237,7 @@ export default function AddTask() {
             <Field label="Client*" field="taskClient"><select className="input" value={details.client} onChange={(e) => setDetails({ ...details, client: e.target.value })}><option value="">Select client</option>{state.clients.map((c) => <option key={c.id} value={c._id}>{c.name}</option>)}</select></Field>
             <Field label="Assign To" field="taskAssignedTo"><select className="input" value={details.assigned} onChange={(e) => setDetails({ ...details, assigned: e.target.value })}><option value="">Unassigned</option>{state.users.map((u) => <option key={u.id} value={u._id}>{u.name}</option>)}</select></Field>
             <Field label="Due Date*" field="taskDueDate"><input className="input" type="date" value={details.dueDate} onChange={(e) => handleRecurrenceChange({ dueDate: e.target.value })} /></Field>
-            <Field label="Remarks" field="taskDescription"><textarea className="input textarea" value={details.description} onChange={(e) => setDetails({ ...details, description: e.target.value })} /></Field>
+            <Field label="Description / Notes" field="taskDescription"><textarea className="input textarea" value={details.description} onChange={(e) => setDetails({ ...details, description: e.target.value })} /></Field>
           </div>
 
           {/* ── Period section ─────────────────────────────────────────── */}

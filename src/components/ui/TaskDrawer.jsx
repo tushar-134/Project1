@@ -109,10 +109,10 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
   }, [taskId, loadTask]);
 
   useEffect(() => {
-    setRemarkDraft(task?.description || "");
+    setRemarkDraft(task?.remarks || "");
     setRemarkError("");
     setRemarkNotice("");
-  }, [task?.description, task?._id]);
+  }, [task?.remarks, task?._id]);
 
   if (!taskId) return null;
 
@@ -148,18 +148,18 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
   async function handleRemarkSave() {
     if (!task || !canEditRemark || remarkSaving) return;
     const nextRemark = remarkDraft.trim();
-    const currentRemark = String(task.description || "").trim();
+    const currentRemark = String(task.remarks || "").trim();
     if (nextRemark === currentRemark) return;
 
     setRemarkSaving(true);
     setRemarkError("");
     setRemarkNotice("");
     try {
-      const updatedTask = await taskService.update(task._id, { description: nextRemark });
+      const updatedTask = await taskService.updateRemarks(task._id, nextRemark);
       const logsData = await taskService.getLogs(task._id);
       setTask(updatedTask);
       setLogs(logsData);
-      setRemarkDraft(updatedTask.description || "");
+      setRemarkDraft(updatedTask.remarks || "");
       setRemarkNotice(nextRemark ? "Remarks saved." : "Remarks cleared.");
     } catch (err) {
       setRemarkError(err.response?.data?.message || "Failed to save remarks");
@@ -347,7 +347,7 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
                   )}
                 </div>
 
-                {(task.description || canEditRemark) && (
+                {(task.remarks || canEditRemark) && (
                   <div className="task-detail-description">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
@@ -362,7 +362,7 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
                         <Button
                           size="sm"
                           onClick={handleRemarkSave}
-                          disabled={remarkSaving || String(task.description || "").trim() === remarkDraft.trim()}
+                          disabled={remarkSaving || String(task.remarks || "").trim() === remarkDraft.trim()}
                         >
                           {remarkSaving ? <LoaderCircle size={14} className="animate-spin" /> : <FileText size={14} />}
                           {remarkSaving ? "Saving..." : "Save remarks"}
@@ -378,9 +378,7 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
                         placeholder="Add a clear remark for this task..."
                         aria-busy={remarkSaving}
                       />
-                    ) : (
-                      <p className="mt-3 text-[13px] leading-relaxed text-slate-700">{task.description}</p>
-                    )}
+                    ) : <p className="mt-3 text-[13px] leading-relaxed text-slate-700">{task.remarks}</p>}
 
                     {remarkError && (
                       <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">
@@ -393,6 +391,15 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
                         {remarkNotice}
                       </div>
                     )}
+                  </div>
+                )}
+
+                {task.description && (
+                  <div className="task-detail-description">
+                    <div className="mb-2 task-detail-field-label">
+                      <FileText size={13} /> Description
+                    </div>
+                    <p className="text-[13px] leading-relaxed text-slate-700">{task.description}</p>
                   </div>
                 )}
 

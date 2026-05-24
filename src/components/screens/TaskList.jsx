@@ -24,6 +24,18 @@ const STATUS_PILL = {
   "Submitted to FTA": { bg: "bg-purple-50", text: "text-purple-700" },
 };
 
+const EMPTY_COLUMN_FILTERS = {
+  taskId: "",
+  client: "",
+  category: "",
+  type: "",
+  remarks: "",
+  dueDate: "",
+  assigned: "",
+  status: "",
+  recurring: "",
+};
+
 function StatusPill({ status }) {
   const { bg, text } = STATUS_PILL[status] || { bg: "bg-slate-100", text: "text-slate-500" };
   return (
@@ -43,6 +55,7 @@ export default function TaskList() {
   const [scope, setScope] = useState(searchParams.get("scope") || "By Month");
   const [month, setMonth] = useState(searchParams.get("month") || getCurrentMonthValue());
   const [drawerTaskId, setDrawerTaskId] = useState(null);
+  const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
 
   const canManage = canManageTasks(currentUser?.role);
   const isTaskOnly = currentUser?.role === "task_only";
@@ -61,12 +74,10 @@ export default function TaskList() {
   };
 
   const refetchTasks = useCallback(() => fetchTasks(filterRef.current).catch(() => { }), [fetchTasks]);
-
   const [availableCats, setAvailableCats] = useState(["All"]);
 
   useEffect(() => {
-    const params = filterRef.current;
-    fetchTasks(params)
+    fetchTasks(filterRef.current)
       .then((tasks) => {
         if (cat === "All") {
           const found = new Set(tasks.map((task) => task.category));
@@ -88,11 +99,28 @@ export default function TaskList() {
     }
   }, [cat, month, scope, searchParams, setSearchParams, status]);
 
-  const rows = state.tasks;
-  const activeRows = rows.filter((task) => task.status !== "Completed");
-  const completedRows = rows.filter((task) => task.status === "Completed");
+  const taskMatches = (value, filter) => String(value || "").toLowerCase().includes(String(filter || "").toLowerCase().trim());
+  const filterOptions = (key) => [...new Set(state.tasks.map((task) => task[key]).filter(Boolean))].sort();
+  const updateColumnFilter = (key, value) => setColumnFilters((current) => ({ ...current, [key]: value }));
+  const hasColumnFilters = Object.values(columnFilters).some(Boolean);
+  const filteredRows = state.tasks.filter((task) => {
+    if (!taskMatches(task.taskId, columnFilters.taskId)) return false;
+    if (!taskMatches(task.client, columnFilters.client)) return false;
+    if (columnFilters.category && task.category !== columnFilters.category) return false;
+    if (!taskMatches(task.type, columnFilters.type)) return false;
+    if (!taskMatches(task.remarks, columnFilters.remarks)) return false;
+    if (!taskMatches(task.dueDate, columnFilters.dueDate)) return false;
+    if (!taskMatches(task.assigned, columnFilters.assigned)) return false;
+    if (columnFilters.status && task.status !== columnFilters.status) return false;
+    if (columnFilters.recurring === "recurring" && !task.recurring) return false;
+    if (columnFilters.recurring === "one-time" && task.recurring) return false;
+    return true;
+  });
+
+  const activeRows = filteredRows.filter((task) => task.status !== "Completed");
+  const completedRows = filteredRows.filter((task) => task.status === "Completed");
   const overdueCount = activeRows.filter((task) => task.overdueDays > 0).length;
-  const remarkedCount = rows.filter((task) => String(task.description || "").trim()).length;
+  const remarkedCount = filteredRows.filter((task) => String(task.remarks || "").trim()).length;
   const currentMonthValue = getCurrentMonthValue();
   const hasActiveFilters = cat !== "All" || status !== "All" || scope !== "By Month" || month !== currentMonthValue;
 
@@ -115,6 +143,10 @@ export default function TaskList() {
     setMonth(currentMonthValue);
   }
 
+  function clearColumnFilters() {
+    setColumnFilters(EMPTY_COLUMN_FILTERS);
+  }
+
   function openTask(taskId) {
     setDrawerTaskId(taskId);
   }
@@ -124,7 +156,7 @@ export default function TaskList() {
       canManage ||
       (isTaskOnly && String(task.assignedId) === String(currentUser?._id || currentUser?.id));
     const isStatusLocked = task.ftaStatus === "approved" || task.status === "Completed";
-    const remarkLabel = task.description?.trim()
+    const remarkLabel = task.remarks?.trim()
       ? (canChangeStatus ? "Edit remark" : "View remark")
       : (canChangeStatus ? "Add remark" : "Open task");
 
@@ -147,8 +179,8 @@ export default function TaskList() {
         <td>{task.type}</td>
         <td className="max-w-[290px]">
           <div className="space-y-2">
-            {task.description?.trim() ? (
-              <p className="task-remark-preview text-[12px] leading-5">{task.description}</p>
+            {task.remarks?.trim() ? (
+              <p className="task-remark-preview text-[12px] leading-5">{task.remarks}</p>
             ) : (
               <span className="task-remark-placeholder text-[12px]">No remarks added yet.</span>
             )}
@@ -238,11 +270,11 @@ export default function TaskList() {
         )}
       </div>
 
-      <div className="grid gap-3 xl:grid-cols-3">
+      <div className="grid gap-3 xl:grid-cols-4">
         <TaskStat
           icon={ClipboardList}
           label="Visible tasks"
-          value={rows.length}
+          value={filteredRows.length}
           helper={`${activeRows.length} active · ${completedRows.length} completed`}
         />
         <TaskStat
@@ -257,6 +289,14 @@ export default function TaskList() {
           value={remarkedCount}
           helper="Quick context for handoffs and follow-ups"
         />
+        <div className="flex items-end justify-end gap-2">
+          {hasColumnFilters && (
+            <Button variant="ghost" onClick={clearColumnFilters}>
+              <X size={16} />
+              Clear column filters
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="task-filter-panel p-4 md:p-5">
@@ -268,7 +308,7 @@ export default function TaskList() {
             </div>
             <h3 className="mt-2 text-[18px] font-extrabold text-slate-900">Sharper views for daily execution</h3>
             <p className="mt-1 text-[13px] text-slate-500">
-              Filter by category, delivery status, and time window without losing context.
+              Filter by category, delivery status, time window, and table columns without losing context.
             </p>
           </div>
           {hasActiveFilters && (
@@ -307,77 +347,175 @@ export default function TaskList() {
         </div>
       )}
 
-      <div>
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <h3 className="text-[15px] font-extrabold text-slate-900">Active Tasks</h3>
-          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-extrabold text-slate-500">{activeRows.length}</span>
-        </div>
-        <Card>
-          <Table>
-            <thead>
-              <tr>
-                <th>Task ID</th>
-                <th>Client</th>
-                <th>Category</th>
-                <th>Task Type</th>
-                <th>Remarks</th>
-                <th>Due Date</th>
-                <th>Assigned</th>
-                <th>Status</th>
-                <th>Recurring</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!activeRows.length && (
-                <tr>
-                  <td colSpan={9} className="py-8 text-center font-semibold text-slate-500">
-                    No active tasks in the selected view.
-                  </td>
-                </tr>
-              )}
-              {activeRows.map(renderTaskRow)}
-            </tbody>
-          </Table>
-        </Card>
-      </div>
+      <TaskTableSection
+        title="Active Tasks"
+        count={activeRows.length}
+        countClassName="bg-slate-100 text-slate-500"
+        rows={activeRows}
+        emptyMessage="No active tasks in the selected view."
+        columnFilters={columnFilters}
+        filterOptions={filterOptions}
+        updateColumnFilter={updateColumnFilter}
+        renderTaskRow={renderTaskRow}
+      />
 
-      <div>
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <h3 className="text-[15px] font-extrabold text-slate-900">Completed Tasks</h3>
-          <span className="rounded-full bg-green-50 px-2.5 py-1 text-[11px] font-extrabold text-green-700">{completedRows.length}</span>
-        </div>
-        <Card>
-          <Table>
-            <thead>
-              <tr>
-                <th>Task ID</th>
-                <th>Client</th>
-                <th>Category</th>
-                <th>Task Type</th>
-                <th>Remarks</th>
-                <th>Due Date</th>
-                <th>Assigned</th>
-                <th>Status</th>
-                <th>Recurring</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!completedRows.length && (
-                <tr>
-                  <td colSpan={9} className="py-8 text-center font-semibold text-slate-500">
-                    No completed tasks in the selected view.
-                  </td>
-                </tr>
-              )}
-              {completedRows.map(renderTaskRow)}
-            </tbody>
-          </Table>
-        </Card>
-      </div>
+      <TaskTableSection
+        title="Completed Tasks"
+        count={completedRows.length}
+        countClassName="bg-green-50 text-green-700"
+        rows={completedRows}
+        emptyMessage="No completed tasks in the selected view."
+        columnFilters={columnFilters}
+        filterOptions={filterOptions}
+        updateColumnFilter={updateColumnFilter}
+        renderTaskRow={renderTaskRow}
+      />
 
       {drawerTaskId && (
         <TaskDrawer taskId={drawerTaskId} canManage={canManage} onClose={() => setDrawerTaskId(null)} />
       )}
+    </div>
+  );
+}
+
+function TaskTableSection({
+  title,
+  count,
+  countClassName,
+  rows,
+  emptyMessage,
+  columnFilters,
+  filterOptions,
+  updateColumnFilter,
+  renderTaskRow,
+}) {
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <h3 className="text-[15px] font-extrabold text-slate-900">{title}</h3>
+        <span className={`rounded-full px-2.5 py-1 text-[11px] font-extrabold ${countClassName}`}>{count}</span>
+      </div>
+      <Card>
+        <Table>
+          <thead>
+            <tr>
+              <th>Task ID</th>
+              <th>Client</th>
+              <th>Category</th>
+              <th>Task Type</th>
+              <th>Remarks</th>
+              <th>Due Date</th>
+              <th>Assigned</th>
+              <th>Status</th>
+              <th>Recurring</th>
+            </tr>
+            <tr>
+              <th>
+                <input
+                  aria-label="Filter by task ID"
+                  className="input h-8 min-w-28"
+                  type="search"
+                  value={columnFilters.taskId}
+                  onChange={(event) => updateColumnFilter("taskId", event.target.value)}
+                />
+              </th>
+              <th>
+                <input
+                  aria-label="Filter by client"
+                  className="input h-8 min-w-36"
+                  type="search"
+                  value={columnFilters.client}
+                  onChange={(event) => updateColumnFilter("client", event.target.value)}
+                />
+              </th>
+              <th>
+                <select
+                  aria-label="Filter by category"
+                  className="input h-8 min-w-36"
+                  value={columnFilters.category}
+                  onChange={(event) => updateColumnFilter("category", event.target.value)}
+                >
+                  <option value="">All</option>
+                  {filterOptions("category").map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </th>
+              <th>
+                <input
+                  aria-label="Filter by task type"
+                  className="input h-8 min-w-36"
+                  type="search"
+                  value={columnFilters.type}
+                  onChange={(event) => updateColumnFilter("type", event.target.value)}
+                />
+              </th>
+              <th>
+                <input
+                  aria-label="Filter by remarks"
+                  className="input h-8 min-w-36"
+                  type="search"
+                  value={columnFilters.remarks || ""}
+                  onChange={(event) => updateColumnFilter("remarks", event.target.value)}
+                />
+              </th>
+              <th>
+                <input
+                  aria-label="Filter by due date"
+                  className="input h-8 min-w-32"
+                  type="search"
+                  value={columnFilters.dueDate}
+                  onChange={(event) => updateColumnFilter("dueDate", event.target.value)}
+                />
+              </th>
+              <th>
+                <input
+                  aria-label="Filter by assignee"
+                  className="input h-8 min-w-36"
+                  type="search"
+                  value={columnFilters.assigned}
+                  onChange={(event) => updateColumnFilter("assigned", event.target.value)}
+                />
+              </th>
+              <th>
+                <select
+                  aria-label="Filter by status"
+                  className="input h-8 min-w-40"
+                  value={columnFilters.status}
+                  onChange={(event) => updateColumnFilter("status", event.target.value)}
+                >
+                  <option value="">All</option>
+                  {FILTER_STATUSES.filter((option) => option !== "All").map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </th>
+              <th>
+                <select
+                  aria-label="Filter by recurring"
+                  className="input h-8 min-w-32"
+                  value={columnFilters.recurring}
+                  onChange={(event) => updateColumnFilter("recurring", event.target.value)}
+                >
+                  <option value="">All</option>
+                  <option value="recurring">Recurring</option>
+                  <option value="one-time">One-time</option>
+                </select>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {!rows.length && (
+              <tr>
+                <td colSpan={9} className="py-8 text-center font-semibold text-slate-500">
+                  {emptyMessage}
+                </td>
+              </tr>
+            )}
+            {rows.map(renderTaskRow)}
+          </tbody>
+        </Table>
+      </Card>
     </div>
   );
 }
