@@ -16,6 +16,8 @@ export default function ClientGroups() {
   const [modalOpen, setModalOpen] = useState(false);
   const [viewingGroup, setViewingGroup] = useState(null);
   const [viewOpen, setViewOpen] = useState(false);
+  const [selectedExportGroupId, setSelectedExportGroupId] = useState("");
+  const [selectedExportClientId, setSelectedExportClientId] = useState("");
   const load = () => groupService.list().then((groups) => dispatch({
     type: "SET_RESOURCE",
     resource: "groups",
@@ -29,10 +31,38 @@ export default function ClientGroups() {
   // Groups are reloaded after mutations because the current table renders a simplified client-name list.
   useEffect(() => { load(); }, []);
 
-  const exportGroupsCsv = async () => downloadBlob(await groupService.exportGroups(), "client-groups.csv");
-  const exportClientsCsv = async () => downloadBlob(await groupService.exportClients(), "clients.csv");
+  const selectedExportGroup = state.groups.find((group) => group._id === selectedExportGroupId);
+  const exportClientOptions = selectedExportGroup
+    ? selectedExportGroup.clients || []
+    : state.groups.flatMap((group) => group.clients || []);
+  const safeFilename = (value, fallback) =>
+    String(value || fallback)
+      .trim()
+      .replaceAll(" ", "-")
+      .replace(/[^a-zA-Z0-9-_]/g, "")
+      .toLowerCase();
+
+  const exportGroupsCsv = async () => {
+    const filename = selectedExportGroup ? `${safeFilename(selectedExportGroup.name, "client-group")}.csv` : "client-groups.csv";
+    downloadBlob(await groupService.exportGroups(selectedExportGroupId), filename);
+  };
+  const exportClientsCsv = async () => {
+    const selectedClient = exportClientOptions.find((client) => client._id === selectedExportClientId);
+    const filename = selectedClient
+      ? `${safeFilename(selectedClient.legalName, "client")}.csv`
+      : selectedExportGroup
+        ? `${safeFilename(selectedExportGroup.name, "group")}-clients.csv`
+        : "clients.csv";
+    downloadBlob(
+      await groupService.exportClients({
+        groupId: selectedExportGroupId,
+        clientId: selectedExportClientId,
+      }),
+      filename,
+    );
+  };
   const exportThisGroupClientsCsv = async (groupId, groupName) =>
-    downloadBlob(await groupService.exportClients(groupId), `${(groupName || "group").replaceAll(" ", "-").toLowerCase()}-clients.csv`);
+    downloadBlob(await groupService.exportClients({ groupId }), `${safeFilename(groupName, "group")}-clients.csv`);
 
   function closeModal() {
     setEditingGroup(null);
@@ -62,9 +92,9 @@ export default function ClientGroups() {
       await load();
       toast.success("Group updated successfully.");
       closeModal();
-  } catch (error) {
-    toast.error(error?.response?.data?.message || "Unable to update group.");
-  }
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Unable to update group.");
+    }
   }
 
   return (
@@ -76,15 +106,6 @@ export default function ClientGroups() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="ghost" onClick={exportGroupsCsv}>
-            <Download size={16} />
-            Export (Group-wise)
-          </Button>
-          <Button variant="ghost" onClick={exportClientsCsv}>
-            <Download size={16} />
-            Export (Client-wise)
-          </Button>
-
           <input
             id="new-group-name"
             name="newGroupName"
@@ -107,6 +128,58 @@ export default function ClientGroups() {
           </Button>
         </div>
       </div>
+
+      <Card className="p-4">
+        <div className="grid gap-3 md:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_auto_auto] md:items-end">
+          <label htmlFor="export-group">
+            <span className="field-label">Group</span>
+            <select
+              id="export-group"
+              name="exportGroup"
+              className="input"
+              value={selectedExportGroupId}
+              onChange={(event) => {
+                setSelectedExportGroupId(event.target.value);
+                setSelectedExportClientId("");
+              }}
+            >
+              <option value="">All groups</option>
+              {state.groups.map((group) => (
+                <option key={group._id} value={group._id}>
+                  {group.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label htmlFor="export-client">
+            <span className="field-label">Client</span>
+            <select
+              id="export-client"
+              name="exportClient"
+              className="input"
+              value={selectedExportClientId}
+              onChange={(event) => setSelectedExportClientId(event.target.value)}
+            >
+              <option value="">All clients</option>
+              {exportClientOptions.map((client) => (
+                <option key={client._id} value={client._id}>
+                  {client.legalName}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <Button variant="ghost" onClick={exportGroupsCsv} disabled={!!selectedExportClientId}>
+            <Download size={16} />
+            Export Group-wise
+          </Button>
+          <Button variant="ghost" onClick={exportClientsCsv}>
+            <Download size={16} />
+            Export Client-wise
+          </Button>
+        </div>
+      </Card>
 
       <Card>
         <Table>
