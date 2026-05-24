@@ -35,6 +35,11 @@ export function useUsers() {
     await fetchUsers();
     return user;
   }
+  async function updateUser(id, payload) {
+    const user = await userService.update(id, { ...payload, role: roleApi[payload.role] || payload.role });
+    await fetchUsers();
+    return user;
+  }
   async function deleteUser(id) {
     const result = await userService.remove(id);
     await fetchUsers();
@@ -45,5 +50,5 @@ export function useUsers() {
     await fetchUsers();
     return user;
   }
-  return { fetchUsers, createUser, updateUser: userService.update, deleteUser, updateRole, updateStatus };
+  return { fetchUsers, createUser, updateUser, deleteUser, updateRole, updateStatus };
 }

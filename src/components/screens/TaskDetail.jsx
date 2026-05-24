@@ -37,6 +37,26 @@ function daysOverdue(dueDate, status) {
   return Math.max(0, diff);
 }
 
+function getRecurringText(config) {
+  if (!config) return "Yes";
+  const { frequency, dayOfWeek, dateOfMonth, monthOfYear } = config;
+  const monthNames = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  
+  if (frequency === "weekly") {
+    return `Weekly on ${dayOfWeek || "Sunday"}`;
+  }
+  if (frequency === "monthly") {
+    return `Monthly on Day ${dateOfMonth || 1}`;
+  }
+  if (frequency === "quarterly") {
+    return `Quarterly on Day ${dateOfMonth || 1}`;
+  }
+  if (frequency === "annual") {
+    return `Yearly on ${monthNames[monthOfYear] || "Jan"} ${dateOfMonth || 1}`;
+  }
+  return frequency || "Yes";
+}
+
 // Action-specific colors and icons for the timeline
 const actionMeta = {
   "Created": { color: "#059669", bg: "bg-emerald-50", border: "border-emerald-200", icon: "✦" },
@@ -203,8 +223,28 @@ export default function TaskDetail() {
             )}
           </div>
 
-          {/* Period */}
-          {task.period && (
+          {/* Financial Year */}
+          {task.periodFY && (
+            <div className="task-detail-field">
+              <div className="task-detail-field-label">
+                <Clock size={13} /> Financial Year
+              </div>
+              <div className="task-detail-field-value">{task.periodFY}</div>
+            </div>
+          )}
+
+          {/* Quarter */}
+          {task.periodQuarter && (
+            <div className="task-detail-field">
+              <div className="task-detail-field-label">
+                <Clock size={13} /> Quarter
+              </div>
+              <div className="task-detail-field-value">{task.periodQuarter}</div>
+            </div>
+          )}
+
+          {/* Legacy period (free-text) — shown only when new structured fields are absent */}
+          {!task.periodFY && !task.periodQuarter && task.period && (
             <div className="task-detail-field">
               <div className="task-detail-field-label">
                 <Clock size={13} /> Period
@@ -229,7 +269,7 @@ export default function TaskDetail() {
               </div>
               <div className="task-detail-field-value">
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-extrabold text-[#1e3a8a]">
-                  <RotateCw size={11} /> {task.recurringConfig?.frequency || "Yes"}
+                  <RotateCw size={11} /> {getRecurringText(task.recurringConfig)}
                 </span>
               </div>
             </div>

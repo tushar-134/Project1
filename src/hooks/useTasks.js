@@ -36,12 +36,22 @@ export function useTasks() {
     const task = await taskService.updateStatus(id, statusToApi[label] || label);
     // Selecting "Submitted to FTA" auto-sets isAwaitingFta=true on the backend — sync it here.
     const mapped = mapTask(task);
-    dispatch({ type: "UPDATE_TASK_STATUS", id, status: task.status, displayStatus: statusFromApi[task.status] || task.status, isAwaitingFta: mapped.isAwaitingFta });
+    dispatch({ type: "UPDATE_TASK_STATUS", id, status: task.status, displayStatus: statusFromApi[task.status] || task.status, isAwaitingFta: mapped.isAwaitingFta, ftaStatus: mapped.ftaStatus });
     return task;
   }
   async function updateFtaStatus(id, label) {
     dispatch({ type: "UPDATE_FTA_STATUS", id, status: ftaStatusToApi[label], displayStatus: label });
-    return taskService.updateFtaStatus(id, ftaStatusToApi[label] || label);
+    const task = await taskService.updateFtaStatus(id, ftaStatusToApi[label] || label);
+    const mappedTask = mapTask(task);
+    dispatch({
+      type: "UPDATE_TASK_STATUS",
+      id,
+      status: task.status,
+      displayStatus: statusFromApi[task.status] || task.status,
+      isAwaitingFta: mappedTask.isAwaitingFta,
+      ftaStatus: mappedTask.ftaStatus,
+    });
+    return task;
   }
   async function updateAssignee(id, assignedTo, assignedName) {
     // Optimistic update — show new name immediately

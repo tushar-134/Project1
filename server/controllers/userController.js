@@ -1,8 +1,6 @@
-const crypto = require("crypto");
 const { validationResult } = require("express-validator");
 const User = require("../models/User");
 const Client = require("../models/Client");
-const sendEmail = require("../utils/sendEmail");
 const { isValidPhone, normalizeDialCode, normalizePhoneNumber } = require("../utils/phoneUtils");
 
 function normalize(value) {
@@ -15,6 +13,18 @@ function normalizeMobile(value) {
 
 function hasValidMobile(countryCode, value) {
   return isValidPhone(countryCode, value);
+}
+
+function escapeRegex(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function parsePagination(query) {
+  const page = Math.max(Number.parseInt(query.page, 10) || 1, 1);
+  const limit = Math.min(Math.max(Number.parseInt(query.limit, 10) || 20, 1), 100);
+  const search = String(query.search || "").trim();
+  const requested = ["page", "limit", "search"].some((key) => Object.prototype.hasOwnProperty.call(query, key));
+  return { page, limit, search, requested };
 }
 
 async function findUserDuplicate({ email, mobile, excludeId }) {
@@ -36,12 +46,28 @@ async function findUserDuplicate({ email, mobile, excludeId }) {
 
 exports.listUsers = async (req, res, next) => {
   try {
-    const users = await User.find().select("-password").sort({ name: 1 }).lean();
+    const { page, limit, search, requested } = parsePagination(req.query);
+    const query = search
+      ? {
+          $or: [
+            { name: new RegExp(escapeRegex(search), "i") },
+            { email: new RegExp(escapeRegex(search), "i") },
+            { mobile: new RegExp(escapeRegex(search), "i") },
+          ],
+        }
+      : {};
+    const usersQuery = User.find(query).select("-password").sort({ name: 1 });
+    if (requested) usersQuery.skip((page - 1) * limit).limit(limit);
+    const [users, total] = await Promise.all([
+      usersQuery.lean(),
+      requested ? User.countDocuments(query) : User.countDocuments(),
+    ]);
     const usersWithClients = await Promise.all(users.map(async (user) => {
       const clients = await Client.find({ assignedUser: user._id, isActive: true }).select("legalName").lean();
       return { ...user, assignedClients: clients };
     }));
-    res.json(usersWithClients);
+    if (!requested) return res.json(usersWithClients);
+    res.json({ items: usersWithClients, total, page, limit, pages: Math.ceil(total / limit) });
   } catch (error) { next(error); }
 };
 
@@ -69,10 +95,7 @@ exports.createUser = async (req, res, next) => {
     if (await findUserDuplicate({ email: req.body.email, mobile: req.body.mobile })) {
       return res.status(409).json({ message: "User already added with this email or phone number." });
     }
-    // New users are seeded with a temporary password because invite email and first login are separate concerns.
-    const tempPassword = crypto.randomBytes(6).toString("base64url");
-    const user = await User.create({ ...req.body, email, mobile, mobileCountryCode, password: tempPassword });
-    await sendEmail({ to: user.email, subject: "Filing Buddy invite", text: `Your temporary password is ${tempPassword}` });
+    const user = await User.create({ ...req.body, email, mobile, mobileCountryCode, password: req.body.password });
     res.status(201).json(await User.findById(user._id).select("-password"));
   } catch (error) {
     if (error?.code === 11000) {
@@ -85,6 +108,8 @@ exports.createUser = async (req, res, next) => {
 
 exports.updateUser = async (req, res, next) => {
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
     const mobileCountryCode = normalizeDialCode(req.body.mobileCountryCode);
     if (!hasValidMobile(mobileCountryCode, req.body.mobile)) {
       return res.status(400).json({ message: "Phone number is invalid." });
@@ -92,15 +117,21 @@ exports.updateUser = async (req, res, next) => {
     if (await findUserDuplicate({ email: req.body.email, mobile: req.body.mobile, excludeId: req.params.id })) {
       return res.status(409).json({ message: "User already added with this email or phone number." });
     }
-    // Bug #8 Fix: findByIdAndUpdate returns null for a missing id; return 404 instead of 200 null.
-    const payload = { ...req.body };
-    if ("email" in payload) payload.email = String(payload.email || "").trim().toLowerCase();
-    if ("mobile" in payload) payload.mobile = normalizeMobile(payload.mobile);
-    if ("mobileCountryCode" in payload) payload.mobileCountryCode = normalizeDialCode(payload.mobileCountryCode);
-    const user = await User.findByIdAndUpdate(req.params.id, payload, { new: true }).select("-password").lean();
+    const user = await User.findById(req.params.id).select("+password");
     if (!user) return res.status(404).json({ message: "User not found" });
+
+    if ("name" in req.body) user.name = req.body.name;
+    if ("email" in req.body) user.email = String(req.body.email || "").trim().toLowerCase();
+    if ("mobile" in req.body) user.mobile = normalizeMobile(req.body.mobile);
+    if ("mobileCountryCode" in req.body) user.mobileCountryCode = normalizeDialCode(req.body.mobileCountryCode);
+    if ("role" in req.body) user.role = req.body.role;
+    if (req.body.password) user.password = req.body.password;
+
+    await user.save();
+
+    const safeUser = await User.findById(user._id).select("-password").lean();
     const clients = await Client.find({ assignedUser: user._id, isActive: true }).select("legalName").lean();
-    res.json({ ...user, assignedClients: clients });
+    res.json({ ...safeUser, assignedClients: clients });
   } catch (error) {
     if (error?.code === 11000) {
       return res.status(409).json({ message: "User already added with this email or phone number." });

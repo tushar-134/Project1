@@ -7,6 +7,7 @@ const ClientGroup = require("../models/ClientGroup");
 const Notification = require("../models/Notification");
 const ActivityLog = require("../models/ActivityLog");
 const { nextClientFileNo } = require("../utils/autoId");
+const { normalizeDialCode, normalizePhoneNumber } = require("../utils/phoneUtils");
 
 // Managers can assign clients to themselves or task_only users only — not to other managers or admins.
 async function ensureManagerCanAssignClient(req, assignedUser) {
@@ -21,7 +22,15 @@ async function ensureManagerCanAssignClient(req, assignedUser) {
   return null;
 }
 
-const populateClient = [{ path: "assignedUser", select: "name" }, { path: "group", select: "name" }, { path: "createdBy", select: "name" }];
+const populateClient = [
+  { path: "assignedUser", select: "name" },
+  { path: "group", select: "name" },
+  { path: "createdBy", select: "name" },
+  { path: "attachments.uploadedBy", select: "name" },
+  { path: "tradeLicences.documents.uploadedBy", select: "name" },
+  { path: "contactPersons.emiratesId.documents.uploadedBy", select: "name" },
+  { path: "contactPersons.passport.documents.uploadedBy", select: "name" },
+];
 
 function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -92,14 +101,7 @@ function duplicateMessage(client, payload) {
 }
 
 function findInvalidContactMobile(contactPersons = []) {
-  return contactPersons.findIndex((contact) => {
-    const countryCode = String(contact?.mobile?.countryCode || "").trim();
-    const digits = String(contact?.mobile?.number || "").replace(/\D+/g, "");
-    if (!digits.length) return false;
-    if (!countryCode) return true;
-    // E.164 max length is 15 digits; keep a sane minimum to avoid junk input.
-    return digits.length < 6 || digits.length > 15;
-  });
+  return -1;
 }
 
 function findMissingContactName(contactPersons = []) {
@@ -123,17 +125,110 @@ function validateVatTrn(vatDetails = {}) {
   return null;
 }
 
-function buildUploadedFile(req) {
-  if (!req.file) return null;
-  const url = req.file.path?.startsWith?.("http")
-    ? req.file.path
-    : `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+function toUploadedFile(file, req) {
+  const url = file.path?.startsWith?.("http")
+    ? file.path
+    : `${req.protocol}://${req.get("host")}/uploads/${file.filename}`;
   return {
-    name: req.file.originalname,
-    size: `${Math.round(req.file.size / 1024)} KB`,
-    fileType: req.file.mimetype,
+    name: file.originalname,
+    size: `${Math.round(file.size / 1024)} KB`,
+    fileType: file.mimetype,
     url,
   };
+}
+
+function buildUploadedFiles(req) {
+  const fieldFiles = Object.values(req.files || {}).flat();
+  const files = fieldFiles.length ? fieldFiles : (req.file ? [req.file] : []);
+  return files.map((file) => toUploadedFile(file, req));
+}
+
+function toStoredFileEntry(uploadedFile, userId, description = "") {
+  return {
+    name: uploadedFile.name,
+    size: uploadedFile.size,
+    fileType: uploadedFile.fileType,
+    description,
+    url: uploadedFile.url,
+    uploadedBy: userId,
+  };
+}
+
+function getDocumentContainer(client, section, index) {
+  if (!Number.isInteger(index) || index < 0) return null;
+  if (section === "tradeLicences") {
+    const item = client.tradeLicences[index];
+    if (!item) return null;
+    item.documents = Array.isArray(item.documents) ? item.documents : [];
+    return { holder: item, key: "documents" };
+  }
+  if (section === "emiratesId") {
+    const item = client.contactPersons[index];
+    if (!item) return null;
+    item.emiratesId = item.emiratesId || {};
+    item.emiratesId.documents = Array.isArray(item.emiratesId.documents) ? item.emiratesId.documents : [];
+    return { holder: item.emiratesId, key: "documents" };
+  }
+  if (section === "passport") {
+    const item = client.contactPersons[index];
+    if (!item) return null;
+    item.passport = item.passport || {};
+    item.passport.documents = Array.isArray(item.passport.documents) ? item.passport.documents : [];
+    return { holder: item.passport, key: "documents" };
+  }
+  return null;
+}
+
+function syncLegacyDocumentUrl(container) {
+  const docs = Array.isArray(container.documents) ? container.documents : [];
+  container.documentUrl = docs.length ? docs[docs.length - 1].url : "";
+}
+
+function normalizeTradeLicencesForPersistence(tradeLicences = [], existingTradeLicences = []) {
+  return (tradeLicences || []).map((licence, index) => {
+    const existing = existingTradeLicences[index] || {};
+    const documents = Array.isArray(licence?.documents)
+      ? licence.documents
+      : Array.isArray(existing.documents)
+        ? existing.documents
+        : [];
+    return {
+      ...licence,
+      documents,
+      documentUrl: licence?.documentUrl || documents[documents.length - 1]?.url || existing.documentUrl || "",
+    };
+  });
+}
+
+function normalizeContactPersonsForPersistence(contactPersons = [], existingContactPersons = []) {
+  return (contactPersons || []).map((contact, index) => {
+    const existing = existingContactPersons[index] || {};
+    const existingEmiratesId = existing.emiratesId || {};
+    const existingPassport = existing.passport || {};
+    const emiratesIdDocuments = Array.isArray(contact?.emiratesId?.documents)
+      ? contact.emiratesId.documents
+      : Array.isArray(existingEmiratesId.documents)
+        ? existingEmiratesId.documents
+        : [];
+    const passportDocuments = Array.isArray(contact?.passport?.documents)
+      ? contact.passport.documents
+      : Array.isArray(existingPassport.documents)
+        ? existingPassport.documents
+        : [];
+    return {
+      ...contact,
+      emiratesId: {
+        ...(contact.emiratesId || {}),
+        documents: emiratesIdDocuments,
+        documentUrl: contact?.emiratesId?.documentUrl || emiratesIdDocuments[emiratesIdDocuments.length - 1]?.url || existingEmiratesId.documentUrl || "",
+      },
+      passport: {
+        ...(contact.passport || {}),
+        documents: passportDocuments,
+        documentUrl: contact?.passport?.documentUrl || passportDocuments[passportDocuments.length - 1]?.url || existingPassport.documentUrl || "",
+      },
+    };
+  });
 }
 
 exports.listClients = async (req, res, next) => {
@@ -167,7 +262,7 @@ exports.listClients = async (req, res, next) => {
 
 exports.getClient = async (req, res, next) => {
   try {
-    const client = await Client.findById(req.params.id).populate(populateClient).populate("attachments.uploadedBy", "name");
+    const client = await Client.findById(req.params.id).populate(populateClient);
     if (!client || !client.isActive) return res.status(404).json({ message: "Client not found" });
     if (req.user.role === "task_only") {
       // task_only users may only access a client if they have at least one task assigned to them for that client.
@@ -207,6 +302,12 @@ exports.createClient = async (req, res, next) => {
     }
     const duplicate = await findDuplicateClient(req.body);
     if (duplicate) return res.status(409).json({ message: duplicateMessage(duplicate, req.body) });
+    if (Array.isArray(req.body.tradeLicences)) {
+      req.body.tradeLicences = normalizeTradeLicencesForPersistence(req.body.tradeLicences);
+    }
+    if (Array.isArray(req.body.contactPersons)) {
+      req.body.contactPersons = normalizeContactPersonsForPersistence(req.body.contactPersons);
+    }
     const client = await Client.create({
       ...req.body,
       fileNo: customFileNo || await nextClientFileNo(),
@@ -253,6 +354,12 @@ exports.updateClient = async (req, res, next) => {
       if (req.body.tradeLicences?.length && emptyLicenceIndex >= 0) {
         return res.status(400).json({ message: `Trade licence ${emptyLicenceIndex + 1}: Licence number is required.` });
       }
+    }
+    if (Array.isArray(req.body.tradeLicences)) {
+      req.body.tradeLicences = normalizeTradeLicencesForPersistence(req.body.tradeLicences, client.tradeLicences || []);
+    }
+    if (Array.isArray(req.body.contactPersons)) {
+      req.body.contactPersons = normalizeContactPersonsForPersistence(req.body.contactPersons, client.contactPersons || []);
     }
     const candidate = {
       legalName: "legalName" in req.body ? req.body.legalName : client.legalName,
@@ -364,18 +471,14 @@ exports.uploadAttachment = async (req, res, next) => {
   try {
     const client = await Client.findById(req.params.id);
     if (!client) return res.status(404).json({ message: "Client not found" });
-    const uploadedFile = buildUploadedFile(req);
-    if (!uploadedFile) return res.status(400).json({ message: "Please choose a file to upload" });
-    client.attachments.push({
-      name: uploadedFile.name,
-      size: uploadedFile.size,
-      fileType: uploadedFile.fileType,
-      description: req.body.description,
-      url: uploadedFile.url,
-      uploadedBy: req.user._id,
+    const uploadedFiles = buildUploadedFiles(req);
+    if (!uploadedFiles.length) return res.status(400).json({ message: "Please choose a file to upload" });
+    const description = req.body.description || "";
+    uploadedFiles.forEach((uploadedFile) => {
+      client.attachments.push(toStoredFileEntry(uploadedFile, req.user._id, description));
     });
     await client.save();
-    res.status(201).json(client.attachments);
+    res.status(201).json(await client.populate(populateClient));
   } catch (error) { next(error); }
 };
 
@@ -383,39 +486,39 @@ exports.uploadClientDocument = async (req, res, next) => {
   try {
     const client = await Client.findById(req.params.id);
     if (!client || !client.isActive) return res.status(404).json({ message: "Client not found" });
-    const uploadedFile = buildUploadedFile(req);
-    if (!uploadedFile) return res.status(400).json({ message: "Please choose a file to upload" });
+    const uploadedFiles = buildUploadedFiles(req);
+    if (!uploadedFiles.length) return res.status(400).json({ message: "Please choose a file to upload" });
 
     const index = Number(req.body.index);
     const section = req.body.section;
     const description = req.body.description || "";
     if (!Number.isInteger(index) || index < 0) return res.status(400).json({ message: "A valid document index is required" });
 
-    if (section === "tradeLicences") {
-      if (!client.tradeLicences[index]) return res.status(404).json({ message: "Trade licence not found" });
-      client.tradeLicences[index].documentUrl = uploadedFile.url;
-    } else if (section === "emiratesId") {
-      if (!client.contactPersons[index]) return res.status(404).json({ message: "Contact person not found" });
-      client.contactPersons[index].emiratesId = client.contactPersons[index].emiratesId || {};
-      client.contactPersons[index].emiratesId.documentUrl = uploadedFile.url;
-    } else if (section === "passport") {
-      if (!client.contactPersons[index]) return res.status(404).json({ message: "Contact person not found" });
-      client.contactPersons[index].passport = client.contactPersons[index].passport || {};
-      client.contactPersons[index].passport.documentUrl = uploadedFile.url;
-    } else {
-      return res.status(400).json({ message: "Unsupported document section" });
-    }
+    const container = getDocumentContainer(client, section, index);
+    if (!container) return res.status(400).json({ message: "Unsupported document section" });
 
-    client.attachments.push({
-      name: uploadedFile.name,
-      size: uploadedFile.size,
-      fileType: uploadedFile.fileType,
-      description,
-      url: uploadedFile.url,
-      uploadedBy: req.user._id,
+    uploadedFiles.forEach((uploadedFile) => {
+      container.holder[container.key].push(toStoredFileEntry(uploadedFile, req.user._id, description));
     });
+    syncLegacyDocumentUrl(container.holder);
     await client.save();
-    res.status(201).json(client);
+    res.status(201).json(await client.populate(populateClient));
+  } catch (error) { next(error); }
+};
+
+exports.deleteClientDocument = async (req, res, next) => {
+  try {
+    const client = await Client.findById(req.params.id);
+    if (!client || !client.isActive) return res.status(404).json({ message: "Client not found" });
+    const index = Number(req.params.index);
+    const container = getDocumentContainer(client, req.params.section, index);
+    if (!container) return res.status(400).json({ message: "Unsupported document section" });
+    const doc = container.holder[container.key].id(req.params.documentId);
+    if (!doc) return res.status(404).json({ message: "Document not found" });
+    doc.deleteOne();
+    syncLegacyDocumentUrl(container.holder);
+    await client.save();
+    res.json(await client.populate(populateClient));
   } catch (error) { next(error); }
 };
 
@@ -425,6 +528,6 @@ exports.deleteAttachment = async (req, res, next) => {
     if (!client) return res.status(404).json({ message: "Client not found" });
     client.attachments.pull(req.params.attachId);
     await client.save();
-    res.json(client.attachments);
+    res.json(await client.populate(populateClient));
   } catch (error) { next(error); }
 };

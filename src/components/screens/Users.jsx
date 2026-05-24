@@ -1,4 +1,4 @@
-import { Plus, Briefcase, ChevronRight, Search, X } from "lucide-react";
+import { Plus, Briefcase, ChevronRight, Search, X, Eye, EyeOff } from "lucide-react";
 import { cloneElement, isValidElement, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
@@ -19,6 +19,20 @@ function normalizeMobile(value) {
 }
 
 const DEFAULT_DIAL_CODE = "+971";
+const ROLE_DETAILS = {
+  "Task Only": {
+    summary: "Execution-only access",
+    text: "Can work only on assigned tasks. Cannot assign work and cannot delete work.",
+  },
+  Manager: {
+    summary: "Assign only, no delete",
+    text: "Can assign work and manage daily operations, but cannot delete work.",
+  },
+  Admin: {
+    summary: "Full access",
+    text: "Can assign work, delete work, and manage users, groups, categories, reports, clients, and tasks.",
+  },
+};
 
 export default function Users() {
   const { state } = useApp();
@@ -27,11 +41,13 @@ export default function Users() {
   const canManageUsers = currentUser?.role === "admin";
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [form, setForm] = useState({ name: "", email: "", mobileCountryCode: DEFAULT_DIAL_CODE, mobile: "", role: "Task Only" });
+  const [form, setForm] = useState({ name: "", email: "", mobileCountryCode: DEFAULT_DIAL_CODE, mobile: "", role: "Task Only", password: "", confirmPassword: "" });
   const [mobileError, setMobileError] = useState("");
   const [saving, setSaving] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
   const [activeTooltip, setActiveTooltip] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const savingRef = useRef(false);
   const tooltipRef = useRef(null);
 
@@ -53,14 +69,16 @@ export default function Users() {
     if (saving) return;
     setModalOpen(false);
     setEditingUser(null);
-    setForm({ name: "", email: "", mobileCountryCode: DEFAULT_DIAL_CODE, mobile: "", role: "Task Only" });
+    setForm({ name: "", email: "", mobileCountryCode: DEFAULT_DIAL_CODE, mobile: "", role: "Task Only", password: "", confirmPassword: "" });
     setMobileError("");
     setClientSearch("");
+    setShowPassword(false);
+    setShowConfirmPassword(false);
   }
 
   function handleAddUser() {
     setEditingUser(null);
-    setForm({ name: "", email: "", mobileCountryCode: DEFAULT_DIAL_CODE, mobile: "", role: "Task Only" });
+    setForm({ name: "", email: "", mobileCountryCode: DEFAULT_DIAL_CODE, mobile: "", role: "Task Only", password: "", confirmPassword: "" });
     setMobileError("");
     setModalOpen(true);
   }
@@ -76,6 +94,8 @@ export default function Users() {
       mobileCountryCode,
       mobile: mobileNumber,
       role: user.role || "Task Only",
+      password: "",
+      confirmPassword: "",
     });
     setMobileError("");
     setModalOpen(true);
@@ -87,6 +107,29 @@ export default function Users() {
       toast.error("Name and email are required.");
       return;
     }
+    if (!editingUser) {
+      if (!form.password) {
+        toast.error("Password is required.");
+        return;
+      }
+      if (form.password.length < 8) {
+        toast.error("Password must be at least 8 characters.");
+        return;
+      }
+      if (form.password !== form.confirmPassword) {
+        toast.error("Password and confirm password must match.");
+        return;
+      }
+    } else if (form.password || form.confirmPassword) {
+      if (form.password.length < 8) {
+        toast.error("Password must be at least 8 characters.");
+        return;
+      }
+      if (form.password !== form.confirmPassword) {
+        toast.error("Password and confirm password must match.");
+        return;
+      }
+    }
     const mobileCountryCode = normalizeDialCode(form.mobileCountryCode);
     const mobile = normalizePhoneNumber(form.mobile);
     const { min, max } = getPhoneNumberSpec(mobileCountryCode);
@@ -94,8 +137,8 @@ export default function Users() {
       setMobileError("Country code is required.");
       return;
     }
-    if (mobile.length !== min) {
-      setMobileError("Phone number is invalid.");
+    if (mobile.length < min || mobile.length > max) {
+      setMobileError(`Phone number must be between ${min} and ${max} digits.`);
       return;
     }
     setMobileError("");
@@ -116,10 +159,18 @@ export default function Users() {
     setSaving(true);
     try {
       if (editingUser) {
-        await updateUser(editingUser._id, { name: form.name.trim(), email: form.email.trim(), mobileCountryCode, mobile });
+        const payload = {
+          name: form.name.trim(),
+          email: form.email.trim(),
+          mobileCountryCode,
+          mobile,
+          role: form.role || "Task Only",
+        };
+        if (form.password) payload.password = form.password;
+        await updateUser(editingUser._id, payload);
         toast.success("User updated successfully.");
       } else {
-        await createUser({ name: form.name.trim(), email: form.email.trim(), mobileCountryCode, mobile, role: form.role || "Task Only" });
+        await createUser({ name: form.name.trim(), email: form.email.trim(), mobileCountryCode, mobile, role: form.role || "Task Only", password: form.password });
         toast.success("User created successfully.");
       }
       closeModal();
@@ -318,9 +369,9 @@ export default function Users() {
       <Card className="p-4">
         <div className="mb-2 text-[14px] font-extrabold">Role permissions</div>
         <div className="grid gap-3 md:grid-cols-3">
-          <Role title="Task Only" text="View assigned clients and update task status." />
-          <Role title="Manager" text="Manage clients, tasks, FTA tracker, reports." />
-          <Role title="Admin" text="Full access including users, groups, categories." />
+          <Role title="Task Only" summary={ROLE_DETAILS["Task Only"].summary} text={ROLE_DETAILS["Task Only"].text} />
+          <Role title="Manager" summary={ROLE_DETAILS.Manager.summary} text={ROLE_DETAILS.Manager.text} />
+          <Role title="Admin" summary={ROLE_DETAILS.Admin.summary} text={ROLE_DETAILS.Admin.text} />
         </div>
       </Card>
       {modalOpen && (
@@ -340,8 +391,7 @@ export default function Users() {
                     value={form.mobileCountryCode}
                     onChange={(e) => {
                       const code = e.target.value;
-                      const { max } = getPhoneNumberSpec(code);
-                      setForm({ ...form, mobileCountryCode: code, mobile: normalizePhoneNumber(form.mobile).slice(0, max) });
+                      setForm({ ...form, mobileCountryCode: code, mobile: normalizePhoneNumber(form.mobile) });
                       setMobileError("");
                     }}
                   >
@@ -355,27 +405,78 @@ export default function Users() {
                     type="tel"
                     autoComplete="tel"
                     inputMode="numeric"
-                    maxLength={getPhoneNumberSpec(form.mobileCountryCode).max}
                     placeholder={getPhoneNumberSpec(form.mobileCountryCode).placeholder}
                     value={form.mobile}
                     onChange={(e) => {
-                      const { max } = getPhoneNumberSpec(form.mobileCountryCode);
-                      setForm({ ...form, mobile: normalizePhoneNumber(e.target.value).slice(0, max) });
+                      setForm({ ...form, mobile: normalizePhoneNumber(e.target.value) });
                       setMobileError("");
                     }}
                   />
                 </div>
                 {mobileError && <div className="mt-1 text-[12px] font-bold text-[#dc2626]">{mobileError}</div>}
               </Field>
-              {!editingUser && (
-                <Field label="Role" field="user-form-role">
-                  <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                    <option>Task Only</option>
-                    <option>Manager</option>
-                    <option>Admin</option>
-                  </select>
-                </Field>
+              <Field label="Role" field="user-form-role">
+                <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+                  <option>Task Only</option>
+                  <option>Manager</option>
+                  <option>Admin</option>
+                </select>
+              </Field>
+              <div className="rounded-xl border border-[#dbeafe] bg-blue-50/60 p-3">
+                <div className="text-[11px] font-black uppercase tracking-wider text-[#1e3a8a]">
+                  {ROLE_DETAILS[form.role]?.summary}
+                </div>
+                <div className="mt-1 text-[13px] font-semibold text-slate-700">
+                  {ROLE_DETAILS[form.role]?.text}
+                </div>
+              </div>
+              {!editingUser ? (
+                <div className="rounded-xl border border-[#dbeafe] bg-blue-50/60 p-3">
+                  <div className="text-[12px] font-bold text-slate-700">
+                    Set an initial password for this user.
+                  </div>
+                  <div className="mt-1 text-[12px] font-semibold text-slate-500">
+                    They will use this password for their first login.
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="text-[12px] font-bold text-slate-700">
+                    Password change is optional.
+                  </div>
+                  <div className="mt-1 text-[12px] font-semibold text-slate-500">
+                    Leave it blank to keep the current password unchanged.
+                  </div>
+                </div>
               )}
+              <Field label={editingUser ? "New Password" : "Password"} field="user-form-password">
+                <div className="flex gap-2">
+                  <input className="input" type={showPassword ? "text" : "password"} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+                  <button
+                    type="button"
+                    className="grid h-10 w-10 flex-none place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-600 transition hover:bg-slate-50"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    title={showPassword ? "Hide password" : "Show password"}
+                    onClick={() => setShowPassword((value) => !value)}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </Field>
+              <Field label={editingUser ? "Confirm New Password" : "Confirm Password"} field="user-form-confirm-password">
+                <div className="flex gap-2">
+                  <input className="input" type={showConfirmPassword ? "text" : "password"} value={form.confirmPassword} onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} />
+                  <button
+                    type="button"
+                    className="grid h-10 w-10 flex-none place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-600 transition hover:bg-slate-50"
+                    aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                    title={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                    onClick={() => setShowConfirmPassword((value) => !value)}
+                  >
+                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </Field>
               {editingUser && editingUser.assignedClients && editingUser.assignedClients.length > 0 && (
                 <div className="mt-4 border-t border-slate-100 pt-5">
                   <div className="mb-4 flex items-center justify-between">
@@ -390,11 +491,11 @@ export default function Users() {
                     </div>
                     {editingUser.assignedClients.length > 5 && (
                       <div className="relative">
-                        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input 
-                          type="text" 
+                          type="search" 
                           placeholder="Search..." 
-                          className="h-8 w-32 rounded-lg border border-slate-200 bg-slate-50 pl-8 pr-2 text-[12px] font-bold transition-all focus:w-48 focus:border-blue-400 focus:bg-white focus:outline-none"
+                          className="h-8 w-32 rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-2 text-[12px] font-bold transition-all focus:w-48 focus:border-blue-400 focus:bg-white focus:outline-none"
                           value={clientSearch}
                           onChange={(e) => setClientSearch(e.target.value)}
                         />
@@ -456,10 +557,11 @@ export default function Users() {
   );
 }
 
-function Role({ title, text }) {
+function Role({ title, summary, text }) {
   return (
-    <div className="rounded-xl bg-slate-50 p-3">
+    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
       <div className="font-extrabold">{title}</div>
+      <div className="mt-1 text-[11px] font-black uppercase tracking-wider text-[#1e3a8a]">{summary}</div>
       <div className="mt-1 text-[12px] font-semibold text-slate-500">{text}</div>
     </div>
   );

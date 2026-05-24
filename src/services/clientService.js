@@ -12,4 +12,5 @@ export const clientService = {
   uploadAttachment: (id, formData) => api.post(`/clients/${id}/attachments`, formData).then((res) => res.data),
   uploadDocument: (id, formData) => api.post(`/clients/${id}/documents`, formData).then((res) => res.data),
   deleteAttachment: (id, attachId) => api.delete(`/clients/${id}/attachments/${attachId}`).then((res) => res.data),
+  deleteDocument: (id, section, index, documentId) => api.delete(`/clients/${id}/documents/${section}/${index}/${documentId}`).then((res) => res.data),
 };

@@ -13,8 +13,31 @@ function sendCsv(res, filename, csv) {
     .send(csv);
 }
 
+function escapeRegex(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function parsePagination(query) {
+  const page = Math.max(Number.parseInt(query.page, 10) || 1, 1);
+  const limit = Math.min(Math.max(Number.parseInt(query.limit, 10) || 20, 1), 100);
+  const search = String(query.search || "").trim();
+  const requested = ["page", "limit", "search"].some((key) => Object.prototype.hasOwnProperty.call(query, key));
+  return { page, limit, search, requested };
+}
+
 exports.listGroups = async (req, res, next) => {
-  try { res.json(await ClientGroup.find().populate("clients", "legalName fileNo").sort({ name: 1 })); } catch (error) { next(error); }
+  try {
+    const { page, limit, search, requested } = parsePagination(req.query);
+    const query = search ? { name: new RegExp(escapeRegex(search), "i") } : {};
+    const groupsQuery = ClientGroup.find(query).populate("clients", "legalName fileNo").sort({ name: 1 });
+    if (requested) groupsQuery.skip((page - 1) * limit).limit(limit);
+    const [groups, total] = await Promise.all([
+      groupsQuery,
+      requested ? ClientGroup.countDocuments(query) : ClientGroup.countDocuments(),
+    ]);
+    if (!requested) return res.json(groups);
+    res.json({ items: groups, total, page, limit, pages: Math.ceil(total / limit) });
+  } catch (error) { next(error); }
 };
 exports.createGroup = async (req, res, next) => {
   try {

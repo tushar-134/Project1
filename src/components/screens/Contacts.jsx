@@ -84,11 +84,6 @@ export default function Contacts() {
       return;
     }
     const digits = normalizePhoneNumber(form.mobile);
-    const { min } = getPhoneNumberSpec(form.countryCode);
-    if (digits.length !== min) {
-      toast.error(`Mobile number must be exactly ${min} digits.`);
-      return;
-    }
     const client = state.clients.find((item) => item._id === form.clientId || item.id === form.clientId);
     if (!client) {
       toast.error("Please select a valid client.");
@@ -140,8 +135,8 @@ export default function Contacts() {
 
       <Card className="p-3">
         <div className="relative">
-          <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
-          <input id="contact-search" name="contactSearch" className="input pl-9" placeholder="Search contacts by name, client, phone, email" value={query} onChange={(e) => setQuery(e.target.value)} />
+          <Search className="absolute left-5 top-2.5 text-slate-400" size={16} />
+          <input id="contact-search" name="contactSearch" type="search" className="input pl-12" placeholder="Search contacts by name, email, or mobile..." value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
       </Card>
 
@@ -218,13 +213,9 @@ export default function Contacts() {
                   <input
                     className="input"
                     value={form.mobile}
-                    onChange={(e) => {
-                      const { max } = getPhoneNumberSpec(form.countryCode);
-                      setForm({ ...form, mobile: normalizePhoneNumber(e.target.value).slice(0, max) });
-                    }}
+                    onChange={(e) => setForm({ ...form, mobile: normalizePhoneNumber(e.target.value) })}
                     placeholder={getPhoneNumberSpec(form.countryCode).placeholder}
                     inputMode="numeric"
-                    maxLength={getPhoneNumberSpec(form.countryCode).max}
                   />
                 </div>
               </Field>

@@ -18,9 +18,9 @@ const mobileValidator = body("mobile")
   .custom((value, { req }) => {
     const digits = normalizePhoneNumber(value);
     if (!digits) return true;
-    const { min } = getPhoneNumberSpec(req.body.mobileCountryCode);
-    if (digits.length !== min) {
-      throw new Error(`Mobile number must be exactly ${min} digits.`);
+    const { min, max } = getPhoneNumberSpec(req.body.mobileCountryCode);
+    if (digits.length < min || digits.length > max) {
+      throw new Error(`Mobile number must be between ${min} and ${max} digits.`);
     }
     return true;
   });
@@ -29,8 +29,17 @@ const mobileValidator = body("mobile")
 router.get("/", auth, requireRoles("admin", "manager"), ctrl.listUsers);
 router.get("/:id", auth, requireRoles("admin", "manager"), ctrl.getUser);
 router.use(auth, adminOnly);
-router.post("/", body("name").notEmpty(), body("email").isEmail(), dialCodeValidator, mobileValidator, body("role").isIn(["admin", "manager", "task_only"]), ctrl.createUser);
-router.put("/:id", body("name").optional().notEmpty(), body("email").optional().isEmail(), dialCodeValidator, mobileValidator, ctrl.updateUser);
+router.post("/", body("name").notEmpty(), body("email").isEmail(), body("password").isLength({ min: 8 }), dialCodeValidator, mobileValidator, body("role").isIn(["admin", "manager", "task_only"]), ctrl.createUser);
+router.put(
+  "/:id",
+  body("name").optional().notEmpty(),
+  body("email").optional().isEmail(),
+  body("password").optional({ values: "falsy" }).isLength({ min: 8 }),
+  body("role").optional().isIn(["admin", "manager", "task_only"]),
+  dialCodeValidator,
+  mobileValidator,
+  ctrl.updateUser
+);
 router.patch("/:id/role", body("role").isIn(["admin", "manager", "task_only"]), ctrl.updateRole);
 router.patch("/:id/status", body("isActive").isBoolean(), ctrl.updateStatus);
 router.delete("/:id", ctrl.deleteUser);

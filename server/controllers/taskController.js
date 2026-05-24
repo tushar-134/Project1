@@ -27,6 +27,91 @@ function asDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function getNextWeeklyDate(baseDate, targetDayStr) {
+  const dayMap = { "Sun": 0, "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6 };
+  const targetDay = dayMap[targetDayStr];
+  if (targetDay === undefined) return null;
+  
+  const result = new Date(baseDate);
+  for (let i = 1; i <= 7; i++) {
+    result.setUTCDate(result.getUTCDate() + 1);
+    if (result.getUTCDay() === targetDay) {
+      return result;
+    }
+  }
+  return result;
+}
+
+function getNextMonthlyDate(baseDate, targetDate) {
+  const currentYear = baseDate.getUTCFullYear();
+  const currentMonth = baseDate.getUTCMonth();
+  let targetYear = currentYear;
+  let targetMonth = currentMonth + 1;
+  if (targetMonth > 11) {
+    targetMonth = 0;
+    targetYear += 1;
+  }
+  
+  const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  
+  if (targetDate <= daysInTargetMonth) {
+    return new Date(Date.UTC(targetYear, targetMonth, targetDate));
+  } else {
+    let nextMonth = targetMonth + 1;
+    let nextYear = targetYear;
+    if (nextMonth > 11) {
+      nextMonth = 0;
+      nextYear += 1;
+    }
+    return new Date(Date.UTC(nextYear, nextMonth, 1));
+  }
+}
+
+function getNextQuarterlyDate(baseDate, targetDate) {
+  const currentYear = baseDate.getUTCFullYear();
+  const currentMonth = baseDate.getUTCMonth();
+  let targetMonth = currentMonth + 3;
+  let targetYear = currentYear;
+  while (targetMonth > 11) {
+    targetMonth -= 12;
+    targetYear += 1;
+  }
+  
+  const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  
+  if (targetDate <= daysInTargetMonth) {
+    return new Date(Date.UTC(targetYear, targetMonth, targetDate));
+  } else {
+    let nextMonth = targetMonth + 1;
+    let nextYear = targetYear;
+    if (nextMonth > 11) {
+      nextMonth = 0;
+      nextYear += 1;
+    }
+    return new Date(Date.UTC(nextYear, nextMonth, 1));
+  }
+}
+
+function getNextYearlyDate(baseDate, targetMonth, targetDate) {
+  const targetMonth0 = targetMonth - 1;
+  const currentYear = baseDate.getUTCFullYear();
+  const targetYear = currentYear + 1;
+  
+  const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth0 + 1, 0)).getUTCDate();
+  
+  if (targetDate <= daysInTargetMonth) {
+    return new Date(Date.UTC(targetYear, targetMonth0, targetDate));
+  } else {
+    let nextMonth = targetMonth0 + 1;
+    let nextYear = targetYear;
+    if (nextMonth > 11) {
+      nextMonth = 0;
+      nextYear += 1;
+    }
+    return new Date(Date.UTC(nextYear, nextMonth, 1));
+  }
+}
+
 function addFrequency(dateValue, frequency) {
   const date = asDate(dateValue);
   if (!date || !frequency) return null;
@@ -52,20 +137,48 @@ function addFrequency(dateValue, frequency) {
   }
 }
 
+function calculateNextOccurrence(baseDate, config) {
+  if (!baseDate || !config) return null;
+  const { frequency, dayOfWeek, dateOfMonth, monthOfYear } = config;
+  const date = asDate(baseDate);
+  if (!date) return null;
+
+  switch (frequency) {
+    case "weekly":
+      return getNextWeeklyDate(date, dayOfWeek || "Sun");
+    case "monthly":
+      return getNextMonthlyDate(date, dateOfMonth || 1);
+    case "quarterly":
+      return getNextQuarterlyDate(date, dateOfMonth || 1);
+    case "annual":
+      return getNextYearlyDate(date, monthOfYear || 1, dateOfMonth || 1);
+    default:
+      return addFrequency(date, frequency);
+  }
+}
+
 function normalizeRecurringFields(body, fallbackDueDate) {
   if (!body.isRecurring) return { isRecurring: false, recurringConfig: undefined };
-  const frequency = body.recurringConfig?.frequency;
+  const rc = body.recurringConfig || {};
+  const frequency = rc.frequency;
+  const dayOfWeek = rc.dayOfWeek;
+  const dateOfMonth = rc.dateOfMonth ? Number(rc.dateOfMonth) : undefined;
+  const monthOfYear = rc.monthOfYear ? Number(rc.monthOfYear) : undefined;
+
   const dueDate = asDate(body.dueDate || fallbackDueDate);
-  const providedNextDueDate = asDate(body.recurringConfig?.nextDueDate);
-  const calculatedNextDueDate = addFrequency(dueDate, frequency);
+  const providedNextDueDate = asDate(rc.nextDueDate);
+  const calculatedNextDueDate = calculateNextOccurrence(dueDate, { frequency, dayOfWeek, dateOfMonth, monthOfYear });
   const nextDueDate = providedNextDueDate && (!dueDate || providedNextDueDate > dueDate)
     ? providedNextDueDate
     : (providedNextDueDate || calculatedNextDueDate);
-  const endDate = asDate(body.recurringConfig?.endDate);
+  const endDate = asDate(rc.endDate);
   return {
     isRecurring: true,
     recurringConfig: {
       frequency,
+      dayOfWeek,
+      dateOfMonth,
+      monthOfYear,
       nextDueDate: nextDueDate || undefined,
       endDate: endDate || undefined,
     },
@@ -84,31 +197,91 @@ async function ensureManagerCanAssign(req, assignedTo) {
   return null;
 }
 
-async function maybeGenerateNextRecurringTask(task, userId) {
+// ---------------------------------------------------------------------------
+// Inline period helpers (CJS-safe — mirrors src/utils/periodUtils.js).
+// Kept here so the controller has no FE import dependency.
+// ---------------------------------------------------------------------------
+const PERIOD_MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function parseFYEStartMonth(fyeString) {
+  if (!fyeString) return 0;
+  const firstPart = fyeString.split("-")[0].trim();
+  const idx = PERIOD_MONTH_NAMES.findIndex((m) => m.toLowerCase() === firstPart.slice(0, 3).toLowerCase());
+  return idx >= 0 ? idx : 0;
+}
+
+function buildFYLabelServer(startYear, fyeString) {
+  const startMonth = parseFYEStartMonth(fyeString);
+  if (startMonth === 0) return `FY ${startYear}`;
+  return `FY ${startYear}-${String(startYear + 1).slice(-2)}`;
+}
+
+function getPeriodFromDateServer(date, fyeString) {
+  if (!date) return { periodFY: "", periodQuarter: "" };
+  const startMonth = parseFYEStartMonth(fyeString);
+  const month = date.getUTCMonth();
+  const year = date.getUTCFullYear();
+
+  // Which 0-based quarter (within the FY) does this month fall in?
+  let relativeMonth = (month - startMonth + 12) % 12;
+  const qi = Math.floor(relativeMonth / 3); // 0-3
+
+  // FY start year
+  const fyStartYear = month >= startMonth ? year : year - 1;
+
+  const qStart = (startMonth + qi * 3) % 12;
+  const qEnd = (qStart + 2) % 12;
+
+  return {
+    periodFY: buildFYLabelServer(fyStartYear, fyeString),
+    periodQuarter: `${PERIOD_MONTH_NAMES[qStart]}-${PERIOD_MONTH_NAMES[qEnd]}`,
+  };
+}
+// ---------------------------------------------------------------------------
+
+ async function maybeGenerateNextRecurringTask(task, userId) {
   if (!task?.isRecurring || task.recurringGeneratedTask) return null;
-  const frequency = task.recurringConfig?.frequency;
-  const nextDueDate = asDate(task.recurringConfig?.nextDueDate) || addFrequency(task.dueDate, frequency);
+  const rc = task.recurringConfig || {};
+  const frequency = rc.frequency;
+  const dayOfWeek = rc.dayOfWeek;
+  const dateOfMonth = rc.dateOfMonth;
+  const monthOfYear = rc.monthOfYear;
+
+  const nextDueDate = asDate(rc.nextDueDate) || calculateNextOccurrence(task.dueDate, rc);
   if (!nextDueDate) return null;
-  const endDate = asDate(task.recurringConfig?.endDate);
+  const endDate = asDate(rc.endDate);
   if (endDate && nextDueDate > endDate) return null;
-  const followingDueDate = addFrequency(nextDueDate, frequency);
+
+  const followingDueDate = calculateNextOccurrence(nextDueDate, { frequency, dayOfWeek, dateOfMonth, monthOfYear });
+
+  // Compute the period for the new task from its due date and the client's FYE config.
+  // The client may or may not be populated at this point, so we guard carefully.
+  const clientFYE =
+    (task.client && typeof task.client === "object" ? task.client.financialYearEnd : null) || "Jan - Dec";
+  const nextPeriod = getPeriodFromDateServer(nextDueDate, clientFYE);
+
   const nextTask = await Task.create({
     category: task.category,
     taskType: task.taskType,
     client: task.client,
     assignedTo: task.assignedTo,
     dueDate: nextDueDate,
-    period: task.period,
+    period: task.period, // legacy free-text — keep for backward compat
+    periodFY: nextPeriod.periodFY || undefined,
+    periodQuarter: nextPeriod.periodQuarter || undefined,
     description: task.description,
     status: "not_started",
     isRecurring: true,
     recurringConfig: {
       frequency,
+      dayOfWeek,
+      dateOfMonth,
+      monthOfYear,
       nextDueDate: followingDueDate || undefined,
       endDate: endDate || undefined,
     },
     isAwaitingFta: task.isAwaitingFta,
-    ftaStatus: "in_review",
+    ftaStatus: task.isAwaitingFta ? "in_review" : null,
     ftaSubmittedDate: undefined,
     createdBy: userId || task.createdBy,
     taskId: await nextTaskId(nextDueDate.getUTCFullYear()),
@@ -165,7 +338,7 @@ function taskQuery(req) {
   return query;
 }
 
-const populateTask = [{ path: "client", select: "legalName fileNo jurisdiction vatDetails tradeLicences contactPersons" }, { path: "assignedTo", select: "name email role" }, { path: "createdBy", select: "name" }];
+const populateTask = [{ path: "client", select: "legalName fileNo jurisdiction vatDetails tradeLicences contactPersons financialYearEnd" }, { path: "assignedTo", select: "name email role" }, { path: "createdBy", select: "name" }];
 
 exports.listTasks = async (req, res, next) => {
   try {
@@ -215,6 +388,9 @@ exports.updateTask = async (req, res, next) => {
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
     }
+    if (task.ftaStatus === "approved" && ("status" in req.body || "ftaStatus" in req.body || "isAwaitingFta" in req.body)) {
+      return res.status(400).json({ message: "Approved FTA tasks are locked and cannot have their status changed." });
+    }
     const assignmentError = await ensureManagerCanAssign(
       req,
       "assignedTo" in req.body ? req.body.assignedTo : task.assignedTo,
@@ -224,7 +400,7 @@ exports.updateTask = async (req, res, next) => {
     }
     const previousStatus = task.status;
     // Bug #4 Fix: whitelist editable fields to block mass-assignment of taskId, createdBy, etc.
-    const ALLOWED = ["category", "taskType", "client", "assignedTo", "dueDate", "status", "description", "isAwaitingFta", "ftaStatus", "period"];
+    const ALLOWED = ["category", "taskType", "client", "assignedTo", "dueDate", "status", "description", "isAwaitingFta", "ftaStatus", "period", "periodFY", "periodQuarter"];
     ALLOWED.forEach((key) => { if (key in req.body) task[key] = req.body[key]; });
 
     if ("isRecurring" in req.body || "recurringConfig" in req.body || "dueDate" in req.body) {
@@ -271,6 +447,9 @@ exports.updateStatus = async (req, res, next) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: "Task not found" });
     if (req.user.role === "task_only" && String(task.assignedTo) !== String(req.user._id)) return res.status(403).json({ message: "Forbidden" });
+    if (task.ftaStatus === "approved") {
+      return res.status(400).json({ message: "Approved FTA tasks are locked and cannot have their status changed." });
+    }
 
     const previousStatus = task.status;
     const newStatus = req.body.status;
@@ -353,15 +532,31 @@ exports.updateFtaStatus = async (req, res, next) => {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: "Task not found" });
     const previousStatus = task.ftaStatus;
-    task.ftaStatus = req.body.ftaStatus;
-    await task.save();
-    await auditLogger({ task: task._id, user: req.user._id, action: "FTA Status Changed", previousStatus, newStatus: task.ftaStatus });
-    if (previousStatus !== "additional_query" && task.ftaStatus === "additional_query") {
-      const admins = await User.find({ role: "admin", isActive: true });
-      const recipients = [...new Set([task.assignedTo, ...admins.map((u) => u._id)].filter(Boolean).map((id) => String(id)))];
-      await Notification.insertMany(recipients.map((recipient) => ({ recipient, title: "FTA query received", message: `${task.taskId} has an additional FTA query.`, type: "fta_query", relatedTask: task._id })));
+    const previousTaskStatus = task.status;
+    const nextFtaStatus = req.body.ftaStatus;
+    const updateFields = { ftaStatus: nextFtaStatus };
+    if (nextFtaStatus === "approved") {
+      updateFields.status = "completed";
+      updateFields.isAwaitingFta = false;
     }
-    res.json(await task.populate(populateTask));
+
+    const updated = await Task.findByIdAndUpdate(
+      task._id,
+      { $set: updateFields },
+      { new: true, runValidators: true }
+    ).populate(populateTask);
+
+    await auditLogger({ task: updated._id, user: req.user._id, action: "FTA Status Changed", previousStatus, newStatus: updated.ftaStatus });
+    if (previousTaskStatus !== "completed" && updated.status === "completed") {
+      await auditLogger({ task: updated._id, user: req.user._id, action: "Status Changed", previousStatus: previousTaskStatus, newStatus: updated.status, notes: "Auto-completed after FTA approval" });
+      await maybeGenerateNextRecurringTask(updated, req.user._id);
+    }
+    if (previousStatus !== "additional_query" && updated.ftaStatus === "additional_query") {
+      const admins = await User.find({ role: "admin", isActive: true });
+      const recipients = [...new Set([updated.assignedTo?._id || updated.assignedTo, ...admins.map((u) => u._id)].filter(Boolean).map((id) => String(id)))];
+      await Notification.insertMany(recipients.map((recipient) => ({ recipient, title: "FTA query received", message: `${updated.taskId} has an additional FTA query.`, type: "fta_query", relatedTask: updated._id })));
+    }
+    res.json(updated);
   } catch (error) { next(error); }
 };
 
@@ -384,4 +579,14 @@ exports.exportTasks = async (req, res, next) => {
       .setHeader("Content-Type", "text/csv")
       .send(csv);
   } catch (error) { next(error); }
+};
+
+exports.maybeGenerateNextRecurringTask =  maybeGenerateNextRecurringTask ;
+// Export helper functions for testing
+exports._test = {
+  getNextWeeklyDate,
+  getNextMonthlyDate,
+  getNextQuarterlyDate,
+  getNextYearlyDate,
+  calculateNextOccurrence
 };

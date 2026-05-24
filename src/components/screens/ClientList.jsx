@@ -54,11 +54,12 @@ export default function ClientList() {
 
       <Card className="p-3">
         <div className="relative">
-          <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
+          <Search className="absolute left-5 top-2.5 text-slate-400" size={16} />
           <input
             id="client-search"
             name="clientSearch"
-            className="input pl-9"
+            className="input pl-12"
+            type="search"
             placeholder="Search by name, TRN, trade licence, group"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
