@@ -201,6 +201,7 @@ export default function Login() {
 
               <div className="pt-2">
                 <Button 
+                  type="submit"
                   className="w-full h-11 text-[10px] font-black rounded-xl shadow-2xl active:scale-[0.98] transition-all uppercase tracking-[0.2em] text-white border-none overflow-hidden relative group/btn" 
                   style={{ background: `linear-gradient(135deg, ${brandBlue} 0%, #1e25a5 100%)` }}
                   disabled={loading}

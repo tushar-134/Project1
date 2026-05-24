@@ -33,11 +33,21 @@ export default function AddTask() {
   const [submitting, setSubmitting] = useState(false);
   const [details, setDetails] = useState({ client: "", assigned: "", dueDate: "2026-05-31", period: "Q2 2026", description: "", frequency: "monthly", dayOfWeek: "Sun", dateOfMonth: 1, monthOfYear: 1, nextDue: "2026-06-30", endDate: "" });
   const chips = useMemo(() => category?.taskTypes || [], [category]);
+
+  // Derive field-visibility config from the selected task type's saved toggles.
+  // Falls back to true so existing task types (which have DB default true) keep all fields visible.
+  const selectedRawType = useMemo(() => {
+    const raw = category?.rawTaskTypes || [];
+    return raw.find((t) => t.name === type) || null;
+  }, [category, type]);
+  const showPeriod = selectedRawType ? (selectedRawType.showPeriod !== false) : true;
+  const showRecurring = selectedRawType ? (selectedRawType.showRecurring !== false) : true;
+  const showAwaitingFta = selectedRawType ? (selectedRawType.showAwaitingFta !== false) : true;
   useEffect(() => {
     // The task wizard needs lookup data up front so each step can stay synchronous and snappy.
-    fetchClients({ limit: 100 }).catch(() => {});
-    fetchUsers().catch(() => {});
-    categoryService.list().then((data) => dispatch({ type: "SET_RESOURCE", resource: "categories", payload: data.map(mapCategory) })).catch(() => {});
+    fetchClients({ limit: 100 }).catch(() => { });
+    fetchUsers().catch(() => { });
+    categoryService.list().then((data) => dispatch({ type: "SET_RESOURCE", resource: "categories", payload: data.map(mapCategory) })).catch(() => { });
   }, []);
   useEffect(() => {
     if (!isEditMode) return;
@@ -141,27 +151,30 @@ export default function AddTask() {
         setStep(1);
         return;
       }
+      // Resolve effective values — reset hidden fields so they don't accidentally persist.
+      const effectiveRecurring = showRecurring ? recurring : false;
+      const effectiveFta = showAwaitingFta ? fta : false;
       const payload = {
         category: resolvedCategory.name,
         taskType: type,
         client: details.client,
         assignedTo: details.assigned || undefined,
         dueDate: details.dueDate,
-        period: details.period,
+        period: showPeriod ? details.period : undefined,
         description: details.description,
-        isRecurring: recurring,
-        recurringConfig: recurring ? { 
-          frequency: details.frequency, 
+        isRecurring: effectiveRecurring,
+        recurringConfig: effectiveRecurring ? {
+          frequency: details.frequency,
           dayOfWeek: details.frequency === "weekly" ? details.dayOfWeek : undefined,
           dateOfMonth: (details.frequency === "monthly" || details.frequency === "quarterly" || details.frequency === "annual") ? details.dateOfMonth : undefined,
           monthOfYear: details.frequency === "annual" ? details.monthOfYear : undefined,
-          nextDueDate: details.nextDue, 
-          endDate: details.endDate || undefined 
+          nextDueDate: details.nextDue,
+          endDate: details.endDate || undefined
         } : undefined,
-        isAwaitingFta: fta,
+        isAwaitingFta: effectiveFta,
         // In edit mode, preserve the current status — don't override it just because FTA toggle is on.
         // In create mode, auto-set to submitted_to_fta if FTA toggle is on, else not_started.
-        status: isEditMode ? savedStatus : (fta ? "submitted_to_fta" : "not_started"),
+        status: isEditMode ? savedStatus : (effectiveFta ? "submitted_to_fta" : "not_started"),
       };
       if (isEditMode) {
         await updateTask(id, payload);
@@ -198,99 +211,107 @@ export default function AddTask() {
             <Field label="Client*" field="taskClient"><select className="input" value={details.client} onChange={(e) => setDetails({ ...details, client: e.target.value })}><option value="">Select client</option>{state.clients.map((c) => <option key={c.id} value={c._id}>{c.name}</option>)}</select></Field>
             <Field label="Assign To" field="taskAssignedTo"><select className="input" value={details.assigned} onChange={(e) => setDetails({ ...details, assigned: e.target.value })}><option value="">Unassigned</option>{state.users.map((u) => <option key={u.id} value={u._id}>{u.name}</option>)}</select></Field>
             <Field label="Due Date*" field="taskDueDate"><input className="input" type="date" value={details.dueDate} onChange={(e) => handleRecurrenceChange({ dueDate: e.target.value })} /></Field>
-            <Field label="Period" field="taskPeriod"><input className="input" value={details.period} onChange={(e) => setDetails({ ...details, period: e.target.value })} /></Field>
+            {showPeriod && <Field label="Period" field="taskPeriod"><input className="input" value={details.period} onChange={(e) => setDetails({ ...details, period: e.target.value })} /></Field>}
             <Field label="Description / Notes" field="taskDescription"><textarea className="input textarea" value={details.description} onChange={(e) => setDetails({ ...details, description: e.target.value })} /></Field>
           </div>
-          <ToggleRow label="Recurring Task" checked={recurring} onChange={(val) => {
-            setRecurring(val);
-            if (val && !details.nextDue) {
-              const nextDue = calculateFrontendNextDue(
-                details.dueDate,
-                details.frequency,
-                details.dayOfWeek,
-                details.dateOfMonth,
-                details.monthOfYear
-              );
-              setDetails(prev => ({ ...prev, nextDue }));
-            }
-          }} />
-          <div className={`smooth-panel overflow-hidden ${recurring ? "max-h-96 opacity-100" : "max-h-0 opacity-0"}`}>
-            <div className="mt-3 rounded-xl bg-slate-50 p-4 space-y-4">
-              <div className="grid gap-3 md:grid-cols-3">
-                <Field label="Frequency" field="taskRecurringFrequency">
-                  <select className="input" value={details.frequency} onChange={(e) => handleRecurrenceChange({ frequency: e.target.value })}>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="quarterly">Quarterly</option>
-                    <option value="annual">Annually</option>
-                  </select>
-                </Field>
-                <Field label="Next Due Date" field="taskNextDueDate">
-                  <input className="input" type="date" value={details.nextDue} onChange={(e) => setDetails({ ...details, nextDue: e.target.value })} />
-                </Field>
-                <Field label="End Date" field="taskRecurringEndDate">
-                  <input className="input" type="date" value={details.endDate} onChange={(e) => setDetails({ ...details, endDate: e.target.value })} />
-                </Field>
-              </div>
-
-              {/* Dynamic Frequency Settings Row */}
-              <div className="grid gap-3 md:grid-cols-3 border-t border-slate-200/60 pt-3">
-                {details.frequency === "weekly" && (
-                  <Field label="Select Day" field="taskWeeklyDay">
-                    <select className="input" value={details.dayOfWeek} onChange={(e) => handleRecurrenceChange({ dayOfWeek: e.target.value })}>
-                      <option value="Sun">Sunday</option>
-                      <option value="Mon">Monday</option>
-                      <option value="Tue">Tuesday</option>
-                      <option value="Wed">Wednesday</option>
-                      <option value="Thu">Thursday</option>
-                      <option value="Fri">Friday</option>
-                      <option value="Sat">Saturday</option>
-                    </select>
-                  </Field>
-                )}
-
-                {(details.frequency === "monthly" || details.frequency === "quarterly") && (
-                  <Field label="Select Date" field="taskDateOfMonth">
-                    <select className="input" value={details.dateOfMonth} onChange={(e) => handleRecurrenceChange({ dateOfMonth: Number(e.target.value) })}>
-                      {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-                        <option key={d} value={d}>Day {d}</option>
-                      ))}
-                    </select>
-                  </Field>
-                )}
-
-                {details.frequency === "annual" && (
-                  <>
-                    <Field label="Select Month" field="taskMonthOfYear">
-                      <select className="input" value={details.monthOfYear} onChange={(e) => handleRecurrenceChange({ monthOfYear: Number(e.target.value) })}>
-                        <option value={1}>January</option>
-                        <option value={2}>February</option>
-                        <option value={3}>March</option>
-                        <option value={4}>April</option>
-                        <option value={5}>May</option>
-                        <option value={6}>June</option>
-                        <option value={7}>July</option>
-                        <option value={8}>August</option>
-                        <option value={9}>September</option>
-                        <option value={10}>October</option>
-                        <option value={11}>November</option>
-                        <option value={12}>December</option>
+          {showRecurring && (
+            <>
+              <ToggleRow label="Recurring Task" checked={recurring} onChange={(val) => {
+                setRecurring(val);
+                if (val && !details.nextDue) {
+                  const nextDue = calculateFrontendNextDue(
+                    details.dueDate,
+                    details.frequency,
+                    details.dayOfWeek,
+                    details.dateOfMonth,
+                    details.monthOfYear
+                  );
+                  setDetails(prev => ({ ...prev, nextDue }));
+                }
+              }} />
+              <div className={`smooth-panel overflow-hidden ${recurring ? "max-h-96 opacity-100" : "max-h-0 opacity-0"}`}>
+                <div className="mt-3 rounded-xl bg-slate-50 p-4 space-y-4">
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <Field label="Frequency" field="taskRecurringFrequency">
+                      <select className="input" value={details.frequency} onChange={(e) => handleRecurrenceChange({ frequency: e.target.value })}>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="quarterly">Quarterly</option>
+                        <option value="annual">Annually</option>
                       </select>
                     </Field>
-                    <Field label="Select Date" field="taskDateOfMonth">
-                      <select className="input" value={details.dateOfMonth} onChange={(e) => handleRecurrenceChange({ dateOfMonth: Number(e.target.value) })}>
-                        {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-                          <option key={d} value={d}>Day {d}</option>
-                        ))}
-                      </select>
+                    <Field label="Next Due Date" field="taskNextDueDate">
+                      <input className="input" type="date" value={details.nextDue} onChange={(e) => setDetails({ ...details, nextDue: e.target.value })} />
                     </Field>
-                  </>
-                )}
+                    <Field label="End Date" field="taskRecurringEndDate">
+                      <input className="input" type="date" value={details.endDate} onChange={(e) => setDetails({ ...details, endDate: e.target.value })} />
+                    </Field>
+                  </div>
+
+                  {/* Dynamic Frequency Settings Row */}
+                  <div className="grid gap-3 md:grid-cols-3 border-t border-slate-200/60 pt-3">
+                    {details.frequency === "weekly" && (
+                      <Field label="Select Day" field="taskWeeklyDay">
+                        <select className="input" value={details.dayOfWeek} onChange={(e) => handleRecurrenceChange({ dayOfWeek: e.target.value })}>
+                          <option value="Sun">Sunday</option>
+                          <option value="Mon">Monday</option>
+                          <option value="Tue">Tuesday</option>
+                          <option value="Wed">Wednesday</option>
+                          <option value="Thu">Thursday</option>
+                          <option value="Fri">Friday</option>
+                          <option value="Sat">Saturday</option>
+                        </select>
+                      </Field>
+                    )}
+
+                    {(details.frequency === "monthly" || details.frequency === "quarterly") && (
+                      <Field label="Select Date" field="taskDateOfMonth">
+                        <select className="input" value={details.dateOfMonth} onChange={(e) => handleRecurrenceChange({ dateOfMonth: Number(e.target.value) })}>
+                          {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                            <option key={d} value={d}>Day {d}</option>
+                          ))}
+                        </select>
+                      </Field>
+                    )}
+
+                    {details.frequency === "annual" && (
+                      <>
+                        <Field label="Select Month" field="taskMonthOfYear">
+                          <select className="input" value={details.monthOfYear} onChange={(e) => handleRecurrenceChange({ monthOfYear: Number(e.target.value) })}>
+                            <option value={1}>January</option>
+                            <option value={2}>February</option>
+                            <option value={3}>March</option>
+                            <option value={4}>April</option>
+                            <option value={5}>May</option>
+                            <option value={6}>June</option>
+                            <option value={7}>July</option>
+                            <option value={8}>August</option>
+                            <option value={9}>September</option>
+                            <option value={10}>October</option>
+                            <option value={11}>November</option>
+                            <option value={12}>December</option>
+                          </select>
+                        </Field>
+                        <Field label="Select Date" field="taskDateOfMonth">
+                          <select className="input" value={details.dateOfMonth} onChange={(e) => handleRecurrenceChange({ dateOfMonth: Number(e.target.value) })}>
+                            {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                              <option key={d} value={d}>Day {d}</option>
+                            ))}
+                          </select>
+                        </Field>
+                      </>
+                    )}
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-          <ToggleRow label="Awaiting FTA Response" checked={fta} onChange={setFta} />
-          <div className={`smooth-panel overflow-hidden ${fta ? "max-h-20 opacity-100" : "max-h-0 opacity-0"}`}><div className="mt-3 rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-[12px] font-semibold text-yellow-800">This task will be routed to FTA Tracker when submitted.</div></div>
+            </>
+          )}
+          {showAwaitingFta && (
+            <>
+              <ToggleRow label="Awaiting FTA Response" checked={fta} onChange={setFta} />
+              <div className={`smooth-panel overflow-hidden ${fta ? "max-h-20 opacity-100" : "max-h-0 opacity-0"}`}><div className="mt-3 rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-[12px] font-semibold text-yellow-800">This task will be routed to FTA Tracker when submitted.</div></div>
+            </>
+          )}
           <div className="mt-5 flex gap-2"><Button variant="ghost" onClick={() => setStep(2)}>Back</Button><Button onClick={submit} disabled={submitting}><Send size={16} />{submitting ? (isEditMode ? "Saving..." : "Submitting...") : (isEditMode ? "Save Task" : "Submit Task")}</Button></div>
         </Card>
       )}
@@ -301,9 +322,9 @@ function Step({ n, label, active }) { return <div className={`flex items-center 
 function Field({ label, field, children }) {
   const control = isValidElement(children)
     ? cloneElement(children, {
-        id: children.props.id || field,
-        name: children.props.name || field,
-      })
+      id: children.props.id || field,
+      name: children.props.name || field,
+    })
     : children;
   return <label htmlFor={field}><span className="field-label">{label}</span>{control}</label>;
 }
@@ -315,7 +336,7 @@ function getNextWeeklyDate(baseDate, targetDayStr) {
   const dayMap = { "Sun": 0, "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6 };
   const targetDay = dayMap[targetDayStr];
   if (targetDay === undefined) return baseDate;
-  
+
   const result = new Date(baseDate);
   for (let i = 1; i <= 7; i++) {
     result.setUTCDate(result.getUTCDate() + 1);
@@ -335,9 +356,9 @@ function getNextMonthlyDate(baseDate, targetDate) {
     targetMonth = 0;
     targetYear += 1;
   }
-  
+
   const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
-  
+
   if (targetDate <= daysInTargetMonth) {
     return new Date(Date.UTC(targetYear, targetMonth, targetDate));
   } else {
@@ -360,9 +381,9 @@ function getNextQuarterlyDate(baseDate, targetDate) {
     targetMonth -= 12;
     targetYear += 1;
   }
-  
+
   const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
-  
+
   if (targetDate <= daysInTargetMonth) {
     return new Date(Date.UTC(targetYear, targetMonth, targetDate));
   } else {
@@ -380,9 +401,9 @@ function getNextYearlyDate(baseDate, targetMonth, targetDate) {
   const targetMonth0 = targetMonth - 1;
   const currentYear = baseDate.getUTCFullYear();
   const targetYear = currentYear + 1;
-  
+
   const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth0 + 1, 0)).getUTCDate();
-  
+
   if (targetDate <= daysInTargetMonth) {
     return new Date(Date.UTC(targetYear, targetMonth0, targetDate));
   } else {
@@ -400,7 +421,7 @@ function calculateFrontendNextDue(dueDateStr, frequency, dayOfWeek, dateOfMonth,
   if (!dueDateStr) return "";
   const baseDate = new Date(dueDateStr);
   if (isNaN(baseDate.getTime())) return "";
-  
+
   let nextDate;
   switch (frequency) {
     case "weekly":
@@ -419,7 +440,7 @@ function calculateFrontendNextDue(dueDateStr, frequency, dayOfWeek, dateOfMonth,
       nextDate = new Date(baseDate);
       nextDate.setUTCMonth(nextDate.getUTCMonth() + 1);
   }
-  
+
   try {
     return nextDate.toISOString().slice(0, 10);
   } catch (e) {
