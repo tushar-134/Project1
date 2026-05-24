@@ -1,4 +1,4 @@
-import { Download } from "lucide-react";
+import { Download, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -29,6 +29,17 @@ const STATUS_PILL = {
   "Submitted to FTA": { bg: "bg-purple-50", text: "text-purple-700" },
 };
 
+const EMPTY_COLUMN_FILTERS = {
+  taskId: "",
+  client: "",
+  category: "",
+  type: "",
+  dueDate: "",
+  assigned: "",
+  status: "",
+  recurring: "",
+};
+
 /** Read-only coloured pill used when the user cannot change a status */
 function StatusPill({ status }) {
   const { bg, text } = STATUS_PILL[status] || { bg: "bg-slate-100", text: "text-slate-500" };
@@ -49,6 +60,7 @@ export default function TaskList() {
   const [scope, setScope] = useState("By Month");
   const [month, setMonth] = useState(searchParams.get("month") || "2026-05");
   const [drawerTaskId, setDrawerTaskId] = useState(null);
+  const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
 
   const canManage = canManageTasks(currentUser?.role);
   const isTaskOnly = currentUser?.role === "task_only";
@@ -82,9 +94,22 @@ export default function TaskList() {
       .catch(() => { });
   }, [cat, status, scope, month]);
 
-  const rows = state.tasks;
-  const activeRows = rows.filter((task) => task.status !== "Completed");
-  const completedRows = rows.filter((task) => task.status === "Completed");
+  const taskMatches = (value, filter) => String(value || "").toLowerCase().includes(String(filter || "").toLowerCase().trim());
+  const filterOptions = (key) => [...new Set(state.tasks.map((task) => task[key]).filter(Boolean))].sort();
+  const hasColumnFilters = Object.values(columnFilters).some(Boolean);
+  const updateColumnFilter = (key, value) => setColumnFilters((current) => ({ ...current, [key]: value }));
+  const rows = state.tasks.filter((task) => {
+    if (!taskMatches(task.taskId, columnFilters.taskId)) return false;
+    if (!taskMatches(task.client, columnFilters.client)) return false;
+    if (columnFilters.category && task.category !== columnFilters.category) return false;
+    if (!taskMatches(task.type, columnFilters.type)) return false;
+    if (!taskMatches(task.dueDate, columnFilters.dueDate)) return false;
+    if (!taskMatches(task.assigned, columnFilters.assigned)) return false;
+    if (columnFilters.status && task.status !== columnFilters.status) return false;
+    if (columnFilters.recurring === "recurring" && !task.recurring) return false;
+    if (columnFilters.recurring === "one-time" && task.recurring) return false;
+    return true;
+  });
   const exportCsv = async () =>
     downloadBlob(
       await exportTasks({
@@ -208,6 +233,12 @@ export default function TaskList() {
           value={month}
           onChange={(e) => setMonth(e.target.value)}
         />
+        {hasColumnFilters && (
+          <Button variant="ghost" onClick={() => setColumnFilters(EMPTY_COLUMN_FILTERS)}>
+            <X size={16} />
+            Clear column filters
+          </Button>
+        )}
       </div>
 
       {/* BRD 5.4 role note */}
@@ -235,16 +266,188 @@ export default function TaskList() {
               <th>Status</th>
               <th>Recurring</th>
             </tr>
+            <tr>
+              <th>
+                <input
+                  aria-label="Filter by task ID"
+                  className="input h-8 min-w-28"
+                  type="search"
+                  value={columnFilters.taskId}
+                  onChange={(e) => updateColumnFilter("taskId", e.target.value)}
+                />
+              </th>
+              <th>
+                <input
+                  aria-label="Filter by client"
+                  className="input h-8 min-w-36"
+                  type="search"
+                  value={columnFilters.client}
+                  onChange={(e) => updateColumnFilter("client", e.target.value)}
+                />
+              </th>
+              <th>
+                <select
+                  aria-label="Filter by category"
+                  className="input h-8 min-w-36"
+                  value={columnFilters.category}
+                  onChange={(e) => updateColumnFilter("category", e.target.value)}
+                >
+                  <option value="">All</option>
+                  {filterOptions("category").map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </th>
+              <th>
+                <input
+                  aria-label="Filter by task type"
+                  className="input h-8 min-w-36"
+                  type="search"
+                  value={columnFilters.type}
+                  onChange={(e) => updateColumnFilter("type", e.target.value)}
+                />
+              </th>
+              <th>
+                <input
+                  aria-label="Filter by due date"
+                  className="input h-8 min-w-32"
+                  type="search"
+                  value={columnFilters.dueDate}
+                  onChange={(e) => updateColumnFilter("dueDate", e.target.value)}
+                />
+              </th>
+              <th>
+                <input
+                  aria-label="Filter by assignee"
+                  className="input h-8 min-w-36"
+                  type="search"
+                  value={columnFilters.assigned}
+                  onChange={(e) => updateColumnFilter("assigned", e.target.value)}
+                />
+              </th>
+              <th>
+                <select
+                  aria-label="Filter by status"
+                  className="input h-8 min-w-40"
+                  value={columnFilters.status}
+                  onChange={(e) => updateColumnFilter("status", e.target.value)}
+                >
+                  <option value="">All</option>
+                  {FILTER_STATUSES.filter((option) => option !== "All").map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </th>
+              <th>
+                <select
+                  aria-label="Filter by recurring"
+                  className="input h-8 min-w-32"
+                  value={columnFilters.recurring}
+                  onChange={(e) => updateColumnFilter("recurring", e.target.value)}
+                >
+                  <option value="">All</option>
+                  <option value="recurring">Recurring</option>
+                  <option value="one-time">One-time</option>
+                </select>
+              </th>
+            </tr>
           </thead>
           <tbody>
-            {!activeRows.length && (
+            {!rows.length && (
               <tr>
                 <td colSpan={8} className="py-8 text-center font-semibold text-slate-500">
-                  No active tasks in the selected view.
+                  No tasks match the selected filters.
                 </td>
               </tr>
             )}
-            {activeRows.map(renderTaskRow)}
+            {rows.map((task) => {
+              // BRD 5.4: task_only can only change status for tasks assigned to them
+              const canChangeStatus =
+                canManage ||
+                (isTaskOnly && String(task.assignedId) === String(currentUser?._id || currentUser?.id));
+              const isStatusLocked = task.ftaStatus === "approved" || task.status === "Completed";
+
+              // BRD 5.4: "Submitted to FTA" available for all tasks — backend auto-routes to FTA Tracker
+              const availableStatuses = ALL_STATUSES;
+
+              return (
+                <tr key={task.id}>
+                  <td className="font-extrabold text-[#1e3a8a]">
+                    <button
+                      className="task-id-link"
+                      onClick={() => (canManage ? setDrawerTaskId(task.id) : navigate(`/tasks/${task.id}`))}
+                      title={canManage ? "Open task details" : "View task details"}
+                    >
+                      {task.taskId}
+                    </button>
+                  </td>
+                  <td>{task.client}</td>
+                  <td>
+                    <Badge>{task.category}</Badge>
+                  </td>
+                  <td>{task.type}</td>
+                  <td>
+                    <div>{task.dueDate}</div>
+                    {task.overdueDays > 0 && (
+                      <span className="mt-1 inline-flex rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-extrabold text-[#dc2626]">
+                        {task.overdueDays}d overdue
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    {canManage ? (
+                      // Admin/Manager: inline assignee dropdown
+                      <select
+                        id={`task-assignee-${task.id}`}
+                        className="input h-8 min-w-36"
+                        value={task.assignedId || ""}
+                        onChange={(e) => {
+                          const selected = state.users.find((u) => u._id === e.target.value || u.id === e.target.value);
+                          updateAssignee(task.id, e.target.value || null, selected?.name || "Unassigned").catch(() => fetchTasks());
+                        }}
+                      >
+                        <option value="">Unassigned</option>
+                        {state.users.map((u) => (
+                          <option key={u._id || u.id} value={u._id || u.id}>{u.name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span>{task.assigned}</span>
+                    )}
+                  </td>
+                  <td>
+                    {canChangeStatus && !isStatusLocked ? (
+                      <select
+                        id={`task-status-${task.id}`}
+                        name={`taskStatus${task.id}`}
+                        className="input h-8 min-w-40"
+                        // Use displayStatus when available (set by optimistic update) so the
+                        // select doesn't revert to the first option while the API request is in flight.
+                        value={task.displayStatus ?? task.status}
+                        onChange={(e) =>
+                          // Always re-fetch after update (success or fail) to guarantee DB sync.
+                          updateStatus(task.id, e.target.value).then(() => refetchTasks()).catch(() => refetchTasks())
+                        }
+                      >
+                        {availableStatuses.map((s) => (
+                          <option key={s}>{s}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      // BRD 5.4: task_only sees a locked pill for tasks not assigned to them
+                      <StatusPill status={task.status} />
+                    )}
+                  </td>
+                  <td>
+                    {task.recurring && (
+                      <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-extrabold text-[#1e3a8a]">
+                        Recurring
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </Table>
       </Card>
