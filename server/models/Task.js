@@ -8,7 +8,11 @@ const taskSchema = new mongoose.Schema({
   client: { type: mongoose.Schema.Types.ObjectId, ref: "Client", required: true },
   assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   dueDate: { type: Date, required: true },
+  // Structured period fields (new) — both optional and independent.
+  // period (legacy) is kept so existing free-text values still read correctly.
   period: String,
+  periodFY: String,      // e.g. "FY 2025-26"  or "FY 2025" for calendar year
+  periodQuarter: String, // e.g. "Jan-Mar", "Apr-Jun", "Jul-Sep", "Oct-Dec"
   description: String,
   status: { type: String, enum: ["not_started", "wip", "completed", "submitted_to_fta"], default: "not_started" },
   isRecurring: { type: Boolean, default: false },

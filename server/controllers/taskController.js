@@ -197,6 +197,48 @@ async function ensureManagerCanAssign(req, assignedTo) {
   return null;
 }
 
+// ---------------------------------------------------------------------------
+// Inline period helpers (CJS-safe — mirrors src/utils/periodUtils.js).
+// Kept here so the controller has no FE import dependency.
+// ---------------------------------------------------------------------------
+const PERIOD_MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function parseFYEStartMonth(fyeString) {
+  if (!fyeString) return 0;
+  const firstPart = fyeString.split("-")[0].trim();
+  const idx = PERIOD_MONTH_NAMES.findIndex((m) => m.toLowerCase() === firstPart.slice(0, 3).toLowerCase());
+  return idx >= 0 ? idx : 0;
+}
+
+function buildFYLabelServer(startYear, fyeString) {
+  const startMonth = parseFYEStartMonth(fyeString);
+  if (startMonth === 0) return `FY ${startYear}`;
+  return `FY ${startYear}-${String(startYear + 1).slice(-2)}`;
+}
+
+function getPeriodFromDateServer(date, fyeString) {
+  if (!date) return { periodFY: "", periodQuarter: "" };
+  const startMonth = parseFYEStartMonth(fyeString);
+  const month = date.getUTCMonth();
+  const year = date.getUTCFullYear();
+
+  // Which 0-based quarter (within the FY) does this month fall in?
+  let relativeMonth = (month - startMonth + 12) % 12;
+  const qi = Math.floor(relativeMonth / 3); // 0-3
+
+  // FY start year
+  const fyStartYear = month >= startMonth ? year : year - 1;
+
+  const qStart = (startMonth + qi * 3) % 12;
+  const qEnd = (qStart + 2) % 12;
+
+  return {
+    periodFY: buildFYLabelServer(fyStartYear, fyeString),
+    periodQuarter: `${PERIOD_MONTH_NAMES[qStart]}-${PERIOD_MONTH_NAMES[qEnd]}`,
+  };
+}
+// ---------------------------------------------------------------------------
+
  async function maybeGenerateNextRecurringTask(task, userId) {
   if (!task?.isRecurring || task.recurringGeneratedTask) return null;
   const rc = task.recurringConfig || {};
@@ -212,13 +254,21 @@ async function ensureManagerCanAssign(req, assignedTo) {
 
   const followingDueDate = calculateNextOccurrence(nextDueDate, { frequency, dayOfWeek, dateOfMonth, monthOfYear });
 
+  // Compute the period for the new task from its due date and the client's FYE config.
+  // The client may or may not be populated at this point, so we guard carefully.
+  const clientFYE =
+    (task.client && typeof task.client === "object" ? task.client.financialYearEnd : null) || "Jan - Dec";
+  const nextPeriod = getPeriodFromDateServer(nextDueDate, clientFYE);
+
   const nextTask = await Task.create({
     category: task.category,
     taskType: task.taskType,
     client: task.client,
     assignedTo: task.assignedTo,
     dueDate: nextDueDate,
-    period: task.period,
+    period: task.period, // legacy free-text — keep for backward compat
+    periodFY: nextPeriod.periodFY || undefined,
+    periodQuarter: nextPeriod.periodQuarter || undefined,
     description: task.description,
     status: "not_started",
     isRecurring: true,
@@ -288,7 +338,7 @@ function taskQuery(req) {
   return query;
 }
 
-const populateTask = [{ path: "client", select: "legalName fileNo jurisdiction vatDetails tradeLicences contactPersons" }, { path: "assignedTo", select: "name email role" }, { path: "createdBy", select: "name" }];
+const populateTask = [{ path: "client", select: "legalName fileNo jurisdiction vatDetails tradeLicences contactPersons financialYearEnd" }, { path: "assignedTo", select: "name email role" }, { path: "createdBy", select: "name" }];
 
 exports.listTasks = async (req, res, next) => {
   try {
@@ -350,7 +400,7 @@ exports.updateTask = async (req, res, next) => {
     }
     const previousStatus = task.status;
     // Bug #4 Fix: whitelist editable fields to block mass-assignment of taskId, createdBy, etc.
-    const ALLOWED = ["category", "taskType", "client", "assignedTo", "dueDate", "status", "description", "isAwaitingFta", "ftaStatus", "period"];
+    const ALLOWED = ["category", "taskType", "client", "assignedTo", "dueDate", "status", "description", "isAwaitingFta", "ftaStatus", "period", "periodFY", "periodQuarter"];
     ALLOWED.forEach((key) => { if (key in req.body) task[key] = req.body[key]; });
 
     if ("isRecurring" in req.body || "recurringConfig" in req.body || "dueDate" in req.body) {

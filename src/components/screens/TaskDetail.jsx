@@ -223,8 +223,28 @@ export default function TaskDetail() {
             )}
           </div>
 
-          {/* Period */}
-          {task.period && (
+          {/* Financial Year */}
+          {task.periodFY && (
+            <div className="task-detail-field">
+              <div className="task-detail-field-label">
+                <Clock size={13} /> Financial Year
+              </div>
+              <div className="task-detail-field-value">{task.periodFY}</div>
+            </div>
+          )}
+
+          {/* Quarter */}
+          {task.periodQuarter && (
+            <div className="task-detail-field">
+              <div className="task-detail-field-label">
+                <Clock size={13} /> Quarter
+              </div>
+              <div className="task-detail-field-value">{task.periodQuarter}</div>
+            </div>
+          )}
+
+          {/* Legacy period (free-text) — shown only when new structured fields are absent */}
+          {!task.periodFY && !task.periodQuarter && task.period && (
             <div className="task-detail-field">
               <div className="task-detail-field-label">
                 <Clock size={13} /> Period
