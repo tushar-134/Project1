@@ -29,6 +29,17 @@ const STATUS_PILL = {
   "Submitted to FTA": { bg: "bg-purple-50", text: "text-purple-700" },
 };
 
+const EMPTY_COLUMN_FILTERS = {
+  taskId: "",
+  client: "",
+  category: "",
+  type: "",
+  dueDate: "",
+  assigned: "",
+  status: "",
+  recurring: "",
+};
+
 /** Read-only coloured pill used when the user cannot change a status */
 function StatusPill({ status }) {
   const { bg, text } = STATUS_PILL[status] || { bg: "bg-slate-100", text: "text-slate-500" };
@@ -49,10 +60,7 @@ export default function TaskList() {
   const [scope, setScope] = useState("By Month");
   const [month, setMonth] = useState(searchParams.get("month") || "2026-05");
   const [drawerTaskId, setDrawerTaskId] = useState(null);
-  const [remarkTask, setRemarkTask] = useState(null);
-  const [remarkText, setRemarkText] = useState("");
-  const [remarkSaving, setRemarkSaving] = useState(false);
-  const [remarkError, setRemarkError] = useState("");
+  const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
 
   const canManage = canManageTasks(currentUser?.role);
   const isTaskOnly = currentUser?.role === "task_only";
@@ -86,7 +94,22 @@ export default function TaskList() {
       .catch(() => { });
   }, [cat, status, scope, month]);
 
-  const rows = state.tasks;
+  const taskMatches = (value, filter) => String(value || "").toLowerCase().includes(String(filter || "").toLowerCase().trim());
+  const filterOptions = (key) => [...new Set(state.tasks.map((task) => task[key]).filter(Boolean))].sort();
+  const hasColumnFilters = Object.values(columnFilters).some(Boolean);
+  const updateColumnFilter = (key, value) => setColumnFilters((current) => ({ ...current, [key]: value }));
+  const rows = state.tasks.filter((task) => {
+    if (!taskMatches(task.taskId, columnFilters.taskId)) return false;
+    if (!taskMatches(task.client, columnFilters.client)) return false;
+    if (columnFilters.category && task.category !== columnFilters.category) return false;
+    if (!taskMatches(task.type, columnFilters.type)) return false;
+    if (!taskMatches(task.dueDate, columnFilters.dueDate)) return false;
+    if (!taskMatches(task.assigned, columnFilters.assigned)) return false;
+    if (columnFilters.status && task.status !== columnFilters.status) return false;
+    if (columnFilters.recurring === "recurring" && !task.recurring) return false;
+    if (columnFilters.recurring === "one-time" && task.recurring) return false;
+    return true;
+  });
   const exportCsv = async () =>
     downloadBlob(
       await exportTasks({
@@ -163,6 +186,12 @@ export default function TaskList() {
           value={month}
           onChange={(e) => setMonth(e.target.value)}
         />
+        {hasColumnFilters && (
+          <Button variant="ghost" onClick={() => setColumnFilters(EMPTY_COLUMN_FILTERS)}>
+            <X size={16} />
+            Clear column filters
+          </Button>
+        )}
       </div>
 
       {/* BRD 5.4 role note */}
@@ -186,8 +215,100 @@ export default function TaskList() {
               <th>Remarks</th>
               <th>Recurring</th>
             </tr>
+            <tr>
+              <th>
+                <input
+                  aria-label="Filter by task ID"
+                  className="input h-8 min-w-28"
+                  type="search"
+                  value={columnFilters.taskId}
+                  onChange={(e) => updateColumnFilter("taskId", e.target.value)}
+                />
+              </th>
+              <th>
+                <input
+                  aria-label="Filter by client"
+                  className="input h-8 min-w-36"
+                  type="search"
+                  value={columnFilters.client}
+                  onChange={(e) => updateColumnFilter("client", e.target.value)}
+                />
+              </th>
+              <th>
+                <select
+                  aria-label="Filter by category"
+                  className="input h-8 min-w-36"
+                  value={columnFilters.category}
+                  onChange={(e) => updateColumnFilter("category", e.target.value)}
+                >
+                  <option value="">All</option>
+                  {filterOptions("category").map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </th>
+              <th>
+                <input
+                  aria-label="Filter by task type"
+                  className="input h-8 min-w-36"
+                  type="search"
+                  value={columnFilters.type}
+                  onChange={(e) => updateColumnFilter("type", e.target.value)}
+                />
+              </th>
+              <th>
+                <input
+                  aria-label="Filter by due date"
+                  className="input h-8 min-w-32"
+                  type="search"
+                  value={columnFilters.dueDate}
+                  onChange={(e) => updateColumnFilter("dueDate", e.target.value)}
+                />
+              </th>
+              <th>
+                <input
+                  aria-label="Filter by assignee"
+                  className="input h-8 min-w-36"
+                  type="search"
+                  value={columnFilters.assigned}
+                  onChange={(e) => updateColumnFilter("assigned", e.target.value)}
+                />
+              </th>
+              <th>
+                <select
+                  aria-label="Filter by status"
+                  className="input h-8 min-w-40"
+                  value={columnFilters.status}
+                  onChange={(e) => updateColumnFilter("status", e.target.value)}
+                >
+                  <option value="">All</option>
+                  {FILTER_STATUSES.filter((option) => option !== "All").map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </th>
+              <th>
+                <select
+                  aria-label="Filter by recurring"
+                  className="input h-8 min-w-32"
+                  value={columnFilters.recurring}
+                  onChange={(e) => updateColumnFilter("recurring", e.target.value)}
+                >
+                  <option value="">All</option>
+                  <option value="recurring">Recurring</option>
+                  <option value="one-time">One-time</option>
+                </select>
+              </th>
+            </tr>
           </thead>
           <tbody>
+            {!rows.length && (
+              <tr>
+                <td colSpan={8} className="py-8 text-center font-semibold text-slate-500">
+                  No tasks match the selected filters.
+                </td>
+              </tr>
+            )}
             {rows.map((task) => {
               // BRD 5.4: task_only can only change status for tasks assigned to them
               const canChangeStatus =
