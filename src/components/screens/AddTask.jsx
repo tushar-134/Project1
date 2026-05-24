@@ -8,6 +8,7 @@ import { useUsers } from "../../hooks/useUsers";
 import { useTasks } from "../../hooks/useTasks";
 import { categoryService } from "../../services/categoryService";
 import { mapCategory } from "../../utils/adapterUtils";
+import { getFYOptions, getQuarters, getCurrentFYAndQuarter } from "../../utils/periodUtils";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import Toggle from "../ui/Toggle.jsx";
@@ -31,7 +32,7 @@ export default function AddTask() {
   const [fta, setFta] = useState(false);
   const [savedStatus, setSavedStatus] = useState("not_started");
   const [submitting, setSubmitting] = useState(false);
-  const [details, setDetails] = useState({ client: "", assigned: "", dueDate: "2026-05-31", period: "Q2 2026", description: "", frequency: "monthly", dayOfWeek: "Sun", dateOfMonth: 1, monthOfYear: 1, nextDue: "2026-06-30", endDate: "" });
+  const [details, setDetails] = useState({ client: "", assigned: "", dueDate: "2026-05-31", periodFY: "", periodQuarter: "", description: "", frequency: "monthly", dayOfWeek: "Sun", dateOfMonth: 1, monthOfYear: 1, nextDue: "2026-06-30", endDate: "" });
   const chips = useMemo(() => category?.taskTypes || [], [category]);
 
   // Derive field-visibility config from the selected task type's saved toggles.
@@ -43,12 +44,34 @@ export default function AddTask() {
   const showPeriod = selectedRawType ? (selectedRawType.showPeriod !== false) : true;
   const showRecurring = selectedRawType ? (selectedRawType.showRecurring !== false) : true;
   const showAwaitingFta = selectedRawType ? (selectedRawType.showAwaitingFta !== false) : true;
+
+  // Derive FY + Quarter options from the selected client's financialYearEnd.
+  const selectedClient = useMemo(
+    () => state.clients.find((c) => (c._id || c.id) === details.client) || null,
+    [state.clients, details.client]
+  );
+  const clientFYE = selectedClient?.financialYearEnd || "Jan - Dec";
+  const fyOptions = useMemo(() => getFYOptions(clientFYE), [clientFYE]);
+  const quarterOptions = useMemo(() => getQuarters(clientFYE), [clientFYE]);
   useEffect(() => {
     // The task wizard needs lookup data up front so each step can stay synchronous and snappy.
     fetchClients({ limit: 100 }).catch(() => { });
     fetchUsers().catch(() => { });
     categoryService.list().then((data) => dispatch({ type: "SET_RESOURCE", resource: "categories", payload: data.map(mapCategory) })).catch(() => { });
   }, []);
+
+  // Auto-populate FY and Quarter once a client is selected (new tasks only).
+  // Clears the fields when client is deselected; re-computes when client changes.
+  useEffect(() => {
+    if (isEditMode) return;
+    if (!details.client) {
+      setDetails((prev) => ({ ...prev, periodFY: "", periodQuarter: "" }));
+      return;
+    }
+    const { fy, quarter } = getCurrentFYAndQuarter(clientFYE);
+    setDetails((prev) => ({ ...prev, periodFY: fy, periodQuarter: quarter }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [details.client, clientFYE, isEditMode]);
   useEffect(() => {
     if (!isEditMode) return;
 
@@ -81,7 +104,8 @@ export default function AddTask() {
         // Handle both mapped shape (assignedId) and raw API shape (assignedTo._id)
         assigned: task.assignedTo?._id || task.assignedId || (typeof task.assignedTo === "string" ? task.assignedTo : "") || "",
         dueDate: task.dueDate?.slice?.(0, 10) || "",
-        period: task.period || "",
+        periodFY: task.periodFY || "",
+        periodQuarter: task.periodQuarter || "",
         description: task.description || "",
         frequency: task.recurringConfig?.frequency || "monthly",
         dayOfWeek: task.recurringConfig?.dayOfWeek || "Sun",
@@ -160,7 +184,9 @@ export default function AddTask() {
         client: details.client,
         assignedTo: details.assigned || undefined,
         dueDate: details.dueDate,
-        period: showPeriod ? details.period : undefined,
+        // Structured period fields — send only when the Period section is visible.
+        periodFY: showPeriod ? (details.periodFY || undefined) : undefined,
+        periodQuarter: showPeriod ? (details.periodQuarter || undefined) : undefined,
         description: details.description,
         isRecurring: effectiveRecurring,
         recurringConfig: effectiveRecurring ? {
@@ -211,9 +237,48 @@ export default function AddTask() {
             <Field label="Client*" field="taskClient"><select className="input" value={details.client} onChange={(e) => setDetails({ ...details, client: e.target.value })}><option value="">Select client</option>{state.clients.map((c) => <option key={c.id} value={c._id}>{c.name}</option>)}</select></Field>
             <Field label="Assign To" field="taskAssignedTo"><select className="input" value={details.assigned} onChange={(e) => setDetails({ ...details, assigned: e.target.value })}><option value="">Unassigned</option>{state.users.map((u) => <option key={u.id} value={u._id}>{u.name}</option>)}</select></Field>
             <Field label="Due Date*" field="taskDueDate"><input className="input" type="date" value={details.dueDate} onChange={(e) => handleRecurrenceChange({ dueDate: e.target.value })} /></Field>
-            {showPeriod && <Field label="Period" field="taskPeriod"><input className="input" value={details.period} onChange={(e) => setDetails({ ...details, period: e.target.value })} /></Field>}
             <Field label="Description / Notes" field="taskDescription"><textarea className="input textarea" value={details.description} onChange={(e) => setDetails({ ...details, description: e.target.value })} /></Field>
           </div>
+
+          {/* ── Period section ─────────────────────────────────────────── */}
+          {showPeriod && (
+            <div className="mt-4 rounded-xl border border-[#e2e8f0] bg-slate-50/60 p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="text-[11px] font-extrabold uppercase tracking-[.08em] text-slate-500">Period</span>
+                {details.client && selectedClient?.financialYearEnd && (
+                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-[#1e3a8a]">
+                    FYE: {selectedClient.financialYearEnd}
+                  </span>
+                )}
+              </div>
+              <div className="grid gap-3 md:grid-cols-2">
+                <Field label="Financial Year" field="taskPeriodFY">
+                  <select
+                    className="input"
+                    value={details.periodFY}
+                    onChange={(e) => setDetails({ ...details, periodFY: e.target.value })}
+                  >
+                    <option value="">Select FY</option>
+                    {fyOptions.map((fy) => (
+                      <option key={fy} value={fy}>{fy}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Quarter" field="taskPeriodQuarter">
+                  <select
+                    className="input"
+                    value={details.periodQuarter}
+                    onChange={(e) => setDetails({ ...details, periodQuarter: e.target.value })}
+                  >
+                    <option value="">Select Quarter</option>
+                    {quarterOptions.map((q) => (
+                      <option key={q.value} value={q.value}>{q.value}</option>
+                    ))}
+                  </select>
+                </Field>
+              </div>
+            </div>
+          )}
           {showRecurring && (
             <>
               <ToggleRow label="Recurring Task" checked={recurring} onChange={(val) => {

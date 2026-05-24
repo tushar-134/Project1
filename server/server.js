@@ -104,14 +104,15 @@ async function dailyTaskNotifications() {
   for (const [to, ids] of byEmail) await sendEmail({ to, subject: "Filing Buddy overdue task digest", text: `Overdue tasks: ${ids.join(", ")}` });
 }
 
-async function taskScheduler() { 
-  
- const now = new Date();
+async function taskScheduler() {
+
+  const now = new Date();
 
   const today = new Date(Date.UTC(
     now.getUTCFullYear(),
     now.getUTCMonth(),
-    now.getUTCDate()
+    now.getUTCDate() - 15
+    // Create task 15 days before due date
   ));
 
   console.log("Now running task scheduler for ", today);
@@ -122,7 +123,7 @@ async function taskScheduler() {
     "recurringConfig.nextDueDate": today
   });
 
-   if (!tasks.length) {
+  if (!tasks.length) {
     console.log("No recurring tasks found");
     return;
   }
@@ -166,8 +167,8 @@ connectDB().then(async () => {
       ];
 
       const admin = await User.create({ name: "Hamad Siddiqui", email: "admin@filingbuddy.ae", password: "Admin@123", role: "admin" });
-      const sara  = await User.create({ name: "Sara Mahmoud",   email: "sara@filingbuddy.ae",  password: "Sara@123",  role: "manager" });
-      const omar  = await User.create({ name: "Omar Khalid",    email: "omar@filingbuddy.ae",  password: "Omar@123",  role: "task_only" });
+      const sara = await User.create({ name: "Sara Mahmoud", email: "sara@filingbuddy.ae", password: "Sara@123", role: "manager" });
+      const omar = await User.create({ name: "Omar Khalid", email: "omar@filingbuddy.ae", password: "Omar@123", role: "task_only" });
 
       for (const [name, icon, color, taskTypes] of categories) {
         await Category.create({ name, icon, color, isDefault: true, taskTypes: taskTypes.map((t) => ({ name: t })) });
@@ -177,24 +178,24 @@ connectDB().then(async () => {
       const maritime = await ClientGroup.create({ name: "Gulf Maritime Group", createdBy: admin._id });
 
       const mkClient = (d) => Client.create({ ...d, createdBy: admin._id });
-      const alBaraka = await mkClient({ fileNo: "FB-CLIENT-0001", clientType: "legal", legalName: "Al Baraka Trading LLC",   jurisdiction: "mainland",  registeredAddress: { country: "UAE", emirate: "Dubai" },    vatDetails: { trn: "1004821550003", status: "registered", filingFrequency: "quarterly" }, group: cipriani._id });
-      const zenith   = await mkClient({ fileNo: "FB-CLIENT-0002", clientType: "legal", legalName: "Zenith Digital FZ LLC",   jurisdiction: "freezone",  registeredAddress: { country: "UAE", emirate: "DMCC" },     group: cipriani._id });
-      const petra    = await mkClient({ fileNo: "FB-CLIENT-0003", clientType: "legal", legalName: "Petra Construction Co.",  jurisdiction: "mainland",  registeredAddress: { country: "UAE", emirate: "Abu Dhabi" } });
-      const gulf     = await mkClient({ fileNo: "FB-CLIENT-0004", clientType: "legal", legalName: "Gulf Star Logistics",     jurisdiction: "mainland",  registeredAddress: { country: "UAE", emirate: "Sharjah" },  group: maritime._id });
-      const nova     = await mkClient({ fileNo: "FB-CLIENT-0005", clientType: "legal", legalName: "Nova Tech DMCC",          jurisdiction: "freezone",  registeredAddress: { country: "UAE", emirate: "Dubai" } });
+      const alBaraka = await mkClient({ fileNo: "FB-CLIENT-0001", clientType: "legal", legalName: "Al Baraka Trading LLC", jurisdiction: "mainland", registeredAddress: { country: "UAE", emirate: "Dubai" }, vatDetails: { trn: "1004821550003", status: "registered", filingFrequency: "quarterly" }, group: cipriani._id });
+      const zenith = await mkClient({ fileNo: "FB-CLIENT-0002", clientType: "legal", legalName: "Zenith Digital FZ LLC", jurisdiction: "freezone", registeredAddress: { country: "UAE", emirate: "DMCC" }, group: cipriani._id });
+      const petra = await mkClient({ fileNo: "FB-CLIENT-0003", clientType: "legal", legalName: "Petra Construction Co.", jurisdiction: "mainland", registeredAddress: { country: "UAE", emirate: "Abu Dhabi" } });
+      const gulf = await mkClient({ fileNo: "FB-CLIENT-0004", clientType: "legal", legalName: "Gulf Star Logistics", jurisdiction: "mainland", registeredAddress: { country: "UAE", emirate: "Sharjah" }, group: maritime._id });
+      const nova = await mkClient({ fileNo: "FB-CLIENT-0005", clientType: "legal", legalName: "Nova Tech DMCC", jurisdiction: "freezone", registeredAddress: { country: "UAE", emirate: "Dubai" } });
       await mkClient({ fileNo: "FB-CLIENT-0006", clientType: "natural", legalName: "Mr. Khalid Al Rashidi", jurisdiction: "mainland", registeredAddress: { country: "UAE", emirate: "Dubai" } });
 
       cipriani.clients = [alBaraka._id, zenith._id]; await cipriani.save();
-      maritime.clients = [gulf._id];                  await maritime.save();
+      maritime.clients = [gulf._id]; await maritime.save();
 
       const seedTasks = [
-        ["FB/2026/T001", alBaraka, "VAT",        "VAT Return",             "2026-04-28", sara, "wip",            false, null,       false],
-        ["FB/2026/T002", zenith,   "CT",         "CT Return",              "2026-05-31", omar, "not_started",    false, null,       false],
-        ["FB/2026/T003", petra,    "VAT",        "VAT Registration",       "2026-05-15", sara, "submitted_to_fta",false,null,      true, "in_review"],
-        ["FB/2026/T004", gulf,     "Accounting", "Monthly Accounting",     "2026-05-31", null, "not_started",    false, null,       false],
-        ["FB/2026/T007", petra,    "VAT",        "VAT Registration",       "2026-05-10", sara, "submitted_to_fta",false,null,      true, "in_review"],
-        ["FB/2026/T008", nova,     "CT",         "CT Registration",        "2026-05-10", omar, "submitted_to_fta",false,null,      true, "in_review"],
-        ["FB/2026/T009", alBaraka, "VAT",        "VAT Refund Application", "2026-05-10", sara, "submitted_to_fta",false,null,      true, "additional_query"],
+        ["FB/2026/T001", alBaraka, "VAT", "VAT Return", "2026-04-28", sara, "wip", false, null, false],
+        ["FB/2026/T002", zenith, "CT", "CT Return", "2026-05-31", omar, "not_started", false, null, false],
+        ["FB/2026/T003", petra, "VAT", "VAT Registration", "2026-05-15", sara, "submitted_to_fta", false, null, true, "in_review"],
+        ["FB/2026/T004", gulf, "Accounting", "Monthly Accounting", "2026-05-31", null, "not_started", false, null, false],
+        ["FB/2026/T007", petra, "VAT", "VAT Registration", "2026-05-10", sara, "submitted_to_fta", false, null, true, "in_review"],
+        ["FB/2026/T008", nova, "CT", "CT Registration", "2026-05-10", omar, "submitted_to_fta", false, null, true, "in_review"],
+        ["FB/2026/T009", alBaraka, "VAT", "VAT Refund Application", "2026-05-10", sara, "submitted_to_fta", false, null, true, "additional_query"],
       ];
       let lastTask;
       for (const [taskId, client, category, taskType, dueDate, assignedTo, status, isRecurring, frequency, isAwaitingFta, ftaStatus] of seedTasks) {
