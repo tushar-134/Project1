@@ -84,11 +84,6 @@ export default function Contacts() {
       return;
     }
     const digits = normalizePhoneNumber(form.mobile);
-    const { min } = getPhoneNumberSpec(form.countryCode);
-    if (digits.length !== min) {
-      toast.error(`Mobile number must be exactly ${min} digits.`);
-      return;
-    }
     const client = state.clients.find((item) => item._id === form.clientId || item.id === form.clientId);
     if (!client) {
       toast.error("Please select a valid client.");
@@ -218,13 +213,9 @@ export default function Contacts() {
                   <input
                     className="input"
                     value={form.mobile}
-                    onChange={(e) => {
-                      const { max } = getPhoneNumberSpec(form.countryCode);
-                      setForm({ ...form, mobile: normalizePhoneNumber(e.target.value).slice(0, max) });
-                    }}
+                    onChange={(e) => setForm({ ...form, mobile: normalizePhoneNumber(e.target.value) })}
                     placeholder={getPhoneNumberSpec(form.countryCode).placeholder}
                     inputMode="numeric"
-                    maxLength={getPhoneNumberSpec(form.countryCode).max}
                   />
                 </div>
               </Field>

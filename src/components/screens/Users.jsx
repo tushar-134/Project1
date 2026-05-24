@@ -89,13 +89,8 @@ export default function Users() {
     }
     const mobileCountryCode = normalizeDialCode(form.mobileCountryCode);
     const mobile = normalizePhoneNumber(form.mobile);
-    const { min, max } = getPhoneNumberSpec(mobileCountryCode);
     if (!mobileCountryCode) {
       setMobileError("Country code is required.");
-      return;
-    }
-    if (mobile.length !== min) {
-      setMobileError("Phone number is invalid.");
       return;
     }
     setMobileError("");
@@ -340,8 +335,7 @@ export default function Users() {
                     value={form.mobileCountryCode}
                     onChange={(e) => {
                       const code = e.target.value;
-                      const { max } = getPhoneNumberSpec(code);
-                      setForm({ ...form, mobileCountryCode: code, mobile: normalizePhoneNumber(form.mobile).slice(0, max) });
+                      setForm({ ...form, mobileCountryCode: code, mobile: normalizePhoneNumber(form.mobile) });
                       setMobileError("");
                     }}
                   >
@@ -355,12 +349,10 @@ export default function Users() {
                     type="tel"
                     autoComplete="tel"
                     inputMode="numeric"
-                    maxLength={getPhoneNumberSpec(form.mobileCountryCode).max}
                     placeholder={getPhoneNumberSpec(form.mobileCountryCode).placeholder}
                     value={form.mobile}
                     onChange={(e) => {
-                      const { max } = getPhoneNumberSpec(form.mobileCountryCode);
-                      setForm({ ...form, mobile: normalizePhoneNumber(e.target.value).slice(0, max) });
+                      setForm({ ...form, mobile: normalizePhoneNumber(e.target.value) });
                       setMobileError("");
                     }}
                   />

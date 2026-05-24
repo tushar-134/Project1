@@ -3,7 +3,7 @@ const { validationResult } = require("express-validator");
 const User = require("../models/User");
 const Client = require("../models/Client");
 const sendEmail = require("../utils/sendEmail");
-const { isValidPhone, normalizeDialCode, normalizePhoneNumber } = require("../utils/phoneUtils");
+const { normalizeDialCode, normalizePhoneNumber } = require("../utils/phoneUtils");
 
 function normalize(value) {
   return String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
@@ -11,10 +11,6 @@ function normalize(value) {
 
 function normalizeMobile(value) {
   return normalizePhoneNumber(value);
-}
-
-function hasValidMobile(countryCode, value) {
-  return isValidPhone(countryCode, value);
 }
 
 function escapeRegex(value) {
@@ -91,9 +87,6 @@ exports.createUser = async (req, res, next) => {
     const email = normalize(req.body.email);
     const mobile = normalizeMobile(req.body.mobile);
     const mobileCountryCode = normalizeDialCode(req.body.mobileCountryCode);
-    if (!hasValidMobile(mobileCountryCode, req.body.mobile)) {
-      return res.status(400).json({ message: "Phone number is invalid." });
-    }
     if (await findUserDuplicate({ email: req.body.email, mobile: req.body.mobile })) {
       return res.status(409).json({ message: "User already added with this email or phone number." });
     }
@@ -114,9 +107,6 @@ exports.createUser = async (req, res, next) => {
 exports.updateUser = async (req, res, next) => {
   try {
     const mobileCountryCode = normalizeDialCode(req.body.mobileCountryCode);
-    if (!hasValidMobile(mobileCountryCode, req.body.mobile)) {
-      return res.status(400).json({ message: "Phone number is invalid." });
-    }
     if (await findUserDuplicate({ email: req.body.email, mobile: req.body.mobile, excludeId: req.params.id })) {
       return res.status(409).json({ message: "User already added with this email or phone number." });
     }

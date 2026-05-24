@@ -7,7 +7,7 @@ const ClientGroup = require("../models/ClientGroup");
 const Notification = require("../models/Notification");
 const ActivityLog = require("../models/ActivityLog");
 const { nextClientFileNo } = require("../utils/autoId");
-const { getPhoneNumberSpec, normalizeDialCode, normalizePhoneNumber } = require("../utils/phoneUtils");
+const { normalizeDialCode, normalizePhoneNumber } = require("../utils/phoneUtils");
 
 // Managers can assign clients to themselves or task_only users only — not to other managers or admins.
 async function ensureManagerCanAssignClient(req, assignedUser) {
@@ -93,12 +93,7 @@ function duplicateMessage(client, payload) {
 }
 
 function findInvalidContactMobile(contactPersons = []) {
-  return contactPersons.findIndex((contact) => {
-    const digits = normalizePhoneNumber(contact?.mobile?.number || "");
-    if (!digits.length) return false;
-    const { min, max } = getPhoneNumberSpec(contact?.mobile?.countryCode);
-    return digits.length < min || digits.length > max;
-  });
+  return -1;
 }
 
 function findMissingContactName(contactPersons = []) {

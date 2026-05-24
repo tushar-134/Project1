@@ -570,17 +570,6 @@ export default function AddClient() {
         toast.error(`Contact person ${missingContactCodeIndex + 1}: please select a country code.`);
         return false;
       }
-      const invalidContactIndex = contacts.findIndex((contact) => {
-        const phoneDigits = normalizePhoneNumber(contact.mobile);
-        if (!phoneDigits) return false;
-        const { min } = getPhoneNumberSpec(contact.code);
-        return phoneDigits.length !== min;
-      });
-      if (invalidContactIndex >= 0) {
-        const { min } = getPhoneNumberSpec(contacts[invalidContactIndex]?.code);
-        toast.error(`Contact person ${invalidContactIndex + 1}: mobile number must be exactly ${min} digits.`);
-        return false;
-      }
     }
     setIsSaving(true);
     try {
@@ -760,24 +749,20 @@ export default function AddClient() {
                       <select id={`contact-code-${i}`} name={`contactCode${i}`} className="input w-44" value={c.code} onChange={(e) => patch(i, { code: e.target.value })}>
                         <option value="">Code</option>
                         {DIAL_CODE_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>{option.label}</option>
-                        ))}
-                      </select>
-                      <input
-                        id={`contact-mobile-${i}`}
-                        name={`contactMobile${i}`}
-                        className="input"
-                        value={c.mobile}
-                        onChange={(e) => {
-                          const { max } = getPhoneNumberSpec(c.code);
-                          patch(i, { mobile: normalizePhoneNumber(e.target.value).slice(0, max) });
-                        }}
-                        placeholder={getPhoneNumberSpec(c.code).placeholder}
-                        inputMode="numeric"
-                        maxLength={getPhoneNumberSpec(c.code).max}
-                      />
-                    </div>
-                  </Field>
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                    <input
+                      id={`contact-mobile-${i}`}
+                      name={`contactMobile${i}`}
+                      className="input"
+                      value={c.mobile}
+                      onChange={(e) => patch(i, { mobile: normalizePhoneNumber(e.target.value) })}
+                      placeholder={getPhoneNumberSpec(c.code).placeholder}
+                      inputMode="numeric"
+                    />
+                  </div>
+                </Field>
                   <Field label="WhatsApp Number" field={`contact-whatsapp-${i}`}><input className="input" value={c.whatsapp} onChange={(e) => patch(i, { whatsapp: e.target.value })} /></Field>
                   <Field label="Alternate Email" field={`contact-alternate-${i}`}><input className="input" value={c.alternate} onChange={(e) => patch(i, { alternate: e.target.value })} /></Field>
                   <label className="flex items-center gap-2 font-bold" htmlFor={`contact-primary-${i}`}><input id={`contact-primary-${i}`} name={`contactPrimary${i}`} type="checkbox" checked={c.primary} onChange={(e) => {
