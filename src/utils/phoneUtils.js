@@ -16,10 +16,10 @@ export function normalizePhoneNumber(value) {
 export function getPhoneNumberSpec(countryCode) {
   const normalizedCode = normalizeDialCode(countryCode);
   if (normalizedCode === "+971") {
-    return { min: 9, max: 9, placeholder: "Enter mobile number" };
+    return { min: 7, max: 15, placeholder: "Enter mobile number" };
   }
   if (normalizedCode === "+91") {
-    return { min: 10, max: 10, placeholder: "Enter mobile number" };
+    return { min: 7, max: 15, placeholder: "Enter mobile number" };
   }
-  return { min: 10, max: 10, placeholder: "Enter mobile number" };
+  return { min: 7, max: 15, placeholder: "Enter mobile number" };
 }

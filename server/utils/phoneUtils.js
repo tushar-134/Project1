@@ -16,12 +16,12 @@ function normalizePhoneNumber(value) {
 function getPhoneNumberSpec(countryCode) {
   const normalizedCode = normalizeDialCode(countryCode);
   if (normalizedCode === "+971") {
-    return { min: 9, max: 9 };
+    return { min: 7, max: 15 };
   }
   if (normalizedCode === "+91") {
-    return { min: 10, max: 10 };
+    return { min: 7, max: 15 };
   }
-  return { min: 10, max: 10 };
+  return { min: 7, max: 15 };
 }
 
 function isValidPhone(countryCode, number) {

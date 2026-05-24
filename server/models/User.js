@@ -11,6 +11,9 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ["admin", "manager", "user", "task_only"], default: "user" },
   isActive: { type: Boolean, default: true },
   lastLogin: Date,
+  authToken: String,
+  authTokenIssuedAt: Date,
+  authTokenExpiresAt: Date,
 }, { timestamps: true });
 
 userSchema.pre("save", async function hashPassword() {

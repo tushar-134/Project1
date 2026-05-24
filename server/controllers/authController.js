@@ -1,9 +1,17 @@
 const { validationResult } = require("express-validator");
 const User = require("../models/User");
 const generateToken = require("../utils/generateToken");
+const jwt = require("jsonwebtoken");
 
 function publicUser(user) {
   return { id: user._id, name: user.name, email: user.email, role: user.role, mobile: user.mobile, mobileCountryCode: user.mobileCountryCode, isActive: user.isActive };
+}
+
+function applyStoredToken(user, token) {
+  const decoded = jwt.decode(token);
+  user.authToken = token;
+  user.authTokenIssuedAt = new Date();
+  user.authTokenExpiresAt = decoded?.exp ? new Date(decoded.exp * 1000) : undefined;
 }
 
 exports.login = async (req, res, next) => {
@@ -15,13 +23,26 @@ exports.login = async (req, res, next) => {
     if (!user || !user.isActive || !(await user.comparePassword(req.body.password))) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
+    const token = generateToken(user);
     user.lastLogin = new Date();
+    applyStoredToken(user, token);
     await user.save();
-    res.json({ token: generateToken(user), user: publicUser(user) });
+    res.json({ token, user: publicUser(user) });
   } catch (error) { next(error); }
 };
 
-exports.logout = (req, res) => res.json({ message: "Logged out" });
+exports.logout = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (user) {
+      user.authToken = undefined;
+      user.authTokenIssuedAt = undefined;
+      user.authTokenExpiresAt = undefined;
+      await user.save({ validateBeforeSave: false });
+    }
+    res.json({ message: "Logged out" });
+  } catch (error) { next(error); }
+};
 
 exports.me = (req, res) => res.json({ user: publicUser(req.user) });
 
