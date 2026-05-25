@@ -29,6 +29,8 @@ const populateClient = [
   { path: "attachments.uploadedBy", select: "name" },
   { path: "tradeLicences.documents.uploadedBy", select: "name" },
   { path: "contactPersons.emiratesId.documents.uploadedBy", select: "name" },
+  { path: "contactPersons.emiratesId.frontDocuments.uploadedBy", select: "name" },
+  { path: "contactPersons.emiratesId.backDocuments.uploadedBy", select: "name" },
   { path: "contactPersons.passport.documents.uploadedBy", select: "name" },
 ];
 
@@ -160,28 +162,37 @@ function getDocumentContainer(client, section, index) {
     const item = client.tradeLicences[index];
     if (!item) return null;
     item.documents = Array.isArray(item.documents) ? item.documents : [];
-    return { holder: item, key: "documents" };
+    return { holder: item, key: "documents", sync(container) { container.documentUrl = container.documents.at(-1)?.url || ""; } };
   }
   if (section === "emiratesId") {
     const item = client.contactPersons[index];
     if (!item) return null;
     item.emiratesId = item.emiratesId || {};
     item.emiratesId.documents = Array.isArray(item.emiratesId.documents) ? item.emiratesId.documents : [];
-    return { holder: item.emiratesId, key: "documents" };
+    return { holder: item.emiratesId, key: "documents", sync(container) { container.documentUrl = container.documents.at(-1)?.url || ""; } };
+  }
+  if (section === "emiratesIdFront") {
+    const item = client.contactPersons[index];
+    if (!item) return null;
+    item.emiratesId = item.emiratesId || {};
+    item.emiratesId.frontDocuments = Array.isArray(item.emiratesId.frontDocuments) ? item.emiratesId.frontDocuments : [];
+    return { holder: item.emiratesId, key: "frontDocuments", sync(container) { container.frontDocumentUrl = container.frontDocuments.at(-1)?.url || ""; } };
+  }
+  if (section === "emiratesIdBack") {
+    const item = client.contactPersons[index];
+    if (!item) return null;
+    item.emiratesId = item.emiratesId || {};
+    item.emiratesId.backDocuments = Array.isArray(item.emiratesId.backDocuments) ? item.emiratesId.backDocuments : [];
+    return { holder: item.emiratesId, key: "backDocuments", sync(container) { container.backDocumentUrl = container.backDocuments.at(-1)?.url || ""; } };
   }
   if (section === "passport") {
     const item = client.contactPersons[index];
     if (!item) return null;
     item.passport = item.passport || {};
     item.passport.documents = Array.isArray(item.passport.documents) ? item.passport.documents : [];
-    return { holder: item.passport, key: "documents" };
+    return { holder: item.passport, key: "documents", sync(container) { container.documentUrl = container.documents.at(-1)?.url || ""; } };
   }
   return null;
-}
-
-function syncLegacyDocumentUrl(container) {
-  const docs = Array.isArray(container.documents) ? container.documents : [];
-  container.documentUrl = docs.length ? docs[docs.length - 1].url : "";
 }
 
 function normalizeTradeLicencesForPersistence(tradeLicences = [], existingTradeLicences = []) {
@@ -210,6 +221,16 @@ function normalizeContactPersonsForPersistence(contactPersons = [], existingCont
       : Array.isArray(existingEmiratesId.documents)
         ? existingEmiratesId.documents
         : [];
+    const frontDocuments = Array.isArray(contact?.emiratesId?.frontDocuments)
+      ? contact.emiratesId.frontDocuments
+      : Array.isArray(existingEmiratesId.frontDocuments)
+        ? existingEmiratesId.frontDocuments
+        : [];
+    const backDocuments = Array.isArray(contact?.emiratesId?.backDocuments)
+      ? contact.emiratesId.backDocuments
+      : Array.isArray(existingEmiratesId.backDocuments)
+        ? existingEmiratesId.backDocuments
+        : [];
     const passportDocuments = Array.isArray(contact?.passport?.documents)
       ? contact.passport.documents
       : Array.isArray(existingPassport.documents)
@@ -220,7 +241,11 @@ function normalizeContactPersonsForPersistence(contactPersons = [], existingCont
       emiratesId: {
         ...(contact.emiratesId || {}),
         documents: emiratesIdDocuments,
+        frontDocuments,
+        backDocuments,
         documentUrl: contact?.emiratesId?.documentUrl || emiratesIdDocuments[emiratesIdDocuments.length - 1]?.url || existingEmiratesId.documentUrl || "",
+        frontDocumentUrl: contact?.emiratesId?.frontDocumentUrl || frontDocuments[frontDocuments.length - 1]?.url || existingEmiratesId.frontDocumentUrl || "",
+        backDocumentUrl: contact?.emiratesId?.backDocumentUrl || backDocuments[backDocuments.length - 1]?.url || existingEmiratesId.backDocumentUrl || "",
       },
       passport: {
         ...(contact.passport || {}),
@@ -500,7 +525,7 @@ exports.uploadClientDocument = async (req, res, next) => {
     uploadedFiles.forEach((uploadedFile) => {
       container.holder[container.key].push(toStoredFileEntry(uploadedFile, req.user._id, description));
     });
-    syncLegacyDocumentUrl(container.holder);
+    container.sync(container.holder);
     await client.save();
     res.status(201).json(await client.populate(populateClient));
   } catch (error) { next(error); }
@@ -516,7 +541,7 @@ exports.deleteClientDocument = async (req, res, next) => {
     const doc = container.holder[container.key].id(req.params.documentId);
     if (!doc) return res.status(404).json({ message: "Document not found" });
     doc.deleteOne();
-    syncLegacyDocumentUrl(container.holder);
+    container.sync(container.holder);
     await client.save();
     res.json(await client.populate(populateClient));
   } catch (error) { next(error); }
