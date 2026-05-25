@@ -492,6 +492,83 @@ exports.exportClients = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
+exports.expiryAlerts = async (req, res, next) => {
+  try {
+    const query = { isActive: true };
+    if (req.user.role === "task_only") {
+      const assignedClientIds = await Task.find({ assignedTo: req.user._id }).distinct("client");
+      query._id = { $in: assignedClientIds };
+    }
+
+    const clients = await Client.find(query).select("legalName fileNo tradeLicences contactPersons");
+    const today = new Date();
+    const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+    const soonEnd = new Date(start);
+    soonEnd.setUTCDate(soonEnd.getUTCDate() + 15);
+    const alerts = [];
+
+    function pushAlert({ client, type, label, holderName, expiryDate }) {
+      if (!expiryDate) return;
+      const date = new Date(expiryDate);
+      if (Number.isNaN(date.getTime())) return;
+      const normalized = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+      if (normalized > soonEnd) return;
+      const status = normalized < start ? "expired" : "expiring_soon";
+      alerts.push({
+        clientId: client._id,
+        clientName: client.legalName,
+        fileNo: client.fileNo,
+        type,
+        label,
+        holderName: holderName || "",
+        expiryDate: normalized.toISOString(),
+        status,
+      });
+    }
+
+    clients.forEach((client) => {
+      (client.tradeLicences || []).forEach((licence) => {
+        pushAlert({
+          client,
+          type: "licence",
+          label: "Trade Licence",
+          holderName: licence.licenceNumber || licence.issuingAuthority || "",
+          expiryDate: licence.expiryDate,
+        });
+      });
+
+      (client.contactPersons || []).forEach((person) => {
+        pushAlert({
+          client,
+          type: "emirates_id",
+          label: "Emirates ID",
+          holderName: person.fullName || "",
+          expiryDate: person.emiratesId?.expiryDate,
+        });
+        pushAlert({
+          client,
+          type: "passport",
+          label: "Passport",
+          holderName: person.fullName || "",
+          expiryDate: person.passport?.expiryDate,
+        });
+      });
+    });
+
+    alerts.sort((a, b) => {
+      if (a.status !== b.status) return a.status === "expired" ? -1 : 1;
+      return new Date(a.expiryDate) - new Date(b.expiryDate);
+    });
+
+    res.json({
+      expiredCount: alerts.filter((item) => item.status === "expired").length,
+      expiringSoonCount: alerts.filter((item) => item.status === "expiring_soon").length,
+      total: alerts.length,
+      alerts,
+    });
+  } catch (error) { next(error); }
+};
+
 exports.uploadAttachment = async (req, res, next) => {
   try {
     const client = await Client.findById(req.params.id);
