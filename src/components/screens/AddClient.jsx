@@ -731,14 +731,21 @@ export default function AddClient() {
         }));
       }
       payload.customFields = Object.fromEntries(Object.entries(customFieldValues).filter(([k]) => selectedFieldKeys.includes(k)));
-      const pendingAttachments = attachments.filter((attachment) => !attachment.saved && attachment.file);
-      const pendingLicenceDocuments = licences
-        .map((licence, index) => ({ index, files: (licence.documents || []).filter((document) => !document.saved && document.file).map((document) => document.file) }))
-        .filter((item) => item.files.length);
-      const pendingContactDocuments = contacts.flatMap((contact, index) => ([
-        contact.eidDocuments?.some((document) => !document.saved && document.file) ? { index, files: contact.eidDocuments.filter((document) => !document.saved && document.file).map((document) => document.file), section: "emiratesId" } : null,
-        contact.passportDocuments?.some((document) => !document.saved && document.file) ? { index, files: contact.passportDocuments.filter((document) => !document.saved && document.file).map((document) => document.file), section: "passport" } : null,
-      ].filter(Boolean)));
+      const includeAttachments = !continueToNext || tab >= 7;
+      const pendingAttachments = includeAttachments
+        ? attachments.filter((attachment) => !attachment.saved && attachment.file)
+        : [];
+      const pendingLicenceDocuments = includeTradeLicences
+        ? licences
+          .map((licence, index) => ({ index, files: (licence.documents || []).filter((document) => !document.saved && document.file).map((document) => document.file) }))
+          .filter((item) => item.files.length)
+        : [];
+      const pendingContactDocuments = includeContactPersons
+        ? contacts.flatMap((contact, index) => ([
+          contact.eidDocuments?.some((document) => !document.saved && document.file) ? { index, files: contact.eidDocuments.filter((document) => !document.saved && document.file).map((document) => document.file), section: "emiratesId" } : null,
+          contact.passportDocuments?.some((document) => !document.saved && document.file) ? { index, files: contact.passportDocuments.filter((document) => !document.saved && document.file).map((document) => document.file), section: "passport" } : null,
+        ].filter(Boolean)))
+        : [];
       if (isEditMode) {
         await updateClient(id, payload);
         if (pendingLicenceDocuments.length) {
