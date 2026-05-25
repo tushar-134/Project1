@@ -161,6 +161,90 @@ function ClientTaskDrawer({ detail, loading, onClose }) {
   );
 }
 
+function UserTaskDrawer({ detail, loading, onClose }) {
+  if (!detail && !loading) return null;
+
+  return (
+    <>
+      <button
+        type="button"
+        className="fixed inset-0 z-40 bg-slate-950/30 backdrop-blur-[1px]"
+        onClick={onClose}
+        aria-label="Close user task report"
+      />
+      <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[680px] flex-col border-l border-[#dbe4f0] bg-[#f8fbff] shadow-[-24px_0_60px_rgba(15,23,42,0.16)]">
+        <div className="flex items-center justify-between border-b border-[#e2e8f0] bg-white px-5 py-4">
+          <div>
+            <div className="page-kicker">User Report</div>
+            <div className="mt-1 text-[18px] font-black text-slate-900">{detail?.user?.name || "Loading user"}</div>
+            <div className="text-[12px] font-semibold text-slate-500">{detail?.user?.email || detail?.user?.role || "Task activity for this user"}</div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-10 w-10 place-items-center rounded-xl border border-[#dbe4f0] bg-slate-50 text-slate-500 transition hover:bg-slate-100"
+            aria-label="Close user task drawer"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-5">
+          {loading ? (
+            <Card className="p-8 text-center text-[14px] font-semibold text-slate-500">Loading user tasks...</Card>
+          ) : !detail?.items?.length ? (
+            <Card className="p-8 text-center text-[14px] font-semibold text-slate-500">No tasks found for this user in the selected date range.</Card>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Card className="p-4">
+                  <div className="text-[11px] font-black uppercase tracking-wider text-slate-400">User</div>
+                  <div className="mt-1 text-[14px] font-extrabold text-slate-900">{detail.user?.name || "-"}</div>
+                </Card>
+                <Card className="p-4">
+                  <div className="text-[11px] font-black uppercase tracking-wider text-slate-400">Email</div>
+                  <div className="mt-1 break-all text-[14px] font-extrabold leading-5 text-slate-900">
+                    {detail.user?.email || "-"}
+                  </div>
+                </Card>
+                <Card className="p-4">
+                  <div className="text-[11px] font-black uppercase tracking-wider text-slate-400">Tasks</div>
+                  <div className="mt-1 text-[14px] font-extrabold text-slate-900">{detail.total ?? detail.items.length}</div>
+                </Card>
+              </div>
+
+              <Card>
+                <Table>
+                  <thead>
+                    <tr>
+                      <th>Client</th>
+                      <th>Task ID</th>
+                      <th>Task Name</th>
+                      <th>Status</th>
+                      <th>Last Updated</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detail.items.map((task) => (
+                      <tr key={task._id}>
+                        <td className="font-extrabold text-[#1e3a8a]">{task.client?.legalName || "-"}</td>
+                        <td>{task.taskId || "-"}</td>
+                        <td>{task.taskType || "-"}</td>
+                        <td>{formatStatus(task.status)}</td>
+                        <td>{formatDateTime(task.latestActionAt || task.updatedAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </Card>
+            </div>
+          )}
+        </div>
+      </aside>
+    </>
+  );
+}
+
 const reportColumns = {
   "login-activity": [
     ["Name", (row) => row.name || "-"],
@@ -238,6 +322,8 @@ export default function Reports() {
   const [rangeError, setRangeError] = useState("");
   const [clientTaskDetail, setClientTaskDetail] = useState(null);
   const [clientTaskLoading, setClientTaskLoading] = useState(false);
+  const [userTaskDetail, setUserTaskDetail] = useState(null);
+  const [userTaskLoading, setUserTaskLoading] = useState(false);
   const columns = useMemo(() => reportColumns[activeReport] || reportColumns["task-activity"], [activeReport]);
 
   const loadReport = (report = activeReport, nextPage = page, nextRange = range) => {
@@ -256,6 +342,7 @@ export default function Reports() {
     setActiveReport(report);
     setPage(1);
     setClientTaskDetail(null);
+    setUserTaskDetail(null);
     loadReport(report, 1);
   };
 
@@ -298,6 +385,17 @@ export default function Reports() {
       .then((data) => setClientTaskDetail(data))
       .catch(() => setClientTaskDetail({ client: row.client, items: [], total: 0 }))
       .finally(() => setClientTaskLoading(false));
+  };
+
+  const openUserTaskDetail = (row) => {
+    const userId = row?.user?._id;
+    if (!userId) return;
+    setUserTaskLoading(true);
+    setUserTaskDetail({ user: row.user, items: [], total: row.total || 0 });
+    reportService.userTaskDetail(userId, range)
+      .then((data) => setUserTaskDetail(data))
+      .catch(() => setUserTaskDetail({ user: row.user, items: [], total: 0 }))
+      .finally(() => setUserTaskLoading(false));
   };
 
   useEffect(() => {
@@ -362,6 +460,14 @@ export default function Reports() {
                       >
                         {asText(render(row))}
                       </button>
+                    ) : activeReport === "user-wise" && label === "User" && row.user?._id ? (
+                      <button
+                        type="button"
+                        className="font-extrabold text-[#1e3a8a] underline-offset-4 hover:underline"
+                        onClick={() => openUserTaskDetail(row)}
+                      >
+                        {asText(render(row))}
+                      </button>
                     ) : (
                       asText(render(row))
                     )}
@@ -386,6 +492,7 @@ export default function Reports() {
         </div>
       </Card>
       <ClientTaskDrawer detail={clientTaskDetail} loading={clientTaskLoading} onClose={() => setClientTaskDetail(null)} />
+      <UserTaskDrawer detail={userTaskDetail} loading={userTaskLoading} onClose={() => setUserTaskDetail(null)} />
     </div>
   );
 }

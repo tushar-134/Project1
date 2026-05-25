@@ -238,6 +238,52 @@ exports.userWise = async (req, res, next) => {
   try { res.status(200).json(await aggregatePage(userWisePipeline(parseRange(req.query)), parsePage(req.query.page))); } catch (error) { next(error); }
 };
 
+exports.userTaskDetail = async (req, res, next) => {
+  try {
+    const range = parseRange(req.query);
+    const user = await User.findById(req.params.userId).select("name email role");
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const tasks = await Task.find({
+      assignedTo: user._id,
+      ...dateMatch("updatedAt", range),
+    })
+      .populate("client", "legalName fileNo")
+      .populate("assignedTo", "name email role")
+      .sort({ updatedAt: -1, createdAt: -1 });
+
+    const activityByTask = await latestTaskActors(tasks.map((task) => task._id));
+    const items = tasks.map((task) => {
+      const latestActivity = activityByTask.get(String(task._id));
+      return {
+        _id: task._id,
+        taskId: task.taskId,
+        taskType: task.taskType,
+        category: task.category,
+        status: task.status,
+        dueDate: task.dueDate,
+        updatedAt: task.updatedAt,
+        client: task.client ? {
+          _id: task.client._id,
+          legalName: task.client.legalName,
+          fileNo: task.client.fileNo,
+        } : null,
+        assignedTo: task.assignedTo ? {
+          _id: task.assignedTo._id,
+          name: task.assignedTo.name,
+          email: task.assignedTo.email,
+          role: task.assignedTo.role,
+        } : null,
+        performedBy: latestActivity?.user || null,
+        latestAction: latestActivity?.action || null,
+        latestActionAt: latestActivity?.createdAt || null,
+      };
+    });
+
+    res.status(200).json({ user, items, total: items.length });
+  } catch (error) { next(error); }
+};
+
 exports.overdue = async (req, res, next) => {
   try {
     const range = parseRange(req.query);

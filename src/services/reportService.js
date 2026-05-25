@@ -8,6 +8,7 @@ export const reportService = {
   clientWise: (params) => api.get("/reports/v2/client-wise", { params }).then((res) => res.data),
   clientTaskDetail: (clientId, params) => api.get(`/reports/v2/client-wise/${clientId}/tasks`, { params }).then((res) => res.data),
   userWise: (params) => api.get("/reports/v2/user-wise", { params }).then((res) => res.data),
+  userTaskDetail: (userId, params) => api.get(`/reports/v2/user-wise/${userId}/tasks`, { params }).then((res) => res.data),
   overdue: (params) => api.get("/reports/v2/overdue", { params }).then((res) => res.data),
   ftaTracker: (params) => api.get("/reports/v2/fta-tracker", { params }).then((res) => res.data),
   exportCsv: (report, params) => api.get(`/reports/v2/${report}/export`, { params, responseType: "blob" }).then((res) => res.data),

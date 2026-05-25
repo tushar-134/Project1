@@ -12,6 +12,7 @@ router.get("/v2/task-activity", auth, adminManager, v2.taskActivity);
 router.get("/v2/client-wise", auth, adminManager, v2.clientWise);
 router.get("/v2/client-wise/:clientId/tasks", auth, adminManager, v2.clientTaskDetail);
 router.get("/v2/user-wise", auth, adminManager, v2.userWise);
+router.get("/v2/user-wise/:userId/tasks", auth, adminManager, v2.userTaskDetail);
 router.get("/v2/overdue", auth, adminManager, v2.overdue);
 router.get("/v2/fta-tracker", auth, adminManager, v2.ftaTrackerReport);
 router.get("/v2/:report/export", auth, adminManager, v2.exportCsv);
