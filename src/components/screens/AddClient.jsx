@@ -900,10 +900,12 @@ export default function AddClient() {
                   <Field label="Passport Issue Date" field={`contact-passport-issue-${i}`}><input className="input" type="date" value={c.passportIssue} onChange={(e) => patch(i, { passportIssue: e.target.value })} /></Field>
                   <Field label="Passport Expiry" field={`contact-passport-expiry-${i}`}><input className="input" type="date" value={c.passportExpiry} onChange={(e) => patch(i, { passportExpiry: e.target.value })} /></Field>
                   <Field label="Passport Issuing Country" field={`contact-passport-country-${i}`}><><input className="input" list="passport-issuing-countries" value={c.issuingCountry} onChange={(e) => patch(i, { issuingCountry: e.target.value })} /><datalist id="passport-issuing-countries">{countries.map((country) => <option key={country} value={country} />)}</datalist></></Field>
-                  <div className="md:col-span-3 grid gap-3 md:grid-cols-2">
-                    <DocumentUploadZone id={`contact-eid-upload-${i}`} title="Upload Emirates ID documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.eidDocuments || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "emiratesId")} onDeleteDocument={(document) => removeContactDocument(i, "emiratesId", document)} />
-                    <DocumentUploadZone id={`contact-passport-upload-${i}`} title="Upload passport documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.passportDocuments || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "passport")} onDeleteDocument={(document) => removeContactDocument(i, "passport", document)} />
-                  </div>
+                  {c.primary && (
+                    <div className="md:col-span-3 grid gap-3 md:grid-cols-2">
+                      <DocumentUploadZone id={`contact-eid-upload-${i}`} title="Upload Emirates ID documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.eidDocuments || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "emiratesId")} onDeleteDocument={(document) => removeContactDocument(i, "emiratesId", document)} />
+                      <DocumentUploadZone id={`contact-passport-upload-${i}`} title="Upload passport documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.passportDocuments || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "passport")} onDeleteDocument={(document) => removeContactDocument(i, "passport", document)} />
+                    </div>
+                  )}
                 </div>
               )}
             />
