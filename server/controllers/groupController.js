@@ -1,20 +1,17 @@
 const ClientGroup = require("../models/ClientGroup");
 const Client = require("../models/Client");
+const XLSX = require("xlsx");
 
-function csvEscape(value) {
-  return `"${String(value ?? "").replaceAll('"', '""')}"`;
-}
+function sendWorkbook(res, filename, worksheetName, rows) {
+  const workbook = XLSX.utils.book_new();
+  const worksheet = XLSX.utils.aoa_to_sheet(rows);
+  XLSX.utils.book_append_sheet(workbook, worksheet, worksheetName);
+  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
 
-function csvRow(values) {
-  return values.map(csvEscape).join(",");
-}
-
-function sendCsv(res, filename, csv) {
-  // Express 5 removed res.attachment(); set headers explicitly.
   res
     .setHeader("Content-Disposition", `attachment; filename="${filename}"`)
-    .setHeader("Content-Type", "text/csv; charset=utf-8")
-    .send(`\uFEFF${csv}`);
+    .setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    .send(buffer);
 }
 
 function escapeRegex(value) {
@@ -121,11 +118,14 @@ exports.exportGroups = async (req, res, next) => {
       if (clientId) query._id = clientId;
 
       const clients = await Client.find(query).populate("group", "name").sort({ fileNo: 1 });
-      const csv = [CLIENT_EXPORT_HEADERS, ...clients.map((client) => clientExportRow(client))]
-        .map(csvRow)
-        .join("\r\n");
+      const rows = [CLIENT_EXPORT_HEADERS, ...clients.map((client) => clientExportRow(client))];
 
-      return sendCsv(res, clientId ? "client.csv" : groupId ? "group-clients.csv" : "clients.csv", csv);
+      return sendWorkbook(
+        res,
+        clientId ? "client.xlsx" : groupId ? "group-clients.xlsx" : "clients.xlsx",
+        "Clients",
+        rows,
+      );
     }
 
     const groupQuery = groupId ? { _id: groupId } : {};
@@ -142,11 +142,12 @@ exports.exportGroups = async (req, res, next) => {
         ...clientExportRow(client, group.name),
       ]);
     });
-    const csv = [["Group Name", "Client Count", ...CLIENT_EXPORT_HEADERS], ...rows]
-      .map(csvRow)
-      .join("\r\n");
-
-    return sendCsv(res, groupId ? "client-group.csv" : "client-groups.csv", csv);
+    return sendWorkbook(
+      res,
+      groupId ? "client-group.xlsx" : "client-groups.xlsx",
+      "Client Groups",
+      [["Group Name", "Client Count", ...CLIENT_EXPORT_HEADERS], ...rows],
+    );
   } catch (error) {
     next(error);
   }

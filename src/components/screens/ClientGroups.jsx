@@ -42,17 +42,17 @@ export default function ClientGroups() {
       .replace(/[^a-zA-Z0-9-_]/g, "")
       .toLowerCase();
 
-  const exportGroupsCsv = async () => {
-    const filename = selectedExportGroup ? `${safeFilename(selectedExportGroup.name, "client-group")}.csv` : "client-groups.csv";
+  const exportGroupsExcel = async () => {
+    const filename = selectedExportGroup ? `${safeFilename(selectedExportGroup.name, "client-group")}.xlsx` : "client-groups.xlsx";
     downloadBlob(await groupService.exportGroups(selectedExportGroupId), filename);
   };
-  const exportClientsCsv = async () => {
+  const exportClientsExcel = async () => {
     const selectedClient = exportClientOptions.find((client) => client._id === selectedExportClientId);
     const filename = selectedClient
-      ? `${safeFilename(selectedClient.legalName, "client")}.csv`
+      ? `${safeFilename(selectedClient.legalName, "client")}.xlsx`
       : selectedExportGroup
-        ? `${safeFilename(selectedExportGroup.name, "group")}-clients.csv`
-        : "clients.csv";
+        ? `${safeFilename(selectedExportGroup.name, "group")}-clients.xlsx`
+        : "clients.xlsx";
     downloadBlob(
       await groupService.exportClients({
         groupId: selectedExportGroupId,
@@ -61,8 +61,8 @@ export default function ClientGroups() {
       filename,
     );
   };
-  const exportThisGroupClientsCsv = async (groupId, groupName) =>
-    downloadBlob(await groupService.exportClients({ groupId }), `${safeFilename(groupName, "group")}-clients.csv`);
+  const exportThisGroupClientsExcel = async (groupId, groupName) =>
+    downloadBlob(await groupService.exportClients({ groupId }), `${safeFilename(groupName, "group")}-clients.xlsx`);
 
   function closeModal() {
     setEditingGroup(null);
@@ -170,11 +170,11 @@ export default function ClientGroups() {
             </select>
           </label>
 
-          <Button variant="ghost" onClick={exportGroupsCsv} disabled={!!selectedExportClientId}>
+          <Button variant="ghost" onClick={exportGroupsExcel} disabled={!!selectedExportClientId}>
             <Download size={16} />
             Export Group-wise
           </Button>
-          <Button variant="ghost" onClick={exportClientsCsv}>
+          <Button variant="ghost" onClick={exportClientsExcel}>
             <Download size={16} />
             Export Client-wise
           </Button>
@@ -269,7 +269,7 @@ export default function ClientGroups() {
               </div>
               <Button
                 variant="ghost"
-                onClick={() => exportThisGroupClientsCsv(viewingGroup._id, viewingGroup.name)}
+                onClick={() => exportThisGroupClientsExcel(viewingGroup._id, viewingGroup.name)}
                 disabled={!(viewingGroup.clients || []).length}
               >
                 <Download size={16} />
