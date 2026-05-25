@@ -162,9 +162,9 @@ export default function ClientList() {
                 </td>
                 <td>
                   <div className="space-y-1">
-                    <div className="font-semibold text-slate-800">{client.contact || "-"}</div>
-                    <div className="text-[12px] text-slate-500">{client.mobile || "-"}</div>
-                    <div className="text-[12px] text-slate-500 break-all">{client.email || "-"}</div>
+                    <div><span className="font-semibold text-slate-500">Contact:</span> <span className="font-semibold text-slate-800">{client.contact || "-"}</span></div>
+                    <div className="text-[12px] text-slate-500"><span className="font-semibold">Phone No:</span> {client.mobile || "-"}</div>
+                    <div className="text-[12px] text-slate-500 break-all"><span className="font-semibold">Email:</span> {client.email || "-"}</div>
                   </div>
                 </td>
                 {canManage && (
