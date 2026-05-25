@@ -621,6 +621,17 @@ export default function AddClient() {
       }
     }
     const shouldValidateContacts = !continueToNext || tab >= 2;
+    const shouldValidateTradeLicences = !continueToNext || tab >= 1;
+    if (shouldValidateTradeLicences) {
+      const missingLicenceNumberWithFilesIndex = licences.findIndex((licence) =>
+        !String(licence.number || "").trim() &&
+        (licence.documents || []).some((document) => document?.file || document?.url),
+      );
+      if (missingLicenceNumberWithFilesIndex >= 0) {
+        toast.error(`Trade licence ${missingLicenceNumberWithFilesIndex + 1}: licence number is required before uploading documents.`);
+        return false;
+      }
+    }
     if (shouldValidateContacts) {
       const emiratesIdPattern = /^\d{3}-\d{4}-\d{7}-\d$/;
       const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -671,6 +682,11 @@ export default function AddClient() {
     try {
       const includeTradeLicences = !continueToNext || tab >= 1;
       const includeContactPersons = !continueToNext || tab >= 2;
+      const preparedTradeLicences = includeTradeLicences
+        ? licences
+          .map((licence, originalIndex) => ({ licence, originalIndex }))
+          .filter(({ licence }) => String(licence.number || "").trim())
+        : [];
       // The screen state is intentionally tab-oriented and user-friendly; this transform is
       // where we fold it back into the nested API contract expected by the Mongo model.
       const payload = {
@@ -694,16 +710,15 @@ export default function AddClient() {
         payload.ctDetails = { tin: form.ctTin, status: form.ctStatus === "Registered" ? "registered" : form.ctStatus === "Pending" ? "applying" : "not_registered", registrationDate: form.ctDate, financialYearEnd: form.fye };
       }
       if (includeTradeLicences) {
-        payload.tradeLicences = licences
-          .filter((l) => String(l.number || "").trim())
-          .map((l) => ({
-            licenceNumber: l.number,
-            issueDate: l.issue,
-            expiryDate: l.expiry,
-            issuingAuthority: l.authority,
-            licenceType: l.type?.toLowerCase() || "commercial",
-            officialEmail: l.email,
-            documentUrl: l.documentUrl || undefined,
+        payload.tradeLicences = preparedTradeLicences
+          .map(({ licence }) => ({
+            licenceNumber: licence.number,
+            issueDate: licence.issue,
+            expiryDate: licence.expiry,
+            issuingAuthority: licence.authority,
+            licenceType: licence.type?.toLowerCase() || "commercial",
+            officialEmail: licence.email,
+            documentUrl: licence.documentUrl || undefined,
           }));
       }
       if (includeContactPersons) {
@@ -731,14 +746,21 @@ export default function AddClient() {
         }));
       }
       payload.customFields = Object.fromEntries(Object.entries(customFieldValues).filter(([k]) => selectedFieldKeys.includes(k)));
-      const pendingAttachments = attachments.filter((attachment) => !attachment.saved && attachment.file);
-      const pendingLicenceDocuments = licences
-        .map((licence, index) => ({ index, files: (licence.documents || []).filter((document) => !document.saved && document.file).map((document) => document.file) }))
-        .filter((item) => item.files.length);
-      const pendingContactDocuments = contacts.flatMap((contact, index) => ([
-        contact.eidDocuments?.some((document) => !document.saved && document.file) ? { index, files: contact.eidDocuments.filter((document) => !document.saved && document.file).map((document) => document.file), section: "emiratesId" } : null,
-        contact.passportDocuments?.some((document) => !document.saved && document.file) ? { index, files: contact.passportDocuments.filter((document) => !document.saved && document.file).map((document) => document.file), section: "passport" } : null,
-      ].filter(Boolean)));
+      const includeAttachments = !continueToNext || tab >= 7;
+      const pendingAttachments = includeAttachments
+        ? attachments.filter((attachment) => !attachment.saved && attachment.file)
+        : [];
+      const pendingLicenceDocuments = includeTradeLicences
+        ? preparedTradeLicences
+          .map(({ licence }, index) => ({ index, files: (licence.documents || []).filter((document) => !document.saved && document.file).map((document) => document.file) }))
+          .filter((item) => item.files.length)
+        : [];
+      const pendingContactDocuments = includeContactPersons
+        ? contacts.flatMap((contact, index) => ([
+          contact.eidDocuments?.some((document) => !document.saved && document.file) ? { index, files: contact.eidDocuments.filter((document) => !document.saved && document.file).map((document) => document.file), section: "emiratesId" } : null,
+          contact.passportDocuments?.some((document) => !document.saved && document.file) ? { index, files: contact.passportDocuments.filter((document) => !document.saved && document.file).map((document) => document.file), section: "passport" } : null,
+        ].filter(Boolean)))
+        : [];
       if (isEditMode) {
         await updateClient(id, payload);
         if (pendingLicenceDocuments.length) {
@@ -870,18 +892,22 @@ export default function AddClient() {
                   <label className="flex items-center gap-2 font-bold" htmlFor={`contact-primary-${i}`}><input id={`contact-primary-${i}`} name={`contactPrimary${i}`} type="checkbox" checked={c.primary} onChange={(e) => {
                     const checked = e.target.checked;
                     setContacts((current) => current.map((entry, idx) => idx === i ? { ...entry, primary: checked } : checked ? { ...entry, primary: false } : entry));
-                  }} /> Primary Contact</label>
-                  <Field label="Emirates ID Number" field={`contact-eid-${i}`}><input className="input" placeholder="784-XXXX-XXXXXXX-X" value={c.eid} onChange={(e) => patch(i, { eid: formatEmiratesIdInput(e.target.value) })} /></Field>
-                  <Field label="Emirates ID Issue Date" field={`contact-eid-issue-${i}`}><input className="input" type="date" value={c.eidIssue} onChange={(e) => patch(i, { eidIssue: e.target.value })} /></Field>
-                  <Field label="Emirates ID Expiry" field={`contact-eid-expiry-${i}`}><input className="input" type="date" value={c.eidExpiry} onChange={(e) => patch(i, { eidExpiry: e.target.value })} /></Field>
-                  <Field label="Passport Number" field={`contact-passport-${i}`}><input className="input" value={c.passport} onChange={(e) => patch(i, { passport: e.target.value })} /></Field>
-                  <Field label="Passport Issue Date" field={`contact-passport-issue-${i}`}><input className="input" type="date" value={c.passportIssue} onChange={(e) => patch(i, { passportIssue: e.target.value })} /></Field>
-                  <Field label="Passport Expiry" field={`contact-passport-expiry-${i}`}><input className="input" type="date" value={c.passportExpiry} onChange={(e) => patch(i, { passportExpiry: e.target.value })} /></Field>
-                  <Field label="Passport Issuing Country" field={`contact-passport-country-${i}`}><><input className="input" list="passport-issuing-countries" value={c.issuingCountry} onChange={(e) => patch(i, { issuingCountry: e.target.value })} /><datalist id="passport-issuing-countries">{countries.map((country) => <option key={country} value={country} />)}</datalist></></Field>
-                  <div className="md:col-span-3 grid gap-3 md:grid-cols-2">
-                    <DocumentUploadZone id={`contact-eid-upload-${i}`} title="Upload Emirates ID documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.eidDocuments || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "emiratesId")} onDeleteDocument={(document) => removeContactDocument(i, "emiratesId", document)} />
-                    <DocumentUploadZone id={`contact-passport-upload-${i}`} title="Upload passport documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.passportDocuments || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "passport")} onDeleteDocument={(document) => removeContactDocument(i, "passport", document)} />
-                  </div>
+                  }} /> Official Contact</label>
+                  {c.primary && (
+                    <>
+                      <Field label="Emirates ID Number" field={`contact-eid-${i}`}><input className="input" placeholder="784-XXXX-XXXXXXX-X" value={c.eid} onChange={(e) => patch(i, { eid: formatEmiratesIdInput(e.target.value) })} /></Field>
+                      <Field label="Emirates ID Issue Date" field={`contact-eid-issue-${i}`}><input className="input" type="date" value={c.eidIssue} onChange={(e) => patch(i, { eidIssue: e.target.value })} /></Field>
+                      <Field label="Emirates ID Expiry" field={`contact-eid-expiry-${i}`}><input className="input" type="date" value={c.eidExpiry} onChange={(e) => patch(i, { eidExpiry: e.target.value })} /></Field>
+                      <Field label="Passport Number" field={`contact-passport-${i}`}><input className="input" value={c.passport} onChange={(e) => patch(i, { passport: e.target.value })} /></Field>
+                      <Field label="Passport Issue Date" field={`contact-passport-issue-${i}`}><input className="input" type="date" value={c.passportIssue} onChange={(e) => patch(i, { passportIssue: e.target.value })} /></Field>
+                      <Field label="Passport Expiry" field={`contact-passport-expiry-${i}`}><input className="input" type="date" value={c.passportExpiry} onChange={(e) => patch(i, { passportExpiry: e.target.value })} /></Field>
+                      <Field label="Passport Issuing Country" field={`contact-passport-country-${i}`}><><input className="input" list="passport-issuing-countries" value={c.issuingCountry} onChange={(e) => patch(i, { issuingCountry: e.target.value })} /><datalist id="passport-issuing-countries">{countries.map((country) => <option key={country} value={country} />)}</datalist></></Field>
+                      <div className="md:col-span-3 grid gap-3 md:grid-cols-2">
+                        <DocumentUploadZone id={`contact-eid-upload-${i}`} title="Upload Emirates ID documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.eidDocuments || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "emiratesId")} onDeleteDocument={(document) => removeContactDocument(i, "emiratesId", document)} />
+                        <DocumentUploadZone id={`contact-passport-upload-${i}`} title="Upload passport documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.passportDocuments || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "passport")} onDeleteDocument={(document) => removeContactDocument(i, "passport", document)} />
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             />
@@ -1162,7 +1188,7 @@ export default function AddClient() {
               </div>
             </div>
           )}
-          {tab === 7 && <div className="space-y-3"><AttachmentUploadZone description={attachmentDescription} onDescriptionChange={setAttachmentDescription} onFiles={uploadFiles} isUploading={isUploading} /><div className="overflow-x-auto"><table className="table min-w-max"><thead><tr><th>Name</th><th>Size</th><th>Type</th><th>Description</th><th>Uploaded On</th><th>Uploaded By</th><th>Actions</th></tr></thead><tbody>{attachments.length === 0 && <tr><td colSpan={7} className="text-center text-slate-500">No attachments uploaded yet.</td></tr>}{attachments.map((a) => <tr key={a.id || a.name}><td>{a.name}</td><td>{a.size}</td><td>{a.type}</td><td>{a.description || "-"}</td><td>{a.uploadedOn}</td><td>{a.uploadedBy}</td><td><Button size="sm" variant="ghost" disabled={!a.url} onClick={() => a.url && window.open(a.url, "_blank", "noopener,noreferrer")}>Open</Button> {(currentUser?.role === "admin" || !a.saved) && <Button size="sm" variant="danger" onClick={() => removeAttachment(a)}>Delete</Button>}</td></tr>)}</tbody></table></div></div>}
+          {tab === 7 && <div className="space-y-3"><AttachmentUploadZone description={attachmentDescription} onDescriptionChange={setAttachmentDescription} onFiles={uploadFiles} isUploading={isUploading} /><div className="overflow-x-auto"><table className="table min-w-max"><thead><tr><th>Name</th><th>Size</th><th>Type</th><th>Description</th><th>Uploaded On</th><th>Uploaded By</th><th>Actions</th></tr></thead><tbody>{attachments.length === 0 && <tr><td colSpan={7} className="text-center text-slate-500">No attachments uploaded yet.</td></tr>}{attachments.map((a) => <tr key={a.id || a.name}><td>{a.name}</td><td>{a.size}</td><td>{a.type}</td><td>{a.description || "-"}</td><td>{a.uploadedOn}</td><td>{a.uploadedBy}</td><td><Button size="sm" variant="ghost" disabled={!a.url && !a.file} onClick={() => openDocumentFile(a)}>Open</Button> {(currentUser?.role === "admin" || !a.saved) && <Button size="sm" variant="danger" onClick={() => removeAttachment(a)}>Delete</Button>}</td></tr>)}</tbody></table></div></div>}
         </div>
         <div className="flex flex-col gap-3 border-t border-[#e2e8f0] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
           <Button variant="ghost" onClick={goPrevious} disabled={isFirstTab || isSaving}>Previous</Button>
@@ -1264,6 +1290,17 @@ function DocumentUploadZone({ id, title, subtitle, documents, isUploading, onFil
   );
 }
 
+function openDocumentFile(document) {
+  if (document?.url) {
+    window.open(document.url, "_blank", "noopener,noreferrer");
+    return;
+  }
+  if (!document?.file) return;
+  const objectUrl = URL.createObjectURL(document.file);
+  window.open(objectUrl, "_blank", "noopener,noreferrer");
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+}
+
 function DocumentList({ documents, canDelete, onDeleteDocument }) {
   if (!documents?.length) {
     return <div className="rounded-xl border border-dashed border-slate-200 px-3 py-4 text-[12px] font-semibold text-slate-500">No files uploaded yet.</div>;
@@ -1277,7 +1314,7 @@ function DocumentList({ documents, canDelete, onDeleteDocument }) {
             <div className="text-[11px] font-semibold text-slate-500">{[document.size, document.uploadedOn, document.uploadedBy].filter(Boolean).join(" • ") || (document.saved ? "Uploaded" : "Pending save")}</div>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="ghost" disabled={!document.url} onClick={() => document.url && window.open(document.url, "_blank", "noopener,noreferrer")}>Open</Button>
+            <Button size="sm" variant="ghost" disabled={!document.url && !document.file} onClick={() => openDocumentFile(document)}>Open</Button>
             {((canDelete && !String(document.id || "").includes("/")) || !document.saved) && <Button size="sm" variant="danger" onClick={() => onDeleteDocument(document)}>Delete</Button>}
           </div>
         </div>

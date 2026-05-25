@@ -13,16 +13,18 @@ function normalizeCountryCode(value) {
 
 exports.listContacts = async (req, res, next) => {
   try {
-    const { search, client } = req.query;
+    const { search } = req.query;
     const query = { isActive: true };
-    if (client) query.client = client;
     if (search) {
       query.$or = [
+        { authorityName: new RegExp(search, "i") },
+        { contactPersonName: new RegExp(search, "i") },
         { fullName: new RegExp(search, "i") },
         { designation: new RegExp(search, "i") },
         { email: new RegExp(search, "i") },
         { "mobile.number": new RegExp(search, "i") },
-        { type: new RegExp(search, "i") },
+        { address: new RegExp(search, "i") },
+        { location: new RegExp(search, "i") },
         { city: new RegExp(search, "i") },
       ];
     }
@@ -36,12 +38,18 @@ exports.createContact = async (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
     const contact = await Contact.create({
-      ...req.body,
+      authorityName: String(req.body.authorityName || "").trim(),
+      contactPersonName: String(req.body.contactPersonName || "").trim(),
+      fullName: String(req.body.contactPersonName || "").trim(),
+      address: String(req.body.address || "").trim(),
+      location: String(req.body.location || "").trim(),
+      designation: String(req.body.designation || "").trim(),
       email: String(req.body.email || "").trim().toLowerCase(),
       mobile: {
         countryCode: normalizeCountryCode(req.body.mobile?.countryCode),
         number: String(req.body.mobile?.number || "").replace(/\D+/g, ""),
       },
+      type: "Government Authority",
       createdBy: req.user._id,
     });
     res.status(201).json(await contact.populate(populateContact));
@@ -54,8 +62,10 @@ exports.updateContact = async (req, res, next) => {
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
     const contact = await Contact.findById(req.params.id);
     if (!contact || !contact.isActive) return res.status(404).json({ message: "Contact not found" });
-    const ALLOWED = ["fullName", "client", "designation", "email", "type", "city", "isPrimary"];
-    ALLOWED.forEach((key) => { if (key in req.body) contact[key] = req.body[key]; });
+    const ALLOWED = ["authorityName", "contactPersonName", "designation", "email", "address", "location", "city"];
+    ALLOWED.forEach((key) => {
+      if (key in req.body) contact[key] = typeof req.body[key] === "string" ? req.body[key].trim() : req.body[key];
+    });
     if ("mobile" in req.body) {
       const nextCountryCode = normalizeCountryCode(req.body.mobile?.countryCode);
       contact.mobile = {
@@ -64,6 +74,8 @@ exports.updateContact = async (req, res, next) => {
       };
     }
     if ("email" in req.body) contact.email = String(req.body.email || "").trim().toLowerCase();
+    if ("contactPersonName" in req.body) contact.fullName = String(req.body.contactPersonName || "").trim();
+    contact.type = "Government Authority";
     await contact.save();
     res.json(await contact.populate(populateContact));
   } catch (error) { next(error); }

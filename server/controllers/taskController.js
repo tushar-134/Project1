@@ -27,6 +27,35 @@ function asDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+function toUploadedFile(file, req) {
+  const fileUrl = file.path && /^https?:\/\//i.test(String(file.path || ""))
+    ? file.path
+    : `${req.protocol}://${req.get("host")}/uploads/${file.filename}`;
+  return {
+    name: file.originalname || file.filename || "File",
+    size: file.size ? `${(file.size / 1024 / 1024).toFixed(file.size >= 1024 * 1024 ? 2 : 3).replace(/\.?0+$/, "")} MB` : "",
+    fileType: file.mimetype || "",
+    url: fileUrl,
+  };
+}
+
+function buildUploadedFiles(req) {
+  const fieldFiles = Object.values(req.files || {}).flat();
+  const files = fieldFiles.length ? fieldFiles : (req.file ? [req.file] : []);
+  return files.map((file) => toUploadedFile(file, req));
+}
+
+function toStoredFileEntry(uploadedFile, userId, description = "") {
+  return {
+    name: uploadedFile.name,
+    size: uploadedFile.size,
+    fileType: uploadedFile.fileType,
+    description,
+    url: uploadedFile.url,
+    uploadedBy: userId,
+  };
+}
+
 function getNextWeeklyDate(baseDate, targetDayStr) {
   const dayMap = { "Sun": 0, "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6 };
   const targetDay = dayMap[targetDayStr];
@@ -338,7 +367,12 @@ function taskQuery(req) {
   return query;
 }
 
-const populateTask = [{ path: "client", select: "legalName fileNo jurisdiction vatDetails tradeLicences contactPersons financialYearEnd" }, { path: "assignedTo", select: "name email role" }, { path: "createdBy", select: "name" }];
+const populateTask = [
+  { path: "client", select: "legalName fileNo jurisdiction vatDetails tradeLicences contactPersons financialYearEnd" },
+  { path: "assignedTo", select: "name email role" },
+  { path: "createdBy", select: "name" },
+  { path: "attachments.uploadedBy", select: "name" },
+];
 
 exports.listTasks = async (req, res, next) => {
   try {
@@ -557,6 +591,47 @@ exports.updateFtaStatus = async (req, res, next) => {
       await Notification.insertMany(recipients.map((recipient) => ({ recipient, title: "FTA query received", message: `${updated.taskId} has an additional FTA query.`, type: "fta_query", relatedTask: updated._id })));
     }
     res.json(updated);
+  } catch (error) { next(error); }
+};
+
+exports.uploadTaskAttachment = async (req, res, next) => {
+  try {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ message: "Task not found" });
+    const uploadedFiles = buildUploadedFiles(req);
+    if (!uploadedFiles.length) return res.status(400).json({ message: "Please choose at least one file to upload" });
+    const description = String(req.body.description || "").trim();
+    uploadedFiles.forEach((uploadedFile) => {
+      task.attachments.push(toStoredFileEntry(uploadedFile, req.user._id, description));
+    });
+    await task.save();
+    await auditLogger({
+      task: task._id,
+      user: req.user._id,
+      action: "Updated",
+      newStatus: task.status,
+      notes: `${uploadedFiles.length} attachment${uploadedFiles.length === 1 ? "" : "s"} uploaded`,
+    });
+    res.json(await task.populate(populateTask));
+  } catch (error) { next(error); }
+};
+
+exports.deleteTaskAttachment = async (req, res, next) => {
+  try {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ message: "Task not found" });
+    const attachment = task.attachments.id(req.params.attachId);
+    if (!attachment) return res.status(404).json({ message: "Attachment not found" });
+    attachment.deleteOne();
+    await task.save();
+    await auditLogger({
+      task: task._id,
+      user: req.user._id,
+      action: "Updated",
+      newStatus: task.status,
+      notes: `Attachment deleted: ${attachment.name || "File"}`,
+    });
+    res.json(await task.populate(populateTask));
   } catch (error) { next(error); }
 };
 

@@ -4,6 +4,7 @@ import api from "./api";
 export const clientService = {
   list: (params) => api.get("/clients", { params }).then((res) => res.data),
   get: (id) => api.get(`/clients/${id}`).then((res) => res.data),
+  expiryAlerts: () => api.get("/clients/expiry-alerts").then((res) => res.data),
   create: (payload) => api.post("/clients", payload).then((res) => res.data),
   update: (id, payload) => api.put(`/clients/${id}`, payload).then((res) => res.data),
   remove: (id) => api.delete(`/clients/${id}`).then((res) => res.data),

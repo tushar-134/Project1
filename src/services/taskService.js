@@ -11,6 +11,8 @@ export const taskService = {
   updateAssignee: (id, assignedTo) => api.patch(`/tasks/${id}/assignee`, { assignedTo }).then((res) => res.data),
   ftaTracker: (params) => api.get("/tasks/fta-tracker", { params }).then((res) => res.data),
   updateFtaStatus: (id, ftaStatus) => api.patch(`/tasks/${id}/fta-status`, { ftaStatus }).then((res) => res.data),
+  uploadAttachment: (id, formData) => api.post(`/tasks/${id}/attachments`, formData).then((res) => res.data),
+  deleteAttachment: (id, attachId) => api.delete(`/tasks/${id}/attachments/${attachId}`).then((res) => res.data),
   export: (params) => api.get("/tasks/export", { params, responseType: "blob" }).then((res) => res.data),
   getLogs: (id) => api.get(`/tasks/${id}/logs`).then((res) => res.data),
 };

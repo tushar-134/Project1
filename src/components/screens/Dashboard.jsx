@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { reportService } from "../../services/reportService";
+import { DEFAULT_DASHBOARD_TILE_ORDER, loadDashboardTileOrder, subscribeDashboardTileOrder } from "../../utils/dashboardPreferences.js";
 import { canManageTasks, ROLE_LABELS } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
 import Card from "../ui/Card.jsx";
@@ -30,6 +31,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [month, setMonth] = useState(new Date(2026, 4, 1));
   const [drawerTaskId, setDrawerTaskId] = useState(null);
+  const [tileOrder, setTileOrder] = useState(DEFAULT_DASHBOARD_TILE_ORDER);
   const monthText = month.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
   const roleLabel = ROLE_LABELS[currentUser?.role] || currentUser?.role || "User";
   const canManage = canManageTasks(currentUser?.role);
@@ -39,11 +41,21 @@ export default function Dashboard() {
     const selected = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
     reportService.dashboardStats({ month: selected }).then((data) => dispatch({ type: "SET_DASHBOARD", payload: data })).catch(() => { });
   }, [month, dispatch]);
+  useEffect(() => {
+    setTileOrder(loadDashboardTileOrder(currentUser));
+    return subscribeDashboardTileOrder((event) => {
+      setTileOrder(event.detail?.order || loadDashboardTileOrder(currentUser));
+    });
+  }, [currentUser]);
   const stats = state.dashboardStats || {};
   const selectedMonth = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
-  const tiles = stats.categoryBreakdown?.length
-    ? stats.categoryBreakdown.map((item) => [categoryLabels[item.category] || item.category, item.pending, item.overdue])
-    : serviceTiles.map(([name]) => [name, 0, 0]);
+  const tileMetrics = new Map(
+    (stats.categoryBreakdown || []).map((item) => [categoryLabels[item.category] || item.category, item])
+  );
+  const tiles = tileOrder.map((name) => {
+    const metric = tileMetrics.get(name);
+    return [name, metric?.pending || 0, metric?.overdue || 0];
+  });
   const openTasks = (category) => {
     const params = new URLSearchParams({ category, month: selectedMonth });
     navigate(`/tasks/list?${params.toString()}`);

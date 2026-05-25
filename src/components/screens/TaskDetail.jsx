@@ -298,6 +298,27 @@ export default function TaskDetail() {
           </div>
         )}
 
+        {!!task.attachments?.length && (
+          <div className="task-detail-description">
+            <div className="task-detail-field-label mb-2">
+              <FileText size={13} /> Attachments
+            </div>
+            <div className="space-y-2">
+              {task.attachments.map((attachment) => (
+                <div key={attachment._id || attachment.url || attachment.name} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+                  <div className="min-w-0">
+                    <div className="truncate text-[13px] font-bold text-slate-800">{attachment.name}</div>
+                    <div className="text-[11px] font-semibold text-slate-500">
+                      {[attachment.size, attachment.description, attachment.uploadedAt?.slice?.(0, 10), attachment.uploadedBy?.name].filter(Boolean).join(" • ")}
+                    </div>
+                  </div>
+                  <Button size="sm" variant="ghost" disabled={!attachment.url} onClick={() => window.open(attachment.url, "_blank", "noopener,noreferrer")}>Open</Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Timestamps */}
         <div className="task-detail-timestamps">
           <span>Created {formatDateTime(task.createdAt)}</span>
