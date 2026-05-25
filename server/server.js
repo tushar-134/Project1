@@ -50,6 +50,7 @@ app.use("/api/users", require("./routes/userRoutes"));
 app.use("/api/profile", require("./routes/profileRoutes"));
 app.use("/api/groups", require("./routes/groupRoutes"));
 app.use("/api/contacts", require("./routes/contactRoutes"));
+app.use("/api/client-visits", require("./routes/clientVisitRoutes"));
 app.use("/api/categories", require("./routes/categoryRoutes"));
 app.use("/api/reports", require("./routes/reportRoutes"));
 app.use("/api/notifications", require("./routes/notificationRoutes"));
