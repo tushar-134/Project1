@@ -159,11 +159,11 @@ export default function AddClient() {
         eidFrontDocumentUrl: person.emiratesId?.frontDocumentUrl || "",
         eidFrontDocumentName: person.emiratesId?.frontDocumentUrl ? person.emiratesId.frontDocumentUrl.split("/").pop() : "",
         eidFrontDocumentFile: null,
-        eidFrontDocuments: mapExistingDocuments(person.emiratesId?.frontDocuments, person.emiratesId?.frontDocumentUrl),
+        eidFrontDocuments: mapExistingDocuments(person.emiratesId?.frontDocuments?.length ? person.emiratesId.frontDocuments : person.emiratesId?.documents, person.emiratesId?.frontDocumentUrl || person.emiratesId?.documentUrl),
         eidBackDocumentUrl: person.emiratesId?.backDocumentUrl || "",
         eidBackDocumentName: person.emiratesId?.backDocumentUrl ? person.emiratesId.backDocumentUrl.split("/").pop() : "",
         eidBackDocumentFile: null,
-        eidBackDocuments: mapExistingDocuments(person.emiratesId?.backDocuments, person.emiratesId?.backDocumentUrl),
+        eidBackDocuments: mapExistingDocuments(person.emiratesId?.backDocuments?.length ? person.emiratesId.backDocuments : person.emiratesId?.documents, person.emiratesId?.backDocumentUrl || person.emiratesId?.documentUrl),
         passportDocumentUrl: person.passport?.documentUrl || "",
         passportDocumentName: person.passport?.documentUrl ? person.passport.documentUrl.split("/").pop() : "",
         passportDocumentFile: null,
@@ -279,8 +279,8 @@ export default function AddClient() {
       setContacts((current) => current.map((contact, index) => {
         const uploadedContact = client.contactPersons?.[index];
         if (!uploadedContact) return contact;
-        const eidFrontDocuments = mapExistingDocuments(uploadedContact.emiratesId?.frontDocuments, uploadedContact.emiratesId?.frontDocumentUrl);
-        const eidBackDocuments = mapExistingDocuments(uploadedContact.emiratesId?.backDocuments, uploadedContact.emiratesId?.backDocumentUrl);
+        const eidFrontDocuments = mapExistingDocuments(uploadedContact.emiratesId?.frontDocuments?.length ? uploadedContact.emiratesId.frontDocuments : uploadedContact.emiratesId?.documents, uploadedContact.emiratesId?.frontDocumentUrl || uploadedContact.emiratesId?.documentUrl);
+        const eidBackDocuments = mapExistingDocuments(uploadedContact.emiratesId?.backDocuments?.length ? uploadedContact.emiratesId.backDocuments : uploadedContact.emiratesId?.documents, uploadedContact.emiratesId?.backDocumentUrl || uploadedContact.emiratesId?.documentUrl);
         const passportDocuments = mapExistingDocuments(uploadedContact.passport?.documents, uploadedContact.passport?.documentUrl);
         return {
           ...contact,
@@ -607,15 +607,15 @@ export default function AddClient() {
           }
         }
         if (pendingAttachments.length) {
-          let uploadedAttachments = [];
+          let uploadedAttachments = null;
           for (const attachment of pendingAttachments) {
             const formData = new FormData();
-            formData.append("file", attachment.file);
+            formData.append("files", attachment.file);
             formData.append("description", attachment.description || "");
             formData.append("documentType", attachment.documentType || "Other");
             uploadedAttachments = await uploadAttachment(created._id, formData);
           }
-          if (uploadedAttachments.length) setAttachments(mapSavedAttachments(uploadedAttachments));
+          if (uploadedAttachments?.attachments) setAttachments(mapSavedAttachments(uploadedAttachments.attachments));
         }
         toast.success(continueToNext ? "Progress saved." : (pendingAttachments.length || pendingLicenceDocuments.length || pendingContactDocuments.length ? "Client created and documents uploaded." : "Client created successfully."));
         if (continueToNext) navigate(`/clients/edit/${created._id}`, { replace: true });

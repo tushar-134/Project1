@@ -28,6 +28,7 @@ const populateClient = [
   { path: "createdBy", select: "name" },
   { path: "attachments.uploadedBy", select: "name" },
   { path: "tradeLicences.documents.uploadedBy", select: "name" },
+  { path: "contactPersons.emiratesId.documents.uploadedBy", select: "name" },
   { path: "contactPersons.emiratesId.frontDocuments.uploadedBy", select: "name" },
   { path: "contactPersons.emiratesId.backDocuments.uploadedBy", select: "name" },
   { path: "contactPersons.passport.documents.uploadedBy", select: "name" },
@@ -139,6 +140,13 @@ function getDocumentContainer(client, section, index) {
     item.documents = Array.isArray(item.documents) ? item.documents : [];
     return { holder: item, key: "documents", sync(container) { container.documentUrl = container.documents.at(-1)?.url || ""; } };
   }
+  if (section === "emiratesId") {
+    const item = client.contactPersons[index];
+    if (!item) return null;
+    item.emiratesId = item.emiratesId || {};
+    item.emiratesId.documents = Array.isArray(item.emiratesId.documents) ? item.emiratesId.documents : [];
+    return { holder: item.emiratesId, key: "documents", sync(container) { container.documentUrl = container.documents.at(-1)?.url || ""; } };
+  }
   if (section === "emiratesIdFront") {
     const item = client.contactPersons[index];
     if (!item) return null;
@@ -180,6 +188,7 @@ function normalizeContactPersonsForPersistence(contactPersons = [], existingCont
     const existing = existingContactPersons[index] || {};
     const existingEid = existing.emiratesId || {};
     const existingPassport = existing.passport || {};
+    const documents = Array.isArray(contact?.emiratesId?.documents) ? contact.emiratesId.documents : Array.isArray(existingEid.documents) ? existingEid.documents : [];
     const frontDocuments = Array.isArray(contact?.emiratesId?.frontDocuments) ? contact.emiratesId.frontDocuments : Array.isArray(existingEid.frontDocuments) ? existingEid.frontDocuments : [];
     const backDocuments = Array.isArray(contact?.emiratesId?.backDocuments) ? contact.emiratesId.backDocuments : Array.isArray(existingEid.backDocuments) ? existingEid.backDocuments : [];
     const passportDocuments = Array.isArray(contact?.passport?.documents) ? contact.passport.documents : Array.isArray(existingPassport.documents) ? existingPassport.documents : [];
@@ -187,8 +196,10 @@ function normalizeContactPersonsForPersistence(contactPersons = [], existingCont
       ...contact,
       emiratesId: {
         ...(contact.emiratesId || {}),
+        documents,
         frontDocuments,
         backDocuments,
+        documentUrl: contact?.emiratesId?.documentUrl || documents[documents.length - 1]?.url || existingEid.documentUrl || "",
         frontDocumentUrl: contact?.emiratesId?.frontDocumentUrl || frontDocuments[frontDocuments.length - 1]?.url || existingEid.frontDocumentUrl || "",
         backDocumentUrl: contact?.emiratesId?.backDocumentUrl || backDocuments[backDocuments.length - 1]?.url || existingEid.backDocumentUrl || "",
       },
