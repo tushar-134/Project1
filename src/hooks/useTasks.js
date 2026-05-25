@@ -70,6 +70,13 @@ export function useTasks() {
     dispatch({ type: "UPDATE_TASK_ASSIGNEE", id, assignedTo: mapped.assignedId, assigned: mapped.assigned });
     return task;
   }
+  async function updateRemarks(id, remarks) {
+    dispatch({ type: "UPDATE_TASK_REMARKS", id, remarks });
+    const task = await taskService.updateRemarks(id, remarks);
+    dispatch({ type: "UPDATE_TASK_REMARKS", id, remarks: task.remarks || "" });
+    return task;
+  }
+  return { fetchTasks, fetchFtaTracker, getTask: taskService.get, createTask: taskService.create, updateTask: taskService.update, updateStatus, updateAssignee, updateRemarks, updateFtaStatus, exportTasks: (params) => taskService.export(normalizeTaskParams(params)) };
   return {
     fetchTasks,
     fetchFtaTracker,

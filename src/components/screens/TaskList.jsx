@@ -1,4 +1,4 @@
-import { Download, RefreshCw, Search, SlidersHorizontal, X } from "lucide-react";
+import { Download, MessageSquare, RefreshCw, Search, SlidersHorizontal, X } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -18,6 +18,7 @@ const BASE_STATUSES = ["Not Yet Started", "WIP", "Completed"]; // for non-FTA ta
 const FILTER_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed", "All"];
 // Category order for stable display
 const CAT_ORDER = ["VAT", "Corporate Tax", "Audit", "Accounting", "MIS Reporting", "E-Invoicing", "VAT Refund", "Other"];
+const TASK_TABLE_COLUMNS = 9;
 
 const STATUS_PILL = {
   "Not Yet Started": { bg: "bg-slate-100", text: "text-slate-600" },
@@ -35,6 +36,7 @@ function createEmptyColumnFilters() {
     dueDate: "",
     assigned: "",
     status: "",
+    remarks: "",
     recurring: "",
   };
 }
@@ -63,6 +65,7 @@ function buildActiveColumnFilterSummary(filters) {
     filters.dueDate ? `Due Date: ${filters.dueDate}` : null,
     filters.assigned ? `Assigned: ${filters.assigned}` : null,
     filters.status ? `Status: ${filters.status}` : null,
+    filters.remarks ? `Remark: ${filters.remarks}` : null,
     filters.recurring ? `Recurring: ${filters.recurring === "recurring" ? "Recurring" : "One-time"}` : null,
   ].filter(Boolean);
 }
@@ -81,7 +84,7 @@ export default function TaskList() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { fetchTasks, updateStatus, updateAssignee, exportTasks } = useTasks();
+  const { fetchTasks, updateStatus, updateAssignee, updateRemarks, exportTasks } = useTasks();
   const initialMonth = searchParams.get("month") || getCurrentMonthValue();
   const [cat, setCat] = useState(searchParams.get("category") || "All");
   const [status, setStatus] = useState("Not Yet Started");
@@ -90,6 +93,10 @@ export default function TaskList() {
   const [drawerTaskId, setDrawerTaskId] = useState(null);
   const [columnFilters, setColumnFilters] = useState(() => createEmptyColumnFilters());
   const deferredColumnFilters = useDeferredValue(columnFilters);
+  const [remarkTask, setRemarkTask] = useState(null);
+  const [remarkText, setRemarkText] = useState("");
+  const [remarkSaving, setRemarkSaving] = useState(false);
+  const [remarkError, setRemarkError] = useState("");
 
   const canManage = canManageTasks(currentUser?.role);
   const isTaskOnly = currentUser?.role === "task_only";
@@ -137,11 +144,14 @@ export default function TaskList() {
     if (deferredColumnFilters.dueDate && task.dueDate !== deferredColumnFilters.dueDate) return false;
     if (deferredColumnFilters.assigned && task.assigned !== deferredColumnFilters.assigned) return false;
     if (deferredColumnFilters.status && task.status !== deferredColumnFilters.status) return false;
+    if (deferredColumnFilters.remarks && !normalizeText(task.remarks).includes(normalizeText(deferredColumnFilters.remarks))) return false;
     if (deferredColumnFilters.recurring === "recurring" && !task.recurring) return false;
     if (deferredColumnFilters.recurring === "one-time" && task.recurring) return false;
     return true;
   });
 
+  const workingRows = rows.filter((task) => task.status !== "Completed");
+  const completedRows = rows.filter((task) => task.status === "Completed");
   const activeColumnFilters = buildActiveColumnFilterSummary(columnFilters);
   const activeTopFilterCount =
     (cat !== "All" ? 1 : 0) +
@@ -179,6 +189,148 @@ export default function TaskList() {
       "tasks.csv",
     );
 
+  function openRemark(task) {
+    setRemarkTask(task);
+    setRemarkText(task.remarks || "");
+    setRemarkError("");
+  }
+
+  function closeRemark() {
+    if (remarkSaving) return;
+    setRemarkTask(null);
+    setRemarkText("");
+    setRemarkError("");
+  }
+
+  async function saveRemark() {
+    if (!remarkTask) return;
+    setRemarkSaving(true);
+    setRemarkError("");
+    try {
+      await updateRemarks(remarkTask.id, remarkText);
+      setRemarkTask(null);
+      setRemarkText("");
+    } catch (error) {
+      setRemarkError(error?.response?.data?.message || "Unable to save remark.");
+    } finally {
+      setRemarkSaving(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!remarkTask) return undefined;
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") closeRemark();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [remarkTask, remarkSaving]);
+
+  const renderTaskRow = (task) => {
+    const canEditTask =
+      canManage ||
+      (isTaskOnly && String(task.assignedId) === String(currentUser?._id || currentUser?.id));
+    const canChangeStatus = canEditTask;
+    const isStatusLocked = task.ftaStatus === "approved" || task.status === "Completed";
+
+    return (
+      <tr key={task.id}>
+        <td className="font-extrabold text-[#1e3a8a]">
+          <button
+            className="task-id-link"
+            onClick={() => (canManage ? setDrawerTaskId(task.id) : navigate(`/tasks/${task.id}`))}
+            title={canManage ? "Open task details" : "View task details"}
+          >
+            {task.taskId}
+          </button>
+        </td>
+        <td>{task.client}</td>
+        <td>
+          <Badge>{task.category}</Badge>
+        </td>
+        <td>{task.type}</td>
+        <td>
+          <div>{task.dueDate}</div>
+          {task.overdueDays > 0 && (
+            <span className="mt-1 inline-flex rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-extrabold text-[#dc2626]">
+              {task.overdueDays}d overdue
+            </span>
+          )}
+        </td>
+        <td>
+          {canManage ? (
+            <select
+              id={`task-assignee-${task.id}`}
+              className="input h-8 min-w-36"
+              value={task.assignedId || ""}
+              onChange={(event) => {
+                const selected = state.users.find((user) => user._id === event.target.value || user.id === event.target.value);
+                updateAssignee(task.id, event.target.value || null, selected?.name || "Unassigned")
+                  .catch(() => refetchTasks());
+              }}
+            >
+              <option value="">Unassigned</option>
+              {state.users.map((user) => (
+                <option key={user._id || user.id} value={user._id || user.id}>
+                  {user.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span>{task.assigned}</span>
+          )}
+        </td>
+        <td>
+          {canChangeStatus && !isStatusLocked ? (
+            <select
+              id={`task-status-${task.id}`}
+              name={`taskStatus${task.id}`}
+              className="input h-8 min-w-40"
+              value={task.displayStatus ?? task.status}
+              onChange={(event) =>
+                updateStatus(task.id, event.target.value)
+                  .then(() => refetchTasks())
+                  .catch(() => refetchTasks())
+              }
+            >
+              {ALL_STATUSES.map((item) => (
+                <option key={item}>{item}</option>
+              ))}
+            </select>
+          ) : (
+            <StatusPill status={task.status} />
+          )}
+        </td>
+        <td>
+          <div className="flex min-w-44 flex-col gap-2">
+            {task.remarks ? (
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] font-semibold text-slate-600" title={task.remarks}>
+                {task.remarks}
+              </div>
+            ) : (
+              <div className="text-[12px] font-medium text-slate-400">No remark added</div>
+            )}
+            {canEditTask && (
+              <Button size="sm" variant="ghost" onClick={() => openRemark(task)}>
+                <MessageSquare size={14} />
+                {task.remarks ? "Edit remark" : "Add remark"}
+              </Button>
+            )}
+          </div>
+        </td>
+        <td>
+          {task.recurring ? (
+            <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-extrabold text-[#1e3a8a]">
+              Recurring
+            </span>
+          ) : (
+            <span className="text-[12px] font-semibold text-slate-500">One-time</span>
+          )}
+        </td>
+      </tr>
+    );
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -203,13 +355,14 @@ export default function TaskList() {
                 Filter and review tasks
               </div>
               <p className="mt-1 text-[12px] font-medium text-slate-500">
-                Every visible column has its own filter now, so you can narrow the list quickly without hunting inside the table.
+                Working tasks stay up top, completed work moves into its own section below, and remarks can now be managed directly from this screen.
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <InfoPill tone="navy" label={`${rows.length} shown`} />
-              <InfoPill tone="slate" label={`${state.tasks.length} loaded`} />
+              <InfoPill tone="navy" label={`${workingRows.length} working`} />
+              <InfoPill tone="green" label={`${completedRows.length} completed`} />
+              <InfoPill tone="slate" label={`${rows.length} shown`} />
               {tasksLoading && <InfoPill tone="amber" label="Refreshing" />}
               {hasActiveFilters && <InfoPill tone="blue" label={`${activeFilterCount} active filters`} />}
             </div>
@@ -366,6 +519,20 @@ export default function TaskList() {
               </select>
             </FilterField>
 
+            <FilterField label="Remark" htmlFor="task-filter-remarks">
+              <div className="task-list-input-wrap">
+                <Search size={14} className="task-list-input-icon" aria-hidden="true" />
+                <input
+                  id="task-filter-remarks"
+                  className="input"
+                  type="search"
+                  placeholder="Search remarks"
+                  value={columnFilters.remarks}
+                  onChange={(event) => updateColumnFilter("remarks", event.target.value)}
+                />
+              </div>
+            </FilterField>
+
             <FilterField label="Recurring" htmlFor="task-filter-recurring">
               <select
                 id="task-filter-recurring"
@@ -394,178 +561,190 @@ export default function TaskList() {
 
       {isTaskOnly && (
         <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-2.5 text-[12px] font-medium text-blue-700">
-          You can update status only for tasks assigned to you.
+          You can update status and remarks only for tasks assigned to you.
         </div>
       )}
 
-      <Card className="overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-5">
-          <div>
-            <div className="text-[14px] font-extrabold text-slate-900">Showing {rows.length} task{rows.length === 1 ? "" : "s"}</div>
-            <div className="text-[12px] font-medium text-slate-500">
-              {tasksLoading ? "Task list is updating with your latest filters." : hasActiveFilters ? `Filtered from ${state.tasks.length} loaded tasks.` : "All loaded tasks are visible."}
-            </div>
-          </div>
-          <div className="text-[12px] font-semibold text-slate-500">
-            Click a task ID to open details
-          </div>
-        </div>
+      <TaskSection
+        title="Working Tasks"
+        subtitle={
+          tasksLoading
+            ? "Task list is updating with your latest filters."
+            : hasActiveFilters
+              ? `Filtered from ${state.tasks.length} loaded tasks.`
+              : "Open and in-progress work stays here for faster daily review."
+        }
+        accentClassName="task-list-section-title"
+      >
+        <TaskTableState
+          tasks={workingRows}
+          tasksLoading={tasksLoading}
+          taskError={taskError}
+          hasActiveFilters={hasActiveFilters}
+          emptyTitle={completedRows.length ? "No working tasks match the current view" : "No working tasks right now"}
+          emptyDescription={completedRows.length ? "Your completed work is still available in the section below." : "Adjust a filter or create a new task to start filling this list."}
+          onReset={resetAllFilters}
+          onRetry={refetchTasks}
+        >
+          {workingRows.map(renderTaskRow)}
+        </TaskTableState>
+      </TaskSection>
 
-        <Table className="task-list-table">
-          <thead>
-            <tr>
-              <th>Task ID</th>
-              <th>Client</th>
-              <th>Category</th>
-              <th>Task Type</th>
-              <th>Due Date</th>
-              <th>Assigned</th>
-              <th>Status</th>
-              <th>Recurring</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tasksLoading && state.tasks.length === 0 && (
-              <LoadingRows />
-            )}
-
-            {!tasksLoading && taskError && (
-              <tr>
-                <td colSpan={8} className="px-4 py-10">
-                  <div className="rounded-2xl border border-red-100 bg-red-50 px-5 py-5 text-center">
-                    <div className="text-[14px] font-extrabold text-red-700">Unable to load tasks</div>
-                    <div className="mt-1 text-[12px] font-medium text-red-600">{taskError}</div>
-                    <div className="mt-4">
-                      <Button variant="ghost" size="sm" onClick={refetchTasks}>
-                        <RefreshCw size={15} />
-                        Try again
-                      </Button>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            )}
-
-            {!tasksLoading && !taskError && !rows.length && (
-              <tr>
-                <td colSpan={8} className="px-4 py-10">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-6 text-center">
-                    <div className="text-[14px] font-extrabold text-slate-900">No tasks match the current view</div>
-                    <div className="mt-1 text-[12px] font-medium text-slate-500">
-                      Adjust a column filter or reset the task view to bring more rows back in.
-                    </div>
-                    {hasActiveFilters && (
-                      <div className="mt-4">
-                        <Button variant="ghost" size="sm" onClick={resetAllFilters}>
-                          Reset all filters
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            )}
-
-            {!taskError && rows.map((task) => {
-              const canChangeStatus =
-                canManage ||
-                (isTaskOnly && String(task.assignedId) === String(currentUser?._id || currentUser?.id));
-              const isStatusLocked = task.ftaStatus === "approved" || task.status === "Completed";
-
-              return (
-                <tr key={task.id}>
-                  <td className="font-extrabold text-[#1e3a8a]">
-                    <button
-                      className="task-id-link"
-                      onClick={() => (canManage ? setDrawerTaskId(task.id) : navigate(`/tasks/${task.id}`))}
-                      title={canManage ? "Open task details" : "View task details"}
-                    >
-                      {task.taskId}
-                    </button>
-                  </td>
-                  <td>{task.client}</td>
-                  <td>
-                    <Badge>{task.category}</Badge>
-                  </td>
-                  <td>{task.type}</td>
-                  <td>
-                    <div>{task.dueDate}</div>
-                    {task.overdueDays > 0 && (
-                      <span className="mt-1 inline-flex rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-extrabold text-[#dc2626]">
-                        {task.overdueDays}d overdue
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    {canManage ? (
-                      <select
-                        id={`task-assignee-${task.id}`}
-                        className="input h-8 min-w-36"
-                        value={task.assignedId || ""}
-                        onChange={(event) => {
-                          const selected = state.users.find((user) => user._id === event.target.value || user.id === event.target.value);
-                          updateAssignee(task.id, event.target.value || null, selected?.name || "Unassigned")
-                            .catch(() => refetchTasks());
-                        }}
-                      >
-                        <option value="">Unassigned</option>
-                        {state.users.map((user) => (
-                          <option key={user._id || user.id} value={user._id || user.id}>
-                            {user.name}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span>{task.assigned}</span>
-                    )}
-                  </td>
-                  <td>
-                    {canChangeStatus && !isStatusLocked ? (
-                      <select
-                        id={`task-status-${task.id}`}
-                        name={`taskStatus${task.id}`}
-                        className="input h-8 min-w-40"
-                        value={task.displayStatus ?? task.status}
-                        onChange={(event) =>
-                          updateStatus(task.id, event.target.value)
-                            .then(() => refetchTasks())
-                            .catch(() => refetchTasks())
-                        }
-                      >
-                        {ALL_STATUSES.map((item) => (
-                          <option key={item}>{item}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <StatusPill status={task.status} />
-                    )}
-                  </td>
-                  <td>
-                    {task.recurring ? (
-                      <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-extrabold text-[#1e3a8a]">
-                        Recurring
-                      </span>
-                    ) : (
-                      <span className="text-[12px] font-semibold text-slate-500">One-time</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </Table>
-      </Card>
+      {(completedRows.length > 0 || status === "Completed") && (
+        <TaskSection
+          title="Completed Tasks"
+          subtitle="Finished tasks stay separated so the active queue is easier to scan, but they remain searchable and filterable here."
+          accentClassName="task-list-section-title-completed"
+        >
+          <TaskTableState
+            tasks={completedRows}
+            tasksLoading={tasksLoading && state.tasks.length === 0}
+            taskError={taskError}
+            hasActiveFilters={hasActiveFilters}
+            emptyTitle="No completed tasks match the current view"
+            emptyDescription="Try broadening the status or column filters if you expected completed tasks here."
+            onReset={resetAllFilters}
+            onRetry={refetchTasks}
+          >
+            {completedRows.map(renderTaskRow)}
+          </TaskTableState>
+        </TaskSection>
+      )}
 
       {canManage && drawerTaskId && (
         <TaskDrawer taskId={drawerTaskId} canManage={canManage} onClose={() => setDrawerTaskId(null)} />
+      )}
+
+      {remarkTask && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/35 p-4">
+          <Card className="w-full max-w-lg p-4">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <div className="page-kicker">Task Remark</div>
+                <div className="text-[16px] font-extrabold text-slate-900">{remarkTask.taskId}</div>
+              </div>
+              <button
+                type="button"
+                onClick={closeRemark}
+                disabled={remarkSaving}
+                className="text-slate-500 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Close
+              </button>
+            </div>
+
+            <label htmlFor="task-remark">
+              <span className="field-label">Remark</span>
+              <textarea
+                id="task-remark"
+                name="taskRemark"
+                className="input min-h-32"
+                placeholder="Add context, blockers, or follow-up notes for this task."
+                value={remarkText}
+                onChange={(event) => setRemarkText(event.target.value)}
+                disabled={remarkSaving}
+              />
+            </label>
+
+            {remarkError && (
+              <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">
+                {remarkError}
+              </div>
+            )}
+
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="ghost" onClick={closeRemark} disabled={remarkSaving}>
+                Cancel
+              </Button>
+              <Button onClick={saveRemark} disabled={remarkSaving}>
+                {remarkSaving ? "Saving..." : "Save Remark"}
+              </Button>
+            </div>
+          </Card>
+        </div>
       )}
     </div>
   );
 }
 
-function FilterChips({ label, items, value, setValue, compact = false }) {
+function TaskSection({ title, subtitle, accentClassName, children }) {
   return (
-    <div className={`flex flex-wrap items-center gap-2 ${compact ? "" : ""}`}>
+    <Card className="overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-5">
+        <div>
+          <div className={`text-[14px] font-extrabold ${accentClassName}`}>{title}</div>
+          <div className="mt-1 text-[12px] font-medium text-slate-500">{subtitle}</div>
+        </div>
+        <div className="text-[12px] font-semibold text-slate-500">Click a task ID to open details</div>
+      </div>
+      {children}
+    </Card>
+  );
+}
+
+function TaskTableState({ tasks, tasksLoading, taskError, hasActiveFilters, emptyTitle, emptyDescription, onReset, onRetry, children }) {
+  return (
+    <Table className="task-list-table">
+      <thead>
+        <tr>
+          <th>Task ID</th>
+          <th>Client</th>
+          <th>Category</th>
+          <th>Task Type</th>
+          <th>Due Date</th>
+          <th>Assigned</th>
+          <th>Status</th>
+          <th>Remarks</th>
+          <th>Recurring</th>
+        </tr>
+      </thead>
+      <tbody>
+        {tasksLoading && !tasks.length && <LoadingRows columns={TASK_TABLE_COLUMNS} />}
+
+        {!tasksLoading && taskError && (
+          <tr>
+            <td colSpan={TASK_TABLE_COLUMNS} className="px-4 py-10">
+              <div className="rounded-2xl border border-red-100 bg-red-50 px-5 py-5 text-center">
+                <div className="text-[14px] font-extrabold text-red-700">Unable to load tasks</div>
+                <div className="mt-1 text-[12px] font-medium text-red-600">{taskError}</div>
+                <div className="mt-4">
+                  <Button variant="ghost" size="sm" onClick={onRetry}>
+                    <RefreshCw size={15} />
+                    Try again
+                  </Button>
+                </div>
+              </div>
+            </td>
+          </tr>
+        )}
+
+        {!tasksLoading && !taskError && !tasks.length && (
+          <tr>
+            <td colSpan={TASK_TABLE_COLUMNS} className="px-4 py-10">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-6 text-center">
+                <div className="text-[14px] font-extrabold text-slate-900">{emptyTitle}</div>
+                <div className="mt-1 text-[12px] font-medium text-slate-500">{emptyDescription}</div>
+                {hasActiveFilters && (
+                  <div className="mt-4">
+                    <Button variant="ghost" size="sm" onClick={onReset}>
+                      Reset all filters
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </td>
+          </tr>
+        )}
+
+        {!taskError && children}
+      </tbody>
+    </Table>
+  );
+}
+
+function FilterChips({ label, items, value, setValue }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2">
       <span className="mr-1 text-[11px] font-extrabold uppercase tracking-[0.08em] text-slate-500">{label}</span>
       {items.map((item) => (
         <button
@@ -596,6 +775,7 @@ function InfoPill({ tone, label }) {
     slate: "bg-slate-100 text-slate-600",
     amber: "bg-amber-100 text-amber-700",
     blue: "bg-blue-50 text-blue-700",
+    green: "bg-emerald-50 text-emerald-700",
   };
 
   return (
@@ -605,10 +785,10 @@ function InfoPill({ tone, label }) {
   );
 }
 
-function LoadingRows() {
+function LoadingRows({ columns }) {
   return Array.from({ length: 6 }).map((_, index) => (
     <tr key={`loading-row-${index}`}>
-      {Array.from({ length: 8 }).map((__, cellIndex) => (
+      {Array.from({ length: columns }).map((__, cellIndex) => (
         <td key={`loading-cell-${index}-${cellIndex}`}>
           <div className="h-4 animate-pulse rounded-full bg-slate-200" />
         </td>
