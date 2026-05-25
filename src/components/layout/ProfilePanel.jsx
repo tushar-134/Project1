@@ -1,9 +1,10 @@
-import { Camera, ExternalLink, ShieldCheck, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Camera, ExternalLink, Grip, RotateCcw, ShieldCheck, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { profileService } from "../../services/profileService.js";
+import { clearDashboardTileOrder, DEFAULT_DASHBOARD_TILE_ORDER, loadDashboardTileOrder, saveDashboardTileOrder } from "../../utils/dashboardPreferences.js";
 import { resolveMediaUrl } from "../../utils/mediaUrl.js";
 import { ROLE_LABELS } from "../../utils/permissions.js";
 import Button from "../ui/Button.jsx";
@@ -43,12 +44,17 @@ export default function ProfilePanel({ open, initialTab = "profile", onClose }) 
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewBroken, setPreviewBroken] = useState(false);
   const [previewSrc, setPreviewSrc] = useState("");
+  const [dashboardTileOrder, setDashboardTileOrder] = useState(DEFAULT_DASHBOARD_TILE_ORDER);
   const fileRef = useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
+
+  useEffect(() => {
+    setDashboardTileOrder(loadDashboardTileOrder(currentUser));
+  }, [currentUser, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -122,6 +128,28 @@ export default function ProfilePanel({ open, initialTab = "profile", onClose }) 
 
   function handlePreviewError() {
     setPreviewBroken(true);
+  }
+
+  function moveDashboardTile(index, direction) {
+    setDashboardTileOrder((current) => {
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= current.length) return current;
+      const next = [...current];
+      const [item] = next.splice(index, 1);
+      next.splice(nextIndex, 0, item);
+      return next;
+    });
+  }
+
+  function handleSaveDashboardOrder() {
+    saveDashboardTileOrder(currentUser, dashboardTileOrder);
+    toast.success("Dashboard card priority updated.");
+  }
+
+  function handleResetDashboardOrder() {
+    const next = clearDashboardTileOrder(currentUser);
+    setDashboardTileOrder(next);
+    toast.success("Dashboard card priority reset.");
   }
 
   if (!open) return null;
@@ -233,6 +261,53 @@ export default function ProfilePanel({ open, initialTab = "profile", onClose }) 
                           Contact an admin for account changes.
                         </div>
                       )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="flex items-start gap-3">
+                  <div className="grid h-10 w-10 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
+                    <Grip size={18} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[15px] font-extrabold text-slate-900">Dashboard Card Priority</div>
+                    <div className="mt-1 text-[13px] font-semibold text-slate-500">
+                      Arrange the dashboard service cards in the order you want to see them.
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      {dashboardTileOrder.map((name, index) => (
+                        <div key={name} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2">
+                          <div className="text-[11px] font-black text-slate-400">{String(index + 1).padStart(2, "0")}</div>
+                          <div className="min-w-0 flex-1 text-[13px] font-bold text-slate-800">{name}</div>
+                          <button
+                            type="button"
+                            onClick={() => moveDashboardTile(index, -1)}
+                            disabled={index === 0}
+                            className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                            aria-label={`Move ${name} up`}
+                          >
+                            <ArrowUp size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveDashboardTile(index, 1)}
+                            disabled={index === dashboardTileOrder.length - 1}
+                            className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                            aria-label={`Move ${name} down`}
+                          >
+                            <ArrowDown size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <Button onClick={handleSaveDashboardOrder}>Save Priority</Button>
+                      <Button variant="ghost" onClick={handleResetDashboardOrder}>
+                        <RotateCcw size={16} />
+                        Reset
+                      </Button>
                     </div>
                   </div>
                 </div>
