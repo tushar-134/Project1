@@ -1,4 +1,4 @@
-export default function Button({ children, variant = "primary", size = "md", className = "", ...props }) {
+export default function Button({ children, type = "button", variant = "primary", size = "md", className = "", ...props }) {
   // UI primitives centralize the original prototype styling so feature work does not fork button treatments.
   const variants = {
     primary: "bg-[#1e3a8a] text-white hover:bg-[#162d6e]",
@@ -8,5 +8,5 @@ export default function Button({ children, variant = "primary", size = "md", cla
     success: "bg-[#059669] text-white hover:brightness-95",
   };
   const sizes = { sm: "min-h-8 px-3 text-[12px]", md: "min-h-9 px-4 text-[13px]", lg: "min-h-10 px-5 text-[14px]" };
-  return <button className={`inline-flex items-center justify-center gap-2 rounded-lg py-1.5 font-bold leading-tight transition disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${sizes[size]} ${className}`} {...props}>{children}</button>;
+  return <button type={type} className={`inline-flex items-center justify-center gap-2 rounded-lg py-1.5 font-bold leading-tight transition disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${sizes[size]} ${className}`} {...props}>{children}</button>;
 }

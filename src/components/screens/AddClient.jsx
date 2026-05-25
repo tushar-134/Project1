@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ChevronDown, ChevronUp, Plus, Trash2, UploadCloud } from "lucide-react";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
+import { useAuth } from "../../context/AuthContext.jsx";
 import { useClients } from "../../hooks/useClients";
 import { useUsers } from "../../hooks/useUsers";
 import { groupService } from "../../services/groupService";
@@ -42,10 +43,11 @@ function formatEmiratesId(value) {
 
 export default function AddClient() {
   const { state, dispatch } = useApp();
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditMode = Boolean(id);
-  const { createClient, getClient, updateClient, uploadAttachment, uploadDocument, deleteAttachment } = useClients();
+  const { createClient, getClient, updateClient, uploadAttachment, uploadDocument, deleteAttachment, deleteDocument } = useClients();
   const { fetchUsers } = useUsers();
   const [tab, setTab] = useState(0);
   const countries = useMemo(() => {
@@ -66,8 +68,8 @@ export default function AddClient() {
     vatTrn: "", vatStatus: "Not Registered", vatDate: "", vatFreq: "Quarterly", ctTin: "", ctStatus: "Not Registered", ctDate: "", ctFye: "Jan-Dec", group: "", newGroup: "",
     qrmp: "Email", auditFirm: "", bank: "", iban: "",
   });
-  const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null }]);
-  const [contacts, setContacts] = useState([{ name: "", designation: "", email: "", code: "", mobile: "", whatsapp: "", alternate: "", primary: true, eid: "", eidIssue: "", eidExpiry: "", eidFrontDocumentUrl: "", eidFrontDocumentName: "", eidFrontDocumentFile: null, eidBackDocumentUrl: "", eidBackDocumentName: "", eidBackDocumentFile: null, passport: "", passportIssue: "", passportExpiry: "", issuingCountry: "United Arab Emirates", passportDocumentUrl: "", passportDocumentName: "", passportDocumentFile: null }]);
+  const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }]);
+  const [contacts, setContacts] = useState([{ name: "", designation: "", email: "", code: "", mobile: "", whatsapp: "", alternate: "", primary: true, eid: "", eidIssue: "", eidExpiry: "", eidFrontDocumentUrl: "", eidFrontDocumentName: "", eidFrontDocumentFile: null, eidFrontDocuments: [], eidBackDocumentUrl: "", eidBackDocumentName: "", eidBackDocumentFile: null, eidBackDocuments: [], passport: "", passportIssue: "", passportExpiry: "", issuingCountry: "United Arab Emirates", passportDocumentUrl: "", passportDocumentName: "", passportDocumentFile: null, passportDocuments: [] }]);
   const [contactOpen, setContactOpen] = useState([true]);
   const [portals, setPortals] = useState([{ name: "FTA EmaraTax", url: "https://tax.gov.ae", username: "", password: "", notes: "", showPassword: false }]);
   const [customFields, setCustomFields] = useState([EMPTY_CUSTOM_FIELD]);
@@ -136,7 +138,8 @@ export default function AddClient() {
         documentUrl: licence.documentUrl || "",
         documentName: licence.documentUrl ? licence.documentUrl.split("/").pop() : "",
         documentFile: null,
-      })) : [{ number: "", issue: "", expiry: "", authority: "Dubai Economy", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null }]);
+        documents: mapExistingDocuments(licence.documents, licence.documentUrl),
+      })) : [{ number: "", issue: "", expiry: "", authority: "Dubai Economy", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }]);
       setContacts((client.contactPersons || []).length ? client.contactPersons.map((person) => ({
         name: person.fullName || "",
         designation: person.designation || "",
@@ -156,13 +159,16 @@ export default function AddClient() {
         eidFrontDocumentUrl: person.emiratesId?.frontDocumentUrl || "",
         eidFrontDocumentName: person.emiratesId?.frontDocumentUrl ? person.emiratesId.frontDocumentUrl.split("/").pop() : "",
         eidFrontDocumentFile: null,
+        eidFrontDocuments: mapExistingDocuments(person.emiratesId?.frontDocuments, person.emiratesId?.frontDocumentUrl),
         eidBackDocumentUrl: person.emiratesId?.backDocumentUrl || "",
         eidBackDocumentName: person.emiratesId?.backDocumentUrl ? person.emiratesId.backDocumentUrl.split("/").pop() : "",
         eidBackDocumentFile: null,
+        eidBackDocuments: mapExistingDocuments(person.emiratesId?.backDocuments, person.emiratesId?.backDocumentUrl),
         passportDocumentUrl: person.passport?.documentUrl || "",
         passportDocumentName: person.passport?.documentUrl ? person.passport.documentUrl.split("/").pop() : "",
         passportDocumentFile: null,
-      })) : [{ name: "", designation: "", email: "", code: "", mobile: "", whatsapp: "", alternate: "", primary: true, eid: "", eidIssue: "", eidExpiry: "", passport: "", passportIssue: "", passportExpiry: "", issuingCountry: "United Arab Emirates", eidFrontDocumentUrl: "", eidFrontDocumentName: "", eidFrontDocumentFile: null, eidBackDocumentUrl: "", eidBackDocumentName: "", eidBackDocumentFile: null, passportDocumentUrl: "", passportDocumentName: "", passportDocumentFile: null }]);
+        passportDocuments: mapExistingDocuments(person.passport?.documents, person.passport?.documentUrl),
+      })) : [{ name: "", designation: "", email: "", code: "", mobile: "", whatsapp: "", alternate: "", primary: true, eid: "", eidIssue: "", eidExpiry: "", passport: "", passportIssue: "", passportExpiry: "", issuingCountry: "United Arab Emirates", eidFrontDocumentUrl: "", eidFrontDocumentName: "", eidFrontDocumentFile: null, eidFrontDocuments: [], eidBackDocumentUrl: "", eidBackDocumentName: "", eidBackDocumentFile: null, eidBackDocuments: [], passportDocumentUrl: "", passportDocumentName: "", passportDocumentFile: null, passportDocuments: [] }]);
       setPortals((client.portalLogins || []).length ? client.portalLogins.map((portal) => ({
         name: portal.portalName || "",
         url: portal.portalUrl || "",
@@ -200,6 +206,47 @@ export default function AddClient() {
     return `${(size / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const mapExistingDocuments = (documents = [], fallbackUrl = "") => {
+    if (Array.isArray(documents) && documents.length) {
+      return documents.map((document) => ({
+        id: document._id,
+        name: document.name || document.url?.split("/").pop() || "Document",
+        size: document.size || "",
+        type: document.fileType || "",
+        url: document.url || "",
+        uploadedOn: document.uploadedAt?.slice?.(0, 10) || "",
+        uploadedBy: document.uploadedBy?.name || "",
+        description: document.description || "",
+        saved: true,
+      }));
+    }
+    if (!fallbackUrl) return [];
+    return [{
+      id: fallbackUrl,
+      name: fallbackUrl.split("/").pop() || "Document",
+      size: "",
+      type: "",
+      url: fallbackUrl,
+      uploadedOn: "",
+      uploadedBy: "",
+      description: "",
+      saved: true,
+      legacy: true,
+    }];
+  };
+
+  const toPendingDocument = (file) => ({
+    id: `${file.name}-${file.lastModified}-${file.size}`,
+    name: file.name,
+    size: formatFileSize(file.size),
+    type: file.type || file.name.split(".").pop()?.toUpperCase() || "File",
+    uploadedOn: "Pending save",
+    uploadedBy: "You",
+    file,
+    url: "",
+    saved: false,
+  });
+
   const mapSavedAttachments = (items) => items.map((attachment) => ({
     id: attachment._id,
     name: attachment.name,
@@ -213,6 +260,48 @@ export default function AddClient() {
     saved: true,
   }));
 
+  const applyClientDocuments = (client) => {
+    if (client.tradeLicences) {
+      setLicences((current) => current.map((licence, index) => {
+        const uploadedLicence = client.tradeLicences?.[index];
+        if (!uploadedLicence) return licence;
+        const documents = mapExistingDocuments(uploadedLicence.documents, uploadedLicence.documentUrl);
+        return {
+          ...licence,
+          documentUrl: uploadedLicence.documentUrl || documents.at(-1)?.url || "",
+          documentName: documents.at(-1)?.name || "",
+          documentFile: null,
+          documents,
+        };
+      }));
+    }
+    if (client.contactPersons) {
+      setContacts((current) => current.map((contact, index) => {
+        const uploadedContact = client.contactPersons?.[index];
+        if (!uploadedContact) return contact;
+        const eidFrontDocuments = mapExistingDocuments(uploadedContact.emiratesId?.frontDocuments, uploadedContact.emiratesId?.frontDocumentUrl);
+        const eidBackDocuments = mapExistingDocuments(uploadedContact.emiratesId?.backDocuments, uploadedContact.emiratesId?.backDocumentUrl);
+        const passportDocuments = mapExistingDocuments(uploadedContact.passport?.documents, uploadedContact.passport?.documentUrl);
+        return {
+          ...contact,
+          eidFrontDocumentUrl: uploadedContact.emiratesId?.frontDocumentUrl || eidFrontDocuments.at(-1)?.url || "",
+          eidFrontDocumentName: eidFrontDocuments.at(-1)?.name || "",
+          eidFrontDocumentFile: null,
+          eidFrontDocuments,
+          eidBackDocumentUrl: uploadedContact.emiratesId?.backDocumentUrl || eidBackDocuments.at(-1)?.url || "",
+          eidBackDocumentName: eidBackDocuments.at(-1)?.name || "",
+          eidBackDocumentFile: null,
+          eidBackDocuments,
+          passportDocumentUrl: uploadedContact.passport?.documentUrl || passportDocuments.at(-1)?.url || "",
+          passportDocumentName: passportDocuments.at(-1)?.name || "",
+          passportDocumentFile: null,
+          passportDocuments,
+        };
+      }));
+    }
+    if (client.attachments) setAttachments(mapSavedAttachments(client.attachments));
+  };
+
   const patchLicence = (index, values) => {
     setLicences((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...values } : item));
   };
@@ -225,7 +314,7 @@ export default function AddClient() {
     }));
   };
   const addContact = () => {
-    setContacts((current) => [...current, { name: "", designation: "", email: "", code: "", mobile: "", whatsapp: "", alternate: "", primary: false, eid: "", eidIssue: "", eidExpiry: "", eidFrontDocumentUrl: "", eidFrontDocumentName: "", eidFrontDocumentFile: null, eidBackDocumentUrl: "", eidBackDocumentName: "", eidBackDocumentFile: null, passport: "", passportIssue: "", passportExpiry: "", issuingCountry: "United Arab Emirates", passportDocumentUrl: "", passportDocumentName: "", passportDocumentFile: null }]);
+    setContacts((current) => [...current, { name: "", designation: "", email: "", code: "", mobile: "", whatsapp: "", alternate: "", primary: false, eid: "", eidIssue: "", eidExpiry: "", eidFrontDocumentUrl: "", eidFrontDocumentName: "", eidFrontDocumentFile: null, eidFrontDocuments: [], eidBackDocumentUrl: "", eidBackDocumentName: "", eidBackDocumentFile: null, eidBackDocuments: [], passport: "", passportIssue: "", passportExpiry: "", issuingCountry: "United Arab Emirates", passportDocumentUrl: "", passportDocumentName: "", passportDocumentFile: null, passportDocuments: [] }]);
     setContactOpen((current) => [...current, true]);
   };
   const removeContact = (index) => {
@@ -233,98 +322,67 @@ export default function AddClient() {
     setContactOpen((current) => current.filter((_, itemIndex) => itemIndex !== index));
   };
 
-  async function uploadTradeLicenceFile(clientId, licenceIndex, file) {
+  async function uploadTradeLicenceFiles(clientId, licenceIndex, files) {
     const formData = new FormData();
-    formData.append("file", file);
+    files.forEach((file) => formData.append("files", file));
     formData.append("section", "tradeLicences");
     formData.append("index", String(licenceIndex));
     formData.append("description", `Trade Licence ${licenceIndex + 1} document`);
     const updatedClient = await uploadDocument(clientId, formData);
-    const uploadedLicence = updatedClient.tradeLicences?.[licenceIndex];
-    patchLicence(licenceIndex, {
-      documentUrl: uploadedLicence?.documentUrl || "",
-      documentName: file.name,
-      documentFile: null,
-    });
-    if (updatedClient.attachments) setAttachments(mapSavedAttachments(updatedClient.attachments));
+    applyClientDocuments(updatedClient);
   }
 
   async function handleTradeLicenceFile(licenceIndex, files) {
-    const file = files?.[0];
-    if (!file) return;
-    patchLicence(licenceIndex, { documentName: file.name, documentFile: isEditMode ? null : file });
+    const selected = Array.from(files || []);
+    if (!selected.length) return;
     if (!isEditMode) {
-      toast.success("Trade licence file added. Save the client to upload it.");
+      setLicences((current) => current.map((item, index) => index === licenceIndex ? {
+        ...item,
+        documents: [...(item.documents || []), ...selected.map(toPendingDocument)],
+      } : item));
+      toast.success(selected.length === 1 ? "Trade licence file added. Save the client to upload it." : "Trade licence files added. Save the client to upload them.");
       return;
     }
     setIsUploading(true);
     try {
-      await uploadTradeLicenceFile(id, licenceIndex, file);
-      toast.success("Trade licence document uploaded.");
+      await uploadTradeLicenceFiles(id, licenceIndex, selected);
+      toast.success(selected.length === 1 ? "Trade licence document uploaded." : "Trade licence documents uploaded.");
     } catch (error) {
-      patchLicence(licenceIndex, { documentFile: null });
       toast.error(error.response?.data?.message || "Trade licence upload failed.");
     } finally {
       setIsUploading(false);
     }
   }
 
-  async function uploadContactDocument(clientId, contactIndex, file, section) {
+  async function uploadContactDocuments(clientId, contactIndex, files, section) {
     const formData = new FormData();
-    formData.append("file", file);
+    files.forEach((file) => formData.append("files", file));
     formData.append("section", section);
     formData.append("index", String(contactIndex));
     formData.append("description", `Contact ${contactIndex + 1} ${section} document`);
     const updatedClient = await uploadDocument(clientId, formData);
-    const uploadedContact = updatedClient.contactPersons?.[contactIndex];
-    if (section === "passport") {
-      patchContact(contactIndex, {
-        passportDocumentUrl: uploadedContact?.passport?.documentUrl || "",
-        passportDocumentName: file.name,
-        passportDocumentFile: null,
-      });
-    } else if (section === "emiratesIdBack") {
-      patchContact(contactIndex, {
-        eidBackDocumentUrl: uploadedContact?.emiratesId?.backDocumentUrl || "",
-        eidBackDocumentName: file.name,
-        eidBackDocumentFile: null,
-      });
-    } else {
-      patchContact(contactIndex, {
-        eidFrontDocumentUrl: uploadedContact?.emiratesId?.frontDocumentUrl || "",
-        eidFrontDocumentName: file.name,
-        eidFrontDocumentFile: null,
-      });
-    }
-    if (updatedClient.attachments) setAttachments(mapSavedAttachments(updatedClient.attachments));
+    applyClientDocuments(updatedClient);
   }
 
   async function handleContactDocument(contactIndex, files, section) {
-    const file = files?.[0];
-    if (!file) return;
+    const selected = Array.from(files || []);
+    if (!selected.length) return;
     if (section === "passport") {
-      patchContact(contactIndex, { passportDocumentName: file.name, passportDocumentFile: isEditMode ? null : file });
+      setContacts((current) => current.map((item, index) => index === contactIndex ? { ...item, passportDocuments: [...(item.passportDocuments || []), ...(!isEditMode ? selected.map(toPendingDocument) : [])] } : item));
     } else if (section === "emiratesIdBack") {
-      patchContact(contactIndex, { eidBackDocumentName: file.name, eidBackDocumentFile: isEditMode ? null : file });
+      setContacts((current) => current.map((item, index) => index === contactIndex ? { ...item, eidBackDocuments: [...(item.eidBackDocuments || []), ...(!isEditMode ? selected.map(toPendingDocument) : [])] } : item));
     } else {
-      patchContact(contactIndex, { eidFrontDocumentName: file.name, eidFrontDocumentFile: isEditMode ? null : file });
+      setContacts((current) => current.map((item, index) => index === contactIndex ? { ...item, eidFrontDocuments: [...(item.eidFrontDocuments || []), ...(!isEditMode ? selected.map(toPendingDocument) : [])] } : item));
     }
     if (!isEditMode) {
-      toast.success(`${section === "passport" ? "Passport" : "Emirates ID"} file added. Save the client to upload it.`);
+      toast.success(`${section === "passport" ? "Passport" : "Emirates ID"} ${selected.length === 1 ? "file" : "files"} added. Save the client to upload ${selected.length === 1 ? "it" : "them"}.`);
       return;
     }
     setIsUploading(true);
     try {
-      await uploadContactDocument(id, contactIndex, file, section);
-      toast.success(`${section === "passport" ? "Passport" : "Emirates ID"} document uploaded.`);
+      await uploadContactDocuments(id, contactIndex, selected, section);
+      toast.success(`${section === "passport" ? "Passport" : "Emirates ID"} ${selected.length === 1 ? "document" : "documents"} uploaded.`);
     } catch (error) {
-      if (section === "passport") {
-        patchContact(contactIndex, { passportDocumentFile: null });
-      } else if (section === "emiratesIdBack") {
-        patchContact(contactIndex, { eidBackDocumentFile: null });
-      } else {
-        patchContact(contactIndex, { eidFrontDocumentFile: null });
-      }
       toast.error(error.response?.data?.message || "Contact document upload failed.");
     } finally {
       setIsUploading(false);
@@ -358,11 +416,11 @@ export default function AddClient() {
       let uploaded = [];
       for (const file of selected) {
         const formData = new FormData();
-        formData.append("file", file);
+        formData.append("files", file);
         formData.append("description", "");
         uploaded = await uploadAttachment(id, formData);
       }
-      setAttachments(mapSavedAttachments(uploaded));
+      setAttachments(mapSavedAttachments(uploaded.attachments || []));
       toast.success(selected.length === 1 ? "Attachment uploaded." : "Attachments uploaded.");
     } catch (error) {
       toast.error(error.response?.data?.message || "Attachment upload failed.");
@@ -378,10 +436,43 @@ export default function AddClient() {
     }
     try {
       const remaining = await deleteAttachment(id, attachment.id);
-      setAttachments(mapSavedAttachments(remaining));
+      setAttachments(mapSavedAttachments(remaining.attachments || []));
       toast.success("Attachment deleted.");
     } catch (error) {
       toast.error(error.response?.data?.message || "Unable to delete attachment.");
+    }
+  }
+
+  async function removeTradeLicenceDocument(licenceIndex, document) {
+    if (!document.saved) {
+      setLicences((current) => current.map((item, index) => index === licenceIndex ? { ...item, documents: (item.documents || []).filter((entry) => entry.id !== document.id) } : item));
+      return;
+    }
+    try {
+      const updatedClient = await deleteDocument(id, "tradeLicences", licenceIndex, document.id);
+      applyClientDocuments(updatedClient);
+      toast.success("Trade licence document deleted.");
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Unable to delete trade licence document.");
+    }
+  }
+
+  async function removeContactDocument(contactIndex, section, document) {
+    if (!document.saved) {
+      setContacts((current) => current.map((item, index) => {
+        if (index !== contactIndex) return item;
+        if (section === "passport") return { ...item, passportDocuments: (item.passportDocuments || []).filter((entry) => entry.id !== document.id) };
+        if (section === "emiratesIdBack") return { ...item, eidBackDocuments: (item.eidBackDocuments || []).filter((entry) => entry.id !== document.id) };
+        return { ...item, eidFrontDocuments: (item.eidFrontDocuments || []).filter((entry) => entry.id !== document.id) };
+      }));
+      return;
+    }
+    try {
+      const updatedClient = await deleteDocument(id, section, contactIndex, document.id);
+      applyClientDocuments(updatedClient);
+      toast.success(`${section === "passport" ? "Passport" : "Emirates ID"} document deleted.`);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Unable to delete document.");
     }
   }
 
@@ -483,23 +574,23 @@ export default function AddClient() {
       };
       const pendingAttachments = attachments.filter((attachment) => !attachment.saved && attachment.file);
       const pendingLicenceDocuments = licences
-        .map((licence, index) => ({ index, file: licence.documentFile }))
-        .filter((item) => item.file);
+        .map((licence, index) => ({ index, files: (licence.documents || []).filter((document) => !document.saved && document.file).map((document) => document.file) }))
+        .filter((item) => item.files.length);
       const pendingContactDocuments = contacts.flatMap((contact, index) => ([
-        contact.eidFrontDocumentFile ? { index, file: contact.eidFrontDocumentFile, section: "emiratesIdFront" } : null,
-        contact.eidBackDocumentFile ? { index, file: contact.eidBackDocumentFile, section: "emiratesIdBack" } : null,
-        contact.passportDocumentFile ? { index, file: contact.passportDocumentFile, section: "passport" } : null,
+        contact.eidFrontDocuments?.some((document) => !document.saved && document.file) ? { index, files: contact.eidFrontDocuments.filter((document) => !document.saved && document.file).map((document) => document.file), section: "emiratesIdFront" } : null,
+        contact.eidBackDocuments?.some((document) => !document.saved && document.file) ? { index, files: contact.eidBackDocuments.filter((document) => !document.saved && document.file).map((document) => document.file), section: "emiratesIdBack" } : null,
+        contact.passportDocuments?.some((document) => !document.saved && document.file) ? { index, files: contact.passportDocuments.filter((document) => !document.saved && document.file).map((document) => document.file), section: "passport" } : null,
       ].filter(Boolean)));
       if (isEditMode) {
         await updateClient(id, payload);
         if (pendingLicenceDocuments.length) {
           for (const licenceDocument of pendingLicenceDocuments) {
-            await uploadTradeLicenceFile(id, licenceDocument.index, licenceDocument.file);
+            await uploadTradeLicenceFiles(id, licenceDocument.index, licenceDocument.files);
           }
         }
         if (pendingContactDocuments.length) {
           for (const document of pendingContactDocuments) {
-            await uploadContactDocument(id, document.index, document.file, document.section);
+            await uploadContactDocuments(id, document.index, document.files, document.section);
           }
         }
         toast.success(continueToNext ? "Progress saved." : "Client updated successfully.");
@@ -507,12 +598,12 @@ export default function AddClient() {
         const created = await createClient(payload);
         if (pendingLicenceDocuments.length) {
           for (const licenceDocument of pendingLicenceDocuments) {
-            await uploadTradeLicenceFile(created._id, licenceDocument.index, licenceDocument.file);
+            await uploadTradeLicenceFiles(created._id, licenceDocument.index, licenceDocument.files);
           }
         }
         if (pendingContactDocuments.length) {
           for (const document of pendingContactDocuments) {
-            await uploadContactDocument(created._id, document.index, document.file, document.section);
+            await uploadContactDocuments(created._id, document.index, document.files, document.section);
           }
         }
         if (pendingAttachments.length) {
@@ -558,7 +649,7 @@ export default function AddClient() {
         <div className="flex overflow-x-auto border-b border-[#e2e8f0] bg-slate-50 p-2">{tabs.map((t, i) => <button key={t} onClick={() => setTab(i)} className={`mr-1 whitespace-nowrap rounded-lg px-3 py-2 text-[12px] font-extrabold ${tab === i ? "bg-[#1e3a8a] text-white" : "text-slate-600 hover:bg-white"}`}>{t}</button>)}</div>
         <div className="p-4">
           {tab === 0 && <Basic form={form} update={update} countries={countries} users={state.users} />}
-          {tab === 1 && <Repeat title="Trade Licence" items={licences} setItems={setLicences} blank={{ number: "", issue: "", expiry: "", authority: "", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null }} render={(lic, i, patch) => <div className="grid gap-3 md:grid-cols-3"><Field label="Trade Licence Number*" field={`licence-number-${i}`}><input className="input" value={lic.number} onChange={(e) => patch(i, { number: e.target.value })} /></Field><Field label="Issue Date" field={`licence-issue-${i}`}><input className="input" type="date" value={lic.issue} onChange={(e) => patch(i, { issue: e.target.value })} /></Field><Field label="Expiry Date" field={`licence-expiry-${i}`}><input className="input" type="date" value={lic.expiry} onChange={(e) => patch(i, { expiry: e.target.value })} /></Field><Field label="Issuing Authority" field={`licence-authority-${i}`}><input className="input" value={lic.authority} onChange={(e) => patch(i, { authority: e.target.value })} /></Field><Field label="Licence Type" field={`licence-type-${i}`}><select className="input" value={lic.type} onChange={(e) => patch(i, { type: e.target.value })}>{LICENCE_TYPES.map((type) => <option key={type}>{type}</option>)}</select></Field><Field label="Official Email" field={`licence-email-${i}`}><input className="input" type="email" value={lic.email} onChange={(e) => patch(i, { email: e.target.value })} /></Field><div className="md:col-span-3"><DocumentUploadZone id={`trade-licence-upload-${i}`} title="Upload trade licence document" subtitle="PDF, JPG, PNG" fileName={lic.documentName} documentUrl={lic.documentUrl} isUploading={isUploading} onFiles={(files) => handleTradeLicenceFile(i, files)} /></div></div>} />}
+          {tab === 1 && <Repeat title="Trade Licence" items={licences} setItems={setLicences} blank={{ number: "", issue: "", expiry: "", authority: "", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }} render={(lic, i, patch) => <div className="grid gap-3 md:grid-cols-3"><Field label="Trade Licence Number*" field={`licence-number-${i}`}><input className="input" value={lic.number} onChange={(e) => patch(i, { number: e.target.value })} /></Field><Field label="Issue Date" field={`licence-issue-${i}`}><input className="input" type="date" value={lic.issue} onChange={(e) => patch(i, { issue: e.target.value })} /></Field><Field label="Expiry Date" field={`licence-expiry-${i}`}><input className="input" type="date" value={lic.expiry} onChange={(e) => patch(i, { expiry: e.target.value })} /></Field><Field label="Issuing Authority" field={`licence-authority-${i}`}><input className="input" value={lic.authority} onChange={(e) => patch(i, { authority: e.target.value })} /></Field><Field label="Licence Type" field={`licence-type-${i}`}><select className="input" value={lic.type} onChange={(e) => patch(i, { type: e.target.value })}>{LICENCE_TYPES.map((type) => <option key={type}>{type}</option>)}</select></Field><Field label="Official Email" field={`licence-email-${i}`}><input className="input" type="email" value={lic.email} onChange={(e) => patch(i, { email: e.target.value })} /></Field><div className="md:col-span-3"><DocumentUploadZone id={`trade-licence-upload-${i}`} title="Upload trade licence documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={lic.documents || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleTradeLicenceFile(i, files)} onDeleteDocument={(document) => removeTradeLicenceDocument(i, document)} /></div></div>} />}
           {tab === 2 && (
             <div className="space-y-4">
               {contacts.map((c, i) => (
@@ -609,9 +700,9 @@ export default function AddClient() {
                       <Field label="Passport Expiry" field={`contact-passport-expiry-${i}`}><input className="input" type="date" value={c.passportExpiry} onChange={(e) => patchContact(i, { passportExpiry: e.target.value })} /></Field>
                       <Field label="Passport Issuing Country" field={`contact-passport-country-${i}`}><CountryField field={`contact-passport-country-${i}`} value={c.issuingCountry} options={countries} onChange={(value) => patchContact(i, { issuingCountry: value })} /></Field>
                       <div className="md:col-span-3 grid gap-3 md:grid-cols-3">
-                        <DocumentUploadZone id={`contact-eid-front-upload-${i}`} title="Upload Emirates ID Front" subtitle="PDF, JPG, PNG" fileName={c.eidFrontDocumentName} documentUrl={c.eidFrontDocumentUrl} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "emiratesIdFront")} />
-                        <DocumentUploadZone id={`contact-eid-back-upload-${i}`} title="Upload Emirates ID Back" subtitle="PDF, JPG, PNG" fileName={c.eidBackDocumentName} documentUrl={c.eidBackDocumentUrl} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "emiratesIdBack")} />
-                        <DocumentUploadZone id={`contact-passport-upload-${i}`} title="Upload Passport" subtitle="PDF, JPG, PNG" fileName={c.passportDocumentName} documentUrl={c.passportDocumentUrl} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "passport")} />
+                        <DocumentUploadZone id={`contact-eid-front-upload-${i}`} title="Upload Emirates ID Front" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.eidFrontDocuments || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "emiratesIdFront")} onDeleteDocument={(document) => removeContactDocument(i, "emiratesIdFront", document)} />
+                        <DocumentUploadZone id={`contact-eid-back-upload-${i}`} title="Upload Emirates ID Back" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.eidBackDocuments || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "emiratesIdBack")} onDeleteDocument={(document) => removeContactDocument(i, "emiratesIdBack", document)} />
+                        <DocumentUploadZone id={`contact-passport-upload-${i}`} title="Upload Passport" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.passportDocuments || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "passport")} onDeleteDocument={(document) => removeContactDocument(i, "passport", document)} />
                       </div>
                     </div>
                   )}
@@ -624,7 +715,7 @@ export default function AddClient() {
           {tab === 4 && <div className="grid gap-4 md:grid-cols-2"><Field label="Select existing group" field="client-group"><select className="input" value={form.group} onChange={(e) => update("group", e.target.value)}><option value="">No group</option>{state.groups.map((g) => <option key={g.id} value={g._id}>{g.name}</option>)}</select></Field><Field label="Create new group"><div className="flex gap-2"><input id="client-new-group" name="clientNewGroup" className="input" value={form.newGroup} onChange={(e) => update("newGroup", e.target.value)} /><Button onClick={async () => { if (form.newGroup) { const g = await groupService.create({ name: form.newGroup }); dispatch({ type: "SET_RESOURCE", resource: "groups", payload: [...state.groups, { ...g, id: g._id }] }); update("group", g._id); } }}>Create</Button></div></Field><div className="rounded-xl bg-purple-50 p-4 font-bold text-[#7c3aed] md:col-span-2">Current group: {state.groups.find((g) => g._id === form.group)?.name || "Ungrouped"} {form.group && <button onClick={() => update("group", "")} className="ml-3 text-[#dc2626]">Ungroup</button>}</div></div>}
           {tab === 5 && <Repeat title="Portal" items={portals} setItems={setPortals} blank={{ name: "", url: "", username: "", password: "", notes: "", showPassword: false }} render={(p, i, patch) => <div className="grid gap-3 md:grid-cols-2"><Field label="Portal Name*" field={`portal-name-${i}`}><input className="input" value={p.name} onChange={(e) => patch(i, { name: e.target.value })} /></Field><Field label="Portal URL" field={`portal-url-${i}`}><input className="input" value={p.url} onChange={(e) => patch(i, { url: e.target.value })} /></Field><Field label="Username / Login ID" field={`portal-username-${i}`}><input className="input" value={p.username} onChange={(e) => patch(i, { username: e.target.value })} /></Field><Field label="Password" field={`portal-password-${i}`}><div className="flex gap-2"><input className="input" type={p.showPassword ? "text" : "password"} value={p.password} onChange={(e) => patch(i, { password: e.target.value })} /><Button variant="ghost" onClick={() => patch(i, { showPassword: !p.showPassword })}>{p.showPassword ? "Hide" : "Show"}</Button></div></Field><Field label="Notes" field={`portal-notes-${i}`}><textarea className="input textarea" value={p.notes} onChange={(e) => patch(i, { notes: e.target.value })} /></Field></div>} />}
           {tab === 6 && <div className="space-y-4"><div className="grid gap-3 md:grid-cols-2"><Field label="QRMP Preference" field="client-qrmp"><input className="input" value={form.qrmp} onChange={(e) => update("qrmp", e.target.value)} /></Field><Field label="Audit Firm Name" field="client-audit-firm"><input className="input" value={form.auditFirm} onChange={(e) => update("auditFirm", e.target.value)} /></Field><Field label="Bank Name" field="client-bank"><input className="input" value={form.bank} onChange={(e) => update("bank", e.target.value)} /></Field><Field label="IBAN" field="client-iban"><input className="input" value={form.iban} onChange={(e) => update("iban", e.target.value)} /></Field></div><div className="flex items-center justify-between rounded-xl bg-slate-50 p-3"><div className="text-[12px] font-semibold text-slate-500">Custom fields for this client</div><Button variant="ghost" onClick={() => setCustomFields((current) => [...current, { ...EMPTY_CUSTOM_FIELD }])}><Plus size={16} />New Custom Field</Button></div><div className="space-y-3">{customFields.map((field, index) => <div key={`${field.label}-${index}`} className="rounded-xl border border-[#e2e8f0] p-4"><div className="mb-3 flex items-center justify-between"><div className="font-extrabold">Custom Field {index + 1}</div>{customFields.length > 1 && <button onClick={() => setCustomFields((current) => current.filter((_, itemIndex) => itemIndex !== index))} className="text-[#dc2626]"><Trash2 size={16} /></button>}</div><div className="grid gap-3 md:grid-cols-2"><Field label="Field Label" field={`custom-label-${index}`}><input className="input" value={field.label} onChange={(e) => setCustomFields((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, label: e.target.value } : item))} /></Field><Field label="Field Type" field={`custom-type-${index}`}><select className="input" value={field.type} onChange={(e) => setCustomFields((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, type: e.target.value, value: e.target.value === "checkbox" ? false : "", optionsText: e.target.value === "dropdown" ? item.optionsText : "" } : item))}>{CUSTOM_FIELD_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}</select></Field>{field.type === "dropdown" && <Field label="Dropdown Options" field={`custom-options-${index}`}><input className="input" value={field.optionsText} onChange={(e) => setCustomFields((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, optionsText: e.target.value } : item))} placeholder="Option 1, Option 2" /></Field>}{field.type === "checkbox" ? <label className="flex items-center gap-2 font-bold" htmlFor={`custom-checkbox-${index}`}><input id={`custom-checkbox-${index}`} type="checkbox" checked={Boolean(field.value)} onChange={(e) => setCustomFields((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, value: e.target.checked } : item))} />Checked by default</label> : <Field label="Value" field={`custom-value-${index}`}>{field.type === "date" ? <input className="input" type="date" value={field.value} onChange={(e) => setCustomFields((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, value: e.target.value } : item))} /> : field.type === "number" ? <input className="input" type="number" value={field.value} onChange={(e) => setCustomFields((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, value: e.target.value } : item))} /> : field.type === "dropdown" ? <input className="input" value={field.value} onChange={(e) => setCustomFields((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, value: e.target.value } : item))} placeholder="Selected option" /> : <input className="input" value={field.value} onChange={(e) => setCustomFields((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, value: e.target.value } : item))} />}</Field>}</div></div>)}</div></div>}
-          {tab === 7 && <div className="space-y-3"><AttachmentUploadZone onFiles={uploadFiles} isUploading={isUploading} /><div className="overflow-x-auto"><table className="table min-w-max"><thead><tr><th>Name</th><th>Size</th><th>Document Type</th><th>Description</th><th>Uploaded On</th><th>Uploaded By</th><th>Actions</th></tr></thead><tbody>{attachments.length === 0 && <tr><td colSpan={7} className="text-center text-slate-500">No attachments uploaded yet.</td></tr>}{attachments.map((a) => <tr key={a.id || a.name}><td>{a.name}</td><td>{a.size}</td><td><select className="input min-w-40" value={a.documentType || "Other"} onChange={(e) => setAttachments((current) => current.map((item) => item.id === a.id ? { ...item, documentType: e.target.value } : item))} disabled={a.saved}>{ATTACHMENT_TYPES.map((type) => <option key={type}>{type}</option>)}</select></td><td><input className="input min-w-48" value={a.description || ""} onChange={(e) => setAttachments((current) => current.map((item) => item.id === a.id ? { ...item, description: e.target.value } : item))} disabled={a.saved} /></td><td>{a.uploadedOn}</td><td>{a.uploadedBy}</td><td><Button size="sm" variant="ghost" disabled={!a.url} onClick={() => a.url && window.open(a.url, "_blank", "noopener,noreferrer")}>Download</Button> <Button size="sm" variant="danger" onClick={() => removeAttachment(a)}>Delete</Button></td></tr>)}</tbody></table></div></div>}
+          {tab === 7 && <div className="space-y-3"><AttachmentUploadZone onFiles={uploadFiles} isUploading={isUploading} /><div className="overflow-x-auto"><table className="table min-w-max"><thead><tr><th>Name</th><th>Size</th><th>Document Type</th><th>Description</th><th>Uploaded On</th><th>Uploaded By</th><th>Actions</th></tr></thead><tbody>{attachments.length === 0 && <tr><td colSpan={7} className="text-center text-slate-500">No attachments uploaded yet.</td></tr>}{attachments.map((a) => <tr key={a.id || a.name}><td>{a.name}</td><td>{a.size}</td><td><select className="input min-w-40" value={a.documentType || "Other"} onChange={(e) => setAttachments((current) => current.map((item) => item.id === a.id ? { ...item, documentType: e.target.value } : item))} disabled={a.saved}>{ATTACHMENT_TYPES.map((type) => <option key={type}>{type}</option>)}</select></td><td><input className="input min-w-48" value={a.description || ""} onChange={(e) => setAttachments((current) => current.map((item) => item.id === a.id ? { ...item, description: e.target.value } : item))} disabled={a.saved} /></td><td>{a.uploadedOn}</td><td>{a.uploadedBy}</td><td><Button size="sm" variant="ghost" disabled={!a.url && !a.file} onClick={() => openDocumentFile(a)}>Download</Button> <Button size="sm" variant="danger" onClick={() => removeAttachment(a)}>Delete</Button></td></tr>)}</tbody></table></div></div>}
         </div>
         <div className="flex flex-col gap-3 border-t border-[#e2e8f0] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
           <Button variant="ghost" onClick={goPrevious} disabled={isFirstTab || isSaving}>Previous</Button>
@@ -670,35 +761,71 @@ function AttachmentUploadZone({ onFiles, isUploading }) {
   );
 }
 
-function DocumentUploadZone({ id, title, subtitle, fileName, documentUrl, isUploading, onFiles }) {
+function DocumentUploadZone({ id, title, subtitle, documents, isUploading, onFiles, onDeleteDocument, canDelete }) {
   const handleDrop = (event) => {
     event.preventDefault();
     onFiles(event.dataTransfer.files);
   };
   return (
-    <label
-      className={`upload-zone cursor-pointer transition hover:bg-slate-100 ${isUploading ? "pointer-events-none opacity-70" : ""}`}
-      htmlFor={id}
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={handleDrop}
-    >
-      <UploadCloud className="mb-2 text-[#64748b]" size={28} />
-      <div className="text-[15px] font-extrabold text-slate-800">{isUploading ? "Uploading..." : title}</div>
-      <div className="mt-1 text-[12px] font-semibold text-slate-500">{subtitle}</div>
-      {fileName && <div className="mt-3 text-[13px] font-bold text-[#1e3a8a]">{fileName}</div>}
-      {documentUrl && <button type="button" className="mt-3 text-[12px] font-bold text-slate-600 underline" onClick={(event) => { event.preventDefault(); window.open(documentUrl, "_blank", "noopener,noreferrer"); }}>Open current file</button>}
-      <input
-        id={id}
-        name={id}
-        className="hidden"
-        type="file"
-        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
-        onChange={(event) => {
-          onFiles(event.target.files);
-          event.target.value = "";
-        }}
-      />
-    </label>
+    <div className="space-y-3">
+      <label
+        className={`upload-zone cursor-pointer transition hover:bg-slate-100 ${isUploading ? "pointer-events-none opacity-70" : ""}`}
+        htmlFor={id}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={handleDrop}
+      >
+        <UploadCloud className="mb-2 text-[#64748b]" size={28} />
+        <div className="text-[15px] font-extrabold text-slate-800">{isUploading ? "Uploading..." : title}</div>
+        <div className="mt-1 text-[12px] font-semibold text-slate-500">{subtitle}</div>
+        <div className="mt-2 text-[12px] font-semibold text-slate-500">You can upload multiple files here.</div>
+        <input
+          id={id}
+          name={id}
+          className="hidden"
+          type="file"
+          multiple
+          accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+          onChange={(event) => {
+            onFiles(event.target.files);
+            event.target.value = "";
+          }}
+        />
+      </label>
+      <DocumentList documents={documents} canDelete={canDelete} onDeleteDocument={onDeleteDocument} />
+    </div>
+  );
+}
+
+function openDocumentFile(document) {
+  if (document?.url) {
+    window.open(document.url, "_blank", "noopener,noreferrer");
+    return;
+  }
+  if (!document?.file) return;
+  const objectUrl = URL.createObjectURL(document.file);
+  window.open(objectUrl, "_blank", "noopener,noreferrer");
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+}
+
+function DocumentList({ documents, canDelete, onDeleteDocument }) {
+  if (!documents?.length) {
+    return <div className="rounded-xl border border-dashed border-slate-200 px-3 py-4 text-[12px] font-semibold text-slate-500">No files uploaded yet.</div>;
+  }
+  return (
+    <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+      {documents.map((document) => (
+        <div key={document.id || document.name} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-3 py-2">
+          <div className="min-w-0">
+            <div className="truncate text-[13px] font-bold text-slate-800">{document.name}</div>
+            <div className="text-[11px] font-semibold text-slate-500">{[document.size, document.uploadedOn, document.uploadedBy].filter(Boolean).join(" • ") || (document.saved ? "Uploaded" : "Pending save")}</div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="ghost" disabled={!document.url && !document.file} onClick={() => openDocumentFile(document)}>Open</Button>
+            {((canDelete && !document.legacy) || !document.saved) && <Button size="sm" variant="danger" onClick={() => onDeleteDocument(document)}>Delete</Button>}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 

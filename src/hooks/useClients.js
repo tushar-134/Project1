@@ -28,5 +28,6 @@ export function useClients() {
     uploadAttachment: clientService.uploadAttachment,
     uploadDocument: clientService.uploadDocument,
     deleteAttachment: clientService.deleteAttachment,
+    deleteDocument: clientService.deleteDocument,
   };
 }

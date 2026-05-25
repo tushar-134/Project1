@@ -11,6 +11,17 @@ function encrypt(value) {
   return `${iv.toString("hex")}:${encrypted.toString("hex")}`;
 }
 
+const uploadedFileSchema = new mongoose.Schema({
+  name: String,
+  size: String,
+  fileType: String,
+  documentType: String,
+  description: String,
+  url: String,
+  uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  uploadedAt: { type: Date, default: Date.now },
+}, { _id: true });
+
 // Portal passwords are encrypted before persistence because the UI treats them as operational secrets.
 const clientSchema = new mongoose.Schema({
   fileNo: { type: String, unique: true },
@@ -30,6 +41,7 @@ const clientSchema = new mongoose.Schema({
     issueDate: Date,
     expiryDate: Date,
     documentUrl: String,
+    documents: [uploadedFileSchema],
   }],
   contactPersons: [{
     fullName: String,
@@ -39,8 +51,8 @@ const clientSchema = new mongoose.Schema({
     alternateEmail: String,
     mobile: { countryCode: String, number: String },
     isPrimary: { type: Boolean, default: false },
-    emiratesId: { number: String, issueDate: Date, expiryDate: Date, frontDocumentUrl: String, backDocumentUrl: String },
-    passport: { number: String, issuingCountry: String, issueDate: Date, expiryDate: Date, documentUrl: String },
+    emiratesId: { number: String, issueDate: Date, expiryDate: Date, frontDocumentUrl: String, backDocumentUrl: String, frontDocuments: [uploadedFileSchema], backDocuments: [uploadedFileSchema] },
+    passport: { number: String, issuingCountry: String, issueDate: Date, expiryDate: Date, documentUrl: String, documents: [uploadedFileSchema] },
   }],
   vatDetails: {
     trn: String,
@@ -70,16 +82,7 @@ const clientSchema = new mongoose.Schema({
       options: [String],
     }],
   },
-  attachments: [{
-    name: String,
-    size: String,
-    fileType: String,
-    documentType: String,
-    description: String,
-    url: String,
-    uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-    uploadedAt: { type: Date, default: Date.now },
-  }],
+  attachments: [uploadedFileSchema],
   isActive: { type: Boolean, default: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 }, { timestamps: true });

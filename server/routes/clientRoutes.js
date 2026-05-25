@@ -16,8 +16,9 @@ router.get("/:id", ctrl.getClient);
 router.put("/:id", adminManager, ctrl.updateClient);
 router.delete("/:id", adminOnly, ctrl.deleteClient);
 // Bug #5 Fix: add adminManager guard so task_only users cannot upload attachments.
-router.post("/:id/documents", adminManager, upload.single("file"), ctrl.uploadClientDocument);
-router.post("/:id/attachments", adminManager, upload.single("file"), ctrl.uploadAttachment);
+router.post("/:id/documents", adminManager, upload.fields([{ name: "file", maxCount: 10 }, { name: "files", maxCount: 10 }]), ctrl.uploadClientDocument);
+router.delete("/:id/documents/:section/:index/:documentId", adminOnly, ctrl.deleteClientDocument);
+router.post("/:id/attachments", adminManager, upload.fields([{ name: "file", maxCount: 10 }, { name: "files", maxCount: 10 }]), ctrl.uploadAttachment);
 router.delete("/:id/attachments/:attachId", adminManager, ctrl.deleteAttachment);
 
 module.exports = router;
