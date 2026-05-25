@@ -9,6 +9,7 @@ import { canCreateClients, canManageClients } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
+import ClientDrawer from "../ui/ClientDrawer.jsx";
 import Table from "../ui/Table.jsx";
 
 const EMPTY_COLUMN_FILTERS = {
@@ -23,6 +24,7 @@ export default function ClientList() {
   const { fetchClients, deleteClient, exportClients } = useClients();
   const [query, setQuery] = useState("");
   const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
+  const [drawerClientId, setDrawerClientId] = useState(null);
   const canManage = canManageClients(currentUser?.role);
   const canCreate = canCreateClients(currentUser?.role);
 
@@ -145,7 +147,14 @@ export default function ClientList() {
             {rows.map((client) => (
               <tr key={client.id}>
                 <td>
-                  <div className="font-extrabold">{client.name}</div>
+                  <button
+                    type="button"
+                    className="task-id-link font-extrabold text-left"
+                    onClick={() => setDrawerClientId(client.id)}
+                    title="Open client details"
+                  >
+                    {client.name}
+                  </button>
                   <div className="mt-1 flex flex-wrap gap-2">
                     <span className="text-[12px] font-semibold text-slate-500">{client.jurisdiction}</span>
                     <Badge color={client.type === "Legal Person" ? "bg-blue-50 text-[#1e3a8a]" : "bg-emerald-50 text-[#059669]"}>
@@ -195,6 +204,7 @@ export default function ClientList() {
           </tbody>
         </Table>
       </Card>
+      {drawerClientId && <ClientDrawer clientId={drawerClientId} onClose={() => setDrawerClientId(null)} />}
     </div>
   );
 }
