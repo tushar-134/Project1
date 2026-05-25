@@ -1,4 +1,4 @@
-import { Activity, Clock, Download, FileText, ListChecks, User, Users } from "lucide-react";
+import { Activity, Clock, Download, FileText, ListChecks, User, Users, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../../context/AppContext.jsx";
 import { reportService } from "../../services/reportService";
@@ -77,6 +77,90 @@ const asText = (value) => {
   return "-";
 };
 
+function ClientTaskDrawer({ detail, loading, onClose }) {
+  if (!detail && !loading) return null;
+
+  return (
+    <>
+      <button
+        type="button"
+        className="fixed inset-0 z-40 bg-slate-950/30 backdrop-blur-[1px]"
+        onClick={onClose}
+        aria-label="Close client task report"
+      />
+      <aside className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[680px] flex-col border-l border-[#dbe4f0] bg-[#f8fbff] shadow-[-24px_0_60px_rgba(15,23,42,0.16)]">
+        <div className="flex items-center justify-between border-b border-[#e2e8f0] bg-white px-5 py-4">
+          <div>
+            <div className="page-kicker">Client Report</div>
+            <div className="mt-1 text-[18px] font-black text-slate-900">{detail?.client?.legalName || "Loading client"}</div>
+            <div className="text-[12px] font-semibold text-slate-500">{detail?.client?.fileNo || "Task activity for this client"}</div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="grid h-10 w-10 place-items-center rounded-xl border border-[#dbe4f0] bg-slate-50 text-slate-500 transition hover:bg-slate-100"
+            aria-label="Close client task drawer"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-5">
+          {loading ? (
+            <Card className="p-8 text-center text-[14px] font-semibold text-slate-500">Loading client tasks...</Card>
+          ) : !detail?.items?.length ? (
+            <Card className="p-8 text-center text-[14px] font-semibold text-slate-500">No tasks found for this client in the selected date range.</Card>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Card className="p-4">
+                  <div className="text-[11px] font-black uppercase tracking-wider text-slate-400">Client</div>
+                  <div className="mt-1 text-[14px] font-extrabold text-slate-900">{detail.client?.legalName || "-"}</div>
+                </Card>
+                <Card className="p-4">
+                  <div className="text-[11px] font-black uppercase tracking-wider text-slate-400">File No</div>
+                  <div className="mt-1 text-[14px] font-extrabold text-slate-900">{detail.client?.fileNo || "-"}</div>
+                </Card>
+                <Card className="p-4">
+                  <div className="text-[11px] font-black uppercase tracking-wider text-slate-400">Tasks</div>
+                  <div className="mt-1 text-[14px] font-extrabold text-slate-900">{detail.total ?? detail.items.length}</div>
+                </Card>
+              </div>
+
+              <Card>
+                <Table>
+                  <thead>
+                    <tr>
+                      <th>Task ID</th>
+                      <th>Task Name</th>
+                      <th>Status</th>
+                      <th>User</th>
+                      <th>Last Action</th>
+                      <th>Last Updated</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detail.items.map((task) => (
+                      <tr key={task._id}>
+                        <td className="font-extrabold text-[#1e3a8a]">{task.taskId || "-"}</td>
+                        <td>{task.taskType || "-"}</td>
+                        <td>{formatStatus(task.status)}</td>
+                        <td>{task.performedBy?.name || task.assignedTo?.name || "-"}</td>
+                        <td>{task.latestAction || "-"}</td>
+                        <td>{formatDateTime(task.latestActionAt || task.updatedAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </Table>
+              </Card>
+            </div>
+          )}
+        </div>
+      </aside>
+    </>
+  );
+}
+
 const reportColumns = {
   "login-activity": [
     ["Name", (row) => row.name || "-"],
@@ -152,6 +236,8 @@ export default function Reports() {
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [rangeError, setRangeError] = useState("");
+  const [clientTaskDetail, setClientTaskDetail] = useState(null);
+  const [clientTaskLoading, setClientTaskLoading] = useState(false);
   const columns = useMemo(() => reportColumns[activeReport] || reportColumns["task-activity"], [activeReport]);
 
   const loadReport = (report = activeReport, nextPage = page, nextRange = range) => {
@@ -169,6 +255,7 @@ export default function Reports() {
   const selectReport = (report) => {
     setActiveReport(report);
     setPage(1);
+    setClientTaskDetail(null);
     loadReport(report, 1);
   };
 
@@ -200,6 +287,17 @@ export default function Reports() {
       .then((blob) => downloadBlob(blob, `${activeReport}-${range.startDate}-to-${range.endDate}.csv`))
       .catch(() => {})
       .finally(() => setDownloading(false));
+  };
+
+  const openClientTaskDetail = (row) => {
+    const clientId = row?.client?._id;
+    if (!clientId) return;
+    setClientTaskLoading(true);
+    setClientTaskDetail({ client: row.client, items: [], total: row.total || 0 });
+    reportService.clientTaskDetail(clientId, range)
+      .then((data) => setClientTaskDetail(data))
+      .catch(() => setClientTaskDetail({ client: row.client, items: [], total: 0 }))
+      .finally(() => setClientTaskLoading(false));
   };
 
   useEffect(() => {
@@ -255,7 +353,19 @@ export default function Reports() {
             {state.activity.map((row, index) => (
               <tr key={row._id || `${activeReport}-${index}`}>
                 {columns.map(([label, render], cellIndex) => (
-                  <td key={label} className={cellIndex === 0 ? "font-extrabold text-[#1e3a8a]" : ""}>{asText(render(row))}</td>
+                  <td key={label} className={cellIndex === 0 ? "font-extrabold text-[#1e3a8a]" : ""}>
+                    {activeReport === "client-wise" && label === "Client" && row.client?._id ? (
+                      <button
+                        type="button"
+                        className="font-extrabold text-[#1e3a8a] underline-offset-4 hover:underline"
+                        onClick={() => openClientTaskDetail(row)}
+                      >
+                        {asText(render(row))}
+                      </button>
+                    ) : (
+                      asText(render(row))
+                    )}
+                  </td>
                 ))}
               </tr>
             ))}
@@ -275,6 +385,7 @@ export default function Reports() {
           </div>
         </div>
       </Card>
+      <ClientTaskDrawer detail={clientTaskDetail} loading={clientTaskLoading} onClose={() => setClientTaskDetail(null)} />
     </div>
   );
 }
