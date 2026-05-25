@@ -621,6 +621,17 @@ export default function AddClient() {
       }
     }
     const shouldValidateContacts = !continueToNext || tab >= 2;
+    const shouldValidateTradeLicences = !continueToNext || tab >= 1;
+    if (shouldValidateTradeLicences) {
+      const missingLicenceNumberWithFilesIndex = licences.findIndex((licence) =>
+        !String(licence.number || "").trim() &&
+        (licence.documents || []).some((document) => document?.file || document?.url),
+      );
+      if (missingLicenceNumberWithFilesIndex >= 0) {
+        toast.error(`Trade licence ${missingLicenceNumberWithFilesIndex + 1}: licence number is required before uploading documents.`);
+        return false;
+      }
+    }
     if (shouldValidateContacts) {
       const emiratesIdPattern = /^\d{3}-\d{4}-\d{7}-\d$/;
       const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -671,6 +682,11 @@ export default function AddClient() {
     try {
       const includeTradeLicences = !continueToNext || tab >= 1;
       const includeContactPersons = !continueToNext || tab >= 2;
+      const preparedTradeLicences = includeTradeLicences
+        ? licences
+          .map((licence, originalIndex) => ({ licence, originalIndex }))
+          .filter(({ licence }) => String(licence.number || "").trim())
+        : [];
       // The screen state is intentionally tab-oriented and user-friendly; this transform is
       // where we fold it back into the nested API contract expected by the Mongo model.
       const payload = {
@@ -694,16 +710,15 @@ export default function AddClient() {
         payload.ctDetails = { tin: form.ctTin, status: form.ctStatus === "Registered" ? "registered" : form.ctStatus === "Pending" ? "applying" : "not_registered", registrationDate: form.ctDate, financialYearEnd: form.fye };
       }
       if (includeTradeLicences) {
-        payload.tradeLicences = licences
-          .filter((l) => String(l.number || "").trim())
-          .map((l) => ({
-            licenceNumber: l.number,
-            issueDate: l.issue,
-            expiryDate: l.expiry,
-            issuingAuthority: l.authority,
-            licenceType: l.type?.toLowerCase() || "commercial",
-            officialEmail: l.email,
-            documentUrl: l.documentUrl || undefined,
+        payload.tradeLicences = preparedTradeLicences
+          .map(({ licence }) => ({
+            licenceNumber: licence.number,
+            issueDate: licence.issue,
+            expiryDate: licence.expiry,
+            issuingAuthority: licence.authority,
+            licenceType: licence.type?.toLowerCase() || "commercial",
+            officialEmail: licence.email,
+            documentUrl: licence.documentUrl || undefined,
           }));
       }
       if (includeContactPersons) {
@@ -736,8 +751,8 @@ export default function AddClient() {
         ? attachments.filter((attachment) => !attachment.saved && attachment.file)
         : [];
       const pendingLicenceDocuments = includeTradeLicences
-        ? licences
-          .map((licence, index) => ({ index, files: (licence.documents || []).filter((document) => !document.saved && document.file).map((document) => document.file) }))
+        ? preparedTradeLicences
+          .map(({ licence }, index) => ({ index, files: (licence.documents || []).filter((document) => !document.saved && document.file).map((document) => document.file) }))
           .filter((item) => item.files.length)
         : [];
       const pendingContactDocuments = includeContactPersons
