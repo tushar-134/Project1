@@ -1,5 +1,5 @@
-import { Download, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Download, RefreshCw, Search, SlidersHorizontal, X } from "lucide-react";
+import { useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -13,15 +13,10 @@ import Card from "../ui/Card.jsx";
 import Table from "../ui/Table.jsx";
 import TaskDrawer from "../ui/TaskDrawer.jsx";
 
-// BRD 5.4 — all four statuses; "Submitted to FTA" is gated to FTA-tracked tasks only
-// Order: Not Yet Started → WIP → Submitted to FTA → Completed
 const ALL_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed"];
-const BASE_STATUSES = ["Not Yet Started", "WIP", "Completed"]; // for non-FTA tasks
 const FILTER_STATUSES = ["All", "Not Yet Started", "WIP", "Submitted to FTA", "Completed"];
-// Category order for stable display
 const CAT_ORDER = ["VAT", "Corporate Tax", "Audit", "Accounting", "MIS Reporting", "E-Invoicing", "VAT Refund", "Other"];
 
-// Colour map for the status pill shown in read-only states
 const STATUS_PILL = {
   "Not Yet Started": { bg: "bg-slate-100", text: "text-slate-600" },
   WIP: { bg: "bg-blue-50", text: "text-blue-700" },
@@ -29,18 +24,47 @@ const STATUS_PILL = {
   "Submitted to FTA": { bg: "bg-purple-50", text: "text-purple-700" },
 };
 
-const EMPTY_COLUMN_FILTERS = {
-  taskId: "",
-  client: "",
-  category: "",
-  type: "",
-  dueDate: "",
-  assigned: "",
-  status: "",
-  recurring: "",
-};
+function createEmptyColumnFilters() {
+  return {
+    taskId: "",
+    client: "",
+    category: "",
+    type: "",
+    dueDate: "",
+    assigned: "",
+    status: "",
+    recurring: "",
+  };
+}
 
-/** Read-only coloured pill used when the user cannot change a status */
+function getCurrentMonthValue() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
+function normalizeText(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function sortStrings(values) {
+  return [...new Set(values.filter(Boolean))].sort((left, right) => String(left).localeCompare(String(right)));
+}
+
+function buildActiveColumnFilterSummary(filters) {
+  return [
+    filters.taskId ? `Task ID: ${filters.taskId}` : null,
+    filters.client ? `Client: ${filters.client}` : null,
+    filters.category ? `Category: ${filters.category}` : null,
+    filters.type ? `Task Type: ${filters.type}` : null,
+    filters.dueDate ? `Due Date: ${filters.dueDate}` : null,
+    filters.assigned ? `Assigned: ${filters.assigned}` : null,
+    filters.status ? `Status: ${filters.status}` : null,
+    filters.recurring ? `Recurring: ${filters.recurring === "recurring" ? "Recurring" : "One-time"}` : null,
+  ].filter(Boolean);
+}
+
 function StatusPill({ status }) {
   const { bg, text } = STATUS_PILL[status] || { bg: "bg-slate-100", text: "text-slate-500" };
   return (
@@ -49,35 +73,41 @@ function StatusPill({ status }) {
     </span>
   );
 }
+
 export default function TaskList() {
   const { state } = useApp();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { fetchTasks, updateStatus, updateAssignee, exportTasks } = useTasks();
+  const initialMonth = searchParams.get("month") || getCurrentMonthValue();
   const [cat, setCat] = useState(searchParams.get("category") || "All");
   const [status, setStatus] = useState("All");
   const [scope, setScope] = useState("By Month");
-  const [month, setMonth] = useState(searchParams.get("month") || "2026-05");
+  const [month, setMonth] = useState(initialMonth);
   const [drawerTaskId, setDrawerTaskId] = useState(null);
-  const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
+  const [columnFilters, setColumnFilters] = useState(() => createEmptyColumnFilters());
+  const deferredColumnFilters = useDeferredValue(columnFilters);
 
   const canManage = canManageTasks(currentUser?.role);
   const isTaskOnly = currentUser?.role === "task_only";
   const { fetchUsers } = useUsers();
+  const tasksLoading = Boolean(state.loading.tasks);
+  const taskError = state.errors.tasks;
 
-  // Load users list for the inline assignee dropdown
-  useEffect(() => { if (canManage) fetchUsers().catch(() => { }); }, [canManage]);
+  useEffect(() => {
+    if (canManage) fetchUsers().catch(() => {});
+  }, [canManage]);
 
-  // Keep a ref to current filter params so refetch after status-change always uses fresh values.
   const filterRef = useRef({});
-  filterRef.current = { category: cat, status, month: scope === "By Month" ? month : undefined, overdue: scope === "Overdue" ? "true" : undefined };
+  filterRef.current = {
+    category: cat,
+    status,
+    month: scope === "By Month" ? month : undefined,
+    overdue: scope === "Overdue" ? "true" : undefined,
+  };
 
-  const refetchTasks = useCallback(() => fetchTasks(filterRef.current).catch(() => { }), [fetchTasks]);
-
-  // Track which categories actually have tasks in the current scope/month.
-  // We update this only when fetching with category=All so the filter buttons
-  // don't disappear when the user drills into a specific category.
+  const refetchTasks = useCallback(() => fetchTasks(filterRef.current).catch(() => {}), [fetchTasks]);
   const [availableCats, setAvailableCats] = useState(["All"]);
 
   useEffect(() => {
@@ -85,31 +115,57 @@ export default function TaskList() {
     fetchTasks(params)
       .then((tasks) => {
         if (cat === "All") {
-          // Derive unique categories from actual tasks, in canonical order
-          const found = new Set(tasks.map((t) => t.category));
-          const ordered = ["All", ...CAT_ORDER.filter((c) => found.has(c))];
-          setAvailableCats(ordered);
+          const found = new Set(tasks.map((task) => task.category));
+          setAvailableCats(["All", ...CAT_ORDER.filter((category) => found.has(category))]);
         }
       })
-      .catch(() => { });
+      .catch(() => {});
   }, [cat, status, scope, month]);
 
-  const taskMatches = (value, filter) => String(value || "").toLowerCase().includes(String(filter || "").toLowerCase().trim());
-  const filterOptions = (key) => [...new Set(state.tasks.map((task) => task[key]).filter(Boolean))].sort();
-  const hasColumnFilters = Object.values(columnFilters).some(Boolean);
-  const updateColumnFilter = (key, value) => setColumnFilters((current) => ({ ...current, [key]: value }));
+  const categoryOptions = sortStrings(state.tasks.map((task) => task.category));
+  const typeOptions = sortStrings(state.tasks.map((task) => task.type));
+  const assigneeOptions = sortStrings(state.tasks.map((task) => task.assigned));
+  const clientSuggestions = sortStrings(state.tasks.map((task) => task.client));
+
   const rows = state.tasks.filter((task) => {
-    if (!taskMatches(task.taskId, columnFilters.taskId)) return false;
-    if (!taskMatches(task.client, columnFilters.client)) return false;
-    if (columnFilters.category && task.category !== columnFilters.category) return false;
-    if (!taskMatches(task.type, columnFilters.type)) return false;
-    if (!taskMatches(task.dueDate, columnFilters.dueDate)) return false;
-    if (!taskMatches(task.assigned, columnFilters.assigned)) return false;
-    if (columnFilters.status && task.status !== columnFilters.status) return false;
-    if (columnFilters.recurring === "recurring" && !task.recurring) return false;
-    if (columnFilters.recurring === "one-time" && task.recurring) return false;
+    if (deferredColumnFilters.taskId && !normalizeText(task.taskId).includes(normalizeText(deferredColumnFilters.taskId))) return false;
+    if (deferredColumnFilters.client && !normalizeText(task.client).includes(normalizeText(deferredColumnFilters.client))) return false;
+    if (deferredColumnFilters.category && task.category !== deferredColumnFilters.category) return false;
+    if (deferredColumnFilters.type && task.type !== deferredColumnFilters.type) return false;
+    if (deferredColumnFilters.dueDate && task.dueDate !== deferredColumnFilters.dueDate) return false;
+    if (deferredColumnFilters.assigned && task.assigned !== deferredColumnFilters.assigned) return false;
+    if (deferredColumnFilters.status && task.status !== deferredColumnFilters.status) return false;
+    if (deferredColumnFilters.recurring === "recurring" && !task.recurring) return false;
+    if (deferredColumnFilters.recurring === "one-time" && task.recurring) return false;
     return true;
   });
+
+  const activeColumnFilters = buildActiveColumnFilterSummary(columnFilters);
+  const activeTopFilterCount =
+    (cat !== "All" ? 1 : 0) +
+    (status !== "All" ? 1 : 0) +
+    (scope !== "By Month" ? 1 : 0) +
+    (scope === "By Month" && month !== initialMonth ? 1 : 0);
+  const activeFilterCount = activeTopFilterCount + activeColumnFilters.length;
+  const hasColumnFilters = activeColumnFilters.length > 0;
+  const hasActiveFilters = activeFilterCount > 0;
+
+  const updateColumnFilter = (key, value) => {
+    setColumnFilters((current) => ({ ...current, [key]: value }));
+  };
+
+  const clearColumnFilters = () => {
+    setColumnFilters(createEmptyColumnFilters());
+  };
+
+  const resetAllFilters = () => {
+    setCat("All");
+    setStatus("All");
+    setScope("By Month");
+    setMonth(initialMonth);
+    setColumnFilters(createEmptyColumnFilters());
+  };
+
   const exportCsv = async () =>
     downloadBlob(
       await exportTasks({
@@ -118,7 +174,7 @@ export default function TaskList() {
         month: scope === "By Month" ? month : undefined,
         overdue: scope === "Overdue" ? "true" : undefined,
       }),
-      "tasks.csv"
+      "tasks.csv",
     );
 
   return (
@@ -136,36 +192,224 @@ export default function TaskList() {
         )}
       </div>
 
-      <Filter label="Category" items={availableCats} value={cat} setValue={setCat} />
-      <Filter label="Status" items={FILTER_STATUSES} value={status} setValue={setStatus} />
+      <Card className="overflow-hidden">
+        <div className="task-list-toolbar border-b border-slate-200 px-4 py-4 sm:px-5">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-2xl">
+              <div className="flex items-center gap-2 text-[14px] font-extrabold text-slate-900">
+                <SlidersHorizontal size={16} className="text-[#1e3a8a]" />
+                Filter and review tasks
+              </div>
+              <p className="mt-1 text-[12px] font-medium text-slate-500">
+                Every visible column has its own filter now, so you can narrow the list quickly without hunting inside the table.
+              </p>
+            </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Filter label="Scope" items={["By Month", "Overdue", "All"]} value={scope} setValue={setScope} compact />
-        <input
-          id="task-list-month"
-          name="taskListMonth"
-          className="input w-40"
-          type="month"
-          value={month}
-          onChange={(e) => setMonth(e.target.value)}
-        />
-        {hasColumnFilters && (
-          <Button variant="ghost" onClick={() => setColumnFilters(EMPTY_COLUMN_FILTERS)}>
-            <X size={16} />
-            Clear column filters
-          </Button>
-        )}
-      </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <InfoPill tone="navy" label={`${rows.length} shown`} />
+              <InfoPill tone="slate" label={`${state.tasks.length} loaded`} />
+              {tasksLoading && <InfoPill tone="amber" label="Refreshing" />}
+              {hasActiveFilters && <InfoPill tone="blue" label={`${activeFilterCount} active filters`} />}
+            </div>
+          </div>
 
-      {/* BRD 5.4 role note */}
+          <div className="mt-4 space-y-3">
+            <FilterChips label="Category" items={availableCats} value={cat} setValue={setCat} />
+            <FilterChips label="Status" items={FILTER_STATUSES} value={status} setValue={setStatus} />
+
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(220px,auto)_auto] lg:items-end">
+              <FilterChips label="Scope" items={["By Month", "Overdue", "All"]} value={scope} setValue={setScope} compact />
+
+              <label htmlFor="task-list-month" className={`task-list-field ${scope !== "By Month" ? "opacity-60" : ""}`}>
+                <span className="task-list-field-label">Month</span>
+                <input
+                  id="task-list-month"
+                  name="taskListMonth"
+                  className="input"
+                  type="month"
+                  value={month}
+                  disabled={scope !== "By Month"}
+                  onChange={(event) => setMonth(event.target.value)}
+                />
+              </label>
+
+              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                <Button variant="ghost" size="sm" onClick={refetchTasks} disabled={tasksLoading}>
+                  <RefreshCw size={15} className={tasksLoading ? "animate-spin" : ""} />
+                  Refresh
+                </Button>
+                {hasColumnFilters && (
+                  <Button variant="ghost" size="sm" onClick={clearColumnFilters}>
+                    <X size={15} />
+                    Clear columns
+                  </Button>
+                )}
+                {hasActiveFilters && (
+                  <Button variant="ghost" size="sm" onClick={resetAllFilters}>
+                    Reset all
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-4 py-4 sm:px-5">
+          <div className="task-list-column-grid">
+            <FilterField label="Task ID" htmlFor="task-filter-id">
+              <div className="task-list-input-wrap">
+                <Search size={14} className="task-list-input-icon" aria-hidden="true" />
+                <input
+                  id="task-filter-id"
+                  className="input"
+                  type="search"
+                  placeholder="Search ID"
+                  value={columnFilters.taskId}
+                  onChange={(event) => updateColumnFilter("taskId", event.target.value)}
+                />
+              </div>
+            </FilterField>
+
+            <FilterField label="Client" htmlFor="task-filter-client">
+              <div className="task-list-input-wrap">
+                <Search size={14} className="task-list-input-icon" aria-hidden="true" />
+                <input
+                  id="task-filter-client"
+                  className="input"
+                  type="search"
+                  list="task-client-suggestions"
+                  placeholder="Search client"
+                  value={columnFilters.client}
+                  onChange={(event) => updateColumnFilter("client", event.target.value)}
+                />
+              </div>
+              <datalist id="task-client-suggestions">
+                {clientSuggestions.map((client) => (
+                  <option key={client} value={client} />
+                ))}
+              </datalist>
+            </FilterField>
+
+            <FilterField label="Category" htmlFor="task-filter-category">
+              <select
+                id="task-filter-category"
+                className="input"
+                value={columnFilters.category}
+                onChange={(event) => updateColumnFilter("category", event.target.value)}
+              >
+                <option value="">All categories</option>
+                {categoryOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </FilterField>
+
+            <FilterField label="Task Type" htmlFor="task-filter-type">
+              <select
+                id="task-filter-type"
+                className="input"
+                value={columnFilters.type}
+                onChange={(event) => updateColumnFilter("type", event.target.value)}
+              >
+                <option value="">All task types</option>
+                {typeOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </FilterField>
+
+            <FilterField label="Due Date" htmlFor="task-filter-due-date">
+              <input
+                id="task-filter-due-date"
+                className="input"
+                type="date"
+                value={columnFilters.dueDate}
+                onChange={(event) => updateColumnFilter("dueDate", event.target.value)}
+              />
+            </FilterField>
+
+            <FilterField label="Assigned" htmlFor="task-filter-assigned">
+              <select
+                id="task-filter-assigned"
+                className="input"
+                value={columnFilters.assigned}
+                onChange={(event) => updateColumnFilter("assigned", event.target.value)}
+              >
+                <option value="">All assignees</option>
+                {assigneeOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </FilterField>
+
+            <FilterField label="Status" htmlFor="task-filter-status">
+              <select
+                id="task-filter-status"
+                className="input"
+                value={columnFilters.status}
+                onChange={(event) => updateColumnFilter("status", event.target.value)}
+              >
+                <option value="">All statuses</option>
+                {FILTER_STATUSES.filter((option) => option !== "All").map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </FilterField>
+
+            <FilterField label="Recurring" htmlFor="task-filter-recurring">
+              <select
+                id="task-filter-recurring"
+                className="input"
+                value={columnFilters.recurring}
+                onChange={(event) => updateColumnFilter("recurring", event.target.value)}
+              >
+                <option value="">All tasks</option>
+                <option value="recurring">Recurring</option>
+                <option value="one-time">One-time</option>
+              </select>
+            </FilterField>
+          </div>
+
+          {hasColumnFilters && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {activeColumnFilters.map((item) => (
+                <span key={item} className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-600">
+                  {item}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </Card>
+
       {isTaskOnly && (
         <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-2.5 text-[12px] font-medium text-blue-700">
           You can update status only for tasks assigned to you.
         </div>
       )}
 
-      <Card>
-        <Table>
+      <Card className="overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-5">
+          <div>
+            <div className="text-[14px] font-extrabold text-slate-900">Showing {rows.length} task{rows.length === 1 ? "" : "s"}</div>
+            <div className="text-[12px] font-medium text-slate-500">
+              {tasksLoading ? "Task list is updating with your latest filters." : hasActiveFilters ? `Filtered from ${state.tasks.length} loaded tasks.` : "All loaded tasks are visible."}
+            </div>
+          </div>
+          <div className="text-[12px] font-semibold text-slate-500">
+            Click a task ID to open details
+          </div>
+        </div>
+
+        <Table className="task-list-table">
           <thead>
             <tr>
               <th>Task ID</th>
@@ -177,109 +421,54 @@ export default function TaskList() {
               <th>Status</th>
               <th>Recurring</th>
             </tr>
-            <tr>
-              <th>
-                <input
-                  aria-label="Filter by task ID"
-                  className="input h-8 min-w-28"
-                  type="search"
-                  value={columnFilters.taskId}
-                  onChange={(e) => updateColumnFilter("taskId", e.target.value)}
-                />
-              </th>
-              <th>
-                <input
-                  aria-label="Filter by client"
-                  className="input h-8 min-w-36"
-                  type="search"
-                  value={columnFilters.client}
-                  onChange={(e) => updateColumnFilter("client", e.target.value)}
-                />
-              </th>
-              <th>
-                <select
-                  aria-label="Filter by category"
-                  className="input h-8 min-w-36"
-                  value={columnFilters.category}
-                  onChange={(e) => updateColumnFilter("category", e.target.value)}
-                >
-                  <option value="">All</option>
-                  {filterOptions("category").map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              </th>
-              <th>
-                <input
-                  aria-label="Filter by task type"
-                  className="input h-8 min-w-36"
-                  type="search"
-                  value={columnFilters.type}
-                  onChange={(e) => updateColumnFilter("type", e.target.value)}
-                />
-              </th>
-              <th>
-                <input
-                  aria-label="Filter by due date"
-                  className="input h-8 min-w-32"
-                  type="search"
-                  value={columnFilters.dueDate}
-                  onChange={(e) => updateColumnFilter("dueDate", e.target.value)}
-                />
-              </th>
-              <th>
-                <input
-                  aria-label="Filter by assignee"
-                  className="input h-8 min-w-36"
-                  type="search"
-                  value={columnFilters.assigned}
-                  onChange={(e) => updateColumnFilter("assigned", e.target.value)}
-                />
-              </th>
-              <th>
-                <select
-                  aria-label="Filter by status"
-                  className="input h-8 min-w-40"
-                  value={columnFilters.status}
-                  onChange={(e) => updateColumnFilter("status", e.target.value)}
-                >
-                  <option value="">All</option>
-                  {FILTER_STATUSES.filter((option) => option !== "All").map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              </th>
-              <th>
-                <select
-                  aria-label="Filter by recurring"
-                  className="input h-8 min-w-32"
-                  value={columnFilters.recurring}
-                  onChange={(e) => updateColumnFilter("recurring", e.target.value)}
-                >
-                  <option value="">All</option>
-                  <option value="recurring">Recurring</option>
-                  <option value="one-time">One-time</option>
-                </select>
-              </th>
-            </tr>
           </thead>
           <tbody>
-            {!rows.length && (
+            {tasksLoading && state.tasks.length === 0 && (
+              <LoadingRows />
+            )}
+
+            {!tasksLoading && taskError && (
               <tr>
-                <td colSpan={8} className="py-8 text-center font-semibold text-slate-500">
-                  No tasks match the selected filters.
+                <td colSpan={8} className="px-4 py-10">
+                  <div className="rounded-2xl border border-red-100 bg-red-50 px-5 py-5 text-center">
+                    <div className="text-[14px] font-extrabold text-red-700">Unable to load tasks</div>
+                    <div className="mt-1 text-[12px] font-medium text-red-600">{taskError}</div>
+                    <div className="mt-4">
+                      <Button variant="ghost" size="sm" onClick={refetchTasks}>
+                        <RefreshCw size={15} />
+                        Try again
+                      </Button>
+                    </div>
+                  </div>
                 </td>
               </tr>
             )}
-            {rows.map((task) => {
-              // BRD 5.4: task_only can only change status for tasks assigned to them
+
+            {!tasksLoading && !taskError && !rows.length && (
+              <tr>
+                <td colSpan={8} className="px-4 py-10">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-6 text-center">
+                    <div className="text-[14px] font-extrabold text-slate-900">No tasks match the current view</div>
+                    <div className="mt-1 text-[12px] font-medium text-slate-500">
+                      Adjust a column filter or reset the task view to bring more rows back in.
+                    </div>
+                    {hasActiveFilters && (
+                      <div className="mt-4">
+                        <Button variant="ghost" size="sm" onClick={resetAllFilters}>
+                          Reset all filters
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            )}
+
+            {!taskError && rows.map((task) => {
               const canChangeStatus =
                 canManage ||
                 (isTaskOnly && String(task.assignedId) === String(currentUser?._id || currentUser?.id));
               const isStatusLocked = task.ftaStatus === "approved" || task.status === "Completed";
-
-              // BRD 5.4: "Submitted to FTA" available for all tasks — backend auto-routes to FTA Tracker
-              const availableStatuses = ALL_STATUSES;
 
               return (
                 <tr key={task.id}>
@@ -307,19 +496,21 @@ export default function TaskList() {
                   </td>
                   <td>
                     {canManage ? (
-                      // Admin/Manager: inline assignee dropdown
                       <select
                         id={`task-assignee-${task.id}`}
                         className="input h-8 min-w-36"
                         value={task.assignedId || ""}
-                        onChange={(e) => {
-                          const selected = state.users.find((u) => u._id === e.target.value || u.id === e.target.value);
-                          updateAssignee(task.id, e.target.value || null, selected?.name || "Unassigned").catch(() => fetchTasks());
+                        onChange={(event) => {
+                          const selected = state.users.find((user) => user._id === event.target.value || user.id === event.target.value);
+                          updateAssignee(task.id, event.target.value || null, selected?.name || "Unassigned")
+                            .catch(() => refetchTasks());
                         }}
                       >
                         <option value="">Unassigned</option>
-                        {state.users.map((u) => (
-                          <option key={u._id || u.id} value={u._id || u.id}>{u.name}</option>
+                        {state.users.map((user) => (
+                          <option key={user._id || user.id} value={user._id || user.id}>
+                            {user.name}
+                          </option>
                         ))}
                       </select>
                     ) : (
@@ -332,28 +523,28 @@ export default function TaskList() {
                         id={`task-status-${task.id}`}
                         name={`taskStatus${task.id}`}
                         className="input h-8 min-w-40"
-                        // Use displayStatus when available (set by optimistic update) so the
-                        // select doesn't revert to the first option while the API request is in flight.
                         value={task.displayStatus ?? task.status}
-                        onChange={(e) =>
-                          // Always re-fetch after update (success or fail) to guarantee DB sync.
-                          updateStatus(task.id, e.target.value).then(() => refetchTasks()).catch(() => refetchTasks())
+                        onChange={(event) =>
+                          updateStatus(task.id, event.target.value)
+                            .then(() => refetchTasks())
+                            .catch(() => refetchTasks())
                         }
                       >
-                        {availableStatuses.map((s) => (
-                          <option key={s}>{s}</option>
+                        {ALL_STATUSES.map((item) => (
+                          <option key={item}>{item}</option>
                         ))}
                       </select>
                     ) : (
-                      // BRD 5.4: task_only sees a locked pill for tasks not assigned to them
                       <StatusPill status={task.status} />
                     )}
                   </td>
                   <td>
-                    {task.recurring && (
+                    {task.recurring ? (
                       <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-extrabold text-[#1e3a8a]">
                         Recurring
                       </span>
+                    ) : (
+                      <span className="text-[12px] font-semibold text-slate-500">One-time</span>
                     )}
                   </td>
                 </tr>
@@ -370,20 +561,56 @@ export default function TaskList() {
   );
 }
 
-function Filter({ label, items, value, setValue, compact }) {
+function FilterChips({ label, items, value, setValue, compact = false }) {
   return (
-    <div className={`flex flex-wrap items-center gap-2 ${compact ? "" : "rounded-xl border border-[#e2e8f0] bg-white p-3"}`}>
-      <span className="mr-1 text-[11px] font-extrabold uppercase text-slate-500">{label}</span>
+    <div className={`flex flex-wrap items-center gap-2 ${compact ? "" : ""}`}>
+      <span className="mr-1 text-[11px] font-extrabold uppercase tracking-[0.08em] text-slate-500">{label}</span>
       {items.map((item) => (
         <button
           key={item}
+          type="button"
           onClick={() => setValue(item)}
-          className={`rounded-full px-3 py-1.5 text-[12px] font-extrabold ${value === item ? "bg-[#1e3a8a] text-white" : "bg-slate-100 text-slate-600"
-            }`}
+          className={`task-filter-chip ${value === item ? "task-filter-chip-active" : "task-filter-chip-idle"}`}
         >
           {item}
         </button>
       ))}
     </div>
   );
+}
+
+function FilterField({ label, htmlFor, children }) {
+  return (
+    <label htmlFor={htmlFor} className="task-list-field">
+      <span className="task-list-field-label">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function InfoPill({ tone, label }) {
+  const tones = {
+    navy: "bg-[#dbe7ff] text-[#1e3a8a]",
+    slate: "bg-slate-100 text-slate-600",
+    amber: "bg-amber-100 text-amber-700",
+    blue: "bg-blue-50 text-blue-700",
+  };
+
+  return (
+    <span className={`inline-flex rounded-full px-3 py-1 text-[11px] font-extrabold ${tones[tone] || tones.slate}`}>
+      {label}
+    </span>
+  );
+}
+
+function LoadingRows() {
+  return Array.from({ length: 6 }).map((_, index) => (
+    <tr key={`loading-row-${index}`}>
+      {Array.from({ length: 8 }).map((__, cellIndex) => (
+        <td key={`loading-cell-${index}-${cellIndex}`}>
+          <div className="h-4 animate-pulse rounded-full bg-slate-200" />
+        </td>
+      ))}
+    </tr>
+  ));
 }

@@ -78,6 +78,10 @@ button { touch-action: manipulation; }
   .table th {
     white-space: nowrap;
   }
+
+  .task-list-column-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ── Task ID link in task list ── */
@@ -114,6 +118,76 @@ button { touch-action: manipulation; }
 .task-id-link:hover::after {
   opacity: 1;
   transform: scaleX(1);
+}
+
+.task-list-toolbar {
+  background:
+    radial-gradient(circle at top right, rgba(30, 58, 138, 0.08), transparent 34%),
+    linear-gradient(180deg, rgba(248, 250, 252, 0.9), rgba(255, 255, 255, 0.96));
+}
+.task-list-column-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+.task-list-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.task-list-field-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+.task-list-input-wrap {
+  position: relative;
+}
+.task-list-input-icon {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+}
+.task-filter-chip {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 800;
+  transition: transform 0.15s ease, background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.task-filter-chip:hover {
+  transform: translateY(-1px);
+}
+.task-filter-chip:focus-visible,
+.task-id-link:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.18);
+}
+.task-filter-chip-active {
+  background: #1e3a8a;
+  color: white;
+  box-shadow: 0 10px 24px rgba(30, 58, 138, 0.18);
+}
+.task-filter-chip-idle {
+  background: white;
+  color: #475569;
+  border-color: #dbe2ea;
+}
+.task-filter-chip-idle:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+.task-list-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
 }
 
 /* ── Task Detail Page ── */
@@ -294,4 +368,3 @@ button { touch-action: manipulation; }
     align-items: flex-start;
   }
 }
-

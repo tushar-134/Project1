@@ -21,9 +21,18 @@ export function useTasks() {
   const { dispatch } = useApp();
   async function fetchTasks(params) {
     dispatch({ type: "SET_LOADING", resource: "tasks", value: true });
-    const tasks = (await taskService.list(normalizeTaskParams(params))).map(mapTask);
-    dispatch({ type: "SET_RESOURCE", resource: "tasks", payload: tasks });
-    return tasks;
+    try {
+      const tasks = (await taskService.list(normalizeTaskParams(params))).map(mapTask);
+      dispatch({ type: "SET_RESOURCE", resource: "tasks", payload: tasks });
+      return tasks;
+    } catch (error) {
+      dispatch({
+        type: "SET_ERROR",
+        resource: "tasks",
+        error: error?.response?.data?.message || "Unable to load tasks.",
+      });
+      throw error;
+    }
   }
   async function fetchFtaTracker(params) {
     const tasks = (await taskService.ftaTracker(params)).map(mapFtaTask);
