@@ -17,7 +17,7 @@ import TaskDrawer from "../ui/TaskDrawer.jsx";
 // Order: Not Yet Started → WIP → Submitted to FTA → Completed
 const ALL_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed"];
 const BASE_STATUSES = ["Not Yet Started", "WIP", "Completed"]; // for non-FTA tasks
-const FILTER_STATUSES = ["All", "Not Yet Started", "WIP", "Submitted to FTA", "Completed"];
+const FILTER_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed", "All"];
 // Category order for stable display
 const CAT_ORDER = ["VAT", "Corporate Tax", "Audit", "Accounting", "MIS Reporting", "E-Invoicing", "VAT Refund", "Other"];
 
@@ -56,7 +56,7 @@ export default function TaskList() {
   const [searchParams] = useSearchParams();
   const { fetchTasks, updateStatus, updateAssignee, exportTasks } = useTasks();
   const [cat, setCat] = useState(searchParams.get("category") || "All");
-  const [status, setStatus] = useState("All");
+  const [status, setStatus] = useState("Not Yet Started");
   const [scope, setScope] = useState("By Month");
   const [month, setMonth] = useState(searchParams.get("month") || "2026-05");
   const [drawerTaskId, setDrawerTaskId] = useState(null);
