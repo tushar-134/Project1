@@ -75,6 +75,7 @@ export function mapTask(task) {
     status: statusFromApi[task.status] || task.status,
     apiStatus: task.status,
     recurring: task.isRecurring,
+    remarks: task.remarks || "",
     overdueDays: daysOverdue(task.dueDate, task.status),
     ftaStatus: task.ftaStatus,
     // Needed so TaskList can gate "Submitted to FTA" to FTA-tracked tasks only (BRD 5.4)

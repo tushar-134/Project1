@@ -189,6 +189,12 @@ button { touch-action: manipulation; }
   top: 0;
   z-index: 1;
 }
+.task-list-section-title {
+  color: #0f172a;
+}
+.task-list-section-title-completed {
+  color: #047857;
+}
 
 /* ── Task Detail Page ── */
 .task-detail-card {

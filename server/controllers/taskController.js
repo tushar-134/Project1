@@ -516,6 +516,25 @@ exports.updateAssignee = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
+exports.updateRemarks = async (req, res, next) => {
+  try {
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ message: "Task not found" });
+    if (req.user.role === "task_only" && String(task.assignedTo) !== String(req.user._id)) return res.status(403).json({ message: "Forbidden" });
+
+    task.remarks = String(req.body.remarks || "").trim();
+    await task.save();
+    await auditLogger({
+      task: task._id,
+      user: req.user._id,
+      action: "Updated",
+      newStatus: task.status,
+      notes: task.remarks ? "Remarks updated" : "Remarks cleared",
+    });
+    res.json(await task.populate(populateTask));
+  } catch (error) { next(error); }
+};
+
 exports.ftaTracker = async (req, res, next) => {
   try {
     const query = { isAwaitingFta: true };
