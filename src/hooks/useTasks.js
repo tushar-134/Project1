@@ -77,4 +77,17 @@ export function useTasks() {
     return task;
   }
   return { fetchTasks, fetchFtaTracker, getTask: taskService.get, createTask: taskService.create, updateTask: taskService.update, updateStatus, updateAssignee, updateRemarks, updateFtaStatus, exportTasks: (params) => taskService.export(normalizeTaskParams(params)) };
+  return {
+    fetchTasks,
+    fetchFtaTracker,
+    getTask: taskService.get,
+    createTask: taskService.create,
+    updateTask: taskService.update,
+    updateStatus,
+    updateAssignee,
+    updateFtaStatus,
+    uploadAttachment: taskService.uploadAttachment,
+    deleteAttachment: taskService.deleteAttachment,
+    exportTasks: (params) => taskService.export(normalizeTaskParams(params)),
+  };
 }

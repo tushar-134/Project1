@@ -13,6 +13,7 @@ import AddClient from "./components/screens/AddClient.jsx";
 import ClientList from "./components/screens/ClientList.jsx";
 import BulkUpload from "./components/screens/BulkUpload.jsx";
 import Contacts from "./components/screens/Contacts.jsx";
+import ClientVisitTracker from "./components/screens/ClientVisitTracker.jsx";
 import AddTask from "./components/screens/AddTask.jsx";
 import TaskList from "./components/screens/TaskList.jsx";
 import TaskDetail from "./components/screens/TaskDetail.jsx";
@@ -41,6 +42,7 @@ createRoot(document.getElementById("root")).render(
               <Route path="/clients/list" element={<ClientList />} />
               <Route path="/clients/bulk-upload" element={<ProtectedRoute roles={["admin"]}><BulkUpload /></ProtectedRoute>} />
               <Route path="/contacts" element={<ProtectedRoute roles={["admin", "manager"]}><Contacts /></ProtectedRoute>} />
+              <Route path="/contacts/visit-tracker" element={<ProtectedRoute roles={["admin", "manager", "task_only"]}><ClientVisitTracker /></ProtectedRoute>} />
               <Route path="/tasks/add" element={<ProtectedRoute roles={["admin", "manager"]}><AddTask /></ProtectedRoute>} />
               <Route path="/tasks/edit/:id" element={<ProtectedRoute roles={["admin", "manager"]}><AddTask /></ProtectedRoute>} />
               <Route path="/tasks/list" element={<TaskList />} />

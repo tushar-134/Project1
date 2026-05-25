@@ -1,5 +1,15 @@
 const mongoose = require("mongoose");
 
+const uploadedFileSchema = new mongoose.Schema({
+  name: String,
+  size: String,
+  fileType: String,
+  description: String,
+  url: String,
+  uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  uploadedAt: { type: Date, default: Date.now },
+}, { _id: true });
+
 // Task shape mirrors the original practice-management workflow, including recurring and FTA-specific fields.
 const taskSchema = new mongoose.Schema({
   taskId: { type: String, unique: true },
@@ -29,6 +39,7 @@ const taskSchema = new mongoose.Schema({
   isAwaitingFta: { type: Boolean, default: false },
   ftaStatus: { type: String, enum: ["in_review", "additional_query", "approved"], default: "in_review" },
   ftaSubmittedDate: Date,
+  attachments: [uploadedFileSchema],
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
 }, { timestamps: true, toJSON: { virtuals: true }, toObject: { virtuals: true } });
 

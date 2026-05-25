@@ -35,18 +35,6 @@ const TABS = [
     border: "border-yellow-500",
     description: "FTA has asked for more information. The firm must respond before status can advance.",
   },
-  {
-    id: "approved",
-    label: "Approved",
-    statusMatch: "Approved",
-    icon: CheckCircle2,
-    color: "#059669",
-    bg: "bg-green-50",
-    text: "text-green-700",
-    border: "border-green-500",
-    description: "FTA has approved the application. Task moves here and is removed from the active tracker view.",
-    readOnly: true,
-  },
 ];
 
 const FTA_STATUSES = ["In Review", "Additional Query From FTA", "Approved"];
@@ -198,8 +186,6 @@ export default function FtaTracker() {
                   className={
                     currentTab.id === "additional_query"
                       ? "bg-yellow-50/60"
-                      : currentTab.id === "approved"
-                      ? "opacity-80"
                       : ""
                   }
                 >

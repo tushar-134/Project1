@@ -14,7 +14,9 @@ import Table from "../ui/Table.jsx";
 import TaskDrawer from "../ui/TaskDrawer.jsx";
 
 const ALL_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed"];
-const FILTER_STATUSES = ["All", "Not Yet Started", "WIP", "Submitted to FTA", "Completed"];
+const BASE_STATUSES = ["Not Yet Started", "WIP", "Completed"]; // for non-FTA tasks
+const FILTER_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed", "All"];
+// Category order for stable display
 const CAT_ORDER = ["VAT", "Corporate Tax", "Audit", "Accounting", "MIS Reporting", "E-Invoicing", "VAT Refund", "Other"];
 const TASK_TABLE_COLUMNS = 9;
 
@@ -85,7 +87,7 @@ export default function TaskList() {
   const { fetchTasks, updateStatus, updateAssignee, updateRemarks, exportTasks } = useTasks();
   const initialMonth = searchParams.get("month") || getCurrentMonthValue();
   const [cat, setCat] = useState(searchParams.get("category") || "All");
-  const [status, setStatus] = useState("All");
+  const [status, setStatus] = useState("Not Yet Started");
   const [scope, setScope] = useState("By Month");
   const [month, setMonth] = useState(initialMonth);
   const [drawerTaskId, setDrawerTaskId] = useState(null);

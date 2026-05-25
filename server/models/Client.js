@@ -38,7 +38,17 @@ const clientSchema = new mongoose.Schema({
     alternateEmail: String,
     mobile: { countryCode: String, number: String },
     isPrimary: { type: Boolean, default: false },
-    emiratesId: { number: String, issueDate: Date, expiryDate: Date, documentUrl: String, documents: [uploadedFileSchema] },
+    emiratesId: {
+      number: String,
+      issueDate: Date,
+      expiryDate: Date,
+      documentUrl: String,
+      documents: [uploadedFileSchema],
+      frontDocumentUrl: String,
+      backDocumentUrl: String,
+      frontDocuments: [uploadedFileSchema],
+      backDocuments: [uploadedFileSchema],
+    },
     passport: { number: String, issuingCountry: String, issueDate: Date, expiryDate: Date, documentUrl: String, documents: [uploadedFileSchema] },
   }],
   vatDetails: {

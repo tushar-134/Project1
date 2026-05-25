@@ -108,6 +108,41 @@ function clientWisePipeline(range) {
   ];
 }
 
+async function latestTaskActors(taskIds) {
+  if (!taskIds.length) return new Map();
+  const logs = await ActivityLog.aggregate([
+    { $match: { task: { $in: taskIds } } },
+    { $sort: { createdAt: -1 } },
+    {
+      $group: {
+        _id: "$task",
+        user: { $first: "$user" },
+        action: { $first: "$action" },
+        createdAt: { $first: "$createdAt" },
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        localField: "user",
+        foreignField: "_id",
+        as: "user",
+      },
+    },
+    { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+    {
+      $project: {
+        task: "$_id",
+        user: { _id: "$user._id", name: "$user.name", email: "$user.email", role: "$user.role" },
+        action: 1,
+        createdAt: 1,
+      },
+    },
+  ]);
+
+  return new Map(logs.map((row) => [String(row.task), row]));
+}
+
 function userWisePipeline(range) {
   return [
     { $match: dateMatch("updatedAt", range) },
@@ -159,8 +194,94 @@ exports.clientWise = async (req, res, next) => {
   try { res.status(200).json(await aggregatePage(clientWisePipeline(parseRange(req.query)), parsePage(req.query.page))); } catch (error) { next(error); }
 };
 
+exports.clientTaskDetail = async (req, res, next) => {
+  try {
+    const range = parseRange(req.query);
+    const client = await Client.findById(req.params.clientId).select("legalName fileNo");
+    if (!client) return res.status(404).json({ message: "Client not found" });
+
+    const tasks = await Task.find({
+      client: client._id,
+      ...dateMatch("updatedAt", range),
+    })
+      .populate("assignedTo", "name email role")
+      .sort({ updatedAt: -1, createdAt: -1 });
+
+    const activityByTask = await latestTaskActors(tasks.map((task) => task._id));
+    const items = tasks.map((task) => {
+      const latestActivity = activityByTask.get(String(task._id));
+      return {
+        _id: task._id,
+        taskId: task.taskId,
+        taskType: task.taskType,
+        category: task.category,
+        status: task.status,
+        dueDate: task.dueDate,
+        updatedAt: task.updatedAt,
+        assignedTo: task.assignedTo ? {
+          _id: task.assignedTo._id,
+          name: task.assignedTo.name,
+          email: task.assignedTo.email,
+          role: task.assignedTo.role,
+        } : null,
+        performedBy: latestActivity?.user || null,
+        latestAction: latestActivity?.action || null,
+        latestActionAt: latestActivity?.createdAt || null,
+      };
+    });
+
+    res.status(200).json({ client, items, total: items.length });
+  } catch (error) { next(error); }
+};
+
 exports.userWise = async (req, res, next) => {
   try { res.status(200).json(await aggregatePage(userWisePipeline(parseRange(req.query)), parsePage(req.query.page))); } catch (error) { next(error); }
+};
+
+exports.userTaskDetail = async (req, res, next) => {
+  try {
+    const range = parseRange(req.query);
+    const user = await User.findById(req.params.userId).select("name email role");
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const tasks = await Task.find({
+      assignedTo: user._id,
+      ...dateMatch("updatedAt", range),
+    })
+      .populate("client", "legalName fileNo")
+      .populate("assignedTo", "name email role")
+      .sort({ updatedAt: -1, createdAt: -1 });
+
+    const activityByTask = await latestTaskActors(tasks.map((task) => task._id));
+    const items = tasks.map((task) => {
+      const latestActivity = activityByTask.get(String(task._id));
+      return {
+        _id: task._id,
+        taskId: task.taskId,
+        taskType: task.taskType,
+        category: task.category,
+        status: task.status,
+        dueDate: task.dueDate,
+        updatedAt: task.updatedAt,
+        client: task.client ? {
+          _id: task.client._id,
+          legalName: task.client.legalName,
+          fileNo: task.client.fileNo,
+        } : null,
+        assignedTo: task.assignedTo ? {
+          _id: task.assignedTo._id,
+          name: task.assignedTo.name,
+          email: task.assignedTo.email,
+          role: task.assignedTo.role,
+        } : null,
+        performedBy: latestActivity?.user || null,
+        latestAction: latestActivity?.action || null,
+        latestActionAt: latestActivity?.createdAt || null,
+      };
+    });
+
+    res.status(200).json({ user, items, total: items.length });
+  } catch (error) { next(error); }
 };
 
 exports.overdue = async (req, res, next) => {
