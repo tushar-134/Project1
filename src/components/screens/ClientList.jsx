@@ -11,22 +11,61 @@ import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import Table from "../ui/Table.jsx";
 
+const EMPTY_COLUMN_FILTERS = {
+  name: "",
+  jurisdiction: "",
+  type: "",
+  group: "",
+  licence: "",
+  vatTrn: "",
+  contact: "",
+  mobile: "",
+  email: "",
+};
+
 export default function ClientList() {
   const { state } = useApp();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const { fetchClients, deleteClient, exportClients } = useClients();
   const [query, setQuery] = useState("");
+  const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
   const canManage = canManageClients(currentUser?.role);
   const canCreate = canCreateClients(currentUser?.role);
 
   useEffect(() => {
-    // Search is debounced so the list does not issue a request on every keystroke.
-    const timer = setTimeout(() => fetchClients({ search: query, page: 1, limit: 20 }).catch(() => { }), 400);
+    const timer = setTimeout(() => fetchClients({ page: 1, limit: 200 }).catch(() => { }), 400);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [fetchClients]);
 
-  const rows = state.clients;
+  const taskMatches = (value, filter) => String(value || "").toLowerCase().includes(String(filter || "").toLowerCase().trim());
+  const filterOptions = (key) => [...new Set(state.clients.map((client) => client[key]).filter(Boolean))].sort();
+  const hasColumnFilters = Object.values(columnFilters).some(Boolean);
+  const updateColumnFilter = (key, value) => setColumnFilters((current) => ({ ...current, [key]: value }));
+  const rows = state.clients.filter((client) => {
+    const combinedSearch = [
+      client.name,
+      client.jurisdiction,
+      client.type,
+      client.group,
+      client.licence,
+      client.vatTrn,
+      client.contact,
+      client.mobile,
+      client.email,
+    ].join(" ");
+    if (query && !taskMatches(combinedSearch, query)) return false;
+    if (!taskMatches(client.name, columnFilters.name)) return false;
+    if (columnFilters.jurisdiction && client.jurisdiction !== columnFilters.jurisdiction) return false;
+    if (columnFilters.type && client.type !== columnFilters.type) return false;
+    if (columnFilters.group && client.group !== columnFilters.group) return false;
+    if (!taskMatches(client.licence, columnFilters.licence)) return false;
+    if (!taskMatches(client.vatTrn, columnFilters.vatTrn)) return false;
+    if (!taskMatches(client.contact, columnFilters.contact)) return false;
+    if (!taskMatches(client.mobile, columnFilters.mobile)) return false;
+    if (!taskMatches(client.email, columnFilters.email)) return false;
+    return true;
+  });
   const exportCsv = async () => downloadBlob(await exportClients(), "clients.csv");
 
   return (
@@ -60,7 +99,7 @@ export default function ClientList() {
             name="clientSearch"
             className="input pl-12"
             type="search"
-            placeholder="Search by name, TRN, trade licence, group"
+            placeholder="Search by name, jurisdiction, type, group, trade licence, TRN, contact, mobile, email"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -81,8 +120,77 @@ export default function ClientList() {
               <th>Email</th>
               {canManage && <th>Actions</th>}
             </tr>
+            <tr>
+              <th>
+                <input
+                  aria-label="Filter by client name"
+                  className="input h-8 min-w-40"
+                  type="search"
+                  value={columnFilters.name}
+                  onChange={(e) => updateColumnFilter("name", e.target.value)}
+                />
+                <select
+                  aria-label="Filter by jurisdiction"
+                  className="input mt-2 h-8 min-w-40"
+                  value={columnFilters.jurisdiction}
+                  onChange={(e) => updateColumnFilter("jurisdiction", e.target.value)}
+                >
+                  <option value="">All jurisdictions</option>
+                  {filterOptions("jurisdiction").map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+              </th>
+              <th>
+                <select
+                  aria-label="Filter by client type"
+                  className="input h-8 min-w-32"
+                  value={columnFilters.type}
+                  onChange={(e) => updateColumnFilter("type", e.target.value)}
+                >
+                  <option value="">All</option>
+                  {filterOptions("type").map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+              </th>
+              <th>
+                <select
+                  aria-label="Filter by group"
+                  className="input h-8 min-w-32"
+                  value={columnFilters.group}
+                  onChange={(e) => updateColumnFilter("group", e.target.value)}
+                >
+                  <option value="">All</option>
+                  {filterOptions("group").map((option) => <option key={option} value={option}>{option}</option>)}
+                </select>
+              </th>
+              <th>
+                <input aria-label="Filter by trade licence" className="input h-8 min-w-32" type="search" value={columnFilters.licence} onChange={(e) => updateColumnFilter("licence", e.target.value)} />
+              </th>
+              <th>
+                <input aria-label="Filter by VAT TRN" className="input h-8 min-w-32" type="search" value={columnFilters.vatTrn} onChange={(e) => updateColumnFilter("vatTrn", e.target.value)} />
+              </th>
+              <th>
+                <input aria-label="Filter by primary contact" className="input h-8 min-w-32" type="search" value={columnFilters.contact} onChange={(e) => updateColumnFilter("contact", e.target.value)} />
+              </th>
+              <th>
+                <input aria-label="Filter by mobile" className="input h-8 min-w-32" type="search" value={columnFilters.mobile} onChange={(e) => updateColumnFilter("mobile", e.target.value)} />
+              </th>
+              <th>
+                <input aria-label="Filter by email" className="input h-8 min-w-32" type="search" value={columnFilters.email} onChange={(e) => updateColumnFilter("email", e.target.value)} />
+              </th>
+              {canManage && (
+                <th>
+                  {hasColumnFilters && <Button size="sm" variant="ghost" onClick={() => setColumnFilters(EMPTY_COLUMN_FILTERS)}>Clear</Button>}
+                </th>
+              )}
+            </tr>
           </thead>
           <tbody>
+            {!rows.length && (
+              <tr>
+                <td colSpan={canManage ? 9 : 8} className="py-8 text-center font-semibold text-slate-500">
+                  No clients match the current search or filters.
+                </td>
+              </tr>
+            )}
             {rows.map((client) => (
               <tr key={client.id}>
                 <td>
