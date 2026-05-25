@@ -12,15 +12,8 @@ import Card from "../ui/Card.jsx";
 import Table from "../ui/Table.jsx";
 
 const EMPTY_COLUMN_FILTERS = {
-  name: "",
-  jurisdiction: "",
-  type: "",
   group: "",
-  licence: "",
-  vatTrn: "",
   contact: "",
-  mobile: "",
-  email: "",
 };
 
 export default function ClientList() {
@@ -55,15 +48,8 @@ export default function ClientList() {
       client.email,
     ].join(" ");
     if (query && !taskMatches(combinedSearch, query)) return false;
-    if (!taskMatches(client.name, columnFilters.name)) return false;
-    if (columnFilters.jurisdiction && client.jurisdiction !== columnFilters.jurisdiction) return false;
-    if (columnFilters.type && client.type !== columnFilters.type) return false;
     if (columnFilters.group && client.group !== columnFilters.group) return false;
-    if (!taskMatches(client.licence, columnFilters.licence)) return false;
-    if (!taskMatches(client.vatTrn, columnFilters.vatTrn)) return false;
-    if (!taskMatches(client.contact, columnFilters.contact)) return false;
-    if (!taskMatches(client.mobile, columnFilters.mobile)) return false;
-    if (!taskMatches(client.email, columnFilters.email)) return false;
+    if (!taskMatches([client.contact, client.mobile, client.email].join(" "), columnFilters.contact)) return false;
     return true;
   });
   const exportCsv = async () => downloadBlob(await exportClients(), "clients.csv");
@@ -110,50 +96,22 @@ export default function ClientList() {
         <Table>
           <thead>
             <tr>
-              <th>Name + Jurisdiction</th>
-              <th>Type</th>
+              <th>Client</th>
               <th>Group</th>
-              <th>Trade Licence No.</th>
-              <th>VAT TRN</th>
-              <th>Primary Contact</th>
-              <th>Mobile</th>
-              <th>Email</th>
+              <th>Compliance</th>
+              <th>Contact Details</th>
               {canManage && <th>Actions</th>}
             </tr>
             <tr>
               <th>
-                <input
-                  aria-label="Filter by client name"
-                  className="input h-8 min-w-40"
-                  type="search"
-                  value={columnFilters.name}
-                  onChange={(e) => updateColumnFilter("name", e.target.value)}
-                />
-                <select
-                  aria-label="Filter by jurisdiction"
-                  className="input mt-2 h-8 min-w-40"
-                  value={columnFilters.jurisdiction}
-                  onChange={(e) => updateColumnFilter("jurisdiction", e.target.value)}
-                >
-                  <option value="">All jurisdictions</option>
-                  {filterOptions("jurisdiction").map((option) => <option key={option} value={option}>{option}</option>)}
-                </select>
-              </th>
-              <th>
-                <select
-                  aria-label="Filter by client type"
-                  className="input h-8 min-w-32"
-                  value={columnFilters.type}
-                  onChange={(e) => updateColumnFilter("type", e.target.value)}
-                >
-                  <option value="">All</option>
-                  {filterOptions("type").map((option) => <option key={option} value={option}>{option}</option>)}
-                </select>
+                <div className="text-[11px] font-semibold normal-case text-slate-400">
+                  Search above for name, jurisdiction, type
+                </div>
               </th>
               <th>
                 <select
                   aria-label="Filter by group"
-                  className="input h-8 min-w-32"
+                  className="input h-8 min-w-28"
                   value={columnFilters.group}
                   onChange={(e) => updateColumnFilter("group", e.target.value)}
                 >
@@ -162,19 +120,12 @@ export default function ClientList() {
                 </select>
               </th>
               <th>
-                <input aria-label="Filter by trade licence" className="input h-8 min-w-32" type="search" value={columnFilters.licence} onChange={(e) => updateColumnFilter("licence", e.target.value)} />
+                <div className="text-[11px] font-semibold normal-case text-slate-400">
+                  Search above for licence, TRN
+                </div>
               </th>
               <th>
-                <input aria-label="Filter by VAT TRN" className="input h-8 min-w-32" type="search" value={columnFilters.vatTrn} onChange={(e) => updateColumnFilter("vatTrn", e.target.value)} />
-              </th>
-              <th>
-                <input aria-label="Filter by primary contact" className="input h-8 min-w-32" type="search" value={columnFilters.contact} onChange={(e) => updateColumnFilter("contact", e.target.value)} />
-              </th>
-              <th>
-                <input aria-label="Filter by mobile" className="input h-8 min-w-32" type="search" value={columnFilters.mobile} onChange={(e) => updateColumnFilter("mobile", e.target.value)} />
-              </th>
-              <th>
-                <input aria-label="Filter by email" className="input h-8 min-w-32" type="search" value={columnFilters.email} onChange={(e) => updateColumnFilter("email", e.target.value)} />
+                <input aria-label="Filter by contact details" className="input h-8 min-w-36" type="search" value={columnFilters.contact} onChange={(e) => updateColumnFilter("contact", e.target.value)} />
               </th>
               {canManage && (
                 <th>
@@ -186,7 +137,7 @@ export default function ClientList() {
           <tbody>
             {!rows.length && (
               <tr>
-                <td colSpan={canManage ? 9 : 8} className="py-8 text-center font-semibold text-slate-500">
+                <td colSpan={canManage ? 5 : 4} className="py-8 text-center font-semibold text-slate-500">
                   No clients match the current search or filters.
                 </td>
               </tr>
@@ -195,19 +146,27 @@ export default function ClientList() {
               <tr key={client.id}>
                 <td>
                   <div className="font-extrabold">{client.name}</div>
-                  <div className="text-[12px] font-semibold text-slate-500">{client.jurisdiction}</div>
-                </td>
-                <td>
-                  <Badge color={client.type === "Legal Person" ? "bg-blue-50 text-[#1e3a8a]" : "bg-emerald-50 text-[#059669]"}>
-                    {client.type}
-                  </Badge>
+                  <div className="mt-1 flex flex-wrap gap-2">
+                    <span className="text-[12px] font-semibold text-slate-500">{client.jurisdiction}</span>
+                    <Badge color={client.type === "Legal Person" ? "bg-blue-50 text-[#1e3a8a]" : "bg-emerald-50 text-[#059669]"}>
+                      {client.type}
+                    </Badge>
+                  </div>
                 </td>
                 <td>{client.group ? <span className="rounded-full bg-purple-50 px-2 py-1 text-[11px] font-extrabold text-[#7c3aed]">{client.group}</span> : "-"}</td>
-                <td>{client.licence}</td>
-                <td>{client.vatTrn || "-"}</td>
-                <td>{client.contact}</td>
-                <td>{client.mobile}</td>
-                <td>{client.email}</td>
+                <td>
+                  <div className="space-y-1">
+                    <div><span className="font-semibold text-slate-500">Licence:</span> {client.licence || "-"}</div>
+                    <div><span className="font-semibold text-slate-500">VAT TRN:</span> {client.vatTrn || "-"}</div>
+                  </div>
+                </td>
+                <td>
+                  <div className="space-y-1">
+                    <div className="font-semibold text-slate-800">{client.contact || "-"}</div>
+                    <div className="text-[12px] text-slate-500">{client.mobile || "-"}</div>
+                    <div className="text-[12px] text-slate-500 break-all">{client.email || "-"}</div>
+                  </div>
+                </td>
                 {canManage && (
                   <td>
                     <div className="flex gap-1">
