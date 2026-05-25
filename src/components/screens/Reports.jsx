@@ -62,6 +62,14 @@ const formatDateTime = (value) => {
   const period = hours >= 12 ? "PM" : "AM";
   return `${formatDate(date)} ${pad(displayHours)}:${pad(date.getMinutes())} ${period}`;
 };
+const formatStatus = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "-";
+  return raw
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+};
 const asText = (value) => {
   if (value === null || value === undefined || value === "") return "-";
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
@@ -83,7 +91,7 @@ const reportColumns = {
     ["Client", (row) => row.task?.client?.legalName || row.client?.legalName || asText(row.client)],
     ["Task Name", (row) => row.task?.taskType || asText(row.task)],
     ["Category", (row) => row.task?.category || row.category || "-"],
-    ["Action", (row) => row.action || "-"],
+    ["Status", (row) => formatStatus(row.newStatus || row.task?.status || row.status)],
     ["Last Updated", (row) => formatDateTime(row.updatedAt)],
   ],
   "client-wise": [
