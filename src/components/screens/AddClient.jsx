@@ -11,6 +11,7 @@ import { groupService } from "../../services/groupService";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import CustomFieldModal from "../ui/CustomFieldModal.jsx";
+import TaskDrawer from "../ui/TaskDrawer.jsx";
 import { DIAL_CODE_OPTIONS } from "../../utils/dialCodeOptions.js";
 import { getPhoneNumberSpec, normalizeDialCode, normalizePhoneNumber } from "../../utils/phoneUtils.js";
 
@@ -199,7 +200,9 @@ export default function AddClient() {
   const [isGroupSearchLoading, setIsGroupSearchLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [drawerTaskId, setDrawerTaskId] = useState(null);
   const update = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+  const canManageTaskDrawer = currentUser?.role === "admin" || currentUser?.role === "manager";
   const openVatRegistrationTask = () => {
     if (!isEditMode || !id) {
       toast.error("Save the client first, then create the VAT registration task.");
@@ -311,7 +314,7 @@ export default function AddClient() {
         differentAddress: Boolean(client.correspondenceAddress?.street || client.correspondenceAddress?.country || client.correspondenceAddress?.emirate),
         correspondence: client.correspondenceAddress?.street || "",
         vatTrn: client.vatDetails?.trn || "",
-        vatStatus: client.vatDetails?.status === "registered" ? "Registered" : client.vatDetails?.status === "applying" ? "Applying / In Progress" : client.vatDetails?.status === "exempt" ? "Exempt" : "Not Registered",
+        vatStatus: client.vatDetails?.status === "registered" ? "Registered" : "Not Registered",
         vatDate: client.vatDetails?.registrationDate?.slice?.(0, 10) || "",
         vatFreq: normalizeVatFilingFrequency(client.vatDetails?.filingFrequency, normalizeFinancialYearEnd(client.financialYearEnd || client.ctDetails?.financialYearEnd || "")),
         vatRegistrationTask: location.state?.createdRegistrationTask?.taxType === "vat" ? location.state.createdRegistrationTask.taskMongoId || "" : client.vatDetails?.registrationTask || "",
@@ -791,7 +794,7 @@ export default function AddClient() {
       if (includeVatCt) {
         payload.vatDetails = {
           trn: shouldShowVatRegistrationFields ? form.vatTrn : "",
-          status: form.vatStatus === "Registered" ? "registered" : form.vatStatus === "Applying / In Progress" ? "applying" : form.vatStatus === "Exempt" ? "exempt" : "not_registered",
+          status: form.vatStatus === "Registered" ? "registered" : "not_registered",
           registrationDate: shouldShowVatRegistrationFields ? form.vatDate : undefined,
           filingFrequency: shouldShowVatRegistrationFields ? normalizeVatFilingFrequency(form.vatFreq, form.fye) : undefined,
           registrationTask: form.vatRegistrationTask || undefined,
@@ -1015,14 +1018,31 @@ export default function AddClient() {
           )}
           {tab === 3 && (
             <div className="grid gap-3 md:grid-cols-2">
-              <Field label="VAT Registration Status" field="client-vat-status">
-                <select className="input" value={form.vatStatus} onChange={(e) => update("vatStatus", e.target.value)}>
-                  <option>Registered</option>
-                  <option>Applying / In Progress</option>
-                  <option>Not Registered</option>
-                  <option>Exempt</option>
-                </select>
-              </Field>
+              <div className="space-y-2">
+                <label className="text-[14px] font-bold text-slate-700" htmlFor="client-vat-status">VAT Registration Status</label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <select id="client-vat-status" className="input min-w-[240px] flex-1" value={form.vatStatus} onChange={(e) => update("vatStatus", e.target.value)}>
+                    <option>Registered</option>
+                    <option>Not Registered</option>
+                  </select>
+                  {form.vatRegistrationTaskId && (
+                    <button
+                      type="button"
+                      className="rounded-full border border-[#bfdbfe] bg-white px-3 py-2 text-xs font-extrabold text-[#1e3a8a] transition hover:bg-blue-50"
+                      onClick={() => {
+                        if (!form.vatRegistrationTask) return;
+                        if (canManageTaskDrawer) {
+                          setDrawerTaskId(form.vatRegistrationTask);
+                          return;
+                        }
+                        navigate(`/tasks/${form.vatRegistrationTask}`);
+                      }}
+                    >
+                      Task ID: {form.vatRegistrationTaskId}
+                    </button>
+                  )}
+                </div>
+              </div>
               {shouldShowVatRegistrationFields ? (
                 <>
                   <Field label="VAT TRN" field="client-vat-trn">
@@ -1049,15 +1069,6 @@ export default function AddClient() {
                     <button type="button" className="text-sm font-bold text-[#1e3a8a] underline underline-offset-4" onClick={openVatRegistrationTask}>
                       Open VAT registration task
                     </button>
-                    {form.vatRegistrationTaskId && (
-                      <button
-                        type="button"
-                        className="rounded-full border border-[#bfdbfe] bg-white px-3 py-1 text-xs font-extrabold text-[#1e3a8a]"
-                        onClick={() => form.vatRegistrationTask && navigate(`/tasks/${form.vatRegistrationTask}`)}
-                      >
-                        Task ID: {form.vatRegistrationTaskId}
-                      </button>
-                    )}
                   </div>
                 </div>
               )}
@@ -1332,6 +1343,9 @@ export default function AddClient() {
           setSelectedFieldKeys([...selectedFieldKeys, newField.key]);
         }}
       />
+      {drawerTaskId && (
+        <TaskDrawer taskId={drawerTaskId} canManage={canManageTaskDrawer} onClose={() => setDrawerTaskId(null)} />
+      )}
     </div>
   );
 }
