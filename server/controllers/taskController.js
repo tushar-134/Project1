@@ -355,7 +355,14 @@ async function taskQuery(req) {
   const andClauses = [];
 
   if (category && category !== "All") query.category = category;
-  if (status && status !== "All") query.status = status;
+  if (status && status !== "All") {
+    if (status === "Active") {
+      // "Active" chip = all non-completed statuses
+      query.status = { $in: ["not_started", "wip", "submitted_to_fta"] };
+    } else {
+      query.status = status;
+    }
+  }
   if (assignedTo) andClauses.push({ assignedTo });
   if (req.user.role === "task_only") andClauses.push({ assignedTo: req.user._id });
   // Bug #7 Fix: Build the dueDate filter carefully so overdue never silently
