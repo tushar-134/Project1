@@ -1,4 +1,4 @@
-import { AlertTriangle, Briefcase, Calendar, Clock, ExternalLink, FileText, Tag, User, X } from "lucide-react";
+import { AlertTriangle, Briefcase, Calendar, Clock, ExternalLink, FileText, MessageSquare, Tag, User, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -57,6 +57,9 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
   const [error, setError] = useState(null);
   const [statusSaving, setStatusSaving] = useState(false);
   const [statusError, setStatusError] = useState("");
+  const [remarkText, setRemarkText] = useState("");
+  const [remarkSaving, setRemarkSaving] = useState(false);
+  const [remarkError, setRemarkError] = useState("");
 
   const loadTask = useCallback(async (active = true) => {
     setLoading(true);
@@ -69,6 +72,8 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
       if (active) {
         setTask(taskData);
         setLogs(logsData);
+        setRemarkText(taskData?.remarks || "");
+        setRemarkError("");
       }
     } catch (err) {
       if (active) setError(err.response?.data?.message || "Failed to load task details");
@@ -115,6 +120,7 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
       (currentUser?.role === "task_only" && String(task.assignedTo?._id) === String(currentUser?._id || currentUser?.id))
     )
   );
+  const canEditRemarks = canChangeStatus;
 
   async function handleStatusChange(nextLabel) {
     if (!task || statusSaving || nextLabel === displayStatus) return;
@@ -125,12 +131,27 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
     try {
       await taskService.updateStatus(task._id, statusToApi[nextLabel] || nextLabel);
       await loadTask(true);
-      onClose();
     } catch (err) {
       setTask(previousTask);
       setStatusError(err.response?.data?.message || "Failed to update task status");
     } finally {
       setStatusSaving(false);
+    }
+  }
+
+  async function handleRemarkSave() {
+    if (!task || remarkSaving) return;
+    setRemarkSaving(true);
+    setRemarkError("");
+    try {
+      const updatedTask = await taskService.updateRemarks(task._id, remarkText);
+      setTask((current) => current ? { ...current, remarks: updatedTask.remarks || "", updatedAt: updatedTask.updatedAt || current.updatedAt } : current);
+      setRemarkText(updatedTask.remarks || "");
+      await loadTask(true);
+    } catch (err) {
+      setRemarkError(err.response?.data?.message || "Failed to update remark");
+    } finally {
+      setRemarkSaving(false);
     }
   }
 
@@ -321,6 +342,37 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
                     <p className="text-[13px] leading-relaxed text-slate-700">{task.description}</p>
                   </div>
                 )}
+
+                <div className="task-detail-description">
+                  <div className="mb-2 task-detail-field-label">
+                    <MessageSquare size={13} /> Remarks
+                  </div>
+                  {canEditRemarks ? (
+                    <>
+                      <textarea
+                        id="task-drawer-remark"
+                        name="taskDrawerRemark"
+                        className="input min-h-28"
+                        placeholder="Add context, blockers, or follow-up notes for this task."
+                        value={remarkText}
+                        onChange={(event) => setRemarkText(event.target.value)}
+                        disabled={remarkSaving}
+                      />
+                      {remarkError && (
+                        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">
+                          {remarkError}
+                        </div>
+                      )}
+                      <div className="mt-3 flex justify-end">
+                        <Button size="sm" onClick={handleRemarkSave} disabled={remarkSaving}>
+                          {remarkSaving ? "Saving..." : "Save Remark"}
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-[13px] leading-relaxed text-slate-700">{task.remarks || "No remark added"}</p>
+                  )}
+                </div>
 
                 {!!task.attachments?.length && (
                   <div className="task-detail-description">

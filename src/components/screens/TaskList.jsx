@@ -1,5 +1,5 @@
-import { Download, MessageSquare, RefreshCw, Search, SlidersHorizontal, X } from "lucide-react";
-import { useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
+import { Download, RefreshCw, Search, SlidersHorizontal, X } from "lucide-react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -18,7 +18,8 @@ const BASE_STATUSES = ["Not Yet Started", "WIP", "Completed"]; // for non-FTA ta
 const FILTER_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed", "All"];
 // Category order for stable display
 const CAT_ORDER = ["VAT", "Corporate Tax", "Audit", "Accounting", "MIS Reporting", "E-Invoicing", "VAT Refund", "Other"];
-const TASK_TABLE_COLUMNS = 9;
+const TASK_TABLE_COLUMNS = 8;
+const PAGE_SIZE = 20;
 
 const STATUS_PILL = {
   "Not Yet Started": { bg: "bg-slate-100", text: "text-slate-600" },
@@ -84,19 +85,16 @@ export default function TaskList() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { fetchTasks, updateStatus, updateAssignee, updateRemarks, exportTasks } = useTasks();
+  const { fetchTasks, updateStatus, updateAssignee, exportTasks } = useTasks();
   const initialMonth = searchParams.get("month") || getCurrentMonthValue();
   const [cat, setCat] = useState(searchParams.get("category") || "All");
   const [status, setStatus] = useState("Not Yet Started");
   const [scope, setScope] = useState("By Month");
   const [month, setMonth] = useState(initialMonth);
   const [drawerTaskId, setDrawerTaskId] = useState(null);
+  const [page, setPage] = useState(1);
   const [columnFilters, setColumnFilters] = useState(() => createEmptyColumnFilters());
   const deferredColumnFilters = useDeferredValue(columnFilters);
-  const [remarkTask, setRemarkTask] = useState(null);
-  const [remarkText, setRemarkText] = useState("");
-  const [remarkSaving, setRemarkSaving] = useState(false);
-  const [remarkError, setRemarkError] = useState("");
 
   const canManage = canManageTasks(currentUser?.role);
   const isTaskOnly = currentUser?.role === "task_only";
@@ -136,22 +134,29 @@ export default function TaskList() {
   const assigneeOptions = sortStrings(state.tasks.map((task) => task.assigned));
   const clientSuggestions = sortStrings(state.tasks.map((task) => task.client));
 
-  const rows = state.tasks.filter((task) => {
-    if (deferredColumnFilters.taskId && !normalizeText(task.taskId).includes(normalizeText(deferredColumnFilters.taskId))) return false;
-    if (deferredColumnFilters.client && !normalizeText(task.client).includes(normalizeText(deferredColumnFilters.client))) return false;
-    if (deferredColumnFilters.category && task.category !== deferredColumnFilters.category) return false;
-    if (deferredColumnFilters.type && task.type !== deferredColumnFilters.type) return false;
-    if (deferredColumnFilters.dueDate && task.dueDate !== deferredColumnFilters.dueDate) return false;
-    if (deferredColumnFilters.assigned && task.assigned !== deferredColumnFilters.assigned) return false;
-    if (deferredColumnFilters.status && task.status !== deferredColumnFilters.status) return false;
-    if (deferredColumnFilters.remarks && !normalizeText(task.remarks).includes(normalizeText(deferredColumnFilters.remarks))) return false;
-    if (deferredColumnFilters.recurring === "recurring" && !task.recurring) return false;
-    if (deferredColumnFilters.recurring === "one-time" && task.recurring) return false;
-    return true;
-  });
+  const rows = useMemo(() => state.tasks
+    .filter((task) => {
+      if (deferredColumnFilters.taskId && !normalizeText(task.taskId).includes(normalizeText(deferredColumnFilters.taskId))) return false;
+      if (deferredColumnFilters.client && !normalizeText(task.client).includes(normalizeText(deferredColumnFilters.client))) return false;
+      if (deferredColumnFilters.category && task.category !== deferredColumnFilters.category) return false;
+      if (deferredColumnFilters.type && task.type !== deferredColumnFilters.type) return false;
+      if (deferredColumnFilters.dueDate && task.dueDate !== deferredColumnFilters.dueDate) return false;
+      if (deferredColumnFilters.assigned && task.assigned !== deferredColumnFilters.assigned) return false;
+      if (deferredColumnFilters.status && task.status !== deferredColumnFilters.status) return false;
+      if (deferredColumnFilters.remarks && !normalizeText(task.remarks).includes(normalizeText(deferredColumnFilters.remarks))) return false;
+      if (deferredColumnFilters.recurring === "recurring" && !task.recurring) return false;
+      if (deferredColumnFilters.recurring === "one-time" && task.recurring) return false;
+      return true;
+    })
+    .sort((left, right) => {
+      const rightTime = new Date(right.updatedAt || right.createdAt || 0).getTime();
+      const leftTime = new Date(left.updatedAt || left.createdAt || 0).getTime();
+      if (rightTime !== leftTime) return rightTime - leftTime;
+      return String(left.taskId || "").localeCompare(String(right.taskId || ""));
+    }), [state.tasks, deferredColumnFilters]);
 
-  const workingRows = rows.filter((task) => task.status !== "Completed");
-  const completedRows = rows.filter((task) => task.status === "Completed");
+  const completedCount = rows.filter((task) => task.status === "Completed").length;
+  const workingCount = rows.length - completedCount;
   const activeColumnFilters = buildActiveColumnFilterSummary(columnFilters);
   const activeTopFilterCount =
     (cat !== "All" ? 1 : 0) +
@@ -189,42 +194,16 @@ export default function TaskList() {
       "tasks.csv",
     );
 
-  function openRemark(task) {
-    setRemarkTask(task);
-    setRemarkText(task.remarks || "");
-    setRemarkError("");
-  }
-
-  function closeRemark() {
-    if (remarkSaving) return;
-    setRemarkTask(null);
-    setRemarkText("");
-    setRemarkError("");
-  }
-
-  async function saveRemark() {
-    if (!remarkTask) return;
-    setRemarkSaving(true);
-    setRemarkError("");
-    try {
-      await updateRemarks(remarkTask.id, remarkText);
-      setRemarkTask(null);
-      setRemarkText("");
-    } catch (error) {
-      setRemarkError(error?.response?.data?.message || "Unable to save remark.");
-    } finally {
-      setRemarkSaving(false);
-    }
-  }
+  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const paginatedRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   useEffect(() => {
-    if (!remarkTask) return undefined;
-    const handleKeyDown = (event) => {
-      if (event.key === "Escape") closeRemark();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [remarkTask, remarkSaving]);
+    setPage(1);
+  }, [cat, status, scope, month, deferredColumnFilters]);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   const renderTaskRow = (task) => {
     const canEditTask =
@@ -302,23 +281,6 @@ export default function TaskList() {
           )}
         </td>
         <td>
-          <div className="flex min-w-44 flex-col gap-2">
-            {task.remarks ? (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] font-semibold text-slate-600" title={task.remarks}>
-                {task.remarks}
-              </div>
-            ) : (
-              <div className="text-[12px] font-medium text-slate-400">No remark added</div>
-            )}
-            {canEditTask && (
-              <Button size="sm" variant="ghost" onClick={() => openRemark(task)}>
-                <MessageSquare size={14} />
-                {task.remarks ? "Edit remark" : "Add remark"}
-              </Button>
-            )}
-          </div>
-        </td>
-        <td>
           {task.recurring ? (
             <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-extrabold text-[#1e3a8a]">
               Recurring
@@ -355,13 +317,13 @@ export default function TaskList() {
                 Filter and review tasks
               </div>
               <p className="mt-1 text-[12px] font-medium text-slate-500">
-                Working tasks stay up top, completed work moves into its own section below, and remarks can now be managed directly from this screen.
+                Tasks are shown in one list, newest activity first, and completed work appears in the same table when you filter for it.
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <InfoPill tone="navy" label={`${workingRows.length} working`} />
-              <InfoPill tone="green" label={`${completedRows.length} completed`} />
+              <InfoPill tone="navy" label={`${workingCount} working`} />
+              <InfoPill tone="green" label={`${completedCount} completed`} />
               <InfoPill tone="slate" label={`${rows.length} shown`} />
               {tasksLoading && <InfoPill tone="amber" label="Refreshing" />}
               {hasActiveFilters && <InfoPill tone="blue" label={`${activeFilterCount} active filters`} />}
@@ -566,102 +528,48 @@ export default function TaskList() {
       )}
 
       <TaskSection
-        title="Working Tasks"
+        title="Task List"
         subtitle={
           tasksLoading
             ? "Task list is updating with your latest filters."
             : hasActiveFilters
               ? `Filtered from ${state.tasks.length} loaded tasks.`
-              : "Open and in-progress work stays here for faster daily review."
+              : "Latest activity is shown first so the most recently touched work stays at the top."
         }
         accentClassName="task-list-section-title"
       >
         <TaskTableState
-          tasks={workingRows}
+          tasks={paginatedRows}
           tasksLoading={tasksLoading}
           taskError={taskError}
           hasActiveFilters={hasActiveFilters}
-          emptyTitle={completedRows.length ? "No working tasks match the current view" : "No working tasks right now"}
-          emptyDescription={completedRows.length ? "Your completed work is still available in the section below." : "Adjust a filter or create a new task to start filling this list."}
+          emptyTitle="No tasks match the current view"
+          emptyDescription="Adjust a filter or create a new task to start filling this list."
           onReset={resetAllFilters}
           onRetry={refetchTasks}
         >
-          {workingRows.map(renderTaskRow)}
+          {paginatedRows.map(renderTaskRow)}
         </TaskTableState>
+        {rows.length > PAGE_SIZE && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 sm:px-5">
+            <div className="text-[12px] font-semibold text-slate-500">
+              Showing {(page - 1) * PAGE_SIZE + 1} to {Math.min(page * PAGE_SIZE, rows.length)} of {rows.length} tasks
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page === 1}>
+                Previous
+              </Button>
+              <span className="text-[12px] font-semibold text-slate-500">Page {page} of {totalPages}</span>
+              <Button variant="ghost" size="sm" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={page === totalPages}>
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
       </TaskSection>
-
-      {(completedRows.length > 0 || status === "Completed") && (
-        <TaskSection
-          title="Completed Tasks"
-          subtitle="Finished tasks stay separated so the active queue is easier to scan, but they remain searchable and filterable here."
-          accentClassName="task-list-section-title-completed"
-        >
-          <TaskTableState
-            tasks={completedRows}
-            tasksLoading={tasksLoading && state.tasks.length === 0}
-            taskError={taskError}
-            hasActiveFilters={hasActiveFilters}
-            emptyTitle="No completed tasks match the current view"
-            emptyDescription="Try broadening the status or column filters if you expected completed tasks here."
-            onReset={resetAllFilters}
-            onRetry={refetchTasks}
-          >
-            {completedRows.map(renderTaskRow)}
-          </TaskTableState>
-        </TaskSection>
-      )}
 
       {canManage && drawerTaskId && (
         <TaskDrawer taskId={drawerTaskId} canManage={canManage} onClose={() => setDrawerTaskId(null)} />
-      )}
-
-      {remarkTask && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/35 p-4">
-          <Card className="w-full max-w-lg p-4">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div>
-                <div className="page-kicker">Task Remark</div>
-                <div className="text-[16px] font-extrabold text-slate-900">{remarkTask.taskId}</div>
-              </div>
-              <button
-                type="button"
-                onClick={closeRemark}
-                disabled={remarkSaving}
-                className="text-slate-500 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Close
-              </button>
-            </div>
-
-            <label htmlFor="task-remark">
-              <span className="field-label">Remark</span>
-              <textarea
-                id="task-remark"
-                name="taskRemark"
-                className="input min-h-32"
-                placeholder="Add context, blockers, or follow-up notes for this task."
-                value={remarkText}
-                onChange={(event) => setRemarkText(event.target.value)}
-                disabled={remarkSaving}
-              />
-            </label>
-
-            {remarkError && (
-              <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">
-                {remarkError}
-              </div>
-            )}
-
-            <div className="mt-4 flex justify-end gap-2">
-              <Button variant="ghost" onClick={closeRemark} disabled={remarkSaving}>
-                Cancel
-              </Button>
-              <Button onClick={saveRemark} disabled={remarkSaving}>
-                {remarkSaving ? "Saving..." : "Save Remark"}
-              </Button>
-            </div>
-          </Card>
-        </div>
       )}
     </div>
   );
@@ -694,7 +602,6 @@ function TaskTableState({ tasks, tasksLoading, taskError, hasActiveFilters, empt
           <th>Due Date</th>
           <th>Assigned</th>
           <th>Status</th>
-          <th>Remarks</th>
           <th>Recurring</th>
         </tr>
       </thead>
