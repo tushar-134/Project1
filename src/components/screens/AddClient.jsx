@@ -152,10 +152,11 @@ export default function AddClient() {
   const [form, setForm] = useState({
     clientType: "", fileNo: "", legalName: "", tradeName: "", fye: "Jan - Dec", jurisdiction: "Mainland", assigned: "",
     country: "United Arab Emirates", emirate: "Dubai", street: "", poBox: "", postalCode: "", differentAddress: false, correspondence: "",
-    vatTrn: "", vatStatus: "Registered", vatDate: "", vatFreq: "Jan-Mar", vatRegistrationTask: "", vatRegistrationTaskId: "", ctTin: "", ctStatus: "Not Registered", ctDate: "", group: "", newGroup: "",
+    vatTrn: "", vatStatus: "Registered", vatDate: "", vatFreq: "Jan-Mar", vatRegistrationTask: "", vatRegistrationTaskId: "", ctTin: "", ctStatus: "Not Registered", ctDate: "", ctRegistrationTask: "", ctRegistrationTaskId: "", group: "", newGroup: "",
   });
   const vatFilingFrequencyOptions = useMemo(() => getVatFilingFrequencyOptions(form.fye), [form.fye]);
   const shouldShowVatRegistrationFields = form.vatStatus !== "Not Registered";
+  const shouldShowCtRegistrationFields = form.ctStatus !== "Not Registered";
   const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "Dubai", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }]);
 
   const [contacts, setContacts] = useState([{
@@ -221,6 +222,28 @@ export default function AddClient() {
           clientId: id,
           activeTab: 3,
           taxType: "vat",
+        },
+      },
+    });
+  };
+  const openCtRegistrationTask = () => {
+    if (!isEditMode || !id) {
+      toast.error("Save the client first, then create the CT registration task.");
+      return;
+    }
+    navigate("/tasks/add", {
+      state: {
+        prefillTask: {
+          categoryId: "ct",
+          categoryName: "CT",
+          type: "CT Registration",
+          clientId: id,
+          description: `CT registration for ${form.legalName || "this client"}`,
+        },
+        returnToClient: {
+          clientId: id,
+          activeTab: 3,
+          taxType: "ct",
         },
       },
     });
@@ -320,8 +343,10 @@ export default function AddClient() {
         vatRegistrationTask: location.state?.createdRegistrationTask?.taxType === "vat" ? location.state.createdRegistrationTask.taskMongoId || "" : client.vatDetails?.registrationTask || "",
         vatRegistrationTaskId: location.state?.createdRegistrationTask?.taxType === "vat" ? location.state.createdRegistrationTask.taskId || "" : client.vatDetails?.registrationTaskId || "",
         ctTin: client.ctDetails?.tin || "",
-        ctStatus: client.ctDetails?.status === "registered" ? "Registered" : client.ctDetails?.status === "applying" ? "Pending" : "Not Registered",
+        ctStatus: location.state?.createdRegistrationTask?.taxType === "ct" ? "Registered" : client.ctDetails?.status === "registered" ? "Registered" : "Not Registered",
         ctDate: client.ctDetails?.registrationDate?.slice?.(0, 10) || "",
+        ctRegistrationTask: location.state?.createdRegistrationTask?.taxType === "ct" ? location.state.createdRegistrationTask.taskMongoId || "" : client.ctDetails?.registrationTask || "",
+        ctRegistrationTaskId: location.state?.createdRegistrationTask?.taxType === "ct" ? location.state.createdRegistrationTask.taskId || "" : client.ctDetails?.registrationTaskId || "",
         group: client.group?._id || client.group || "",
         newGroup: "",
       });
@@ -800,7 +825,14 @@ export default function AddClient() {
           registrationTask: form.vatRegistrationTask || undefined,
           registrationTaskId: form.vatRegistrationTaskId || undefined,
         };
-        payload.ctDetails = { tin: form.ctTin, status: form.ctStatus === "Registered" ? "registered" : form.ctStatus === "Pending" ? "applying" : "not_registered", registrationDate: form.ctDate, financialYearEnd: form.fye };
+        payload.ctDetails = {
+          tin: shouldShowCtRegistrationFields ? form.ctTin : "",
+          status: form.ctStatus === "Registered" ? "registered" : "not_registered",
+          registrationDate: shouldShowCtRegistrationFields ? form.ctDate : undefined,
+          financialYearEnd: form.fye,
+          registrationTask: form.ctRegistrationTask || undefined,
+          registrationTaskId: form.ctRegistrationTaskId || undefined,
+        };
       }
       if (includeTradeLicences) {
         payload.tradeLicences = preparedTradeLicences
@@ -1079,19 +1111,55 @@ export default function AddClient() {
                   </div>
                 </div>
               )}
-              <Field label="CT Registration Status" field="client-ct-status">
-                <select className="input" value={form.ctStatus} onChange={(e) => update("ctStatus", e.target.value)}>
-                  <option>Registered</option>
-                  <option>Not Registered</option>
-                  <option>Pending</option>
-                </select>
-              </Field>
-              <Field label="CT Registration Number (TIN)" field="client-ct-tin">
-                <input className="input" value={form.ctTin} onChange={(e) => update("ctTin", e.target.value)} />
-              </Field>
-              <Field label="CT Registration Date" field="client-ct-date">
-                <input className="input" type="date" value={form.ctDate} onChange={(e) => update("ctDate", e.target.value)} />
-              </Field>
+              <div className="md:col-span-2 grid gap-3 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="text-[14px] font-bold text-slate-700" htmlFor="client-ct-status">CT Registration Status</label>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <select id="client-ct-status" className="input min-w-[240px] flex-1" value={form.ctStatus} onChange={(e) => update("ctStatus", e.target.value)}>
+                      <option>Registered</option>
+                      <option>Not Registered</option>
+                    </select>
+                    {form.ctRegistrationTaskId && (
+                      <button
+                        type="button"
+                        className="rounded-full border border-[#bfdbfe] bg-white px-3 py-2 text-xs font-extrabold text-[#1e3a8a] transition hover:bg-blue-50"
+                        onClick={() => {
+                          if (!form.ctRegistrationTask) return;
+                          if (canManageTaskDrawer) {
+                            setDrawerTaskId(form.ctRegistrationTask);
+                            return;
+                          }
+                          navigate(`/tasks/${form.ctRegistrationTask}`);
+                        }}
+                      >
+                        Task ID: {form.ctRegistrationTaskId}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {shouldShowCtRegistrationFields ? (
+                  <>
+                    <Field label="CT Registration Number (TIN)" field="client-ct-tin">
+                      <input className="input" value={form.ctTin} onChange={(e) => update("ctTin", e.target.value)} />
+                    </Field>
+                    <Field label="CT Registration Date" field="client-ct-date">
+                      <input className="input" type="date" value={form.ctDate} onChange={(e) => update("ctDate", e.target.value)} />
+                    </Field>
+                  </>
+                ) : (
+                  <div className="md:col-span-2 rounded-2xl border border-dashed border-[#cbd5e1] bg-slate-50 p-4">
+                    <div className="text-sm font-bold text-slate-900">CT registration task required</div>
+                    <p className="mt-1 text-sm text-slate-600">
+                      This client is marked as not registered for CT. Create a CT registration task first, then come back here and continue with the CT details after registration.
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                      <button type="button" className="text-sm font-bold text-[#1e3a8a] underline underline-offset-4" onClick={openCtRegistrationTask}>
+                        Open CT registration task
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
           {tab === 4 && (
