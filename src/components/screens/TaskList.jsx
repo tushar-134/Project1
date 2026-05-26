@@ -16,6 +16,8 @@ import TaskDrawer from "../ui/TaskDrawer.jsx";
 const ALL_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed"];
 const BASE_STATUSES = ["Not Yet Started", "WIP", "Completed"]; // for non-FTA tasks
 const FILTER_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed", "All"];
+// Chip filter includes "Active" (all non-completed). Column dropdown uses FILTER_STATUSES without "Active".
+const CHIP_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed", "Active", "All"];
 // Category order for stable display
 const CAT_ORDER = ["VAT", "Corporate Tax", "Audit", "Accounting", "MIS Reporting", "E-Invoicing", "VAT Refund", "Other"];
 const TASK_TABLE_COLUMNS = 8;
@@ -109,7 +111,9 @@ export default function TaskList() {
 
   const serverFilters = useMemo(() => ({
     category: deferredColumnFilters.category || (cat !== "All" ? cat : undefined),
-    status: deferredColumnFilters.status || (status !== "All" ? status : undefined),
+    // "Active" chip = all non-completed; otherwise the column filter takes priority, then the chip.
+    status: deferredColumnFilters.status ||
+      (status === "Active" ? "Active" : (status !== "All" ? status : undefined)),
     month: scope === "By Month" ? month : undefined,
     overdue: scope === "Overdue" ? "true" : undefined,
     taskId: deferredColumnFilters.taskId || undefined,
@@ -160,6 +164,10 @@ export default function TaskList() {
 
   const updateColumnFilter = (key, value) => {
     setPage(1);
+    // Keep the status chip and the column status dropdown in sync — only one can be active at a time.
+    if (key === "status" && value) {
+      setStatus("All");
+    }
     setColumnFilters((current) => ({ ...current, [key]: value }));
   };
 
@@ -314,9 +322,13 @@ export default function TaskList() {
               setPage(1);
               setCat(value);
             }} />
-            <FilterChips label="Status" items={FILTER_STATUSES} value={status} setValue={(value) => {
+            <FilterChips label="Status" items={CHIP_STATUSES} value={status} setValue={(value) => {
               setPage(1);
               setStatus(value);
+              // Clear the column status dropdown so the two filters don't conflict.
+              if (value !== "All") {
+                setColumnFilters((current) => ({ ...current, status: "" }));
+              }
             }} />
 
             <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(220px,auto)_auto] lg:items-end">
