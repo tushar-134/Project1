@@ -321,30 +321,32 @@ export default function ClientVisitForm() {
                 <Field label="Name *">
                   <input className="input" value={form.newClient.authorityName} onChange={(event) => updateNewClient("authorityName", event.target.value)} />
                 </Field>
-                <Field label="Mobile Number *">
-                  <div className="grid grid-cols-[minmax(220px,0.9fr)_minmax(0,1fr)] gap-2">
-                    <select
-                      className="input"
-                      value={form.newClient.mobileCountryCode}
-                      onChange={(event) => updateNewClient("mobileCountryCode", normalizeDialCode(event.target.value))}
-                    >
-                      {DIAL_CODE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      className="input"
-                      value={form.newClient.mobileNumber}
-                      onChange={(event) => updateNewClient("mobileNumber", normalizePhoneNumber(event.target.value))}
-                      placeholder={getPhoneNumberSpec(form.newClient.mobileCountryCode).placeholder}
-                    />
-                  </div>
-                </Field>
                 <Field label="Email">
                   <input className="input" value={form.newClient.email} onChange={(event) => updateNewClient("email", event.target.value)} />
                 </Field>
+                <div className="md:col-span-2">
+                  <Field label="Mobile Number *">
+                    <div className="grid gap-3 md:grid-cols-[260px_minmax(0,1fr)]">
+                      <select
+                        className="input"
+                        value={form.newClient.mobileCountryCode}
+                        onChange={(event) => updateNewClient("mobileCountryCode", normalizeDialCode(event.target.value))}
+                      >
+                        {DIAL_CODE_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        className="input"
+                        value={form.newClient.mobileNumber}
+                        onChange={(event) => updateNewClient("mobileNumber", normalizePhoneNumber(event.target.value))}
+                        placeholder={getPhoneNumberSpec(form.newClient.mobileCountryCode).placeholder}
+                      />
+                    </div>
+                  </Field>
+                </div>
                 <div className="md:col-span-2">
                   <Field label="Location *">
                     <input className="input" value={form.newClient.location} onChange={(event) => updateNewClient("location", event.target.value)} />
