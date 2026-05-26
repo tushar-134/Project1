@@ -147,6 +147,7 @@ export default function TaskList() {
 
   const completedCount = rows.filter((task) => task.status === "Completed").length;
   const workingCount = rows.length - completedCount;
+  const activeCount = rows.filter((task) => task.status === "Not Yet Started" || task.status === "WIP").length;
   const activeColumnFilters = buildActiveColumnFilterSummary(columnFilters);
   const activeTopFilterCount =
     (cat !== "All" ? 1 : 0) +
@@ -300,6 +301,7 @@ export default function TaskList() {
 
             <div className="flex flex-wrap items-center gap-2">
               <InfoPill tone="navy" label={`${workingCount} working`} />
+              <InfoPill tone="orange" label={`${activeCount} active tasks`} />
               <InfoPill tone="green" label={`${completedCount} completed`} />
               <InfoPill tone="slate" label={`${meta.total} matches`} />
               {tasksLoading && <InfoPill tone="amber" label="Refreshing" />}
@@ -670,6 +672,7 @@ function InfoPill({ tone, label }) {
     navy: "bg-[#dbe7ff] text-[#1e3a8a]",
     slate: "bg-slate-100 text-slate-600",
     amber: "bg-amber-100 text-amber-700",
+    orange: "bg-orange-100 text-orange-700",
     blue: "bg-blue-50 text-blue-700",
     green: "bg-emerald-50 text-emerald-700",
   };
