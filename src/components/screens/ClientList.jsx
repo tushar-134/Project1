@@ -1,5 +1,5 @@
-import { Download, Pencil, Search, Trash2, Upload } from "lucide-react";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { Download, Pencil, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -14,11 +14,71 @@ import Table from "../ui/Table.jsx";
 
 const EMPTY_COLUMN_FILTERS = {
   client: "",
+  jurisdiction: "",
+  type: "",
   group: "",
   compliance: "",
   contact: "",
 };
 const PAGE_SIZE = 20;
+const CLIENT_TABLE_COLUMNS = 5; // Client, Group, Compliance, Contact, Actions
+
+const JURISDICTION_OPTIONS = [
+  "Mainland",
+  "Free Zone",
+  "Designated Zone",
+  "Offshore",
+];
+
+const TYPE_OPTIONS = ["Legal Person", "Natural Person"];
+
+function buildActiveFilterSummary(columnFilters, query) {
+  const chips = [];
+  if (query.trim()) chips.push(`Search: ${query.trim()}`);
+  if (columnFilters.client) chips.push(`Client: ${columnFilters.client}`);
+  if (columnFilters.jurisdiction) chips.push(`Jurisdiction: ${columnFilters.jurisdiction}`);
+  if (columnFilters.type) chips.push(`Type: ${columnFilters.type}`);
+  if (columnFilters.group) chips.push(`Group: ${columnFilters.group}`);
+  if (columnFilters.compliance) chips.push(`Compliance: ${columnFilters.compliance}`);
+  if (columnFilters.contact) chips.push(`Contact: ${columnFilters.contact}`);
+  return chips;
+}
+
+function InfoPill({ tone, label }) {
+  const tones = {
+    navy: "bg-[#dbe7ff] text-[#1e3a8a]",
+    slate: "bg-slate-100 text-slate-600",
+    amber: "bg-amber-100 text-amber-700",
+    blue: "bg-blue-50 text-blue-700",
+    green: "bg-emerald-50 text-emerald-700",
+  };
+  return (
+    <span className={`inline-flex rounded-full px-3 py-1 text-[11px] font-extrabold ${tones[tone] || tones.slate}`}>
+      {label}
+    </span>
+  );
+}
+
+function FilterField({ label, htmlFor, children }) {
+  return (
+    <label htmlFor={htmlFor} className="task-list-field">
+      <span className="task-list-field-label">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function LoadingRows({ columns }) {
+  return Array.from({ length: 6 }).map((_, index) => (
+    <tr key={`loading-row-${index}`}>
+      {Array.from({ length: columns }).map((__, cellIndex) => (
+        <td key={`loading-cell-${index}-${cellIndex}`}>
+          <div className="h-4 animate-pulse rounded-full bg-slate-200" />
+        </td>
+      ))}
+    </tr>
+  ));
+}
 
 export default function ClientList() {
   const { state } = useApp();
@@ -28,7 +88,7 @@ export default function ClientList() {
   const { fetchClients, deleteClient, exportClients } = useClients();
   const [query, setQuery] = useState(searchParams.get("search") || "");
   const [page, setPage] = useState(1);
-  const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1 });
+  const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1, workingTasksTotal: 0 });
   const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
   const [drawerClientId, setDrawerClientId] = useState(null);
   const canManage = canManageClients(currentUser?.role);
@@ -43,48 +103,79 @@ export default function ClientList() {
     limit: PAGE_SIZE,
     search: deferredQuery.trim() || undefined,
     client: deferredColumnFilters.client.trim() || undefined,
+    jurisdiction: deferredColumnFilters.jurisdiction || undefined,
+    type: deferredColumnFilters.type || undefined,
     group: deferredColumnFilters.group.trim() || undefined,
     compliance: deferredColumnFilters.compliance.trim() || undefined,
     contact: deferredColumnFilters.contact.trim() || undefined,
   }), [deferredColumnFilters, deferredQuery, page]);
 
+  const filterRef = useRef(requestParams);
+  filterRef.current = requestParams;
+
+  const refetchClients = useCallback(async () => {
+    const data = await fetchClients(filterRef.current);
+    setMeta({
+      total: data?.total || 0,
+      page: data?.page || 1,
+      pages: data?.pages || 1,
+      workingTasksTotal: data?.workingTasksTotal || 0,
+    });
+    return data;
+  }, [fetchClients]);
+
   useEffect(() => {
     let active = true;
     const timer = setTimeout(() => {
-      fetchClients(requestParams)
-        .then((data) => {
-          if (!active) return;
-          setMeta({
-            total: data?.total || 0,
-            page: data?.page || 1,
-            pages: data?.pages || 1,
-          });
-        })
-        .catch(() => {});
+      refetchClients().catch(() => {}).finally(() => { if (!active) return; });
     }, 250);
     return () => {
       active = false;
       clearTimeout(timer);
     };
-  }, [fetchClients, requestParams]);
+  }, [refetchClients, requestParams]);
 
+  const rows = state.clients;
+  const activeColumnFilters = buildActiveFilterSummary(columnFilters, query);
   const hasColumnFilters = Object.values(columnFilters).some(Boolean);
   const hasActiveFilters = Boolean(query.trim()) || hasColumnFilters;
+  const activeFilterCount = activeColumnFilters.length;
+
+  // Counts derived from current page rows
+  const workingCount = rows.filter((c) => (c.activeTasks || 0) > 0).length;
+
   const updateColumnFilter = (key, value) => {
     setPage(1);
     setColumnFilters((current) => ({ ...current, [key]: value }));
   };
-  const rows = state.clients;
+
+  const clearColumnFilters = () => {
+    setPage(1);
+    setQuery("");
+    setColumnFilters(EMPTY_COLUMN_FILTERS);
+  };
+
+  const resetAllFilters = () => {
+    setPage(1);
+    setQuery("");
+    setColumnFilters(EMPTY_COLUMN_FILTERS);
+  };
+
   const exportCsv = async () => downloadBlob(await exportClients({
     search: deferredQuery.trim() || undefined,
     client: deferredColumnFilters.client.trim() || undefined,
+    jurisdiction: deferredColumnFilters.jurisdiction || undefined,
+    type: deferredColumnFilters.type || undefined,
     group: deferredColumnFilters.group.trim() || undefined,
     compliance: deferredColumnFilters.compliance.trim() || undefined,
     contact: deferredColumnFilters.contact.trim() || undefined,
   }), "clients.csv");
 
+  const tableColSpan = canManage ? 5 : 4;
+
   return (
     <div className="space-y-5">
+      {/* Page header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="page-kicker">Client Directory</div>
@@ -106,25 +197,189 @@ export default function ClientList() {
         )}
       </div>
 
-      <Card className="p-3">
-        <div className="relative">
-          <Search className="absolute left-5 top-2.5 text-slate-400" size={16} />
-          <input
-            id="client-search"
-            name="clientSearch"
-            className="input pl-12"
-            type="search"
-            placeholder="Search by name, jurisdiction, type, group, trade licence, TRN, contact, mobile, email"
-            value={query}
-            onChange={(e) => {
-              setPage(1);
-              setQuery(e.target.value);
-            }}
-          />
+      {/* Filter & review toolbar — mirrors TaskList design */}
+      <Card className="overflow-hidden">
+        <div className="task-list-toolbar border-b border-slate-200 px-4 py-4 sm:px-5">
+          {/* Header row: title + summary pills */}
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-2xl">
+              <div className="flex items-center gap-2 text-[14px] font-extrabold text-slate-900">
+                <SlidersHorizontal size={16} className="text-[#1e3a8a]" />
+                Filter and review clients
+              </div>
+              <p className="mt-1 text-[12px] font-medium text-slate-500">
+                Use the filters below to narrow the client list by name, type, jurisdiction, group, or contact details.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <InfoPill tone="navy" label={`${workingCount} with active tasks`} />
+              <InfoPill tone="slate" label={`${meta.total} total`} />
+              {meta.workingTasksTotal > 0 && (
+                <InfoPill tone="green" label={`${meta.workingTasksTotal} active tasks`} />
+              )}
+              {clientsLoading && <InfoPill tone="amber" label="Refreshing" />}
+              {hasActiveFilters && <InfoPill tone="blue" label={`${activeFilterCount} active filters`} />}
+            </div>
+          </div>
+
+          {/* Global search + action buttons row */}
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <label htmlFor="client-search" className="task-list-field flex-1 min-w-[200px]">
+              <span className="task-list-field-label">Search</span>
+              <div className="task-list-input-wrap">
+                <Search size={14} className="task-list-input-icon" aria-hidden="true" />
+                <input
+                  id="client-search"
+                  name="clientSearch"
+                  className="input"
+                  type="search"
+                  placeholder="Name, TRN, licence, contact, email…"
+                  value={query}
+                  onChange={(e) => {
+                    setPage(1);
+                    setQuery(e.target.value);
+                  }}
+                />
+              </div>
+            </label>
+
+            <div className="flex flex-wrap items-center gap-2 pb-0.5">
+              <Button variant="ghost" size="sm" onClick={refetchClients} disabled={clientsLoading}>
+                <RefreshCw size={15} className={clientsLoading ? "animate-spin" : ""} />
+                Refresh
+              </Button>
+              {hasColumnFilters && (
+                <Button variant="ghost" size="sm" onClick={clearColumnFilters}>
+                  <X size={15} />
+                  Clear columns
+                </Button>
+              )}
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={resetAllFilters}>
+                  Reset all
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Column filter grid — styled exactly like TaskList */}
+        <div className="px-4 py-4 sm:px-5">
+          <div className="task-list-column-grid">
+            <FilterField label="Client Name" htmlFor="client-filter-name">
+              <div className="task-list-input-wrap">
+                <Search size={14} className="task-list-input-icon" aria-hidden="true" />
+                <input
+                  id="client-filter-name"
+                  className="input"
+                  type="search"
+                  placeholder="Search client"
+                  value={columnFilters.client}
+                  onChange={(e) => updateColumnFilter("client", e.target.value)}
+                />
+              </div>
+            </FilterField>
+
+            <FilterField label="Jurisdiction" htmlFor="client-filter-jurisdiction">
+              <select
+                id="client-filter-jurisdiction"
+                className="input"
+                value={columnFilters.jurisdiction}
+                onChange={(e) => updateColumnFilter("jurisdiction", e.target.value)}
+              >
+                <option value="">All jurisdictions</option>
+                {JURISDICTION_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </FilterField>
+
+            <FilterField label="Type" htmlFor="client-filter-type">
+              <select
+                id="client-filter-type"
+                className="input"
+                value={columnFilters.type}
+                onChange={(e) => updateColumnFilter("type", e.target.value)}
+              >
+                <option value="">All types</option>
+                {TYPE_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </FilterField>
+
+            <FilterField label="Group" htmlFor="client-filter-group">
+              <div className="task-list-input-wrap">
+                <Search size={14} className="task-list-input-icon" aria-hidden="true" />
+                <input
+                  id="client-filter-group"
+                  className="input"
+                  type="search"
+                  placeholder="Search group"
+                  value={columnFilters.group}
+                  onChange={(e) => updateColumnFilter("group", e.target.value)}
+                />
+              </div>
+            </FilterField>
+
+            <FilterField label="Compliance" htmlFor="client-filter-compliance">
+              <div className="task-list-input-wrap">
+                <Search size={14} className="task-list-input-icon" aria-hidden="true" />
+                <input
+                  id="client-filter-compliance"
+                  className="input"
+                  type="search"
+                  placeholder="TRN or licence no."
+                  value={columnFilters.compliance}
+                  onChange={(e) => updateColumnFilter("compliance", e.target.value)}
+                />
+              </div>
+            </FilterField>
+
+            <FilterField label="Contact" htmlFor="client-filter-contact">
+              <div className="task-list-input-wrap">
+                <Search size={14} className="task-list-input-icon" aria-hidden="true" />
+                <input
+                  id="client-filter-contact"
+                  className="input"
+                  type="search"
+                  placeholder="Name, phone or email"
+                  value={columnFilters.contact}
+                  onChange={(e) => updateColumnFilter("contact", e.target.value)}
+                />
+              </div>
+            </FilterField>
+          </div>
+
+          {/* Active filter chips */}
+          {hasActiveFilters && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {activeColumnFilters.map((item) => (
+                <span key={item} className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-600">
+                  {item}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </Card>
 
-      <Card>
+      {/* Client table */}
+      <Card className="overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-5">
+          <div>
+            <div className="text-[14px] font-extrabold text-[#1e3a8a]">Client List</div>
+            <div className="mt-1 text-[12px] font-medium text-slate-500">
+              {clientsLoading
+                ? "Updating client list…"
+                : hasActiveFilters
+                  ? `Showing ${rows.length} of ${meta.total} matching clients.`
+                  : "Click a client name to open details."}
+            </div>
+          </div>
+          <div className="text-[12px] font-semibold text-slate-500">Click a name to open details</div>
+        </div>
         <Table>
           <thead>
             <tr>
@@ -134,70 +389,45 @@ export default function ClientList() {
               <th>Contact Details</th>
               {canManage && <th>Actions</th>}
             </tr>
-            <tr>
-              <th>
-                <input
-                  aria-label="Filter by client"
-                  className="input h-8 min-w-36"
-                  type="search"
-                  value={columnFilters.client}
-                  onChange={(e) => updateColumnFilter("client", e.target.value)}
-                />
-              </th>
-              <th>
-                <input
-                  aria-label="Filter by group"
-                  className="input h-8 min-w-28"
-                  type="search"
-                  value={columnFilters.group}
-                  onChange={(e) => updateColumnFilter("group", e.target.value)}
-                />
-              </th>
-              <th>
-                <input
-                  aria-label="Filter by compliance"
-                  className="input h-8 min-w-36"
-                  type="search"
-                  value={columnFilters.compliance}
-                  onChange={(e) => updateColumnFilter("compliance", e.target.value)}
-                />
-              </th>
-              <th>
-                <input aria-label="Filter by contact details" className="input h-8 min-w-36" type="search" value={columnFilters.contact} onChange={(e) => updateColumnFilter("contact", e.target.value)} />
-              </th>
-              {canManage && (
-                <th>
-                  {hasActiveFilters && <Button size="sm" variant="ghost" onClick={() => {
-                    setPage(1);
-                    setQuery("");
-                    setColumnFilters(EMPTY_COLUMN_FILTERS);
-                  }}>Clear</Button>}
-                </th>
-              )}
-            </tr>
           </thead>
           <tbody>
-            {clientsLoading && (
-              <tr>
-                <td colSpan={canManage ? 5 : 4} className="py-8 text-center font-semibold text-slate-500">
-                  Loading clients...
-                </td>
-              </tr>
-            )}
+            {clientsLoading && !rows.length && <LoadingRows columns={tableColSpan} />}
+
             {!clientsLoading && clientError && (
               <tr>
-                <td colSpan={canManage ? 5 : 4} className="py-8 text-center font-semibold text-red-600">
-                  {String(clientError)}
+                <td colSpan={tableColSpan} className="px-4 py-10">
+                  <div className="rounded-2xl border border-red-100 bg-red-50 px-5 py-5 text-center">
+                    <div className="text-[14px] font-extrabold text-red-700">Unable to load clients</div>
+                    <div className="mt-1 text-[12px] font-medium text-red-600">{String(clientError)}</div>
+                    <div className="mt-4">
+                      <Button variant="ghost" size="sm" onClick={refetchClients}>
+                        <RefreshCw size={15} />
+                        Try again
+                      </Button>
+                    </div>
+                  </div>
                 </td>
               </tr>
             )}
+
             {!clientsLoading && !clientError && !rows.length && (
               <tr>
-                <td colSpan={canManage ? 5 : 4} className="py-8 text-center font-semibold text-slate-500">
-                  No clients match the current search or filters.
+                <td colSpan={tableColSpan} className="px-4 py-10">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-6 text-center">
+                    <div className="text-[14px] font-extrabold text-slate-900">No clients match the current filters</div>
+                    <div className="mt-1 text-[12px] font-medium text-slate-500">Adjust a filter or clear the search to see all clients.</div>
+                    {hasActiveFilters && (
+                      <div className="mt-4">
+                        <Button variant="ghost" size="sm" onClick={resetAllFilters}>
+                          Reset all filters
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </td>
               </tr>
             )}
+
             {!clientsLoading && !clientError && rows.map((client) => (
               <tr key={client.id}>
                 <td>
@@ -214,6 +444,11 @@ export default function ClientList() {
                     <Badge color={client.type === "Legal Person" ? "bg-blue-50 text-[#1e3a8a]" : "bg-emerald-50 text-[#059669]"}>
                       {client.type}
                     </Badge>
+                    {client.activeTasks > 0 && (
+                      <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-extrabold text-amber-700">
+                        {client.activeTasks} active {client.activeTasks === 1 ? "task" : "tasks"}
+                      </span>
+                    )}
                   </div>
                 </td>
                 <td>{client.group ? <span className="rounded-full bg-purple-50 px-2 py-1 text-[11px] font-extrabold text-[#7c3aed]">{client.group}</span> : "-"}</td>
@@ -246,12 +481,7 @@ export default function ClientList() {
                               if (rows.length === 1 && page > 1) {
                                 setPage((current) => Math.max(1, current - 1));
                               } else {
-                                const data = await fetchClients(requestParams);
-                                setMeta({
-                                  total: data?.total || 0,
-                                  page: data?.page || 1,
-                                  pages: data?.pages || 1,
-                                });
+                                refetchClients().catch(() => {});
                               }
                             }
                           }}
@@ -266,10 +496,10 @@ export default function ClientList() {
             ))}
           </tbody>
         </Table>
-      </Card>
-      {meta.pages > 1 && (
-        <Card className="px-4 py-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+
+        {/* Pagination */}
+        {meta.pages > 1 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 sm:px-5">
             <div className="text-[12px] font-semibold text-slate-500">
               Showing {Math.max(1, (meta.page - 1) * PAGE_SIZE + 1)} to {Math.min(meta.page * PAGE_SIZE, meta.total)} of {meta.total} clients
             </div>
@@ -283,8 +513,9 @@ export default function ClientList() {
               </Button>
             </div>
           </div>
-        </Card>
-      )}
+        )}
+      </Card>
+
       {drawerClientId && <ClientDrawer clientId={drawerClientId} onClose={() => setDrawerClientId(null)} />}
     </div>
   );

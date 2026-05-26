@@ -68,11 +68,17 @@ function buildClientSearchClause(value) {
 }
 
 async function buildClientListQuery(req) {
-  const { search, jurisdiction, group, assignedUser, client, compliance, contact } = req.query;
+  const { search, jurisdiction, type, group, assignedUser, client, compliance, contact } = req.query;
   const query = { isActive: true };
   const andClauses = [];
 
-  if (jurisdiction) andClauses.push({ jurisdiction });
+  if (jurisdiction) andClauses.push({ jurisdiction: buildPattern(jurisdiction) });
+  if (type) {
+    // type filter: "Legal Person" -> "legal", "Natural Person" -> "natural", or pass raw
+    const typeMap = { "legal person": "legal", "natural person": "natural" };
+    const normalized = typeMap[String(type).trim().toLowerCase()] || String(type).trim();
+    andClauses.push({ clientType: new RegExp(`^${escapeRegex(normalized)}$`, "i") });
+  }
   if (assignedUser) andClauses.push({ assignedUser });
   if (req.user.role === "task_only") {
     const assignedClientIds = await Task.find({ assignedTo: req.user._id }).distinct("client");
@@ -372,7 +378,25 @@ exports.listClients = async (req, res, next) => {
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit);
-    res.json({ clients, total, page, pages, limit });
+
+    // Attach active (non-completed) task counts per client for the list view summary pills.
+    const clientIds = clients.map((c) => c._id);
+    const activeStatuses = ["not_started", "wip", "submitted_to_fta"];
+    const taskCounts = await Task.aggregate([
+      { $match: { client: { $in: clientIds }, status: { $in: activeStatuses } } },
+      { $group: { _id: "$client", count: { $sum: 1 } } },
+    ]);
+    const taskCountMap = {};
+    taskCounts.forEach(({ _id, count }) => { taskCountMap[String(_id)] = count; });
+    const workingTasksTotal = taskCounts.reduce((sum, { count }) => sum + count, 0);
+
+    const enrichedClients = clients.map((client) => {
+      const obj = client.toObject ? client.toObject() : client;
+      obj.activeTasks = taskCountMap[String(client._id)] || 0;
+      return obj;
+    });
+
+    res.json({ clients: enrichedClients, total, page, pages, limit, workingTasksTotal });
   } catch (error) { next(error); }
 };
 
