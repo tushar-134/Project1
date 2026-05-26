@@ -20,6 +20,9 @@ export const navItems = [
     { label: "FTA Tracker", to: "/tasks/fta-tracker", icon: Landmark, badge: "3" },
     { label: "Categories & Types", to: "/tasks/categories", icon: Boxes },
   ]},
+  { section: "Field Operations", links: [
+    { label: "Client Visits", to: "/client-visits", icon: MapPinned },
+  ]},
   { section: "Settings", links: [
     { label: "Users", to: "/settings/users", icon: Users },
     { label: "Custom Fields", to: "/settings/custom-fields", icon: Settings2 },
@@ -28,7 +31,6 @@ export const navItems = [
   ]},
   { section: "Contacts", links: [
     { label: "Contact Directory", to: "/contacts", icon: ContactRound },
-    { label: "Client Visit Tracker", to: "/contacts/visit-tracker", icon: MapPinned },
   ]},
 ];
 
@@ -66,7 +68,7 @@ export default function Sidebar({ open = false, onClose = () => {}, mobile = fal
             return canViewReports(role);
           case "/contacts":
             return canViewContacts(role);
-          case "/contacts/visit-tracker":
+          case "/client-visits":
             return canViewClientVisits(role);
           default:
             return true;

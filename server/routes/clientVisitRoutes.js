@@ -6,30 +6,82 @@ const ctrl = require("../controllers/clientVisitController");
 
 const router = express.Router();
 
-function validateTime(field) {
-  return body(field)
-    .optional({ nullable: true })
-    .custom((value) => value === "" || /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value).trim()))
-    .withMessage("Time must be in HH:mm format.");
-}
+const canAccess = requireRoles("admin", "manager", "task_only");
+const canManage = requireRoles("admin", "manager");
+
+const visitTimeValidator = body("visitTime")
+  .optional({ nullable: true })
+  .custom((value) => !value || /^\d{1,2}:\d{2}\s?(AM|PM)$/i.test(String(value).trim()))
+  .withMessage("Visit time must be in 12-hour format, for example 10:00 AM.");
 
 router.use(auth);
-router.get("/", requireRoles("admin", "manager", "task_only"), ctrl.listVisits);
+
+router.get("/", canAccess, ctrl.listVisits);
+router.get("/export", canAccess, ctrl.exportVisits);
+router.get("/:id", canAccess, ctrl.getVisit);
+
 router.post(
   "/",
-  requireRoles("admin", "manager", "task_only"),
-  body("visitDate").notEmpty().withMessage("Visit date is required.").isISO8601().withMessage("Visit date must be valid."),
-  body("client").notEmpty().withMessage("Client is required."),
-  body("visitors").isArray({ min: 1 }).withMessage("Select at least one visiting user."),
-  body("visitors.*.user").notEmpty().withMessage("Each visitor must have a user."),
+  canAccess,
+  body("clientType").optional().isIn(["existing", "new"]).withMessage("Client Type must be Existing or New."),
+  body("visitDate").notEmpty().withMessage("Visit Date is required.").isISO8601().withMessage("Visit Date must be valid."),
+  visitTimeValidator,
+  body("visitType").optional().isString().withMessage("Visit Type must be valid."),
+  body("location").optional().isString().withMessage("Location must be valid."),
+  body("remarks").optional().isString().withMessage("Remarks must be valid."),
+  body("client")
+    .if(body("clientType").custom((value) => !value || value === "existing"))
+    .notEmpty().withMessage("Existing Client is required."),
+  body("newClient.authorityName")
+    .if(body("clientType").equals("new"))
+    .notEmpty().withMessage("Name is required."),
+  body("newClient.mobileNumber")
+    .if(body("clientType").equals("new"))
+    .notEmpty().withMessage("Mobile Number is required."),
+  body("newClient.location")
+    .if(body("clientType").equals("new"))
+    .notEmpty().withMessage("Location is required."),
+  body("assignedUsers").optional().isArray().withMessage("Assigned Users must be a list."),
+  body("assignedUsers.*.user").optional().notEmpty().withMessage("Each assigned user must include a user id."),
   ctrl.createVisit
 );
+
+router.put(
+  "/:id",
+  canManage,
+  body("clientType").optional().isIn(["existing", "new"]).withMessage("Client Type must be Existing or New."),
+  body("visitDate").optional().isISO8601().withMessage("Visit Date must be valid."),
+  visitTimeValidator,
+  body("status").optional().isIn(["planned", "in_progress", "completed", "cancelled"]).withMessage("Status is invalid."),
+  body("assignedUsers").optional().isArray().withMessage("Assigned Users must be a list."),
+  body("assignedUsers.*.user").optional().notEmpty().withMessage("Each assigned user must include a user id."),
+  ctrl.updateVisit
+);
+
+router.post(
+  "/:id/checkin",
+  canAccess,
+  body("userId").optional().isString().withMessage("User is invalid."),
+  body("gpsLocation").optional().isString().withMessage("GPS Location must be valid."),
+  body("notes").optional().isString().withMessage("Notes must be valid."),
+  ctrl.checkIn
+);
+
+router.post(
+  "/:id/checkout",
+  canAccess,
+  body("userId").optional().isString().withMessage("User is invalid."),
+  body("visitSummary").optional().isString().withMessage("Visit Summary must be valid."),
+  body("followUpRequired").optional().isBoolean().withMessage("Follow-up Required must be Yes or No."),
+  body("notes").optional().isString().withMessage("Notes must be valid."),
+  ctrl.checkOut
+);
+
 router.patch(
-  "/:id/visitors/:visitorId",
-  requireRoles("admin", "manager", "task_only"),
-  validateTime("checkInTime"),
-  validateTime("checkOutTime"),
-  ctrl.updateVisitorTimes
+  "/:id/status",
+  canManage,
+  body("status").isIn(["planned", "in_progress", "completed", "cancelled"]).withMessage("Status is invalid."),
+  ctrl.updateStatus
 );
 
 module.exports = router;

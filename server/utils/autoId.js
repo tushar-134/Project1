@@ -79,4 +79,22 @@ async function nextTaskId(year = new Date().getUTCFullYear()) {
   return `FB/${year}/T${String(doc.seq).padStart(3, "0")}`;
 }
 
-module.exports = { nextClientFileNo, nextTaskId };
+// Client visit ID format:
+//   FB/YYYY/V001
+//
+// Example:
+//   FB/2026/V001
+async function nextVisitId(year = new Date().getUTCFullYear()) {
+  const ClientVisit = require("../models/ClientVisit");
+  const name = `visitId-${year}`;
+  const latest = await ClientVisit.findOne({ visitId: new RegExp(`^FB/${year}/V\\d+$`) }).sort({ visitId: -1 }).select("visitId").lean();
+  await syncCounterFloor(name, numberFromMatch(latest?.visitId, new RegExp(`^FB/${year}/V(\\d+)$`)));
+  const doc = await Counter.findByIdAndUpdate(
+    name,
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true }
+  );
+  return `FB/${year}/V${String(doc.seq).padStart(3, "0")}`;
+}
+
+module.exports = { nextClientFileNo, nextTaskId, nextVisitId };
