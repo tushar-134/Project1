@@ -19,15 +19,17 @@ export default function AddTask() {
   const { id } = useParams();
   const location = useLocation();
   const isEditMode = Boolean(id);
+  const prefillTask = location.state?.prefillTask || null;
+  const returnToClient = location.state?.returnToClient || null;
   const { fetchClients } = useClients();
   const { fetchUsers } = useUsers();
   const { createTask, getTask, updateTask, uploadAttachment, deleteAttachment } = useTasks();
   // If navigated from TaskList with prefetched task data, start directly at step 3 (no flash).
-  const [step, setStep] = useState(() => (isEditMode && location.state?.task) ? 3 : 1);
-  const [categoryId, setCategoryId] = useState("vat");
-  const [categoryName, setCategoryName] = useState("VAT");
+  const [step, setStep] = useState(() => ((isEditMode && location.state?.task) || (!isEditMode && prefillTask)) ? 3 : 1);
+  const [categoryId, setCategoryId] = useState(prefillTask?.categoryId || "vat");
+  const [categoryName, setCategoryName] = useState(prefillTask?.categoryName || "VAT");
   const category = state.categories.find((cat) => cat.id === categoryId);
-  const [type, setType] = useState("VAT Return");
+  const [type, setType] = useState(prefillTask?.type || "VAT Return");
   const [recurring, setRecurring] = useState(false);
   const [fta, setFta] = useState(false);
   const [savedStatus, setSavedStatus] = useState("not_started");
@@ -35,7 +37,20 @@ export default function AddTask() {
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
   const [attachments, setAttachments] = useState([]);
   const [attachmentDescription, setAttachmentDescription] = useState("");
-  const [details, setDetails] = useState({ client: "", assigned: "", dueDate: "2026-05-31", periodFY: "", periodQuarter: "", description: "", frequency: "monthly", dayOfWeek: "Sun", dateOfMonth: 1, monthOfYear: 1, nextDue: "2026-06-30", endDate: "" });
+  const [details, setDetails] = useState({
+    client: prefillTask?.clientId || "",
+    assigned: "",
+    dueDate: "2026-05-31",
+    periodFY: "",
+    periodQuarter: "",
+    description: prefillTask?.description || "",
+    frequency: "monthly",
+    dayOfWeek: "Sun",
+    dateOfMonth: 1,
+    monthOfYear: 1,
+    nextDue: "2026-06-30",
+    endDate: ""
+  });
   const chips = useMemo(() => category?.taskTypes || [], [category]);
 
   // Derive field-visibility config from the selected task type's saved toggles.
@@ -132,6 +147,19 @@ export default function AddTask() {
       }
     });
   }, [id, isEditMode]);
+
+  useEffect(() => {
+    if (isEditMode || !prefillTask) return;
+    setCategoryId(prefillTask.categoryId || "vat");
+    setCategoryName(prefillTask.categoryName || "VAT");
+    setType(prefillTask.type || "VAT Return");
+    setStep(3);
+    setDetails((current) => ({
+      ...current,
+      client: prefillTask.clientId || current.client,
+      description: prefillTask.description || current.description,
+    }));
+  }, [isEditMode, prefillTask]);
 
   useEffect(() => {
     if (!state.categories.length || !categoryName) return;
@@ -276,6 +304,19 @@ export default function AddTask() {
         setAttachments(mapAttachmentRows(savedTask?.attachments || []));
       }
       toast.success(isEditMode ? "Task updated successfully." : "Task created successfully.");
+      if (!isEditMode && returnToClient?.clientId && savedTask?._id) {
+        navigate(`/clients/edit/${returnToClient.clientId}`, {
+          state: {
+            activeTab: Number(returnToClient.activeTab) || 3,
+            createdRegistrationTask: {
+              taxType: returnToClient.taxType || "vat",
+              taskMongoId: savedTask._id,
+              taskId: savedTask.taskId || "",
+            },
+          },
+        });
+        return;
+      }
       navigate("/tasks/list");
     } catch (error) {
       const fallback = isEditMode ? "Unable to save task right now." : "Unable to create task right now.";
