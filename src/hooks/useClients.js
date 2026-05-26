@@ -13,7 +13,7 @@ export function useClients() {
       const rawClients = Array.isArray(data) ? data : (data.clients || data.items || []);
       const clients = rawClients.map(mapClient);
       dispatch({ type: "SET_RESOURCE", resource: "clients", payload: clients });
-      return Array.isArray(data) ? clients : { ...data, clients };
+      return Array.isArray(data) ? clients : { ...data, clients, workingTasksTotal: data.workingTasksTotal || 0 };
     } catch (error) {
       dispatch({ type: "SET_ERROR", resource: "clients", error });
       throw error;

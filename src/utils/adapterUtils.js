@@ -51,6 +51,7 @@ export function mapClient(client) {
     contact: client.contactPersons?.find((p) => p.isPrimary)?.fullName || client.contactPersons?.[0]?.fullName || "",
     mobile: client.contactPersons?.[0]?.mobile ? `${client.contactPersons[0].mobile.countryCode || ""} ${client.contactPersons[0].mobile.number || ""}` : "",
     email: client.contactPersons?.[0]?.email || "",
+    activeTasks: client.activeTasks || 0,
   };
 }
 
