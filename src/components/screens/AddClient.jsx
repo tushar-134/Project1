@@ -1,5 +1,5 @@
 import { cloneElement, isValidElement, useCallback, useEffect, useMemo, useState, useRef } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { Check, ChevronDown, Copy, Eye, EyeOff, Plus, Search, Trash2, UploadCloud, X, Settings2 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
@@ -132,10 +132,11 @@ export default function AddClient() {
   const { state, dispatch } = useApp();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams();
   const isEditMode = Boolean(id);
   const { createClient, getClient, updateClient, uploadAttachment, uploadDocument, deleteAttachment, deleteDocument } = useClients();
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useState(() => Number(location.state?.activeTab) || 0);
   const countries = useMemo(() => {
     const names = new Intl.DisplayNames(["en"], { type: "region" });
     let codes = countryCodes;
@@ -150,9 +151,10 @@ export default function AddClient() {
   const [form, setForm] = useState({
     clientType: "", fileNo: "", legalName: "", tradeName: "", fye: "Jan - Dec", jurisdiction: "Mainland", assigned: "",
     country: "United Arab Emirates", emirate: "Dubai", street: "", poBox: "", postalCode: "", differentAddress: false, correspondence: "",
-    vatTrn: "", vatStatus: "Registered", vatDate: "", vatFreq: "Jan-Mar", ctTin: "", ctStatus: "Not Registered", ctDate: "", group: "", newGroup: "",
+    vatTrn: "", vatStatus: "Registered", vatDate: "", vatFreq: "Jan-Mar", vatRegistrationTask: "", vatRegistrationTaskId: "", ctTin: "", ctStatus: "Not Registered", ctDate: "", group: "", newGroup: "",
   });
   const vatFilingFrequencyOptions = useMemo(() => getVatFilingFrequencyOptions(form.fye), [form.fye]);
+  const shouldShowVatRegistrationFields = form.vatStatus !== "Not Registered";
   const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "Dubai", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }]);
 
   const [contacts, setContacts] = useState([{
@@ -198,6 +200,28 @@ export default function AddClient() {
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const update = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+  const openVatRegistrationTask = () => {
+    if (!isEditMode || !id) {
+      toast.error("Save the client first, then create the VAT registration task.");
+      return;
+    }
+    navigate("/tasks/add", {
+      state: {
+        prefillTask: {
+          categoryId: "vat",
+          categoryName: "VAT",
+          type: "VAT Registration",
+          clientId: id,
+          description: `VAT registration for ${form.legalName || "this client"}`,
+        },
+        returnToClient: {
+          clientId: id,
+          activeTab: 3,
+          taxType: "vat",
+        },
+      },
+    });
+  };
 
   const loadUserOptions = useCallback(async (search = "") => {
     setIsUserSearchLoading(true);
@@ -290,6 +314,8 @@ export default function AddClient() {
         vatStatus: client.vatDetails?.status === "registered" ? "Registered" : client.vatDetails?.status === "applying" ? "Applying / In Progress" : client.vatDetails?.status === "exempt" ? "Exempt" : "Not Registered",
         vatDate: client.vatDetails?.registrationDate?.slice?.(0, 10) || "",
         vatFreq: normalizeVatFilingFrequency(client.vatDetails?.filingFrequency, normalizeFinancialYearEnd(client.financialYearEnd || client.ctDetails?.financialYearEnd || "")),
+        vatRegistrationTask: location.state?.createdRegistrationTask?.taxType === "vat" ? location.state.createdRegistrationTask.taskMongoId || "" : client.vatDetails?.registrationTask || "",
+        vatRegistrationTaskId: location.state?.createdRegistrationTask?.taxType === "vat" ? location.state.createdRegistrationTask.taskId || "" : client.vatDetails?.registrationTaskId || "",
         ctTin: client.ctDetails?.tin || "",
         ctStatus: client.ctDetails?.status === "registered" ? "Registered" : client.ctDetails?.status === "applying" ? "Pending" : "Not Registered",
         ctDate: client.ctDetails?.registrationDate?.slice?.(0, 10) || "",
@@ -385,7 +411,7 @@ export default function AddClient() {
       toast.error("Unable to load this client for editing.");
       navigate("/clients/list");
     });
-  }, [id, isEditMode]);
+  }, [id, isEditMode, location.state, navigate]);
 
   const formatFileSize = (size) => {
     if (size < 1024 * 1024) return `${Math.max(1, Math.round(size / 1024))} KB`;
@@ -763,7 +789,14 @@ export default function AddClient() {
         customFields: { qrmpPreference: form.qrmp, auditFirmName: form.auditFirm, bankName: form.bank, iban: form.iban },
       };
       if (includeVatCt) {
-        payload.vatDetails = { trn: form.vatTrn, status: form.vatStatus === "Registered" ? "registered" : form.vatStatus === "Applying / In Progress" ? "applying" : form.vatStatus === "Exempt" ? "exempt" : "not_registered", registrationDate: form.vatDate, filingFrequency: normalizeVatFilingFrequency(form.vatFreq, form.fye) };
+        payload.vatDetails = {
+          trn: shouldShowVatRegistrationFields ? form.vatTrn : "",
+          status: form.vatStatus === "Registered" ? "registered" : form.vatStatus === "Applying / In Progress" ? "applying" : form.vatStatus === "Exempt" ? "exempt" : "not_registered",
+          registrationDate: shouldShowVatRegistrationFields ? form.vatDate : undefined,
+          filingFrequency: shouldShowVatRegistrationFields ? normalizeVatFilingFrequency(form.vatFreq, form.fye) : undefined,
+          registrationTask: form.vatRegistrationTask || undefined,
+          registrationTaskId: form.vatRegistrationTaskId || undefined,
+        };
         payload.ctDetails = { tin: form.ctTin, status: form.ctStatus === "Registered" ? "registered" : form.ctStatus === "Pending" ? "applying" : "not_registered", registrationDate: form.ctDate, financialYearEnd: form.fye };
       }
       if (includeTradeLicences) {
@@ -990,19 +1023,44 @@ export default function AddClient() {
                   <option>Exempt</option>
                 </select>
               </Field>
-              <Field label="VAT TRN" field="client-vat-trn">
-                <input className="input" inputMode="numeric" maxLength={15} placeholder="15 digits starting with 1" value={form.vatTrn} onChange={(e) => update("vatTrn", String(e.target.value || "").replace(/\D+/g, "").slice(0, 15))} />
-              </Field>
-              <Field label="VAT Registration Date" field="client-vat-date">
-                <input className="input" type="date" value={form.vatDate} onChange={(e) => update("vatDate", e.target.value)} />
-              </Field>
-              <Field label="VAT Filing Frequency" field="client-vat-frequency">
-                <select className="input" value={form.vatFreq} onChange={(e) => update("vatFreq", e.target.value)}>
-                  {vatFilingFrequencyOptions.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-              </Field>
+              {shouldShowVatRegistrationFields ? (
+                <>
+                  <Field label="VAT TRN" field="client-vat-trn">
+                    <input className="input" inputMode="numeric" maxLength={15} placeholder="15 digits starting with 1" value={form.vatTrn} onChange={(e) => update("vatTrn", String(e.target.value || "").replace(/\D+/g, "").slice(0, 15))} />
+                  </Field>
+                  <Field label="VAT Registration Date" field="client-vat-date">
+                    <input className="input" type="date" value={form.vatDate} onChange={(e) => update("vatDate", e.target.value)} />
+                  </Field>
+                  <Field label="VAT Filing Frequency" field="client-vat-frequency">
+                    <select className="input" value={form.vatFreq} onChange={(e) => update("vatFreq", e.target.value)}>
+                      {vatFilingFrequencyOptions.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </Field>
+                </>
+              ) : (
+                <div className="md:col-span-2 rounded-2xl border border-dashed border-[#cbd5e1] bg-slate-50 p-4">
+                  <div className="text-sm font-bold text-slate-900">VAT registration task required</div>
+                  <p className="mt-1 text-sm text-slate-600">
+                    This client is marked as not registered for VAT. Create a VAT registration task first, then come back here and update the status to registered when the registration is complete.
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <button type="button" className="text-sm font-bold text-[#1e3a8a] underline underline-offset-4" onClick={openVatRegistrationTask}>
+                      Open VAT registration task
+                    </button>
+                    {form.vatRegistrationTaskId && (
+                      <button
+                        type="button"
+                        className="rounded-full border border-[#bfdbfe] bg-white px-3 py-1 text-xs font-extrabold text-[#1e3a8a]"
+                        onClick={() => form.vatRegistrationTask && navigate(`/tasks/${form.vatRegistrationTask}`)}
+                      >
+                        Task ID: {form.vatRegistrationTaskId}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
               <Field label="CT Registration Number (TIN)" field="client-ct-tin">
                 <input className="input" value={form.ctTin} onChange={(e) => update("ctTin", e.target.value)} />
               </Field>
