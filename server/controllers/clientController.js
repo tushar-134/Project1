@@ -38,6 +38,90 @@ function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function parsePagination(query = {}, defaultLimit = 20) {
+  const page = Math.max(1, Number(query.page) || 1);
+  const limit = Math.max(1, Math.min(100, Number(query.limit) || defaultLimit));
+  return { page, limit };
+}
+
+function buildPattern(value) {
+  return new RegExp(escapeRegex(String(value || "").trim()), "i");
+}
+
+function buildClientSearchClause(value) {
+  const pattern = buildPattern(value);
+  return {
+    $or: [
+      { legalName: pattern },
+      { tradeName: pattern },
+      { fileNo: pattern },
+      { jurisdiction: pattern },
+      { clientType: pattern },
+      { "vatDetails.trn": pattern },
+      { "tradeLicences.licenceNumber": pattern },
+      { "contactPersons.fullName": pattern },
+      { "contactPersons.email": pattern },
+      { "contactPersons.mobile.number": pattern },
+      { "contactPersons.mobile.countryCode": pattern },
+    ],
+  };
+}
+
+async function buildClientListQuery(req) {
+  const { search, jurisdiction, group, assignedUser, client, compliance, contact } = req.query;
+  const query = { isActive: true };
+  const andClauses = [];
+
+  if (jurisdiction) andClauses.push({ jurisdiction });
+  if (assignedUser) andClauses.push({ assignedUser });
+  if (req.user.role === "task_only") {
+    const assignedClientIds = await Task.find({ assignedTo: req.user._id }).distinct("client");
+    andClauses.push({ _id: { $in: assignedClientIds } });
+  }
+  if (search) andClauses.push(buildClientSearchClause(search));
+  if (client) {
+    const pattern = buildPattern(client);
+    andClauses.push({
+      $or: [
+        { legalName: pattern },
+        { tradeName: pattern },
+        { fileNo: pattern },
+        { jurisdiction: pattern },
+        { clientType: pattern },
+      ],
+    });
+  }
+  if (group) {
+    const trimmed = String(group || "").trim();
+    const groupIds = new Set(/^[0-9a-fA-F]{24}$/.test(trimmed) ? [trimmed] : []);
+    const matchedGroups = await ClientGroup.find({ name: buildPattern(group) }).distinct("_id");
+    matchedGroups.forEach((id) => groupIds.add(String(id)));
+    andClauses.push({ group: groupIds.size ? { $in: [...groupIds] } : { $in: [] } });
+  }
+  if (compliance) {
+    const pattern = buildPattern(compliance);
+    andClauses.push({
+      $or: [
+        { "vatDetails.trn": pattern },
+        { "tradeLicences.licenceNumber": pattern },
+      ],
+    });
+  }
+  if (contact) {
+    const pattern = buildPattern(contact);
+    andClauses.push({
+      $or: [
+        { "contactPersons.fullName": pattern },
+        { "contactPersons.email": pattern },
+        { "contactPersons.mobile.number": pattern },
+        { "contactPersons.mobile.countryCode": pattern },
+      ],
+    });
+  }
+  if (andClauses.length) query.$and = andClauses;
+  return query;
+}
+
 function normalizeFileNo(value) {
   const trimmed = String(value || "").trim();
   return trimmed || undefined;
@@ -278,30 +362,17 @@ function normalizeContactPersonsForPersistence(contactPersons = [], existingCont
 
 exports.listClients = async (req, res, next) => {
   try {
-    const { search, jurisdiction, group, assignedUser, page = 1, limit = 20 } = req.query;
-    const query = { isActive: true };
-    if (jurisdiction) query.jurisdiction = jurisdiction;
-    if (group) query.group = group;
-    if (assignedUser) query.assignedUser = assignedUser;
-    if (req.user.role === "task_only") {
-      // task_only users may only see clients whose tasks are assigned to them.
-      const assignedClientIds = await Task.find({ assignedTo: req.user._id }).distinct("client");
-      query._id = { $in: assignedClientIds };
-    }
-    if (search) {
-      query.$or = [
-        { legalName: new RegExp(search, "i") },
-        { tradeName: new RegExp(search, "i") },
-        { "vatDetails.trn": new RegExp(search, "i") },
-        { "tradeLicences.licenceNumber": new RegExp(search, "i") },
-      ];
-    }
-    const skip = (Number(page) - 1) * Number(limit);
-    const [clients, total] = await Promise.all([
-      Client.find(query).populate(populateClient).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)),
-      Client.countDocuments(query),
-    ]);
-    res.json({ clients, total, page: Number(page), pages: Math.ceil(total / Number(limit)) || 1 });
+    const { page: requestedPage, limit } = parsePagination(req.query, 20);
+    const query = await buildClientListQuery(req);
+    const total = await Client.countDocuments(query);
+    const pages = Math.max(1, Math.ceil(total / limit));
+    const page = Math.min(requestedPage, pages);
+    const clients = await Client.find(query)
+      .populate(populateClient)
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit);
+    res.json({ clients, total, page, pages, limit });
   } catch (error) { next(error); }
 };
 
@@ -503,7 +574,7 @@ exports.bulkUpload = async (req, res, next) => {
 
 exports.exportClients = async (req, res, next) => {
   try {
-    const clients = await Client.find({ isActive: true }).populate("group", "name");
+    const clients = await Client.find(await buildClientListQuery(req)).populate("group", "name");
     const csv = ["File No,Name,Jurisdiction,Group,VAT TRN"].concat(clients.map((c) => [c.fileNo, c.legalName, c.jurisdiction, c.group?.name || "", c.vatDetails?.trn || ""].map((v) => `"${String(v).replaceAll('"', '""')}"`).join(","))).join("\n");
     // Bug #2 Fix: res.attachment() was removed in Express 5; use setHeader instead.
     res.setHeader("Content-Disposition", 'attachment; filename="clients.csv"')

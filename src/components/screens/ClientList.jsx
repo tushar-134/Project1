@@ -1,6 +1,6 @@
 import { Download, Pencil, Search, Trash2, Upload } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useClients } from "../../hooks/useClients";
@@ -13,48 +13,75 @@ import ClientDrawer from "../ui/ClientDrawer.jsx";
 import Table from "../ui/Table.jsx";
 
 const EMPTY_COLUMN_FILTERS = {
+  client: "",
   group: "",
+  compliance: "",
   contact: "",
 };
+const PAGE_SIZE = 20;
 
 export default function ClientList() {
   const { state } = useApp();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { fetchClients, deleteClient, exportClients } = useClients();
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(searchParams.get("search") || "");
+  const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1 });
   const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
   const [drawerClientId, setDrawerClientId] = useState(null);
   const canManage = canManageClients(currentUser?.role);
   const canCreate = canCreateClients(currentUser?.role);
+  const clientsLoading = Boolean(state.loading.clients);
+  const clientError = state.errors.clients;
+  const deferredQuery = useDeferredValue(query);
+  const deferredColumnFilters = useDeferredValue(columnFilters);
+
+  const requestParams = useMemo(() => ({
+    page,
+    limit: PAGE_SIZE,
+    search: deferredQuery.trim() || undefined,
+    client: deferredColumnFilters.client.trim() || undefined,
+    group: deferredColumnFilters.group.trim() || undefined,
+    compliance: deferredColumnFilters.compliance.trim() || undefined,
+    contact: deferredColumnFilters.contact.trim() || undefined,
+  }), [deferredColumnFilters, deferredQuery, page]);
 
   useEffect(() => {
-    const timer = setTimeout(() => fetchClients({ page: 1, limit: 200 }).catch(() => { }), 400);
-    return () => clearTimeout(timer);
-  }, [fetchClients]);
+    let active = true;
+    const timer = setTimeout(() => {
+      fetchClients(requestParams)
+        .then((data) => {
+          if (!active) return;
+          setMeta({
+            total: data?.total || 0,
+            page: data?.page || 1,
+            pages: data?.pages || 1,
+          });
+        })
+        .catch(() => {});
+    }, 250);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [fetchClients, requestParams]);
 
-  const taskMatches = (value, filter) => String(value || "").toLowerCase().includes(String(filter || "").toLowerCase().trim());
-  const filterOptions = (key) => [...new Set(state.clients.map((client) => client[key]).filter(Boolean))].sort();
   const hasColumnFilters = Object.values(columnFilters).some(Boolean);
-  const updateColumnFilter = (key, value) => setColumnFilters((current) => ({ ...current, [key]: value }));
-  const rows = state.clients.filter((client) => {
-    const combinedSearch = [
-      client.name,
-      client.jurisdiction,
-      client.type,
-      client.group,
-      client.licence,
-      client.vatTrn,
-      client.contact,
-      client.mobile,
-      client.email,
-    ].join(" ");
-    if (query && !taskMatches(combinedSearch, query)) return false;
-    if (columnFilters.group && client.group !== columnFilters.group) return false;
-    if (!taskMatches([client.contact, client.mobile, client.email].join(" "), columnFilters.contact)) return false;
-    return true;
-  });
-  const exportCsv = async () => downloadBlob(await exportClients(), "clients.csv");
+  const hasActiveFilters = Boolean(query.trim()) || hasColumnFilters;
+  const updateColumnFilter = (key, value) => {
+    setPage(1);
+    setColumnFilters((current) => ({ ...current, [key]: value }));
+  };
+  const rows = state.clients;
+  const exportCsv = async () => downloadBlob(await exportClients({
+    search: deferredQuery.trim() || undefined,
+    client: deferredColumnFilters.client.trim() || undefined,
+    group: deferredColumnFilters.group.trim() || undefined,
+    compliance: deferredColumnFilters.compliance.trim() || undefined,
+    contact: deferredColumnFilters.contact.trim() || undefined,
+  }), "clients.csv");
 
   return (
     <div className="space-y-5">
@@ -89,7 +116,10 @@ export default function ClientList() {
             type="search"
             placeholder="Search by name, jurisdiction, type, group, trade licence, TRN, contact, mobile, email"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setPage(1);
+              setQuery(e.target.value);
+            }}
           />
         </div>
       </Card>
@@ -106,45 +136,69 @@ export default function ClientList() {
             </tr>
             <tr>
               <th>
-                <div className="text-[11px] font-semibold normal-case text-slate-400">
-                  Search above for name, jurisdiction, type
-                </div>
+                <input
+                  aria-label="Filter by client"
+                  className="input h-8 min-w-36"
+                  type="search"
+                  value={columnFilters.client}
+                  onChange={(e) => updateColumnFilter("client", e.target.value)}
+                />
               </th>
               <th>
-                <select
+                <input
                   aria-label="Filter by group"
                   className="input h-8 min-w-28"
+                  type="search"
                   value={columnFilters.group}
                   onChange={(e) => updateColumnFilter("group", e.target.value)}
-                >
-                  <option value="">All</option>
-                  {filterOptions("group").map((option) => <option key={option} value={option}>{option}</option>)}
-                </select>
+                />
               </th>
               <th>
-                <div className="text-[11px] font-semibold normal-case text-slate-400">
-                  Search above for licence, TRN
-                </div>
+                <input
+                  aria-label="Filter by compliance"
+                  className="input h-8 min-w-36"
+                  type="search"
+                  value={columnFilters.compliance}
+                  onChange={(e) => updateColumnFilter("compliance", e.target.value)}
+                />
               </th>
               <th>
                 <input aria-label="Filter by contact details" className="input h-8 min-w-36" type="search" value={columnFilters.contact} onChange={(e) => updateColumnFilter("contact", e.target.value)} />
               </th>
               {canManage && (
                 <th>
-                  {hasColumnFilters && <Button size="sm" variant="ghost" onClick={() => setColumnFilters(EMPTY_COLUMN_FILTERS)}>Clear</Button>}
+                  {hasActiveFilters && <Button size="sm" variant="ghost" onClick={() => {
+                    setPage(1);
+                    setQuery("");
+                    setColumnFilters(EMPTY_COLUMN_FILTERS);
+                  }}>Clear</Button>}
                 </th>
               )}
             </tr>
           </thead>
           <tbody>
-            {!rows.length && (
+            {clientsLoading && (
+              <tr>
+                <td colSpan={canManage ? 5 : 4} className="py-8 text-center font-semibold text-slate-500">
+                  Loading clients...
+                </td>
+              </tr>
+            )}
+            {!clientsLoading && clientError && (
+              <tr>
+                <td colSpan={canManage ? 5 : 4} className="py-8 text-center font-semibold text-red-600">
+                  {String(clientError)}
+                </td>
+              </tr>
+            )}
+            {!clientsLoading && !clientError && !rows.length && (
               <tr>
                 <td colSpan={canManage ? 5 : 4} className="py-8 text-center font-semibold text-slate-500">
                   No clients match the current search or filters.
                 </td>
               </tr>
             )}
-            {rows.map((client) => (
+            {!clientsLoading && !clientError && rows.map((client) => (
               <tr key={client.id}>
                 <td>
                   <button
@@ -189,7 +243,16 @@ export default function ClientList() {
                           onClick={async () => {
                             if (confirm("Delete client?")) {
                               await deleteClient(client._id);
-                              fetchClients();
+                              if (rows.length === 1 && page > 1) {
+                                setPage((current) => Math.max(1, current - 1));
+                              } else {
+                                const data = await fetchClients(requestParams);
+                                setMeta({
+                                  total: data?.total || 0,
+                                  page: data?.page || 1,
+                                  pages: data?.pages || 1,
+                                });
+                              }
                             }
                           }}
                         >
@@ -204,6 +267,24 @@ export default function ClientList() {
           </tbody>
         </Table>
       </Card>
+      {meta.pages > 1 && (
+        <Card className="px-4 py-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="text-[12px] font-semibold text-slate-500">
+              Showing {Math.max(1, (meta.page - 1) * PAGE_SIZE + 1)} to {Math.min(meta.page * PAGE_SIZE, meta.total)} of {meta.total} clients
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={meta.page <= 1}>
+                Previous
+              </Button>
+              <span className="text-[12px] font-semibold text-slate-500">Page {meta.page} of {meta.pages}</span>
+              <Button variant="ghost" size="sm" onClick={() => setPage((current) => Math.min(meta.pages || 1, current + 1))} disabled={meta.page >= meta.pages}>
+                Next
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
       {drawerClientId && <ClientDrawer clientId={drawerClientId} onClose={() => setDrawerClientId(null)} />}
     </div>
   );

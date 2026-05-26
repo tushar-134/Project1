@@ -10,9 +10,10 @@ export function useClients() {
     dispatch({ type: "SET_LOADING", resource: "clients", value: true });
     try {
       const data = await clientService.list(params);
-      const clients = (data.clients || data).map(mapClient);
+      const rawClients = Array.isArray(data) ? data : (data.clients || data.items || []);
+      const clients = rawClients.map(mapClient);
       dispatch({ type: "SET_RESOURCE", resource: "clients", payload: clients });
-      return data;
+      return Array.isArray(data) ? clients : { ...data, clients };
     } catch (error) {
       dispatch({ type: "SET_ERROR", resource: "clients", error });
       throw error;
