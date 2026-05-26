@@ -13,6 +13,7 @@ server/.env
 server/server.log
 server/*.log
 server/uploads/
+server/tmp-uploads/
 
 .DS_Store
 Thumbs.db

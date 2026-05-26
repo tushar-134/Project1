@@ -9,6 +9,10 @@ export const clientService = {
   update: (id, payload) => api.put(`/clients/${id}`, payload).then((res) => res.data),
   remove: (id) => api.delete(`/clients/${id}`).then((res) => res.data),
   bulkUpload: (rows) => api.post("/clients/bulk-upload", { rows }).then((res) => res.data),
+  bulkUploadV2: (formData) => api.post("/clients/bulk-upload-v2", formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 300000, // 5 minutes for large ZIP uploads
+  }).then((res) => res.data),
   export: () => api.get("/clients/export", { responseType: "blob" }).then((res) => res.data),
   uploadAttachment: (id, formData) => api.post(`/clients/${id}/attachments`, formData).then((res) => res.data),
   uploadDocument: (id, formData) => api.post(`/clients/${id}/documents`, formData).then((res) => res.data),

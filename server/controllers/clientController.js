@@ -469,36 +469,326 @@ exports.deleteClient = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
+// ─── Shared bulk-upload helpers ────────────────────────────────────────────────
+
+const VALID_JURISDICTIONS = ["mainland", "freezone", "designated_zone", "offshore"];
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function normalizeBulkJurisdiction(raw) {
+  const value = String(raw || "mainland").trim().toLowerCase().replace(/\s+/g, "_");
+  if (value === "free_zone") return "freezone";
+  return VALID_JURISDICTIONS.includes(value) ? value : "mainland";
+}
+
+function validateBulkRow(row) {
+  const errors = [];
+  if (!String(row.legalName || "").trim()) errors.push("legalName is required.");
+  const clientType = String(row.clientType || "legal").trim().toLowerCase();
+  if (!["legal", "natural"].includes(clientType)) errors.push("clientType must be 'legal' or 'natural'.");
+  const trn = String(row.vatTrn || row.trn || "").trim();
+  if (trn && !/^1\d{14}$/.test(trn)) errors.push("VAT TRN must be a 15-digit number starting with 1.");
+  if (!String(row.contactName || "").trim()) errors.push("contactName is required.");
+  const email = String(row.contactEmail || "").trim();
+  if (!email) errors.push("contactEmail is required.");
+  else if (!EMAIL_PATTERN.test(email)) errors.push("contactEmail is invalid.");
+  if (!String(row.contactMobile || "").trim()) errors.push("contactMobile is required.");
+  else if (!/^\d+$/.test(String(row.contactMobile).trim())) errors.push("contactMobile must contain only digits.");
+  return errors;
+}
+
+async function resolveAssignedUser(emailId) {
+  const email = String(emailId || "").trim().toLowerCase();
+  if (!email) return undefined;
+  const user = await User.findOne({ email, isActive: true }).select("_id");
+  return user?._id || undefined;
+}
+
+function buildClientPayload(row, userId) {
+  const trn = String(row.vatTrn || row.trn || "").trim();
+  const licence = String(row.licenceNumber || "").trim();
+  const contactCountryCode = String(row.contactCountryCode || "+971").trim();
+  return {
+    clientType: String(row.clientType || "legal").trim().toLowerCase(),
+    legalName: String(row.legalName || "").trim(),
+    tradeName: String(row.tradeName || "").trim() || undefined,
+    jurisdiction: normalizeBulkJurisdiction(row.jurisdiction),
+    vatDetails: trn ? { trn } : undefined,
+    tradeLicences: licence ? [{ licenceNumber: licence }] : [],
+    contactPersons: [{
+      fullName: String(row.contactName || "").trim(),
+      email: String(row.contactEmail || "").trim(),
+      mobile: {
+        countryCode: contactCountryCode,
+        number: String(row.contactMobile || "").trim(),
+      },
+      isPrimary: true,
+    }],
+    createdBy: userId,
+  };
+}
+
+// ─── v1: JSON-based bulk upload (updated with contacts + per-row results) ─────
+
 exports.bulkUpload = async (req, res, next) => {
   try {
-    // Bulk upload accepts already-parsed rows from the browser so the backend can focus on validation and dedupe.
     const rows = Array.isArray(req.body.rows) ? req.body.rows : req.body;
-    let added = 0, skipped = 0;
-    const errors = [];
-    for (const row of rows) {
+    const results = [];
+    let added = 0, failed = 0;
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const serial = row.serial || i + 1;
+      const legalName = String(row.legalName || row.name || "").trim();
+
       try {
-        const trn = row.vatTrn || row.trn || row["VAT TRN"];
-        const licence = row.licenceNumber || row.licence || row["Trade Licence No."];
+        // Validate row fields
+        const validationErrors = validateBulkRow(row);
+        if (validationErrors.length) {
+          results.push({ serial, status: "error", legalName, error: validationErrors.join(" ") });
+          failed++;
+          continue;
+        }
+
+        const trn = String(row.vatTrn || row.trn || "").trim();
+        const licence = String(row.licenceNumber || "").trim();
+
+        // Duplicate check
         const exists = await findDuplicateClient({
-          legalName: row.legalName || row.name,
+          legalName,
           vatDetails: { trn },
           tradeLicences: licence ? [{ licenceNumber: licence }] : [],
         });
-        if (exists) { skipped += 1; continue; }
-        await Client.create({
-          fileNo: await nextClientFileNo(),
-          clientType: row.clientType || "legal",
-          legalName: row.legalName || row.name,
-          jurisdiction: row.jurisdiction || "mainland",
-          vatDetails: { trn },
-          tradeLicences: licence ? [{ licenceNumber: licence }] : [],
-          createdBy: req.user._id,
-        });
-        added += 1;
-      } catch (error) { errors.push({ row, message: error.message }); }
+        if (exists) {
+          results.push({ serial, status: "error", legalName, error: duplicateMessage(exists, { legalName, vatDetails: { trn }, tradeLicences: licence ? [{ licenceNumber: licence }] : [] }) });
+          failed++;
+          continue;
+        }
+
+        // Resolve assigned user by email
+        const assignedUser = await resolveAssignedUser(row.assignedUserEmailId || row.assignedUser);
+
+        const payload = buildClientPayload(row, req.user._id);
+        if (assignedUser) payload.assignedUser = assignedUser;
+        payload.fileNo = await nextClientFileNo();
+
+        const client = await Client.create(payload);
+        results.push({ serial, status: "success", legalName, clientId: client._id });
+        added++;
+      } catch (error) {
+        results.push({ serial, status: "error", legalName, error: error.message });
+        failed++;
+      }
     }
-    res.json({ added, skipped, errors });
+    res.json({ results, summary: { total: rows.length, added, failed } });
   } catch (error) { next(error); }
+};
+
+// ─── v2: ZIP-based bulk upload with document processing ───────────────────────
+
+const XLSX = require("xlsx");
+const fs = require("fs");
+const path = require("path");
+const cloudinary = require("../config/cloudinary");
+const { extractZip, cleanupTempFiles, findFileByBasename, findSpreadsheet, resolveContentRoot } = require("../utils/zipUtils");
+
+// Check if Cloudinary is properly configured (mirrors uploadMiddleware.js logic)
+function isCloudinaryConfigured() {
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+  function isValid(v) {
+    if (!v) return false;
+    const n = String(v).trim().toLowerCase();
+    return n !== "your_cloud_name" && n !== "your_api_key" && n !== "your_api_secret" && n !== "test" && n !== "demo" && n !== "undefined" && n !== "null";
+  }
+  return isValid(cloudName) && isValid(apiKey) && isValid(apiSecret) && /^\d+$/.test(String(apiKey).trim()) && String(apiSecret).trim().length >= 8;
+}
+
+/**
+ * Upload a local file to Cloudinary or copy to local uploads folder.
+ * Returns a file entry suitable for the uploadedFileSchema.
+ */
+async function uploadDocumentFile(filePath, userId, description = "", folderPrefix = "") {
+  const rawFileName = path.basename(filePath);
+  // Prepend folder name so the stored attachment name indicates its source
+  const fileName = folderPrefix ? `${folderPrefix}_${rawFileName}` : rawFileName;
+  const fileSize = fs.statSync(filePath).size;
+  const mimeTypes = { ".pdf": "application/pdf", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".gif": "image/gif", ".webp": "image/webp" };
+  const ext = path.extname(rawFileName).toLowerCase();
+  const fileType = mimeTypes[ext] || "application/octet-stream";
+
+  let url;
+  if (isCloudinaryConfigured()) {
+    const result = await cloudinary.uploader.upload(filePath, {
+      folder: "filing-buddy",
+      resource_type: "auto",
+    });
+    url = result.secure_url || result.url;
+  } else {
+    // Local: copy to server/uploads/
+    const uploadsDir = path.join(__dirname, "..", "uploads");
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    const destName = `${Date.now()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+    const destPath = path.join(uploadsDir, destName);
+    fs.copyFileSync(filePath, destPath);
+    url = `/uploads/${destName}`;
+  }
+
+  return {
+    name: fileName,
+    size: `${Math.round(fileSize / 1024)} KB`,
+    fileType,
+    description,
+    url,
+    uploadedBy: userId,
+  };
+}
+
+exports.bulkUploadV2 = async (req, res, next) => {
+  let extractedDir = null;
+  const zipFilePath = req.file?.path || null;
+
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "Please upload a .zip file." });
+    }
+
+    // 1. Extract ZIP
+    extractedDir = extractZip(zipFilePath);
+
+    // 2. Find the spreadsheet
+    const spreadsheetPath = findSpreadsheet(extractedDir);
+    if (!spreadsheetPath) {
+      return res.status(400).json({ message: "No .xlsx or .csv file found in the ZIP archive." });
+    }
+
+    // 3. Parse spreadsheet
+    const wb = XLSX.readFile(spreadsheetPath);
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
+    if (!rows.length) {
+      return res.status(400).json({ message: "The spreadsheet is empty." });
+    }
+
+    // 4. Locate document folders (case-insensitive)
+    // Resolve the real content root — handles wrapper folders created when re-zipping
+    const contentRoot = resolveContentRoot(extractedDir);
+    const dirEntries = fs.readdirSync(contentRoot);
+    const findSubDir = (name) => {
+      const match = dirEntries.find((e) => e.toLowerCase() === name.toLowerCase());
+      if (!match) return null;
+      const full = path.join(contentRoot, match);
+      return fs.statSync(full).isDirectory() ? full : null;
+    };
+
+    const licensesDir = findSubDir("licenses");
+    const passportsDir = findSubDir("passports");
+    const emirateIdsDir = findSubDir("emirate_ids");
+
+    // 5. Process each row
+    const results = [];
+    let added = 0, failed = 0;
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const serial = row.serial || i + 1;
+      const legalName = String(row.legalName || row.name || "").trim();
+
+      try {
+        // Validate
+        const validationErrors = validateBulkRow(row);
+        if (validationErrors.length) {
+          results.push({ serial, status: "error", legalName, error: validationErrors.join(" ") });
+          failed++;
+          continue;
+        }
+
+        const trn = String(row.vatTrn || row.trn || "").trim();
+        const licence = String(row.licenceNumber || "").trim();
+
+        // Duplicate check
+        const exists = await findDuplicateClient({
+          legalName,
+          vatDetails: { trn },
+          tradeLicences: licence ? [{ licenceNumber: licence }] : [],
+        });
+        if (exists) {
+          results.push({ serial, status: "error", legalName, error: duplicateMessage(exists, { legalName, vatDetails: { trn }, tradeLicences: licence ? [{ licenceNumber: licence }] : [] }) });
+          failed++;
+          continue;
+        }
+
+        // Resolve assigned user
+        const assignedUser = await resolveAssignedUser(row.assignedUserEmailId || row.assignedUser);
+
+        // Build payload
+        const payload = buildClientPayload(row, req.user._id);
+        if (assignedUser) payload.assignedUser = assignedUser;
+        payload.fileNo = await nextClientFileNo();
+
+        // 6. Process documents — upload and map
+        // Trade licence document: licenses/<licenceNumber>.*
+        if (licence && licensesDir) {
+          const licenceFile = findFileByBasename(licensesDir, licence);
+          if (licenceFile) {
+            const fileEntry = await uploadDocumentFile(licenceFile, req.user._id, `Trade licence document for ${licence}`, "licenses");
+            if (payload.tradeLicences.length) {
+              payload.tradeLicences[0].documents = [fileEntry];
+              payload.tradeLicences[0].documentUrl = fileEntry.url;
+            }
+          }
+        }
+
+        // Passport document: passports/<serial>.*
+        if (passportsDir) {
+          const passportFile = findFileByBasename(passportsDir, String(serial));
+          if (passportFile && payload.contactPersons.length) {
+            const fileEntry = await uploadDocumentFile(passportFile, req.user._id, `Passport document for ${row.contactName}`, "passports");
+            payload.contactPersons[0].passport = {
+              ...(payload.contactPersons[0].passport || {}),
+              documents: [fileEntry],
+              documentUrl: fileEntry.url,
+            };
+          }
+        }
+
+        // Emirates ID document: emirate_ids/<serial>.*
+        if (emirateIdsDir) {
+          const eidFile = findFileByBasename(emirateIdsDir, String(serial));
+          if (eidFile && payload.contactPersons.length) {
+            const fileEntry = await uploadDocumentFile(eidFile, req.user._id, `Emirates ID document for ${row.contactName}`, "emirate_ids");
+            payload.contactPersons[0].emiratesId = {
+              ...(payload.contactPersons[0].emiratesId || {}),
+              documents: [fileEntry],
+              documentUrl: fileEntry.url,
+            };
+          }
+        }
+
+        // Normalize for persistence
+        if (payload.tradeLicences?.length) {
+          payload.tradeLicences = normalizeTradeLicencesForPersistence(payload.tradeLicences);
+        }
+        if (payload.contactPersons?.length) {
+          payload.contactPersons = normalizeContactPersonsForPersistence(payload.contactPersons);
+        }
+
+        const client = await Client.create(payload);
+        results.push({ serial, status: "success", legalName, clientId: client._id });
+        added++;
+      } catch (error) {
+        results.push({ serial, status: "error", legalName, error: error.message });
+        failed++;
+      }
+    }
+
+    res.json({ results, summary: { total: rows.length, added, failed } });
+  } catch (error) {
+    next(error);
+  } finally {
+    // 7. Always purge temp files — regardless of success or failure.
+    // Files already uploaded to Cloudinary/blob storage remain.
+    cleanupTempFiles(extractedDir, zipFilePath);
+  }
 };
 
 exports.exportClients = async (req, res, next) => {

@@ -44,4 +44,33 @@ const storage = hasCloudinaryConfig
     });
 
 // Uses Cloudinary when configured; otherwise stores files locally for development.
-module.exports = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
+
+// Separate multer instance for ZIP-based bulk uploads.
+// Writes to a temp directory so the file can be extracted server-side before cleanup.
+const zipUploadDir = path.join(__dirname, "..", "tmp-uploads");
+fs.mkdirSync(zipUploadDir, { recursive: true });
+
+const zipStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, zipUploadDir),
+  filename: (req, file, cb) => {
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, "_");
+    cb(null, `${Date.now()}-${safeName}`);
+  },
+});
+
+const zipUpload = multer({
+  storage: zipStorage,
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (ext === ".zip" || file.mimetype === "application/zip" || file.mimetype === "application/x-zip-compressed") {
+      cb(null, true);
+    } else {
+      cb(new Error("Only .zip files are accepted."), false);
+    }
+  },
+}).single("zipFile");
+
+module.exports = upload;
+module.exports.zipUpload = zipUpload;

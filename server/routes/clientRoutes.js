@@ -3,6 +3,7 @@ const { body } = require("express-validator");
 const auth = require("../middleware/authMiddleware");
 const { adminOnly, adminManager } = require("../middleware/roleMiddleware");
 const upload = require("../middleware/uploadMiddleware");
+const { zipUpload } = require("../middleware/uploadMiddleware");
 const ctrl = require("../controllers/clientController");
 const router = express.Router();
 
@@ -13,6 +14,7 @@ router.get("/expiry-alerts", ctrl.expiryAlerts);
 router.get("/export", adminManager, ctrl.exportClients);
 router.post("/", adminOnly, body("clientType").isIn(["legal", "natural"]), body("legalName").notEmpty(), ctrl.createClient);
 router.post("/bulk-upload", adminOnly, ctrl.bulkUpload);
+router.post("/bulk-upload-v2", adminOnly, zipUpload, ctrl.bulkUploadV2);
 router.get("/:id", ctrl.getClient);
 router.put("/:id", adminManager, ctrl.updateClient);
 router.delete("/:id", adminOnly, ctrl.deleteClient);
