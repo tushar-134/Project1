@@ -202,6 +202,7 @@ export default function AddClient() {
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [drawerTaskId, setDrawerTaskId] = useState(null);
+  const handledCreatedRegistrationTaskRef = useRef("");
   const update = (key, value) => setForm((f) => ({ ...f, [key]: value }));
   const canManageTaskDrawer = currentUser?.role === "admin" || currentUser?.role === "manager";
   const openVatRegistrationTask = () => {
@@ -314,6 +315,7 @@ export default function AddClient() {
   useEffect(() => {
     if (!isEditMode) return;
     getClient(id).then((client) => {
+      const createdRegistrationTask = location.state?.createdRegistrationTask || null;
       const jurisdictionLabels = {
         mainland: "Mainland",
         freezone: "Free Zone",
@@ -321,12 +323,19 @@ export default function AddClient() {
         offshore: "Offshore",
       };
       const primaryContact = client.contactPersons?.find((person) => person.isPrimary) || client.contactPersons?.[0] || {};
+      const nextFye = normalizeFinancialYearEnd(client.financialYearEnd || client.ctDetails?.financialYearEnd || "");
+      const nextVatStatus = client.vatDetails?.status === "registered" || createdRegistrationTask?.taxType === "vat" ? "Registered" : "Not Registered";
+      const nextVatRegistrationTask = createdRegistrationTask?.taxType === "vat" ? createdRegistrationTask.taskMongoId || "" : client.vatDetails?.registrationTask || "";
+      const nextVatRegistrationTaskId = createdRegistrationTask?.taxType === "vat" ? createdRegistrationTask.taskId || "" : client.vatDetails?.registrationTaskId || "";
+      const nextCtStatus = client.ctDetails?.status === "registered" || createdRegistrationTask?.taxType === "ct" ? "Registered" : "Not Registered";
+      const nextCtRegistrationTask = createdRegistrationTask?.taxType === "ct" ? createdRegistrationTask.taskMongoId || "" : client.ctDetails?.registrationTask || "";
+      const nextCtRegistrationTaskId = createdRegistrationTask?.taxType === "ct" ? createdRegistrationTask.taskId || "" : client.ctDetails?.registrationTaskId || "";
       setForm({
         clientType: client.clientType === "natural" ? "Natural Person" : "Legal Person",
         fileNo: client.fileNo || "",
         legalName: client.legalName || "",
         tradeName: client.tradeName || "",
-        fye: normalizeFinancialYearEnd(client.financialYearEnd || client.ctDetails?.financialYearEnd || ""),
+        fye: nextFye,
         jurisdiction: jurisdictionLabels[client.jurisdiction] || "Mainland",
         assigned: client.assignedUser?._id || client.assignedUser || "",
         country: client.registeredAddress?.country || "United Arab Emirates",
@@ -337,19 +346,51 @@ export default function AddClient() {
         differentAddress: Boolean(client.correspondenceAddress?.street || client.correspondenceAddress?.country || client.correspondenceAddress?.emirate),
         correspondence: client.correspondenceAddress?.street || "",
         vatTrn: client.vatDetails?.trn || "",
-        vatStatus: client.vatDetails?.status === "registered" ? "Registered" : "Not Registered",
+        vatStatus: nextVatStatus,
         vatDate: client.vatDetails?.registrationDate?.slice?.(0, 10) || "",
-        vatFreq: normalizeVatFilingFrequency(client.vatDetails?.filingFrequency, normalizeFinancialYearEnd(client.financialYearEnd || client.ctDetails?.financialYearEnd || "")),
-        vatRegistrationTask: location.state?.createdRegistrationTask?.taxType === "vat" ? location.state.createdRegistrationTask.taskMongoId || "" : client.vatDetails?.registrationTask || "",
-        vatRegistrationTaskId: location.state?.createdRegistrationTask?.taxType === "vat" ? location.state.createdRegistrationTask.taskId || "" : client.vatDetails?.registrationTaskId || "",
+        vatFreq: normalizeVatFilingFrequency(client.vatDetails?.filingFrequency, nextFye),
+        vatRegistrationTask: nextVatRegistrationTask,
+        vatRegistrationTaskId: nextVatRegistrationTaskId,
         ctTin: client.ctDetails?.tin || "",
-        ctStatus: location.state?.createdRegistrationTask?.taxType === "ct" ? "Registered" : client.ctDetails?.status === "registered" ? "Registered" : "Not Registered",
+        ctStatus: nextCtStatus,
         ctDate: client.ctDetails?.registrationDate?.slice?.(0, 10) || "",
-        ctRegistrationTask: location.state?.createdRegistrationTask?.taxType === "ct" ? location.state.createdRegistrationTask.taskMongoId || "" : client.ctDetails?.registrationTask || "",
-        ctRegistrationTaskId: location.state?.createdRegistrationTask?.taxType === "ct" ? location.state.createdRegistrationTask.taskId || "" : client.ctDetails?.registrationTaskId || "",
+        ctRegistrationTask: nextCtRegistrationTask,
+        ctRegistrationTaskId: nextCtRegistrationTaskId,
         group: client.group?._id || client.group || "",
         newGroup: "",
       });
+      const createdTaskKey = createdRegistrationTask?.taskMongoId ? `${id}:${createdRegistrationTask.taxType}:${createdRegistrationTask.taskMongoId}` : "";
+      if (createdTaskKey && handledCreatedRegistrationTaskRef.current !== createdTaskKey) {
+        handledCreatedRegistrationTaskRef.current = createdTaskKey;
+        updateClient(id, {
+          vatDetails: {
+            ...(client.vatDetails || {}),
+            trn: client.vatDetails?.trn || "",
+            status: nextVatStatus === "Registered" ? "registered" : "not_registered",
+            registrationDate: client.vatDetails?.registrationDate?.slice?.(0, 10) || undefined,
+            filingFrequency: client.vatDetails?.filingFrequency || normalizeVatFilingFrequency("", nextFye),
+            registrationTask: nextVatRegistrationTask || undefined,
+            registrationTaskId: nextVatRegistrationTaskId || undefined,
+          },
+          ctDetails: {
+            ...(client.ctDetails || {}),
+            tin: client.ctDetails?.tin || "",
+            status: nextCtStatus === "Registered" ? "registered" : "not_registered",
+            registrationDate: client.ctDetails?.registrationDate?.slice?.(0, 10) || undefined,
+            financialYearEnd: client.ctDetails?.financialYearEnd || nextFye,
+            registrationTask: nextCtRegistrationTask || undefined,
+            registrationTaskId: nextCtRegistrationTaskId || undefined,
+          },
+        }).then(() => {
+          navigate(`/clients/edit/${id}`, {
+            replace: true,
+            state: { activeTab: Number(location.state?.activeTab) || 3 },
+          });
+        }).catch(() => {
+          handledCreatedRegistrationTaskRef.current = "";
+          toast.error("Unable to save the registration task link on the client.");
+        });
+      }
       if (client.assignedUser?._id) {
         setUserOptions((current) => mergeOptions(current, [mapUser(client.assignedUser)]));
       }
