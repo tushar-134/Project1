@@ -944,14 +944,18 @@ export default function AddClient() {
         toast.success(continueToNext ? "Progress saved." : "Client updated successfully.");
       } else {
         const created = await createClient(payload);
+        const createdClientId = created?._id || created?.id;
+        if (!createdClientId) {
+          throw new Error("Client was created, but no client ID was returned.");
+        }
         if (pendingLicenceDocuments.length) {
           for (const licenceDocument of pendingLicenceDocuments) {
-            await uploadTradeLicenceFiles(created._id, licenceDocument.index, licenceDocument.files);
+            await uploadTradeLicenceFiles(createdClientId, licenceDocument.index, licenceDocument.files);
           }
         }
         if (pendingContactDocuments.length) {
           for (const document of pendingContactDocuments) {
-            await uploadContactDocuments(created._id, document.index, document.files, document.section);
+            await uploadContactDocuments(createdClientId, document.index, document.files, document.section);
           }
         }
         if (pendingAttachments.length) {
@@ -966,12 +970,12 @@ export default function AddClient() {
             const formData = new FormData();
             files.forEach((file) => formData.append("files", file));
             formData.append("description", description);
-            updatedClient = await uploadAttachment(created._id, formData);
+            updatedClient = await uploadAttachment(createdClientId, formData);
           }
           if (updatedClient?.attachments) setAttachments(mapAttachmentRows(updatedClient.attachments));
         }
         toast.success(continueToNext ? "Progress saved." : (pendingAttachments.length || pendingLicenceDocuments.length || pendingContactDocuments.length ? "Client created and documents uploaded." : "Client created successfully."));
-        if (continueToNext) navigate(`/clients/edit/${created._id}`, { replace: true });
+        if (continueToNext) navigate(`/clients/edit/${createdClientId}`, { replace: true });
       }
       if (continueToNext) {
         setTab((current) => Math.min(current + 1, tabs.length - 1));
@@ -980,7 +984,7 @@ export default function AddClient() {
       navigate("/clients/list");
       return true;
     } catch (error) {
-      toast.error(getApiErrorMessage(error) || "Unable to save client.");
+      toast.error(getApiErrorMessage(error) || error?.message || "Unable to save client.");
       return false;
     } finally {
       setIsSaving(false);
