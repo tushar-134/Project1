@@ -1,5 +1,6 @@
 const { validationResult } = require("express-validator");
 const Task = require("../models/Task");
+const Client = require("../models/Client");
 const User = require("../models/User");
 const Notification = require("../models/Notification");
 const ActivityLog = require("../models/ActivityLog");
@@ -25,6 +26,16 @@ function asDate(value) {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function escapeRegex(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function parsePagination(query = {}, defaultLimit = 20) {
+  const page = Math.max(1, Number(query.page) || 1);
+  const limit = Math.max(1, Math.min(100, Number(query.limit) || defaultLimit));
+  return { page, limit };
 }
 
 function toUploadedFile(file, req) {
@@ -337,14 +348,16 @@ function getPeriodFromDateServer(date, fyeString) {
   return nextTask;
 }
 
-function taskQuery(req) {
+async function taskQuery(req) {
   // Query shaping happens once here so list and export stay aligned with the same role and filter logic.
-  const { category, status, assignedTo, month, overdue } = req.query;
+  const { category, status, assignedTo, month, overdue, taskId, client, type, dueDate, assigned, remarks, recurring } = req.query;
   const query = {};
+  const andClauses = [];
+
   if (category && category !== "All") query.category = category;
   if (status && status !== "All") query.status = status;
-  if (assignedTo) query.assignedTo = assignedTo;
-  if (req.user.role === "task_only") query.assignedTo = req.user._id;
+  if (assignedTo) andClauses.push({ assignedTo });
+  if (req.user.role === "task_only") andClauses.push({ assignedTo: req.user._id });
   // Bug #7 Fix: Build the dueDate filter carefully so overdue never silently
   // clobber the month's $lt boundary. We now apply the month window first, then
   // tighten $lt to today only when no month is selected (overdue standalone).
@@ -364,6 +377,45 @@ function taskQuery(req) {
     // Bug #7 Fix: use a dedicated guard so we don't overwrite an earlier status filter.
     if (!query.status) query.status = { $ne: "completed" };
   }
+
+  if (taskId) {
+    query.taskId = new RegExp(escapeRegex(taskId.trim()), "i");
+  }
+  if (client) {
+    const clientIds = await Client.find({
+      isActive: true,
+      legalName: new RegExp(escapeRegex(client.trim()), "i"),
+    }).distinct("_id");
+    query.client = clientIds.length ? { $in: clientIds } : { $in: [] };
+  }
+  if (type) {
+    query.taskType = type;
+  }
+  if (dueDate) {
+    const start = new Date(`${dueDate}T00:00:00.000Z`);
+    if (!Number.isNaN(start.getTime())) {
+      const end = new Date(start);
+      end.setUTCDate(end.getUTCDate() + 1);
+      query.dueDate = { ...(query.dueDate || {}), $gte: start, $lt: end };
+    }
+  }
+  if (assigned) {
+    if (/^unassigned$/i.test(String(assigned).trim())) {
+      andClauses.push({ assignedTo: null });
+    } else {
+      const userIds = await User.find({
+        isActive: true,
+        name: new RegExp(`^${escapeRegex(assigned.trim())}$`, "i"),
+      }).distinct("_id");
+      andClauses.push({ assignedTo: userIds.length ? { $in: userIds } : { $in: [] } });
+    }
+  }
+  if (remarks) {
+    query.remarks = new RegExp(escapeRegex(remarks.trim()), "i");
+  }
+  if (recurring === "recurring") query.isRecurring = true;
+  if (recurring === "one-time") query.isRecurring = false;
+  if (andClauses.length) query.$and = andClauses;
   return query;
 }
 
@@ -376,8 +428,17 @@ const populateTask = [
 
 exports.listTasks = async (req, res, next) => {
   try {
-    const tasks = await Task.find(taskQuery(req)).populate(populateTask).sort({ dueDate: 1 });
-    res.json(tasks);
+    const { page: requestedPage, limit } = parsePagination(req.query, 20);
+    const query = await taskQuery(req);
+    const total = await Task.countDocuments(query);
+    const pages = Math.max(1, Math.ceil(total / limit));
+    const page = Math.min(requestedPage, pages);
+    const tasks = await Task.find(query)
+      .populate(populateTask)
+      .sort({ updatedAt: -1, createdAt: -1, taskId: 1 })
+      .skip((page - 1) * limit)
+      .limit(limit);
+    res.json({ tasks, total, page, pages, limit });
   } catch (error) { next(error); }
 };
 
@@ -666,7 +727,7 @@ exports.getTaskLogs = async (req, res, next) => {
 
 exports.exportTasks = async (req, res, next) => {
   try {
-    const tasks = await Task.find(taskQuery(req)).populate(populateTask);
+    const tasks = await Task.find(await taskQuery(req)).populate(populateTask);
     const csv = ["Task ID,Client,Category,Task Type,Due Date,Assigned,Status"].concat(tasks.map((t) => [t.taskId, t.client?.legalName || "", t.category, t.taskType, t.dueDate?.toISOString().slice(0, 10), t.assignedTo?.name || "", t.status].map((v) => `"${String(v).replaceAll('"', '""')}"`).join(","))).join("\n");
     // Bug #2 Fix: res.attachment() was removed in Express 5; use setHeader instead.
     res.setHeader("Content-Disposition", 'attachment; filename="tasks.csv"')

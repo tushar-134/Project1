@@ -93,6 +93,7 @@ export default function TaskList() {
   const [month, setMonth] = useState(initialMonth);
   const [drawerTaskId, setDrawerTaskId] = useState(null);
   const [page, setPage] = useState(1);
+  const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1 });
   const [columnFilters, setColumnFilters] = useState(() => createEmptyColumnFilters());
   const deferredColumnFilters = useDeferredValue(columnFilters);
 
@@ -106,55 +107,43 @@ export default function TaskList() {
     if (canManage) fetchUsers().catch(() => {});
   }, [canManage]);
 
-  const filterRef = useRef({});
-  filterRef.current = {
-    category: cat,
-    status,
+  const serverFilters = useMemo(() => ({
+    category: deferredColumnFilters.category || (cat !== "All" ? cat : undefined),
+    status: deferredColumnFilters.status || (status !== "All" ? status : undefined),
     month: scope === "By Month" ? month : undefined,
     overdue: scope === "Overdue" ? "true" : undefined,
-  };
+    taskId: deferredColumnFilters.taskId || undefined,
+    client: deferredColumnFilters.client || undefined,
+    type: deferredColumnFilters.type || undefined,
+    dueDate: deferredColumnFilters.dueDate || undefined,
+    assigned: deferredColumnFilters.assigned || undefined,
+    remarks: deferredColumnFilters.remarks || undefined,
+    recurring: deferredColumnFilters.recurring || undefined,
+  }), [cat, deferredColumnFilters, month, scope, status]);
+  const requestParams = useMemo(() => ({ ...serverFilters, page, limit: PAGE_SIZE }), [page, serverFilters]);
+  const filterRef = useRef(requestParams);
+  filterRef.current = requestParams;
 
-  const refetchTasks = useCallback(() => fetchTasks(filterRef.current).catch(() => {}), [fetchTasks]);
-  const [availableCats, setAvailableCats] = useState(["All"]);
+  const refetchTasks = useCallback(async () => {
+    const data = await fetchTasks(filterRef.current);
+    setMeta({
+      total: data?.total || 0,
+      page: data?.page || 1,
+      pages: data?.pages || 1,
+    });
+    return data;
+  }, [fetchTasks]);
 
   useEffect(() => {
-    const params = filterRef.current;
-    fetchTasks(params)
-      .then((tasks) => {
-        const found = new Set(tasks.map((task) => task.category));
-        if (cat !== "All") found.add(cat);
-        const ordered = CAT_ORDER.filter((category) => found.has(category));
-        const custom = [...found].filter((category) => category && !CAT_ORDER.includes(category)).sort((left, right) => String(left).localeCompare(String(right)));
-        setAvailableCats(["All", ...ordered, ...custom]);
-      })
-      .catch(() => {});
-  }, [cat, status, scope, month]);
+    refetchTasks().catch(() => {});
+  }, [refetchTasks, requestParams]);
 
   const categoryOptions = sortStrings(state.tasks.map((task) => task.category));
   const typeOptions = sortStrings(state.tasks.map((task) => task.type));
   const assigneeOptions = sortStrings(state.tasks.map((task) => task.assigned));
   const clientSuggestions = sortStrings(state.tasks.map((task) => task.client));
-
-  const rows = useMemo(() => state.tasks
-    .filter((task) => {
-      if (deferredColumnFilters.taskId && !normalizeText(task.taskId).includes(normalizeText(deferredColumnFilters.taskId))) return false;
-      if (deferredColumnFilters.client && !normalizeText(task.client).includes(normalizeText(deferredColumnFilters.client))) return false;
-      if (deferredColumnFilters.category && task.category !== deferredColumnFilters.category) return false;
-      if (deferredColumnFilters.type && task.type !== deferredColumnFilters.type) return false;
-      if (deferredColumnFilters.dueDate && task.dueDate !== deferredColumnFilters.dueDate) return false;
-      if (deferredColumnFilters.assigned && task.assigned !== deferredColumnFilters.assigned) return false;
-      if (deferredColumnFilters.status && task.status !== deferredColumnFilters.status) return false;
-      if (deferredColumnFilters.remarks && !normalizeText(task.remarks).includes(normalizeText(deferredColumnFilters.remarks))) return false;
-      if (deferredColumnFilters.recurring === "recurring" && !task.recurring) return false;
-      if (deferredColumnFilters.recurring === "one-time" && task.recurring) return false;
-      return true;
-    })
-    .sort((left, right) => {
-      const rightTime = new Date(right.updatedAt || right.createdAt || 0).getTime();
-      const leftTime = new Date(left.updatedAt || left.createdAt || 0).getTime();
-      if (rightTime !== leftTime) return rightTime - leftTime;
-      return String(left.taskId || "").localeCompare(String(right.taskId || ""));
-    }), [state.tasks, deferredColumnFilters]);
+  const availableCats = useMemo(() => ["All", ...CAT_ORDER], []);
+  const rows = state.tasks;
 
   const completedCount = rows.filter((task) => task.status === "Completed").length;
   const workingCount = rows.length - completedCount;
@@ -169,14 +158,17 @@ export default function TaskList() {
   const hasActiveFilters = activeFilterCount > 0;
 
   const updateColumnFilter = (key, value) => {
+    setPage(1);
     setColumnFilters((current) => ({ ...current, [key]: value }));
   };
 
   const clearColumnFilters = () => {
+    setPage(1);
     setColumnFilters(createEmptyColumnFilters());
   };
 
   const resetAllFilters = () => {
+    setPage(1);
     setCat("All");
     setStatus("All");
     setScope("By Month");
@@ -186,25 +178,9 @@ export default function TaskList() {
 
   const exportCsv = async () =>
     downloadBlob(
-      await exportTasks({
-        category: cat,
-        status,
-        month: scope === "By Month" ? month : undefined,
-        overdue: scope === "Overdue" ? "true" : undefined,
-      }),
+      await exportTasks(serverFilters),
       "tasks.csv",
     );
-
-  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
-  const paginatedRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  useEffect(() => {
-    setPage(1);
-  }, [cat, status, scope, month, deferredColumnFilters]);
-
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages);
-  }, [page, totalPages]);
 
   const renderTaskRow = (task) => {
     const canEditTask =
@@ -325,18 +301,27 @@ export default function TaskList() {
             <div className="flex flex-wrap items-center gap-2">
               <InfoPill tone="navy" label={`${workingCount} working`} />
               <InfoPill tone="green" label={`${completedCount} completed`} />
-              <InfoPill tone="slate" label={`${rows.length} shown`} />
+              <InfoPill tone="slate" label={`${meta.total} matches`} />
               {tasksLoading && <InfoPill tone="amber" label="Refreshing" />}
               {hasActiveFilters && <InfoPill tone="blue" label={`${activeFilterCount} active filters`} />}
             </div>
           </div>
 
           <div className="mt-4 space-y-3">
-            <FilterChips label="Category" items={availableCats} value={cat} setValue={setCat} />
-            <FilterChips label="Status" items={FILTER_STATUSES} value={status} setValue={setStatus} />
+            <FilterChips label="Category" items={availableCats} value={cat} setValue={(value) => {
+              setPage(1);
+              setCat(value);
+            }} />
+            <FilterChips label="Status" items={FILTER_STATUSES} value={status} setValue={(value) => {
+              setPage(1);
+              setStatus(value);
+            }} />
 
             <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(220px,auto)_auto] lg:items-end">
-              <FilterChips label="Scope" items={["By Month", "Overdue", "All"]} value={scope} setValue={setScope} compact />
+              <FilterChips label="Scope" items={["By Month", "Overdue", "All"]} value={scope} setValue={(value) => {
+                setPage(1);
+                setScope(value);
+              }} compact />
 
               <label htmlFor="task-list-month" className={`task-list-field ${scope !== "By Month" ? "opacity-60" : ""}`}>
                 <span className="task-list-field-label">Month</span>
@@ -347,7 +332,10 @@ export default function TaskList() {
                   type="month"
                   value={month}
                   disabled={scope !== "By Month"}
-                  onChange={(event) => setMonth(event.target.value)}
+                  onChange={(event) => {
+                    setPage(1);
+                    setMonth(event.target.value);
+                  }}
                 />
               </label>
 
@@ -534,13 +522,13 @@ export default function TaskList() {
           tasksLoading
             ? "Task list is updating with your latest filters."
             : hasActiveFilters
-              ? `Filtered from ${state.tasks.length} loaded tasks.`
+              ? `Showing ${rows.length} of ${meta.total} matching tasks.`
               : "Latest activity is shown first so the most recently touched work stays at the top."
         }
         accentClassName="task-list-section-title"
       >
         <TaskTableState
-          tasks={paginatedRows}
+          tasks={rows}
           tasksLoading={tasksLoading}
           taskError={taskError}
           hasActiveFilters={hasActiveFilters}
@@ -549,19 +537,19 @@ export default function TaskList() {
           onReset={resetAllFilters}
           onRetry={refetchTasks}
         >
-          {paginatedRows.map(renderTaskRow)}
+          {rows.map(renderTaskRow)}
         </TaskTableState>
-        {rows.length > PAGE_SIZE && (
+        {meta.pages > 1 && (
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 sm:px-5">
             <div className="text-[12px] font-semibold text-slate-500">
-              Showing {(page - 1) * PAGE_SIZE + 1} to {Math.min(page * PAGE_SIZE, rows.length)} of {rows.length} tasks
+              Showing {Math.max(1, (meta.page - 1) * PAGE_SIZE + 1)} to {Math.min(meta.page * PAGE_SIZE, meta.total)} of {meta.total} tasks
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page === 1}>
+              <Button variant="ghost" size="sm" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={meta.page <= 1}>
                 Previous
               </Button>
-              <span className="text-[12px] font-semibold text-slate-500">Page {page} of {totalPages}</span>
-              <Button variant="ghost" size="sm" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={page === totalPages}>
+              <span className="text-[12px] font-semibold text-slate-500">Page {meta.page} of {meta.pages}</span>
+              <Button variant="ghost" size="sm" onClick={() => setPage((current) => Math.min(meta.pages || 1, current + 1))} disabled={meta.page >= meta.pages}>
                 Next
               </Button>
             </div>
