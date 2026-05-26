@@ -37,18 +37,14 @@ exports.dashboardStats = async (req, res, next) => {
         : { $lt: now },
     };
 
-    // Count clients that have at least one task in the selected month (not just all active clients)
-    const clientIdsWithTasks = dueDate
-      ? await Task.find(taskScope).distinct("client")
+    const visibleTaskClientIds = req.user.role === "task_only"
+      ? await Task.find({ assignedTo: req.user._id }).distinct("client")
       : null;
     const clientScope = {
       isActive: true,
-      ...roleScope,
       ...(req.user.role === "task_only"
-        ? { _id: { $in: await Task.find({ assignedTo: req.user._id }).distinct("client") } }
-        : clientIdsWithTasks
-          ? { _id: { $in: clientIdsWithTasks } }
-          : {}),
+        ? { _id: { $in: visibleTaskClientIds } }
+        : {}),
     };
 
     const [totalClients, pendingTasks, overdueTasks, ftaPending, recentActivity] = await Promise.all([

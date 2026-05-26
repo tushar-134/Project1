@@ -1,9 +1,11 @@
 import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock, FileText } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { categoryService } from "../../services/categoryService.js";
 import { reportService } from "../../services/reportService";
+import { mapCategory } from "../../utils/adapterUtils.js";
 import { DEFAULT_DASHBOARD_TILE_ORDER, loadDashboardTileOrder, subscribeDashboardTileOrder } from "../../utils/dashboardPreferences.js";
 import { canManageTasks, ROLE_LABELS } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
@@ -12,18 +14,16 @@ import StatusPill from "../ui/StatusPill.jsx";
 import Table from "../ui/Table.jsx";
 import TaskDrawer from "../ui/TaskDrawer.jsx";
 
-const serviceTiles = [
-  ["VAT", 7, 2, "vat"], ["Corporate Tax", 4, 0, "ct"], ["Audit", 3, 1, "audit"],
-  ["Accounting", 6, 1, "accounting"], ["MIS Reporting", 2, 0, "mis"], ["E-Invoicing", 1, 0, "einvoicing"],
-  ["VAT Refund", 3, 1, "refund"], ["Other", 5, 0, "other"], ["Trade Licence", 2, 0, "other"],
-];
-
 const categoryLabels = {
   CT: "Corporate Tax",
   MIS: "MIS Reporting",
   EInv: "E-Invoicing",
   Refund: "VAT Refund",
 };
+
+function displayCategoryName(category) {
+  return categoryLabels[category?.name] || category?.name || "";
+}
 
 export default function Dashboard() {
   const { state, dispatch } = useApp();
@@ -42,11 +42,20 @@ export default function Dashboard() {
     reportService.dashboardStats({ month: selected }).then((data) => dispatch({ type: "SET_DASHBOARD", payload: data })).catch(() => { });
   }, [month, dispatch]);
   useEffect(() => {
-    setTileOrder(loadDashboardTileOrder(currentUser));
+    categoryService.list()
+      .then((data) => dispatch({ type: "SET_RESOURCE", resource: "categories", payload: data.map(mapCategory) }))
+      .catch(() => {});
+  }, [dispatch]);
+  const availableTileNames = useMemo(() => {
+    const names = state.categories.map(displayCategoryName).filter(Boolean);
+    return names.length ? names : DEFAULT_DASHBOARD_TILE_ORDER;
+  }, [state.categories]);
+  useEffect(() => {
+    setTileOrder(loadDashboardTileOrder(currentUser, availableTileNames));
     return subscribeDashboardTileOrder((event) => {
-      setTileOrder(event.detail?.order || loadDashboardTileOrder(currentUser));
+      setTileOrder(event.detail?.order || loadDashboardTileOrder(currentUser, availableTileNames));
     });
-  }, [currentUser]);
+  }, [currentUser, availableTileNames]);
   const stats = state.dashboardStats || {};
   const selectedMonth = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
   const tileMetrics = new Map(

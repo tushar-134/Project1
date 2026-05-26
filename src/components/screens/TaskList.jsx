@@ -121,10 +121,11 @@ export default function TaskList() {
     const params = filterRef.current;
     fetchTasks(params)
       .then((tasks) => {
-        if (cat === "All") {
-          const found = new Set(tasks.map((task) => task.category));
-          setAvailableCats(["All", ...CAT_ORDER.filter((category) => found.has(category))]);
-        }
+        const found = new Set(tasks.map((task) => task.category));
+        if (cat !== "All") found.add(cat);
+        const ordered = CAT_ORDER.filter((category) => found.has(category));
+        const custom = [...found].filter((category) => category && !CAT_ORDER.includes(category)).sort((left, right) => String(left).localeCompare(String(right)));
+        setAvailableCats(["All", ...ordered, ...custom]);
       })
       .catch(() => {});
   }, [cat, status, scope, month]);

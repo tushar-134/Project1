@@ -1,6 +1,5 @@
 import { AlertTriangle, CalendarClock, ExternalLink, FileBadge2, IdCard } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { clientService } from "../../services/clientService";
 
 const TYPE_META = {
@@ -33,8 +32,7 @@ function formatExpiryDate(value) {
   });
 }
 
-export default function ExpiryAlertPanel({ open, onClose, onSummaryChange }) {
-  const navigate = useNavigate();
+export default function ExpiryAlertPanel({ open, onClose, onSummaryChange, onOpenClient }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [payload, setPayload] = useState({ alerts: [], expiredCount: 0, expiringSoonCount: 0, total: 0 });
@@ -69,8 +67,9 @@ export default function ExpiryAlertPanel({ open, onClose, onSummaryChange }) {
   }), [payload]);
 
   function openClient(item) {
+    if (!item.clientId) return;
     onClose?.();
-    navigate(`/clients/list?search=${encodeURIComponent(item.clientName)}`);
+    onOpenClient?.(item.clientId);
   }
 
   return (

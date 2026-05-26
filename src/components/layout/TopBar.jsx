@@ -6,6 +6,7 @@ import ExpiryAlertPanel from "./ExpiryAlertPanel.jsx";
 import { useAuth } from "../../context/AuthContext";
 import { useApp } from "../../context/AppContext";
 import { ROLE_LABELS } from "../../utils/permissions.js";
+import ClientDrawer from "../ui/ClientDrawer.jsx";
 import UserAvatar from "../ui/UserAvatar.jsx";
 
 export default function TopBar({ title, onMenuClick }) {
@@ -14,6 +15,7 @@ export default function TopBar({ title, onMenuClick }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileTab, setProfileTab] = useState("profile");
+  const [drawerClientId, setDrawerClientId] = useState(null);
   const wrapRef = useRef(null);
   const expiryRef = useRef(null);
   const menuRef = useRef(null);
@@ -55,7 +57,12 @@ export default function TopBar({ title, onMenuClick }) {
             <AlertTriangle size={17} />
             {expirySummary.total > 0 && <span className="absolute right-1.5 top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-[#ea580c] px-1 text-[9px] font-extrabold text-white ring-2 ring-white">{Math.min(expirySummary.total, 99)}</span>}
           </button>
-          <ExpiryAlertPanel open={expiryOpen} onClose={() => setExpiryOpen(false)} onSummaryChange={setExpirySummary} />
+          <ExpiryAlertPanel
+            open={expiryOpen}
+            onClose={() => setExpiryOpen(false)}
+            onSummaryChange={setExpirySummary}
+            onOpenClient={(clientId) => setDrawerClientId(clientId)}
+          />
         </div>
         <button onClick={() => setOpen((v) => !v)} className="relative grid h-9 w-9 place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-600 hover:bg-slate-50" aria-label="Notifications" aria-expanded={open}>
           <Bell size={17} />
@@ -108,6 +115,7 @@ export default function TopBar({ title, onMenuClick }) {
         <NotificationPanel open={open} onClose={() => setOpen(false)} />
       </div>
       <ProfilePanel open={profileOpen} initialTab={profileTab} onClose={() => setProfileOpen(false)} />
+      {drawerClientId && <ClientDrawer clientId={drawerClientId} onClose={() => setDrawerClientId(null)} />}
     </header>
   );
 }

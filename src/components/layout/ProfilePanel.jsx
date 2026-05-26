@@ -1,14 +1,28 @@
-import { ArrowDown, ArrowUp, Camera, ExternalLink, Grip, RotateCcw, ShieldCheck, X } from "lucide-react";
+import { Camera, ExternalLink, Grip, RotateCcw, ShieldCheck, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
+import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { categoryService } from "../../services/categoryService.js";
 import { profileService } from "../../services/profileService.js";
+import { mapCategory } from "../../utils/adapterUtils.js";
 import { clearDashboardTileOrder, DEFAULT_DASHBOARD_TILE_ORDER, loadDashboardTileOrder, saveDashboardTileOrder } from "../../utils/dashboardPreferences.js";
 import { resolveMediaUrl } from "../../utils/mediaUrl.js";
 import { ROLE_LABELS } from "../../utils/permissions.js";
 import Button from "../ui/Button.jsx";
 import UserAvatar from "../ui/UserAvatar.jsx";
+
+const DASHBOARD_CATEGORY_LABELS = {
+  CT: "Corporate Tax",
+  MIS: "MIS Reporting",
+  EInv: "E-Invoicing",
+  Refund: "VAT Refund",
+};
+
+function displayDashboardCategoryName(category) {
+  return DASHBOARD_CATEGORY_LABELS[category?.name] || category?.name || "";
+}
 
 function InfoRow({ label, value }) {
   return (
@@ -36,6 +50,7 @@ function validateImageFile(file) {
 }
 
 export default function ProfilePanel({ open, initialTab = "profile", onClose }) {
+  const { state, dispatch } = useApp();
   const { currentUser, setSessionUser } = useAuth();
   const [profile, setProfile] = useState(currentUser);
   const [loading, setLoading] = useState(false);
@@ -45,6 +60,7 @@ export default function ProfilePanel({ open, initialTab = "profile", onClose }) 
   const [previewBroken, setPreviewBroken] = useState(false);
   const [previewSrc, setPreviewSrc] = useState("");
   const [dashboardTileOrder, setDashboardTileOrder] = useState(DEFAULT_DASHBOARD_TILE_ORDER);
+  const [draggingTile, setDraggingTile] = useState("");
   const fileRef = useRef(null);
   const navigate = useNavigate();
 
@@ -53,8 +69,16 @@ export default function ProfilePanel({ open, initialTab = "profile", onClose }) 
   }, [initialTab]);
 
   useEffect(() => {
-    setDashboardTileOrder(loadDashboardTileOrder(currentUser));
-  }, [currentUser, open]);
+    const names = state.categories.map(displayDashboardCategoryName).filter(Boolean);
+    setDashboardTileOrder(loadDashboardTileOrder(currentUser, names.length ? names : DEFAULT_DASHBOARD_TILE_ORDER));
+  }, [currentUser, open, state.categories]);
+
+  useEffect(() => {
+    if (!open || activeTab !== "settings") return;
+    categoryService.list()
+      .then((data) => dispatch({ type: "SET_RESOURCE", resource: "categories", payload: data.map(mapCategory) }))
+      .catch(() => {});
+  }, [activeTab, dispatch, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -81,6 +105,10 @@ export default function ProfilePanel({ open, initialTab = "profile", onClose }) 
   const roleLabel = ROLE_LABELS[profile?.role] || profile?.role || "User";
   const joinedMobile = useMemo(() => [profile?.mobileCountryCode, profile?.mobile].filter(Boolean).join(" ").trim(), [profile]);
   const photoUrl = useMemo(() => resolveMediaUrl(profile?.profilePhotoUrl), [profile?.profilePhotoUrl]);
+  const dashboardTileNames = useMemo(() => {
+    const names = state.categories.map(displayDashboardCategoryName).filter(Boolean);
+    return names.length ? names : DEFAULT_DASHBOARD_TILE_ORDER;
+  }, [state.categories]);
 
   async function handlePhotoChange(event) {
     const file = event.target.files?.[0];
@@ -130,24 +158,41 @@ export default function ProfilePanel({ open, initialTab = "profile", onClose }) 
     setPreviewBroken(true);
   }
 
-  function moveDashboardTile(index, direction) {
+  function moveDashboardTile(fromIndex, toIndex) {
     setDashboardTileOrder((current) => {
-      const nextIndex = index + direction;
-      if (nextIndex < 0 || nextIndex >= current.length) return current;
+      if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= current.length || toIndex >= current.length) return current;
       const next = [...current];
-      const [item] = next.splice(index, 1);
-      next.splice(nextIndex, 0, item);
+      const [item] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, item);
       return next;
     });
   }
 
+  function handleDashboardDragStart(event, name) {
+    setDraggingTile(name);
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", name);
+  }
+
+  function handleDashboardDragEnter(targetName) {
+    if (!draggingTile || draggingTile === targetName) return;
+    const fromIndex = dashboardTileOrder.indexOf(draggingTile);
+    const toIndex = dashboardTileOrder.indexOf(targetName);
+    moveDashboardTile(fromIndex, toIndex);
+  }
+
+  function handleDashboardDragEnd() {
+    setDraggingTile("");
+  }
+
   function handleSaveDashboardOrder() {
-    saveDashboardTileOrder(currentUser, dashboardTileOrder);
+    const next = saveDashboardTileOrder(currentUser, dashboardTileOrder, dashboardTileNames);
+    setDashboardTileOrder(next);
     toast.success("Dashboard card priority updated.");
   }
 
   function handleResetDashboardOrder() {
-    const next = clearDashboardTileOrder(currentUser);
+    const next = clearDashboardTileOrder(currentUser, dashboardTileNames);
     setDashboardTileOrder(next);
     toast.success("Dashboard card priority reset.");
   }
@@ -274,31 +319,28 @@ export default function ProfilePanel({ open, initialTab = "profile", onClose }) 
                   <div className="min-w-0 flex-1">
                     <div className="text-[15px] font-extrabold text-slate-900">Dashboard Card Priority</div>
                     <div className="mt-1 text-[13px] font-semibold text-slate-500">
-                      Arrange the dashboard service cards in the order you want to see them.
+                      Drag cards into the order you want to see them.
                     </div>
                     <div className="mt-4 space-y-2">
                       {dashboardTileOrder.map((name, index) => (
-                        <div key={name} className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2">
+                        <div
+                          key={name}
+                          draggable
+                          onDragStart={(event) => handleDashboardDragStart(event, name)}
+                          onDragEnter={() => handleDashboardDragEnter(name)}
+                          onDragOver={(event) => event.preventDefault()}
+                          onDrop={(event) => event.preventDefault()}
+                          onDragEnd={handleDashboardDragEnd}
+                          className={`flex cursor-grab items-center gap-3 rounded-xl border px-3 py-2 transition active:cursor-grabbing ${
+                            draggingTile === name
+                              ? "border-[#1e3a8a] bg-blue-50/70 opacity-70"
+                              : "border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50"
+                          }`}
+                          title="Drag to reorder"
+                        >
                           <div className="text-[11px] font-black text-slate-400">{String(index + 1).padStart(2, "0")}</div>
                           <div className="min-w-0 flex-1 text-[13px] font-bold text-slate-800">{name}</div>
-                          <button
-                            type="button"
-                            onClick={() => moveDashboardTile(index, -1)}
-                            disabled={index === 0}
-                            className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                            aria-label={`Move ${name} up`}
-                          >
-                            <ArrowUp size={14} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => moveDashboardTile(index, 1)}
-                            disabled={index === dashboardTileOrder.length - 1}
-                            className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                            aria-label={`Move ${name} down`}
-                          >
-                            <ArrowDown size={14} />
-                          </button>
+                          <Grip size={16} className="shrink-0 text-slate-400" />
                         </div>
                       ))}
                     </div>

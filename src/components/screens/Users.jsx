@@ -376,12 +376,12 @@ export default function Users() {
       </Card>
       {modalOpen && (
         <div className="fixed inset-0 z-40 grid place-items-center bg-slate-900/35 p-4">
-          <Card className="w-full max-w-lg p-4">
-            <div className="mb-4 flex items-center justify-between">
+          <Card className="flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col overflow-hidden p-0">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-4">
               <div className="text-[16px] font-extrabold">{editingUser ? "Edit User" : "Add User"}</div>
               <button onClick={closeModal} disabled={saving} className="text-slate-500 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">Close</button>
             </div>
-            <div className="grid gap-3">
+            <div className="grid gap-3 overflow-y-auto px-4 py-4 custom-scrollbar">
               <Field label="Name" field="user-form-name"><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
               <Field label="Email" field="user-form-email"><input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
               <Field label="Mobile" field="user-form-mobile">
@@ -546,7 +546,7 @@ export default function Users() {
                 </div>
               )}
             </div>
-            <div className="mt-4 flex justify-end gap-2">
+            <div className="flex shrink-0 justify-end gap-2 border-t border-slate-100 px-4 py-4">
               <Button variant="ghost" onClick={closeModal} disabled={saving}>Cancel</Button>
               <Button onClick={saveUser} disabled={saving}>{saving ? (editingUser ? "Saving..." : "Creating...") : (editingUser ? "Save Changes" : "Create User")}</Button>
             </div>
