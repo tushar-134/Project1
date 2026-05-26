@@ -1,4 +1,4 @@
-import { AlertCircle, Check, CheckCircle2, Download, FileArchive, Info, UploadCloud, X, XCircle } from "lucide-react";
+import { AlertCircle, Check, CheckCircle2, Download, FileArchive, FolderOpen, Info, UploadCloud, X, XCircle } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import JSZip from "jszip";
 import * as XLSX from "xlsx";
@@ -30,19 +30,19 @@ const PREVIEW_COLUMNS = ["serial", "legalName", "tradeName", "clientType", "lice
 export default function BulkUpload() {
   const [fileName, setFileName] = useState("");
   const [rows, setRows] = useState([]);
-  const [zipFile, setZipFile] = useState(null);
+  const [folderFiles, setFolderFiles] = useState(null); // File[] from folder input
+  const [zipFile, setZipFile] = useState(null); // Blob from drag-and-drop ZIP fallback
   const [results, setResults] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tooltipRow, setTooltipRow] = useState(null);
-  const fileInputRef = useRef(null);
-  const { bulkUploadV2 } = useClients();
+  const [docCounts, setDocCounts] = useState({ licenses: 0, passports: 0, emirateIds: 0 });
+  const folderInputRef = useRef(null);
+  const { bulkUpload, uploadDocument } = useClients();
 
   const previewColumns = useMemo(() => {
     if (!rows.length) return [];
     const available = Object.keys(rows[0]);
-    // Show a focused set of columns; prefer the well-known ones first
     const ordered = PREVIEW_COLUMNS.filter((c) => available.includes(c));
-    // Add any extras not in PREVIEW_COLUMNS, up to 10 total
     available.forEach((c) => { if (!ordered.includes(c) && ordered.length < 10) ordered.push(c); });
     return ordered;
   }, [rows]);
@@ -63,89 +63,294 @@ export default function BulkUpload() {
     return map;
   }, [results]);
 
-  async function parseZipFile(file) {
+  /**
+   * Normalize the relative path from either webkitRelativePath or ZIP entry.
+   * Strips the top-level wrapper folder so we get paths like "licenses/file.pdf".
+   */
+  function stripRootFolder(relativePath) {
+    const parts = relativePath.split("/").filter(Boolean);
+    // The first part is always the folder name the user selected — strip it
+    return parts.length > 1 ? parts.slice(1).join("/") : parts.join("/");
+  }
+
+  /**
+   * Count documents in each subfolder from a list of relative paths.
+   */
+  function countDocuments(relativePaths) {
+    let licenses = 0, passports = 0, emirateIds = 0;
+    for (const p of relativePaths) {
+      const lower = p.toLowerCase();
+      if (lower.startsWith("licenses/") && !lower.endsWith("/")) licenses++;
+      else if (lower.startsWith("passports/") && !lower.endsWith("/")) passports++;
+      else if (lower.startsWith("emirate_ids/") && !lower.endsWith("/")) emirateIds++;
+    }
+    return { licenses, passports, emirateIds };
+  }
+
+  /**
+   * Handle folder selection via the webkitdirectory input.
+   * Reads all files, finds the xlsx for preview, and stores files for later zipping.
+   */
+  async function parseFolder(fileList) {
     try {
-      const zip = await JSZip.loadAsync(file);
-      // Find the xlsx/csv at root level
-      let spreadsheetFile = null;
-      zip.forEach((relativePath, entry) => {
-        if (entry.dir) return;
-        // Only root-level files (no slashes in name, or just filename)
-        const depth = relativePath.split("/").filter(Boolean).length;
-        if (depth > 1) return;
-        const ext = relativePath.split(".").pop()?.toLowerCase();
-        if ((ext === "xlsx" || ext === "csv") && !spreadsheetFile) {
-          spreadsheetFile = entry;
-        }
+      const files = Array.from(fileList);
+      if (!files.length) return;
+
+      // Find the xlsx/csv — look for it at root of the selected folder
+      const spreadsheetFile = files.find((f) => {
+        const normalized = stripRootFolder(f.webkitRelativePath);
+        // Must be at root level (no further slashes)
+        if (normalized.includes("/")) return false;
+        const ext = normalized.split(".").pop()?.toLowerCase();
+        return ext === "xlsx" || ext === "csv";
       });
 
       if (!spreadsheetFile) {
-        toast.error("No .xlsx or .csv file found in the ZIP. Please include your spreadsheet.");
+        toast.error("No .xlsx or .csv file found in the selected folder.");
         return;
       }
 
-      const buffer = await spreadsheetFile.async("arraybuffer");
+      const buffer = await spreadsheetFile.arrayBuffer();
+      const wb = XLSX.read(buffer);
+      const parsedRows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
+
+      if (!parsedRows.length) {
+        toast.error("The spreadsheet is empty.");
+        resetState();
+        return;
+      }
+
+      // Count document files
+      const paths = files.map((f) => stripRootFolder(f.webkitRelativePath));
+      setDocCounts(countDocuments(paths));
+
+      // Extract folder name from the first file's path
+      const folderName = files[0].webkitRelativePath.split("/")[0] || "folder";
+
+      setRows(parsedRows);
+      setFileName(folderName);
+      setFolderFiles(files);
+      setZipFile(null);
+      setResults(null);
+      toast.success(`${parsedRows.length} rows ready for import.`);
+    } catch (err) {
+      console.error("Error parsing folder contents:", err);
+      toast.error("Unable to read folder contents. Please try again.");
+    }
+  }
+
+  /**
+   * Fallback: handle a .zip file dropped onto the upload zone.
+   */
+  async function parseZipFile(file) {
+    try {
+      const zip = await JSZip.loadAsync(file);
+      let spreadsheetEntry = null;
+      const paths = [];
+
+      zip.forEach((relativePath, entry) => {
+        if (entry.dir) return;
+        paths.push(relativePath);
+        const parts = relativePath.split("/").filter(Boolean);
+        const depth = parts.length;
+        // Root-level or one level deep (wrapper folder)
+        if (depth > 2) return;
+        const name = parts[parts.length - 1];
+        const ext = name.split(".").pop()?.toLowerCase();
+        if ((ext === "xlsx" || ext === "csv") && !spreadsheetEntry) {
+          spreadsheetEntry = entry;
+        }
+      });
+
+      if (!spreadsheetEntry) {
+        toast.error("No .xlsx or .csv file found in the ZIP.");
+        return;
+      }
+
+      const buffer = await spreadsheetEntry.async("arraybuffer");
       const wb = XLSX.read(buffer);
       const parsedRows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
 
       if (!parsedRows.length) {
         toast.error("The spreadsheet in the ZIP is empty.");
-        setRows([]);
-        setFileName("");
-        setZipFile(null);
-        setResults(null);
+        resetState();
         return;
       }
+
+      // Normalize paths (strip wrapper if present)
+      const normalized = paths.map((p) => {
+        const parts = p.split("/").filter(Boolean);
+        return parts.length > 1 ? parts.slice(1).join("/") : p;
+      });
+      setDocCounts(countDocuments(normalized));
 
       setRows(parsedRows);
       setFileName(file.name);
       setZipFile(file);
+      setFolderFiles(null);
       setResults(null);
       toast.success(`${parsedRows.length} rows ready for import.`);
-    } catch {
-      toast.error("Unable to read this file. Please upload a valid .zip file.");
+    } catch (err) {
+      console.error("Error parsing ZIP file:", err);
+      toast.error("Unable to read this file. Please upload a valid .zip file or select a folder.");
     }
+  }
+
+  function resetState() {
+    setRows([]);
+    setFolderFiles(null);
+    setZipFile(null);
+    setFileName("");
+    setResults(null);
+    setDocCounts({ licenses: 0, passports: 0, emirateIds: 0 });
+    if (folderInputRef.current) folderInputRef.current.value = "";
   }
 
   async function downloadTemplate() {
     try {
       const zip = new JSZip();
 
-      // Create the xlsx
       const sheet = XLSX.utils.json_to_sheet(templateRows);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, sheet, "Clients");
       const xlsxBuffer = XLSX.write(workbook, { type: "array", bookType: "xlsx" });
       zip.file("client-bulk-upload-template.xlsx", xlsxBuffer);
 
-      // Create empty folders — JSZip folder() creates proper directory entries without placeholder files
       zip.folder("licenses");
       zip.folder("passports");
       zip.folder("emirate_ids");
 
       const blob = await zip.generateAsync({ type: "blob" });
       downloadBlob(blob, "client-bulk-upload-template.zip");
-      toast.success("Template ZIP downloaded.");
+      toast.success("Template downloaded — extract the ZIP to get the template folder.");
     } catch {
-      toast.error("Failed to generate template ZIP.");
+      toast.error("Failed to generate template.");
     }
   }
 
+  /**
+   * Zip folder files client-side and submit to the v2 API.
+   */
   async function submitUpload() {
-    if (!zipFile) {
-      toast.error("Please upload a ZIP file before submitting.");
+    if (!folderFiles && !zipFile) {
+      toast.error("Please select a folder or ZIP file before submitting.");
       return;
     }
     setIsSubmitting(true);
     try {
-      const formData = new FormData();
-      formData.append("zipFile", zipFile);
-      const response = await bulkUploadV2(formData);
-      setResults(response);
-      const added = response.summary?.added || 0;
-      const failed = response.summary?.failed || 0;
+      // 1. Collect all files client-side into filesMap
+      const filesMap = new Map();
+      if (zipFile) {
+        const zip = await JSZip.loadAsync(zipFile);
+        for (const [relativePath, entry] of Object.entries(zip.files)) {
+          if (entry.dir) continue;
+          const normalized = stripRootFolder(relativePath);
+          const blob = await entry.async("blob");
+          filesMap.set(normalized.toLowerCase(), {
+            blob,
+            name: relativePath.split("/").pop(),
+          });
+        }
+      } else if (folderFiles) {
+        for (const file of folderFiles) {
+          const normalized = stripRootFolder(file.webkitRelativePath);
+          if (normalized) {
+            filesMap.set(normalized.toLowerCase(), {
+              blob: file,
+              name: file.name,
+            });
+          }
+        }
+      }
+
+      // 2. Call bulkUpload to create/validate the clients
+      const response = await bulkUpload(rows);
+      
+      const updatedResults = { ...response };
+      const rowResultsList = response.results || [];
+      
+      // Helper function to find a file from filesMap
+      const findFile = (subfolder, basename) => {
+        const targetPrefix = `${subfolder.toLowerCase()}/`;
+        const targetBasename = String(basename).trim().toLowerCase();
+        if (!targetBasename) return null;
+
+        for (const [path, fileObj] of filesMap.entries()) {
+          if (path.startsWith(targetPrefix)) {
+            const pathParts = path.split("/");
+            const fileNameWithExt = pathParts[pathParts.length - 1];
+            const dotIndex = fileNameWithExt.lastIndexOf(".");
+            const nameWithoutExt = dotIndex !== -1 ? fileNameWithExt.substring(0, dotIndex) : fileNameWithExt;
+            if (nameWithoutExt === targetBasename) {
+              return fileObj;
+            }
+          }
+        }
+        return null;
+      };
+
+      // 3. For each successful row, check for and upload documents sequentially
+      for (const rowResult of rowResultsList) {
+        if (rowResult.status !== "success") continue;
+        
+        const serial = Number(rowResult.serial);
+        const clientId = rowResult.clientId;
+        const row = rows.find((r, idx) => (r.serial || idx + 1) === serial);
+        if (!row) continue;
+        
+        const licence = String(row.licenceNumber || row.licence || "").trim();
+        
+        // Match & Upload Trade Licence Document
+        const licenceFileObj = licence ? findFile("licenses", licence) : null;
+        if (licenceFileObj) {
+          const formData = new FormData();
+          formData.append("files", licenceFileObj.blob, licenceFileObj.name);
+          formData.append("section", "tradeLicences");
+          formData.append("index", "0");
+          formData.append("description", `Trade licence document for ${licence}`);
+          try {
+            await uploadDocument(clientId, formData);
+          } catch (uploadErr) {
+            console.error(`Failed to upload trade licence for client serial ${serial}:`, uploadErr);
+          }
+        }
+        
+        // Match & Upload Passport Document
+        const passportFileObj = findFile("passports", serial);
+        if (passportFileObj) {
+          const formData = new FormData();
+          formData.append("files", passportFileObj.blob, passportFileObj.name);
+          formData.append("section", "passport");
+          formData.append("index", "0");
+          formData.append("description", `Passport document for contact 1`);
+          try {
+            await uploadDocument(clientId, formData);
+          } catch (uploadErr) {
+            console.error(`Failed to upload passport for client serial ${serial}:`, uploadErr);
+          }
+        }
+        
+        // Match & Upload Emirates ID Document
+        const eidFileObj = findFile("emirate_ids", serial);
+        if (eidFileObj) {
+          const formData = new FormData();
+          formData.append("files", eidFileObj.blob, eidFileObj.name);
+          formData.append("section", "emiratesId");
+          formData.append("index", "0");
+          formData.append("description", `Emirates ID document for contact 1`);
+          try {
+            await uploadDocument(clientId, formData);
+          } catch (uploadErr) {
+            console.error(`Failed to upload Emirates ID for client serial ${serial}:`, uploadErr);
+          }
+        }
+      }
+      
+      setResults(updatedResults);
+      const added = updatedResults.summary?.added || 0;
+      const failed = updatedResults.summary?.failed || 0;
       if (failed === 0) {
-        toast.success(`Import complete: ${added} clients added successfully.`);
+        toast.success(`Import complete: ${added} clients and documents uploaded successfully.`);
       } else {
         toast(`Import complete: ${added} added, ${failed} failed.`, { icon: "⚠️" });
       }
@@ -160,12 +365,15 @@ export default function BulkUpload() {
     return rowResults.get(Number(serial));
   }
 
+  const hasFiles = folderFiles || zipFile;
+  const totalDocs = docCounts.licenses + docCounts.passports + docCounts.emirateIds;
+
   const instructions = [
-    "Download the sample template ZIP.",
+    "Download the sample template and extract the ZIP.",
     "Fill mandatory columns: legalName, contactName, contactEmail, contactMobile.",
     "Place trade licence scans in licenses/ folder, named as licenceNumber.ext (e.g. TL-1001.pdf).",
     "Place passport & emirate ID scans in passports/ and emirate_ids/ folders, named as serial.ext (e.g. 1.pdf).",
-    "Re-zip everything and upload here. Review results below.",
+    "Select the entire folder below and review results.",
   ];
 
   return (
@@ -190,7 +398,7 @@ export default function BulkUpload() {
           ))}
           <Button variant="accent" onClick={downloadTemplate}>
             <Download size={16} />
-            Download sample template (ZIP)
+            Download sample template
           </Button>
         </Card>
 
@@ -199,37 +407,144 @@ export default function BulkUpload() {
           <div
             className="upload-zone min-h-72"
             onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => {
+            onDrop={async (e) => {
               e.preventDefault();
-              if (e.dataTransfer.files?.[0]) parseZipFile(e.dataTransfer.files[0]);
+              const items = e.dataTransfer.items;
+              if (items && items.length > 0) {
+                const entries = [];
+                for (let i = 0; i < items.length; i++) {
+                  const entry = items[i].webkitGetAsEntry();
+                  if (entry) entries.push(entry);
+                }
+
+                // ZIP file drop fallback (if it's a single .zip file)
+                if (
+                  entries.length === 1 &&
+                  entries[0].isFile &&
+                  entries[0].name.toLowerCase().endsWith(".zip")
+                ) {
+                  const file = e.dataTransfer.files?.[0];
+                  if (file) parseZipFile(file);
+                  return;
+                }
+
+                // Recursively read all entries (files and directories)
+                const files = [];
+                const readEntry = async (entry, path = "") => {
+                  if (entry.isFile) {
+                    const file = await new Promise((resolve, reject) => {
+                      entry.file(resolve, reject);
+                    });
+                    const relativePath = path ? `${path}/${entry.name}` : entry.name;
+                    Object.defineProperty(file, "webkitRelativePath", {
+                      value: relativePath,
+                      writable: false,
+                      configurable: true,
+                    });
+                    files.push(file);
+                  } else if (entry.isDirectory) {
+                    const dirReader = entry.createReader();
+                    const readEntries = () => {
+                      return new Promise((resolve, reject) => {
+                        dirReader.readEntries((results) => resolve(results), reject);
+                      });
+                    };
+
+                    let dirEntries = [];
+                    let chunk = await readEntries();
+                    while (chunk.length > 0) {
+                      dirEntries = dirEntries.concat(chunk);
+                      chunk = await readEntries();
+                    }
+
+                    const currentPath = path ? `${path}/${entry.name}` : entry.name;
+                    for (const child of dirEntries) {
+                      await readEntry(child, currentPath);
+                    }
+                  }
+                };
+
+                try {
+                  for (const entry of entries) {
+                    await readEntry(entry);
+                  }
+                  if (files.length > 0) {
+                    const hasSpreadsheet = files.some((f) => {
+                      const normalized = stripRootFolder(f.webkitRelativePath);
+                      if (normalized.includes("/")) return false;
+                      const ext = normalized.split(".").pop()?.toLowerCase();
+                      return ext === "xlsx" || ext === "csv";
+                    });
+
+                    if (hasSpreadsheet) {
+                      parseFolder(files);
+                    } else {
+                      const zip = files.find((f) => f.name.toLowerCase().endsWith(".zip"));
+                      if (zip) {
+                        parseZipFile(zip);
+                      } else {
+                        toast.error("No .xlsx or .csv spreadsheet found in the dropped folder/files.");
+                      }
+                    }
+                  }
+                } catch (err) {
+                  console.error("Error reading dropped directory entry:", err);
+                  toast.error("Failed to read dropped files/folder.");
+                }
+              } else {
+                const file = e.dataTransfer.files?.[0];
+                if (file) {
+                  if (file.name.toLowerCase().endsWith(".zip")) {
+                    parseZipFile(file);
+                  } else {
+                    toast.error("Please drop a valid .zip file or select a folder.");
+                  }
+                }
+              }
             }}
           >
-            <FileArchive size={42} className="mb-3 text-[#059669]" />
+            <FolderOpen size={42} className="mb-3 text-[#059669]" />
             <div className="text-[15px] font-extrabold text-slate-800">
-              Drag and drop .zip file
+              Select your upload folder
             </div>
             <div className="mt-1 text-[12px] font-semibold text-slate-500">
-              ZIP containing xlsx + document folders (licenses, passports, emirate_ids)
+              Folder containing xlsx + document subfolders (licenses, passports, emirate_ids)
             </div>
+            <div className="mt-0.5 text-[11px] text-slate-400">
+              You can also drag and drop a .zip file
+            </div>
+
             {fileName && (
-              <div className="mt-3 flex items-center gap-2 text-[13px] font-bold text-[#1e3a8a]">
-                <CheckCircle2 size={16} className="text-[#059669]" />
-                {fileName}
+              <div className="mt-3 flex flex-col items-center gap-1">
+                <div className="flex items-center gap-2 text-[13px] font-bold text-[#1e3a8a]">
+                  <CheckCircle2 size={16} className="text-[#059669]" />
+                  {fileName}
+                </div>
+                {totalDocs > 0 && (
+                  <div className="flex flex-wrap justify-center gap-2 text-[11px] font-semibold text-slate-500">
+                    {docCounts.licenses > 0 && <span className="rounded bg-slate-100 px-1.5 py-0.5">{docCounts.licenses} licence{docCounts.licenses !== 1 ? "s" : ""}</span>}
+                    {docCounts.passports > 0 && <span className="rounded bg-slate-100 px-1.5 py-0.5">{docCounts.passports} passport{docCounts.passports !== 1 ? "s" : ""}</span>}
+                    {docCounts.emirateIds > 0 && <span className="rounded bg-slate-100 px-1.5 py-0.5">{docCounts.emirateIds} emirate ID{docCounts.emirateIds !== 1 ? "s" : ""}</span>}
+                  </div>
+                )}
               </div>
             )}
-            <label className="mt-4 inline-flex" htmlFor="bulk-upload-file">
+
+            <label className="mt-4 inline-flex" htmlFor="bulk-upload-folder">
               <input
-                ref={fileInputRef}
-                id="bulk-upload-file"
-                name="bulkUploadFile"
+                ref={folderInputRef}
+                id="bulk-upload-folder"
+                name="bulkUploadFolder"
                 className="hidden"
                 type="file"
-                accept=".zip"
-                onChange={(e) => e.target.files?.[0] && parseZipFile(e.target.files[0])}
+                /* @ts-ignore — webkitdirectory is non-standard but universally supported */
+                webkitdirectory=""
+                directory=""
+                onChange={(e) => e.target.files?.length && parseFolder(e.target.files)}
               />
               <span className="inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#e2e8f0] bg-white px-4 text-[13px] font-bold text-slate-700 transition-colors hover:bg-slate-50">
-                <UploadCloud size={16} />
-                Browse ZIP File
+                <FolderOpen size={16} />
+                Browse Folder
               </span>
             </label>
           </div>
@@ -380,16 +695,7 @@ export default function BulkUpload() {
 
           {results && (
             <div className="mt-3 flex gap-2">
-              <Button
-                variant="accent"
-                onClick={() => {
-                  setRows([]);
-                  setZipFile(null);
-                  setFileName("");
-                  setResults(null);
-                  if (fileInputRef.current) fileInputRef.current.value = "";
-                }}
-              >
+              <Button variant="accent" onClick={resetState}>
                 Upload Another
               </Button>
             </div>
