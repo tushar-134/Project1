@@ -1018,6 +1018,13 @@ export default function AddClient() {
           )}
           {tab === 3 && (
             <div className="grid gap-3 md:grid-cols-2">
+              <Field label="Financial Year End" field="client-ct-fye">
+                <select className="input" value={form.fye} onChange={(e) => update("fye", e.target.value)}>
+                  {FINANCIAL_YEAR_OPTIONS.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </select>
+              </Field>
               <div className="space-y-2">
                 <label className="text-[14px] font-bold text-slate-700" htmlFor="client-vat-status">VAT Registration Status</label>
                 <div className="flex flex-wrap items-center gap-3">
@@ -1084,13 +1091,6 @@ export default function AddClient() {
               </Field>
               <Field label="CT Registration Date" field="client-ct-date">
                 <input className="input" type="date" value={form.ctDate} onChange={(e) => update("ctDate", e.target.value)} />
-              </Field>
-              <Field label="Financial Year End" field="client-ct-fye">
-                <select className="input" value={form.fye} onChange={(e) => update("fye", e.target.value)}>
-                  {FINANCIAL_YEAR_OPTIONS.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
               </Field>
             </div>
           )}
