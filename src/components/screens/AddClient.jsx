@@ -517,8 +517,28 @@ export default function AddClient() {
     }];
   };
 
+  const fileSignature = (file) => `${String(file?.name || "").trim().toLowerCase()}::${file?.size || 0}`;
+  const documentSignature = (document) => document?.signature || (document?.file ? fileSignature(document.file) : `${String(document?.name || "").trim().toLowerCase()}::${document?.size || ""}`);
+
+  const uniqueTradeLicenceFiles = (files, documents = []) => {
+    const existing = new Set((documents || []).map(documentSignature));
+    const accepted = [];
+    let skipped = 0;
+    Array.from(files || []).forEach((file) => {
+      const signature = fileSignature(file);
+      if (existing.has(signature)) {
+        skipped += 1;
+        return;
+      }
+      existing.add(signature);
+      accepted.push(file);
+    });
+    return { accepted, skipped };
+  };
+
   const toPendingDocument = (file) => ({
-    id: `${file.name}-${file.lastModified}-${file.size}`,
+    id: `${fileSignature(file)}-${file.lastModified || Date.now()}`,
+    signature: fileSignature(file),
     name: file.name,
     size: formatFileSize(file.size),
     type: file.type || file.name.split(".").pop()?.toUpperCase() || "File",
@@ -590,6 +610,7 @@ export default function AddClient() {
     const formData = new FormData();
     files.forEach((file) => formData.append("files", file));
     formData.append("section", "tradeLicences");
+    formData.append("documentSection", "tradeLicences");
     formData.append("index", String(licenceIndex));
     formData.append("description", `Trade Licence ${licenceIndex + 1} document`);
     const updatedClient = await uploadDocument(clientId, formData);
@@ -597,7 +618,9 @@ export default function AddClient() {
   }
 
   async function handleTradeLicenceFile(licenceIndex, files) {
-    const selected = Array.from(files || []);
+    const currentDocuments = licences[licenceIndex]?.documents || [];
+    const { accepted: selected, skipped } = uniqueTradeLicenceFiles(files, currentDocuments);
+    if (skipped) toast.error(skipped === 1 ? "This trade licence file is already added." : `${skipped} duplicate trade licence files were skipped.`);
     if (!selected.length) return;
     if (!isEditMode) {
       setLicences((current) => current.map((item, index) => index === licenceIndex ? {
@@ -717,7 +740,7 @@ export default function AddClient() {
     if (!document.saved) {
       setLicences((current) => current.map((item, index) => index === licenceIndex ? {
         ...item,
-        documents: (item.documents || []).filter((entry) => entry.id !== document.id),
+        documents: (item.documents || []).filter((entry) => entry !== document),
       } : item));
       return;
     }
@@ -783,6 +806,19 @@ export default function AddClient() {
       );
       if (missingLicenceNumberWithFilesIndex >= 0) {
         toast.error(`Trade licence ${missingLicenceNumberWithFilesIndex + 1}: licence number is required before uploading documents.`);
+        return false;
+      }
+      const hasTradeLicence = licences.some((licence) => String(licence.number || "").trim());
+      if (!hasTradeLicence) {
+        toast.error("Add at least one trade licence and upload its document.");
+        return false;
+      }
+      const missingTradeLicenceDocumentIndex = licences.findIndex((licence) =>
+        String(licence.number || "").trim() &&
+        !(licence.documents || []).some((document) => document?.file || document?.url),
+      );
+      if (missingTradeLicenceDocumentIndex >= 0) {
+        toast.error(`Trade licence ${missingTradeLicenceDocumentIndex + 1}: upload at least one document.`);
         return false;
       }
     }

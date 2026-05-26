@@ -156,36 +156,56 @@ function toStoredFileEntry(uploadedFile, userId, description = "") {
   };
 }
 
+function uploadedFileSignature(file) {
+  return `${String(file?.name || "").trim().toLowerCase()}::${file?.size || ""}`;
+}
+
+function normalizeDocumentSection(section) {
+  const value = String(section || "").trim().toLowerCase();
+  const aliases = {
+    tradelicence: "tradeLicences",
+    tradelicences: "tradeLicences",
+    tradelicense: "tradeLicences",
+    tradelicenses: "tradeLicences",
+    emiratesid: "emiratesId",
+    emiratesidfront: "emiratesIdFront",
+    emiratesidback: "emiratesIdBack",
+    passport: "passport",
+  };
+  return aliases[value] || section;
+}
+
 function getDocumentContainer(client, section, index) {
   if (!Number.isInteger(index) || index < 0) return null;
-  if (section === "tradeLicences") {
+  const normalizedSection = normalizeDocumentSection(section);
+  if (normalizedSection === "tradeLicences") {
     const item = client.tradeLicences[index];
     if (!item) return null;
     item.documents = Array.isArray(item.documents) ? item.documents : [];
     return { holder: item, key: "documents", sync(container) { container.documentUrl = container.documents.at(-1)?.url || ""; } };
   }
-  if (section === "emiratesId") {
+  if (normalizedSection === "emiratesId") {
     const item = client.contactPersons[index];
     if (!item) return null;
     item.emiratesId = item.emiratesId || {};
     item.emiratesId.documents = Array.isArray(item.emiratesId.documents) ? item.emiratesId.documents : [];
     return { holder: item.emiratesId, key: "documents", sync(container) { container.documentUrl = container.documents.at(-1)?.url || ""; } };
   }
-  if (section === "emiratesIdFront") {
+  if (normalizedSection === "emiratesIdFront") {
     const item = client.contactPersons[index];
     if (!item) return null;
     item.emiratesId = item.emiratesId || {};
     item.emiratesId.frontDocuments = Array.isArray(item.emiratesId.frontDocuments) ? item.emiratesId.frontDocuments : [];
     return { holder: item.emiratesId, key: "frontDocuments", sync(container) { container.frontDocumentUrl = container.frontDocuments.at(-1)?.url || ""; } };
   }
-  if (section === "emiratesIdBack") {
+  if (normalizedSection === "emiratesIdBack") {
     const item = client.contactPersons[index];
     if (!item) return null;
     item.emiratesId = item.emiratesId || {};
     item.emiratesId.backDocuments = Array.isArray(item.emiratesId.backDocuments) ? item.emiratesId.backDocuments : [];
     return { holder: item.emiratesId, key: "backDocuments", sync(container) { container.backDocumentUrl = container.backDocuments.at(-1)?.url || ""; } };
   }
-  if (section === "passport") {
+  if (normalizedSection === "passport") {
     const item = client.contactPersons[index];
     if (!item) return null;
     item.passport = item.passport || {};
@@ -592,14 +612,23 @@ exports.uploadClientDocument = async (req, res, next) => {
     if (!uploadedFiles.length) return res.status(400).json({ message: "Please choose a file to upload" });
 
     const index = Number(req.body.index);
-    const section = req.body.section;
+    const section = req.body.section || req.body.documentSection;
     const description = req.body.description || "";
     if (!Number.isInteger(index) || index < 0) return res.status(400).json({ message: "A valid document index is required" });
 
     const container = getDocumentContainer(client, section, index);
     if (!container) return res.status(400).json({ message: "Unsupported document section" });
 
-    uploadedFiles.forEach((uploadedFile) => {
+    const existingSignatures = new Set((container.holder[container.key] || []).map(uploadedFileSignature));
+    const newFiles = uploadedFiles.filter((uploadedFile) => {
+      const signature = uploadedFileSignature(uploadedFile);
+      if (existingSignatures.has(signature)) return false;
+      existingSignatures.add(signature);
+      return true;
+    });
+    if (!newFiles.length) return res.status(409).json({ message: "This file is already uploaded." });
+
+    newFiles.forEach((uploadedFile) => {
       container.holder[container.key].push(toStoredFileEntry(uploadedFile, req.user._id, description));
     });
     container.sync(container.holder);

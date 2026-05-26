@@ -1,10 +1,11 @@
+import { useCallback, useMemo } from "react";
 import { clientService } from "../services/clientService";
 import { useApp } from "../context/AppContext";
 import { mapClient } from "../utils/adapterUtils";
 
 export function useClients() {
   const { dispatch } = useApp();
-  async function fetchClients(params) {
+  const fetchClients = useCallback(async (params) => {
     // Hooks own request state updates so screens can focus on filters and user actions.
     dispatch({ type: "SET_LOADING", resource: "clients", value: true });
     try {
@@ -16,8 +17,9 @@ export function useClients() {
       dispatch({ type: "SET_ERROR", resource: "clients", error });
       throw error;
     }
-  }
-  return {
+  }, [dispatch]);
+
+  return useMemo(() => ({
     fetchClients,
     getClient: clientService.get,
     createClient: clientService.create,
@@ -29,5 +31,5 @@ export function useClients() {
     uploadDocument: clientService.uploadDocument,
     deleteAttachment: clientService.deleteAttachment,
     deleteDocument: clientService.deleteDocument,
-  };
+  }), [fetchClients]);
 }
