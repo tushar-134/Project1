@@ -8,6 +8,7 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true, select: false },
   mobileCountryCode: { type: String, trim: true },
   mobile: String,
+  profilePhotoUrl: String,
   role: { type: String, enum: ["admin", "manager", "user", "task_only"], default: "user" },
   isActive: { type: Boolean, default: true },
   lastLogin: Date,

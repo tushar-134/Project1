@@ -12,30 +12,40 @@ router.get("/", adminManager, ctrl.listContacts);
 router.post(
   "/",
   adminManager,
-  body("fullName").notEmpty(),
-  body("client").notEmpty(),
+  body("authorityName").notEmpty().withMessage("Authority name is required."),
+  body("contactPersonName").notEmpty().withMessage("Contact person name is required."),
+  body("address").optional().trim(),
+  body("location").optional().trim(),
   body("mobile.countryCode")
     .customSanitizer((value) => {
       return normalizeDialCode(value);
     })
     .notEmpty()
+    .withMessage("Country code is required.")
+    .bail()
     .matches(/^\+\d{1,4}$/)
     .withMessage("Country code must look like +971."),
   body("mobile.number")
     .customSanitizer((value) => normalizePhoneNumber(value))
-    .notEmpty(),
+    .notEmpty()
+    .withMessage("Mobile number is required."),
   ctrl.createContact
 );
 router.put(
   "/:id",
   adminManager,
-  body("fullName").optional().notEmpty(),
-  body("client").optional().notEmpty(),
+  body("authorityName").optional().notEmpty(),
+  body("contactPersonName").optional().notEmpty(),
+  body("address").optional().trim(),
+  body("location").optional().trim(),
   body("mobile.countryCode")
     .optional()
     .customSanitizer((value) => {
       return normalizeDialCode(value);
     })
+    .notEmpty()
+    .withMessage("Country code is required.")
+    .bail()
     .matches(/^\+\d{1,4}$/)
     .withMessage("Country code must look like +971."),
   body("mobile.number")

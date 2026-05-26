@@ -1,0 +1,663 @@
+const { validationResult } = require("express-validator");
+const XLSX = require("xlsx");
+const ClientVisit = require("../models/ClientVisit");
+const Client = require("../models/Client");
+const User = require("../models/User");
+const { nextVisitId } = require("../utils/autoId");
+const { buildSimplePdf } = require("../utils/simplePdf");
+
+const populateVisit = [
+  { path: "client", select: "legalName fileNo assignedUser registeredAddress correspondenceAddress" },
+  { path: "assignedUsers.user", select: "name role email" },
+  { path: "activityLogs.user", select: "name email role" },
+  { path: "createdBy", select: "name email role" },
+];
+
+const VISIT_TYPES = [
+  "Requirement Gathering",
+  "Verification",
+  "Onboarding Discussion",
+  "Follow Up",
+  "Collection",
+  "Meeting",
+];
+
+function getErrors(req, res) {
+  const errors = validationResult(req);
+  if (errors.isEmpty()) return null;
+  res.status(400).json({ errors: errors.array() });
+  return errors.array();
+}
+
+function visitScope(req) {
+  if (req.user.role === "task_only") {
+    return { "assignedUsers.user": req.user._id };
+  }
+  return {};
+}
+
+function canManageVisit(req) {
+  return req.user.role === "admin" || req.user.role === "manager";
+}
+
+function parse12HourTime(value) {
+  const match = String(value || "").trim().match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/i);
+  if (!match) return null;
+  let hours = Number(match[1]) % 12;
+  const minutes = Number(match[2]);
+  const period = match[3].toUpperCase();
+  if (period === "PM") hours += 12;
+  return { hours, minutes };
+}
+
+function combineDateAndTime(dateValue, timeValue) {
+  if (!dateValue || !timeValue) return null;
+  const parsed = parse12HourTime(timeValue);
+  if (!parsed) return null;
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(parsed.hours, parsed.minutes, 0, 0);
+  return date;
+}
+
+function combineDateAndLegacyTime(dateValue, timeValue) {
+  const match = String(timeValue || "").trim().match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  if (!match) return null;
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(Number(match[1]), Number(match[2]), 0, 0);
+  return date;
+}
+
+function normalizeLegacyRange(checkInAt, checkOutAt) {
+  if (!checkInAt || !checkOutAt) return { checkInAt, checkOutAt };
+  if (checkOutAt >= checkInAt) return { checkInAt, checkOutAt };
+  const adjusted = new Date(checkOutAt);
+  if (adjusted.getHours() < 12) {
+    adjusted.setHours(adjusted.getHours() + 12);
+  } else {
+    adjusted.setDate(adjusted.getDate() + 1);
+  }
+  return { checkInAt, checkOutAt: adjusted };
+}
+
+function formatVisitTime(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+}
+
+function deriveStatus(assignedUsers = [], explicitStatus) {
+  if (explicitStatus === "cancelled") return "cancelled";
+  if (!assignedUsers.length) return explicitStatus || "planned";
+  const checkedIn = assignedUsers.filter((entry) => entry.checkInAt).length;
+  const checkedOut = assignedUsers.filter((entry) => entry.checkOutAt).length;
+  if (!checkedIn) return "planned";
+  if (checkedOut === assignedUsers.length) return "completed";
+  return "in_progress";
+}
+
+function durationMinutes(checkInAt, checkOutAt) {
+  if (!checkInAt || !checkOutAt) return undefined;
+  return Math.max(0, Math.round((new Date(checkOutAt) - new Date(checkInAt)) / 60000));
+}
+
+function visitClientName(visit) {
+  return visit.clientType === "new"
+    ? visit.newClient?.authorityName || "New Client"
+    : visit.client?.legalName || "Unknown Client";
+}
+
+function visitClientLocation(visit) {
+  if (visit.clientType === "new") return visit.newClient?.location || visit.location || "-";
+  const registered = visit.client?.registeredAddress || {};
+  const correspondence = visit.client?.correspondenceAddress || {};
+  return visit.location
+    || [registered.emirate, registered.street].filter(Boolean).join(", ")
+    || [correspondence.emirate, correspondence.street].filter(Boolean).join(", ")
+    || "-";
+}
+
+function serializeVisit(visit) {
+  return {
+    ...visit.toObject({ virtuals: true }),
+    clientName: visitClientName(visit),
+    clientLocation: visitClientLocation(visit),
+    teamLead: visit.assignedUsers?.[0]?.user || null,
+    checkInStatus: visit.assignedUsers?.some((entry) => entry.checkInAt) ? "Checked In" : "Pending",
+    checkOutStatus: visit.assignedUsers?.every((entry) => entry.checkOutAt) && visit.assignedUsers?.length ? "Checked Out" : "Pending",
+  };
+}
+
+function appendActivity(visit, userId, action, message) {
+  visit.activityLogs = Array.isArray(visit.activityLogs) ? visit.activityLogs : [];
+  visit.activityLogs.unshift({ action, message, user: userId, createdAt: new Date() });
+}
+
+function normalizeAssignedUsers(assignedUsers = []) {
+  const byUser = new Map();
+  assignedUsers.forEach((entry) => {
+    const userId = String(entry?.user || "").trim();
+    if (!userId || byUser.has(userId)) return;
+    byUser.set(userId, {
+      user: userId,
+      notes: String(entry?.notes || "").trim(),
+      visitSummary: String(entry?.visitSummary || "").trim(),
+      followUpRequired: Boolean(entry?.followUpRequired),
+    });
+  });
+  return [...byUser.values()];
+}
+
+async function ensureUsersExist(userIds = []) {
+  const uniqueIds = [...new Set(userIds.filter(Boolean).map((id) => String(id)))];
+  if (!uniqueIds.length) return [];
+  const users = await User.find({ _id: { $in: uniqueIds }, isActive: true }).select("_id role");
+  if (users.length !== uniqueIds.length) return null;
+  return users;
+}
+
+async function backfillVisit(visit) {
+  let changed = false;
+
+  if (!visit.visitId) {
+    const year = new Date(visit.visitDate || Date.now()).getUTCFullYear();
+    visit.visitId = await nextVisitId(year);
+    changed = true;
+  }
+
+  if (!visit.clientType) {
+    visit.clientType = visit.client ? "existing" : "new";
+    changed = true;
+  }
+
+  if (!visit.visitType) {
+    visit.visitType = "Requirement Gathering";
+    changed = true;
+  }
+
+  if ((!visit.assignedUsers || !visit.assignedUsers.length) && Array.isArray(visit.visitors) && visit.visitors.length) {
+    visit.assignedUsers = visit.visitors.map((entry) => {
+      const range = normalizeLegacyRange(
+        combineDateAndLegacyTime(visit.visitDate, entry.checkInTime),
+        combineDateAndLegacyTime(visit.visitDate, entry.checkOutTime)
+      );
+      return {
+        user: entry.user,
+        checkInAt: range.checkInAt,
+        checkOutAt: range.checkOutAt,
+        durationMinutes: durationMinutes(range.checkInAt, range.checkOutAt),
+      };
+    });
+    changed = true;
+  }
+
+  const derivedStatus = deriveStatus(visit.assignedUsers || [], visit.status);
+  if (visit.status !== derivedStatus) {
+    visit.status = derivedStatus;
+    changed = true;
+  }
+
+  if (!Array.isArray(visit.activityLogs) || !visit.activityLogs.length) {
+    appendActivity(visit, visit.createdBy, "Visit Created", "Visit record created");
+    changed = true;
+  }
+
+  if (changed) await visit.save();
+  return visit.populate(populateVisit);
+}
+
+async function getVisitOr404(req, res) {
+  let visit = await ClientVisit.findOne({ _id: req.params.id, ...visitScope(req) }).populate(populateVisit);
+  if (!visit) {
+    res.status(404).json({ message: "Visit record not found" });
+    return null;
+  }
+  visit = await backfillVisit(visit);
+  return visit;
+}
+
+async function buildFilteredVisits(req, { exportMode = false } = {}) {
+  const {
+    status,
+    visitType,
+    clientName,
+    userName,
+    fromDate,
+    toDate,
+    sortBy = "visitDate",
+    sortDir = "desc",
+    page = 1,
+    limit = 10,
+  } = req.query;
+
+  const visits = await ClientVisit.find(visitScope(req)).populate(populateVisit);
+  const hydrated = await Promise.all(visits.map((visit) => backfillVisit(visit)));
+  const term = String(clientName || "").trim().toLowerCase();
+  const userTerm = String(userName || "").trim().toLowerCase();
+  const from = fromDate ? new Date(fromDate) : null;
+  const to = toDate ? new Date(toDate) : null;
+  if (to) to.setHours(23, 59, 59, 999);
+
+  let items = hydrated.filter((visit) => {
+    if (status && status !== "all" && visit.status !== status) return false;
+    if (visitType && visitType !== "all" && visit.visitType !== visitType) return false;
+    if (term) {
+      const haystack = [visitClientName(visit), visit.client?.fileNo, visit.location]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      if (!haystack.includes(term)) return false;
+    }
+    if (userTerm) {
+      const names = (visit.assignedUsers || []).map((entry) => String(entry.user?.name || "").toLowerCase());
+      if (!names.some((name) => name.includes(userTerm))) return false;
+    }
+    if (from && new Date(visit.visitDate) < from) return false;
+    if (to && new Date(visit.visitDate) > to) return false;
+    return true;
+  });
+
+  const direction = sortDir === "asc" ? 1 : -1;
+  items.sort((left, right) => {
+    let a;
+    let b;
+    switch (sortBy) {
+      case "visitId":
+        a = left.visitId || "";
+        b = right.visitId || "";
+        break;
+      case "client":
+        a = visitClientName(left);
+        b = visitClientName(right);
+        break;
+      case "status":
+        a = left.status || "";
+        b = right.status || "";
+        break;
+      case "type":
+        a = left.visitType || "";
+        b = right.visitType || "";
+        break;
+      case "createdAt":
+        a = new Date(left.createdAt).getTime();
+        b = new Date(right.createdAt).getTime();
+        break;
+      case "visitDate":
+      default:
+        a = combineDateAndTime(left.visitDate, left.visitTime) || new Date(left.visitDate);
+        b = combineDateAndTime(right.visitDate, right.visitTime) || new Date(right.visitDate);
+        a = a.getTime();
+        b = b.getTime();
+        break;
+    }
+    if (a < b) return -1 * direction;
+    if (a > b) return 1 * direction;
+    return 0;
+  });
+
+  const total = items.length;
+  if (!exportMode) {
+    const pageNumber = Math.max(1, Number(page) || 1);
+    const pageSize = Math.max(1, Math.min(100, Number(limit) || 10));
+    const start = (pageNumber - 1) * pageSize;
+    items = items.slice(start, start + pageSize);
+    return {
+      items: items.map(serializeVisit),
+      total,
+      page: pageNumber,
+      pages: Math.max(1, Math.ceil(total / pageSize)),
+      filters: { status, visitType, clientName, userName, fromDate, toDate },
+      visitTypes: VISIT_TYPES,
+    };
+  }
+
+  return items.map(serializeVisit);
+}
+
+function exportRows(visits = []) {
+  return visits.map((visit) => ({
+    "Visit ID": visit.visitId || "",
+    Client: visit.clientName || "",
+    "Client Type": visit.clientType || "",
+    Date: visit.visitDate ? new Date(visit.visitDate).toISOString().slice(0, 10) : "",
+    Time: visit.visitTime || "",
+    Type: visit.visitType || "",
+    Location: visit.clientLocation || visit.location || "",
+    Status: visit.status || "",
+    "Assigned Users": (visit.assignedUsers || []).map((entry) => entry.user?.name || "").filter(Boolean).join(", "),
+    "Team Lead": visit.teamLead?.name || "",
+    "Check-In Status": visit.checkInStatus || "",
+    "Check-Out Status": visit.checkOutStatus || "",
+    "Created By": visit.createdBy?.name || "",
+    Remarks: visit.remarks || "",
+  }));
+}
+
+exports.listVisits = async (req, res, next) => {
+  try {
+    res.json(await buildFilteredVisits(req));
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getVisit = async (req, res, next) => {
+  try {
+    const visit = await getVisitOr404(req, res);
+    if (!visit) return;
+    res.json(serializeVisit(visit));
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.createVisit = async (req, res, next) => {
+  try {
+    if (getErrors(req, res)) return;
+
+    const {
+      clientType = "existing",
+      client,
+      newClient = {},
+      visitDate,
+      visitTime,
+      visitType = "Requirement Gathering",
+      location,
+      remarks,
+      assignedUsers = [],
+    } = req.body;
+
+    const scheduledDate = new Date(visitDate);
+    scheduledDate.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (scheduledDate < today) {
+      return res.status(400).json({ message: "Visit date cannot be in the past." });
+    }
+
+    if (clientType === "existing" && !client) {
+      return res.status(400).json({ message: "Please select an existing client." });
+    }
+    if (clientType === "existing") {
+      const existingClient = await Client.findById(client).select("_id");
+      if (!existingClient) {
+        return res.status(400).json({ message: "Selected client was not found." });
+      }
+    }
+    if (clientType === "new") {
+      if (!String(newClient.authorityName || "").trim()) {
+        return res.status(400).json({ message: "Name is required." });
+      }
+      if (!String(newClient.mobileNumber || "").trim()) {
+        return res.status(400).json({ message: "Mobile Number is required." });
+      }
+      if (!String(newClient.location || "").trim()) {
+        return res.status(400).json({ message: "Location is required." });
+      }
+    }
+
+    const normalizedAssignedUsers = req.user.role === "task_only"
+      ? [{ user: req.user._id }]
+      : normalizeAssignedUsers(assignedUsers);
+    if (!normalizedAssignedUsers.length) {
+      return res.status(400).json({ message: "Please assign at least one user." });
+    }
+    if (req.user.role === "task_only" && normalizedAssignedUsers.some((entry) => String(entry.user) !== String(req.user._id))) {
+      return res.status(403).json({ message: "Task Only users can only create visits for themselves." });
+    }
+
+    const users = await ensureUsersExist(normalizedAssignedUsers.map((entry) => entry.user));
+    if (!users) {
+      return res.status(400).json({ message: "One or more assigned users are invalid or inactive." });
+    }
+
+    const year = new Date(visitDate).getUTCFullYear();
+    const visit = await ClientVisit.create({
+      visitId: await nextVisitId(year),
+      clientType,
+      client: clientType === "existing" ? client : undefined,
+      newClient: clientType === "new" ? {
+        authorityName: String(newClient.authorityName || "").trim(),
+        mobileCountryCode: String(newClient.mobileCountryCode || "").trim(),
+        mobileNumber: String(newClient.mobileNumber || "").trim(),
+        email: String(newClient.email || "").trim(),
+        location: String(newClient.location || "").trim(),
+      } : undefined,
+      visitDate,
+      visitTime: String(visitTime || "").trim(),
+      visitType: VISIT_TYPES.includes(visitType) ? visitType : "Requirement Gathering",
+      location: String(location || "").trim(),
+      remarks: String(remarks || "").trim(),
+      status: "planned",
+      assignedUsers: normalizedAssignedUsers,
+      createdBy: req.user._id,
+      activityLogs: [{ action: "Visit Created", message: "Visit scheduled", user: req.user._id }],
+    });
+
+    appendActivity(
+      visit,
+      req.user._id,
+      "Users Assigned",
+      `${normalizedAssignedUsers.length} user${normalizedAssignedUsers.length === 1 ? "" : "s"} assigned`
+    );
+    await visit.save();
+    res.status(201).json(serializeVisit(await visit.populate(populateVisit)));
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.updateVisit = async (req, res, next) => {
+  try {
+    if (getErrors(req, res)) return;
+    if (!canManageVisit(req)) {
+      return res.status(403).json({ message: "Only Admin and Manager can edit visits." });
+    }
+
+    const visit = await getVisitOr404(req, res);
+    if (!visit) return;
+
+    const {
+      clientType = visit.clientType,
+      client,
+      newClient = visit.newClient || {},
+      visitDate = visit.visitDate,
+      visitTime = visit.visitTime,
+      visitType = visit.visitType,
+      location = visit.location,
+      remarks = visit.remarks,
+      assignedUsers = visit.assignedUsers.map((entry) => ({ user: entry.user?._id || entry.user })),
+      status = visit.status,
+    } = req.body;
+
+    const scheduledDate = new Date(visitDate);
+    scheduledDate.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (scheduledDate < today) {
+      return res.status(400).json({ message: "Visit date cannot be in the past." });
+    }
+    if (clientType === "existing" && !client) {
+      return res.status(400).json({ message: "Please select an existing client." });
+    }
+    if (clientType === "existing") {
+      const existingClient = await Client.findById(client).select("_id");
+      if (!existingClient) {
+        return res.status(400).json({ message: "Selected client was not found." });
+      }
+    }
+    if (clientType === "new") {
+      if (!String(newClient.authorityName || "").trim()) {
+        return res.status(400).json({ message: "Name is required." });
+      }
+      if (!String(newClient.mobileNumber || "").trim()) {
+        return res.status(400).json({ message: "Mobile Number is required." });
+      }
+      if (!String(newClient.location || "").trim()) {
+        return res.status(400).json({ message: "Location is required." });
+      }
+    }
+
+    const normalizedAssignedUsers = normalizeAssignedUsers(assignedUsers);
+    if (!normalizedAssignedUsers.length) {
+      return res.status(400).json({ message: "Please assign at least one user." });
+    }
+    const users = await ensureUsersExist(normalizedAssignedUsers.map((entry) => entry.user));
+    if (!users) {
+      return res.status(400).json({ message: "One or more assigned users are invalid or inactive." });
+    }
+
+    visit.clientType = clientType;
+    visit.client = clientType === "existing" ? client : undefined;
+    visit.newClient = clientType === "new" ? {
+      authorityName: String(newClient.authorityName || "").trim(),
+      mobileCountryCode: String(newClient.mobileCountryCode || "").trim(),
+      mobileNumber: String(newClient.mobileNumber || "").trim(),
+      email: String(newClient.email || "").trim(),
+      location: String(newClient.location || "").trim(),
+    } : undefined;
+    visit.visitDate = visitDate;
+    visit.visitTime = String(visitTime || "").trim();
+    visit.visitType = VISIT_TYPES.includes(visitType) ? visitType : "Requirement Gathering";
+    visit.location = String(location || "").trim();
+    visit.remarks = String(remarks || "").trim();
+
+    const previousAssignedByUser = new Map(
+      (visit.assignedUsers || []).map((entry) => [String(entry.user?._id || entry.user), entry])
+    );
+    visit.assignedUsers = normalizedAssignedUsers.map((entry) => {
+      const existing = previousAssignedByUser.get(String(entry.user));
+      return {
+        user: entry.user,
+        checkInAt: existing?.checkInAt,
+        checkOutAt: existing?.checkOutAt,
+        durationMinutes: existing?.durationMinutes,
+        visitSummary: existing?.visitSummary,
+        followUpRequired: existing?.followUpRequired,
+        notes: existing?.notes,
+        gpsLocation: existing?.gpsLocation,
+        selfieUrl: existing?.selfieUrl,
+      };
+    });
+
+    visit.status = deriveStatus(visit.assignedUsers, status);
+    appendActivity(visit, req.user._id, "Visit Updated", "Visit details updated");
+    await visit.save();
+    res.json(serializeVisit(await visit.populate(populateVisit)));
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.checkIn = async (req, res, next) => {
+  try {
+    const visit = await getVisitOr404(req, res);
+    if (!visit) return;
+    if (visit.status === "cancelled") {
+      return res.status(400).json({ message: "Cancelled visits cannot be checked in." });
+    }
+
+    const targetUserId = canManageVisit(req) && req.body.userId ? String(req.body.userId) : String(req.user._id);
+    const assignedUser = visit.assignedUsers.find((entry) => String(entry.user?._id || entry.user) === targetUserId);
+    if (!assignedUser) {
+      return res.status(404).json({ message: "Assigned user not found for this visit." });
+    }
+    if (assignedUser.checkInAt) {
+      return res.status(409).json({ message: "This user has already checked in." });
+    }
+
+    assignedUser.checkInAt = new Date();
+    assignedUser.notes = String(req.body.notes || assignedUser.notes || "").trim();
+    assignedUser.gpsLocation = String(req.body.gpsLocation || assignedUser.gpsLocation || "").trim();
+    assignedUser.selfieUrl = String(req.body.selfieUrl || assignedUser.selfieUrl || "").trim();
+    visit.status = deriveStatus(visit.assignedUsers, visit.status);
+    appendActivity(visit, req.user._id, "Check-In Completed", `${assignedUser.user?.name || "Assigned user"} checked in`);
+    await visit.save();
+    res.json(serializeVisit(await visit.populate(populateVisit)));
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.checkOut = async (req, res, next) => {
+  try {
+    const visit = await getVisitOr404(req, res);
+    if (!visit) return;
+    if (visit.status === "cancelled") {
+      return res.status(400).json({ message: "Cancelled visits cannot be checked out." });
+    }
+
+    const targetUserId = canManageVisit(req) && req.body.userId ? String(req.body.userId) : String(req.user._id);
+    const assignedUser = visit.assignedUsers.find((entry) => String(entry.user?._id || entry.user) === targetUserId);
+    if (!assignedUser) {
+      return res.status(404).json({ message: "Assigned user not found for this visit." });
+    }
+    if (!assignedUser.checkInAt) {
+      return res.status(400).json({ message: "Check-in is required before check-out." });
+    }
+    if (assignedUser.checkOutAt) {
+      return res.status(409).json({ message: "This user has already checked out." });
+    }
+
+    assignedUser.checkOutAt = new Date();
+    assignedUser.durationMinutes = durationMinutes(assignedUser.checkInAt, assignedUser.checkOutAt);
+    assignedUser.visitSummary = String(req.body.visitSummary || assignedUser.visitSummary || "").trim();
+    assignedUser.followUpRequired = Boolean(req.body.followUpRequired);
+    assignedUser.notes = String(req.body.notes || assignedUser.notes || "").trim();
+    visit.status = deriveStatus(visit.assignedUsers, visit.status);
+    appendActivity(visit, req.user._id, "Check-Out Completed", `${assignedUser.user?.name || "Assigned user"} checked out`);
+    await visit.save();
+    res.json(serializeVisit(await visit.populate(populateVisit)));
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.updateStatus = async (req, res, next) => {
+  try {
+    if (!canManageVisit(req)) {
+      return res.status(403).json({ message: "Only Admin and Manager can update visit status." });
+    }
+    const visit = await getVisitOr404(req, res);
+    if (!visit) return;
+    visit.status = req.body.status;
+    appendActivity(visit, req.user._id, "Status Changed", `Visit status changed to ${req.body.status}`);
+    await visit.save();
+    res.json(serializeVisit(await visit.populate(populateVisit)));
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.exportVisits = async (req, res, next) => {
+  try {
+    const format = String(req.query.format || "xlsx").toLowerCase();
+    const visits = await buildFilteredVisits(req, { exportMode: true });
+    const rows = exportRows(visits);
+
+    if (format === "pdf") {
+      const lines = rows.flatMap((row, index) => ([
+        `${index + 1}. ${row["Visit ID"]} | ${row.Client} | ${row.Date} ${row.Time} | ${row.Type} | ${row.Status}`,
+        `   Team: ${row["Assigned Users"] || "-"} | Location: ${row.Location || "-"}`,
+      ]));
+      const pdf = buildSimplePdf("Client Visits Report", lines);
+      res
+        .setHeader("Content-Disposition", 'attachment; filename="client-visits.pdf"')
+        .setHeader("Content-Type", "application/pdf")
+        .send(pdf);
+      return;
+    }
+
+    const workbook = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Client Visits");
+    const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "buffer" });
+    res
+      .setHeader("Content-Disposition", 'attachment; filename="client-visits.xlsx"')
+      .setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+      .send(buffer);
+  } catch (error) {
+    next(error);
+  }
+};

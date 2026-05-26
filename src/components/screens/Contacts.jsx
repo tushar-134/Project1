@@ -1,17 +1,22 @@
-import { Mail, Phone, Search, UserRoundPlus } from "lucide-react";
+import { Mail, MapPin, MapPinned, Phone, Search, UserRoundPlus } from "lucide-react";
 import { cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { useApp } from "../../context/AppContext.jsx";
-import { useClients } from "../../hooks/useClients";
 import { contactService } from "../../services/contactService";
-import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import Table from "../ui/Table.jsx";
 import { DIAL_CODE_OPTIONS } from "../../utils/dialCodeOptions.js";
 import { getPhoneNumberSpec, normalizeDialCode, normalizePhoneNumber } from "../../utils/phoneUtils.js";
 
-const blankContact = { name: "", clientId: "", role: "", countryCode: "", mobile: "", email: "", type: "Client Contact", city: "" };
+const blankContact = {
+  authorityName: "",
+  contactPersonName: "",
+  countryCode: "",
+  mobile: "",
+  email: "",
+  address: "",
+  location: "",
+};
 
 function getApiErrorMessage(error) {
   const data = error?.response?.data;
@@ -23,20 +28,16 @@ function getApiErrorMessage(error) {
 function toContactRows(contacts) {
   return (contacts || []).map((contact) => ({
     id: contact._id,
-    clientId: contact.client?._id || contact.client,
-    client: contact.client?.legalName || "Unknown Client",
-    name: contact.fullName || "Unnamed Contact",
-    role: contact.designation || "Contact",
+    authorityName: contact.authorityName || contact.client?.legalName || "Unknown Authority",
+    contactPersonName: contact.contactPersonName || contact.fullName || "Unnamed Contact",
     mobile: [contact.mobile?.countryCode, contact.mobile?.number].filter(Boolean).join(" ").trim(),
     email: contact.email || "",
-    type: contact.isPrimary ? "Primary Contact" : (contact.type || "Client Contact"),
-    city: contact.city || contact.client?.registeredAddress?.emirate || "-",
+    address: contact.address || "-",
+    location: contact.location || contact.city || contact.client?.registeredAddress?.emirate || "-",
   }));
 }
 
 export default function Contacts() {
-  const { state } = useApp();
-  const { fetchClients } = useClients();
   const [query, setQuery] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(blankContact);
@@ -44,9 +45,6 @@ export default function Contacts() {
   const [contactsData, setContactsData] = useState([]);
 
   useEffect(() => {
-    fetchClients({ limit: 100 }).catch(() => {
-      toast.error("Unable to load contact directory.");
-    });
     loadContacts();
   }, []);
 
@@ -63,13 +61,20 @@ export default function Contacts() {
     const term = query.trim().toLowerCase();
     if (!term) return contactList;
     return contactList.filter((contact) =>
-      [contact.name, contact.client, contact.role, contact.mobile, contact.email, contact.type, contact.city].some((value) =>
+      [contact.authorityName, contact.contactPersonName, contact.mobile, contact.email, contact.address, contact.location].some((value) =>
         String(value || "").toLowerCase().includes(term)
       )
     );
   }, [contactList, query]);
-  const clientContacts = contacts.filter((contact) => contact.client !== "Internal").length;
-  const internalContacts = contacts.filter((contact) => contact.client === "Internal").length;
+
+  const authorityCount = useMemo(
+    () => new Set(contacts.map((contact) => contact.authorityName).filter(Boolean)).size,
+    [contacts]
+  );
+  const locationCount = useMemo(
+    () => new Set(contacts.map((contact) => contact.location).filter((value) => value && value !== "-")).size,
+    [contacts]
+  );
 
   function closeModal() {
     if (saving) return;
@@ -79,33 +84,31 @@ export default function Contacts() {
 
   async function saveContact() {
     if (saving) return;
-    if (!form.name.trim() || !form.mobile.trim() || !form.clientId || !form.countryCode.trim()) {
-      toast.error("Client, name, country code and mobile are required.");
+    if (!form.authorityName.trim() || !form.contactPersonName.trim() || !form.mobile.trim() || !form.countryCode.trim()) {
+      toast.error("Authority name, contact person name, country code and mobile are required.");
       return;
     }
     const digits = normalizePhoneNumber(form.mobile);
-    const client = state.clients.find((item) => item._id === form.clientId || item.id === form.clientId);
-    if (!client) {
-      toast.error("Please select a valid client.");
+    const { min, max } = getPhoneNumberSpec(form.countryCode);
+    if (digits.length < min || digits.length > max) {
+      toast.error(`Mobile number must be between ${min} and ${max} digits.`);
       return;
     }
     setSaving(true);
     try {
       await contactService.create({
-        fullName: form.name.trim(),
-        client: client._id || client.id,
-        designation: form.role.trim(),
+        authorityName: form.authorityName.trim(),
+        contactPersonName: form.contactPersonName.trim(),
         email: form.email.trim(),
         mobile: {
           countryCode: normalizeDialCode(form.countryCode),
           number: digits,
         },
-        type: form.type,
-        city: form.city.trim() || client.registeredAddress?.emirate || "",
-        isPrimary: form.type === "Primary Contact",
+        address: form.address.trim(),
+        location: form.location.trim(),
       });
       await loadContacts();
-      toast.success("Contact saved to directory.");
+      toast.success("Authority contact saved.");
       closeModal();
     } catch (error) {
       toast.error(getApiErrorMessage(error) || "Unable to save contact.");
@@ -129,14 +132,22 @@ export default function Contacts() {
 
       <div className="grid gap-3 sm:grid-cols-3">
         <Summary label="Total Contacts" value={contacts.length} />
-        <Summary label="Client Contacts" value={clientContacts} />
-        <Summary label="Internal Contacts" value={internalContacts} />
+        <Summary label="Authorities" value={authorityCount} />
+        <Summary label="Locations" value={locationCount} />
       </div>
 
       <Card className="p-3">
         <div className="relative">
           <Search className="absolute left-5 top-2.5 text-slate-400" size={16} />
-          <input id="contact-search" name="contactSearch" type="search" className="input pl-12" placeholder="Search contacts by name, email, or mobile..." value={query} onChange={(e) => setQuery(e.target.value)} />
+          <input
+            id="contact-search"
+            name="contactSearch"
+            type="search"
+            className="input pl-12"
+            placeholder="Search by authority, contact person, location, email, or mobile..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
         </div>
       </Card>
 
@@ -144,12 +155,11 @@ export default function Contacts() {
         <Table>
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Client / Company</th>
-              <th>Role</th>
-              <th>Type</th>
-              <th>Mobile</th>
+              <th>Name / Authority Name</th>
+              <th>Contact Person Name</th>
+              <th>Mobile Number</th>
               <th>Email</th>
+              <th>Address</th>
               <th>Location</th>
             </tr>
           </thead>
@@ -159,22 +169,21 @@ export default function Contacts() {
                 <td>
                   <div className="flex items-center gap-2">
                     <div className="grid h-8 w-8 place-items-center rounded-full bg-[#1e3a8a] text-[11px] font-black text-white">
-                      {contact.name.split(" ").map((part) => part[0]).join("").slice(0, 2)}
+                      {contact.authorityName.split(" ").map((part) => part[0]).join("").slice(0, 2)}
                     </div>
-                    <div className="font-extrabold">{contact.name}</div>
+                    <div className="font-extrabold">{contact.authorityName}</div>
                   </div>
                 </td>
-                <td>{contact.client}</td>
-                <td>{contact.role}</td>
-                <td><Badge color={contact.type === "Internal" ? "bg-blue-50 text-[#1e3a8a]" : "bg-emerald-50 text-[#059669]"}>{contact.type}</Badge></td>
+                <td>{contact.contactPersonName}</td>
                 <td><span className="inline-flex items-center gap-1"><Phone size={13} />{contact.mobile || "-"}</span></td>
                 <td><span className="inline-flex items-center gap-1"><Mail size={13} />{contact.email || "-"}</span></td>
-                <td>{contact.city}</td>
+                <td><span className="inline-flex items-start gap-1"><MapPinned size={13} className="mt-0.5 shrink-0" />{contact.address}</span></td>
+                <td><span className="inline-flex items-center gap-1"><MapPin size={13} />{contact.location}</span></td>
               </tr>
             ))}
             {contacts.length === 0 && (
               <tr>
-                <td colSpan="7" className="py-8 text-center text-[13px] font-semibold text-slate-500">No stored contacts found yet.</td>
+                <td colSpan="6" className="py-8 text-center text-[13px] font-semibold text-slate-500">No stored authority contacts found yet.</td>
               </tr>
             )}
           </tbody>
@@ -183,22 +192,15 @@ export default function Contacts() {
 
       {modalOpen && (
         <div className="fixed inset-0 z-40 grid place-items-center bg-slate-900/35 p-4">
-          <Card className="w-full max-w-lg p-4">
+          <Card className="w-full max-w-2xl p-4">
             <div className="mb-4 flex items-center justify-between">
-              <div className="text-[16px] font-extrabold">Add Contact</div>
+              <div className="text-[16px] font-extrabold">Add Authority Contact</div>
               <button onClick={closeModal} disabled={saving} className="text-slate-500 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">Close</button>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
-              <Field label="Client / Company*" field="contact-client">
-                <select className="input" value={form.clientId} onChange={(e) => setForm({ ...form, clientId: e.target.value })}>
-                  <option value="">Select client</option>
-                  {state.clients.map((client) => (
-                    <option key={client._id || client.id} value={client._id || client.id}>{client.legalName || client.name}</option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Name*" field="contact-name"><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-              <Field label="Mobile*" field="contact-mobile">
+              <Field label="Name / Authority Name*" field="contact-authority-name"><input className="input" value={form.authorityName} onChange={(e) => setForm({ ...form, authorityName: e.target.value })} /></Field>
+              <Field label="Contact Person Name*" field="contact-person-name"><input className="input" value={form.contactPersonName} onChange={(e) => setForm({ ...form, contactPersonName: e.target.value })} /></Field>
+              <Field label="Mobile Number*" field="contact-mobile">
                 <div className="flex gap-2">
                   <select
                     className="input w-44"
@@ -219,15 +221,11 @@ export default function Contacts() {
                   />
                 </div>
               </Field>
-              <Field label="Role" field="contact-role"><input className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} /></Field>
               <Field label="Email" field="contact-email"><input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
-              <Field label="Location" field="contact-city"><input className="input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} /></Field>
-              <Field label="Type" field="contact-type">
-                <select className="input" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-                  <option>Client Contact</option>
-                  <option>Primary Contact</option>
-                </select>
-              </Field>
+              <Field label="Location" field="contact-location"><input className="input" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></Field>
+              <div className="md:col-span-2">
+                <Field label="Address" field="contact-address"><textarea className="input min-h-[96px] py-2" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></Field>
+              </div>
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <Button variant="ghost" onClick={closeModal} disabled={saving}>Cancel</Button>

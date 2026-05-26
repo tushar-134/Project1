@@ -1,6 +1,6 @@
 import { cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import { Check, Send } from "lucide-react";
+import { Check, Send, UploadCloud } from "lucide-react";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
 import { useClients } from "../../hooks/useClients";
@@ -21,7 +21,7 @@ export default function AddTask() {
   const isEditMode = Boolean(id);
   const { fetchClients } = useClients();
   const { fetchUsers } = useUsers();
-  const { createTask, getTask, updateTask } = useTasks();
+  const { createTask, getTask, updateTask, uploadAttachment, deleteAttachment } = useTasks();
   // If navigated from TaskList with prefetched task data, start directly at step 3 (no flash).
   const [step, setStep] = useState(() => (isEditMode && location.state?.task) ? 3 : 1);
   const [categoryId, setCategoryId] = useState("vat");
@@ -32,6 +32,9 @@ export default function AddTask() {
   const [fta, setFta] = useState(false);
   const [savedStatus, setSavedStatus] = useState("not_started");
   const [submitting, setSubmitting] = useState(false);
+  const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
+  const [attachments, setAttachments] = useState([]);
+  const [attachmentDescription, setAttachmentDescription] = useState("");
   const [details, setDetails] = useState({ client: "", assigned: "", dueDate: "2026-05-31", periodFY: "", periodQuarter: "", description: "", frequency: "monthly", dayOfWeek: "Sun", dateOfMonth: 1, monthOfYear: 1, nextDue: "2026-06-30", endDate: "" });
   const chips = useMemo(() => category?.taskTypes || [], [category]);
 
@@ -114,20 +117,20 @@ export default function AddTask() {
         nextDue: task.recurringConfig?.nextDueDate?.slice?.(0, 10) || "",
         endDate: task.recurringConfig?.endDate?.slice?.(0, 10) || "",
       });
+      setAttachments(mapAttachmentRows(task.attachments || []));
       setStep(3);
     }
 
-    // If TaskList passed the task row via router state, use it immediately (instant open).
-    // Fall back to a fresh API call only when navigating directly via URL.
     const prefetched = location.state?.task;
     if (prefetched) {
       populate(prefetched);
-    } else {
-      getTask(id).then(populate).catch(() => {
+    }
+    getTask(id).then(populate).catch(() => {
+      if (!prefetched) {
         toast.error("Unable to load this task for editing.");
         navigate("/tasks/list");
-      });
-    }
+      }
+    });
   }, [id, isEditMode]);
 
   useEffect(() => {
@@ -156,6 +159,52 @@ export default function AddTask() {
     setType(next.taskTypes[0] || "");
     setStep(2);
   }
+
+  async function handleAttachmentFiles(files, description = "") {
+    const selected = Array.from(files || []);
+    if (!selected.length) return;
+    const note = String(description || "").trim();
+
+    if (!id) {
+      setAttachments((current) => [
+        ...current,
+        ...selected.map((file) => toPendingAttachment(file, note)),
+      ]);
+      setAttachmentDescription("");
+      toast.success(selected.length === 1 ? "Attachment added. You can open it immediately." : "Attachments added. You can open them immediately.");
+      return;
+    }
+
+    setIsUploadingAttachments(true);
+    try {
+      const formData = new FormData();
+      selected.forEach((file) => formData.append("files", file));
+      formData.append("description", note);
+      const updatedTask = await uploadAttachment(id, formData);
+      setAttachments(mapAttachmentRows(updatedTask.attachments || []));
+      setAttachmentDescription("");
+      toast.success(selected.length === 1 ? "Attachment uploaded." : "Attachments uploaded.");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Attachment upload failed.");
+    } finally {
+      setIsUploadingAttachments(false);
+    }
+  }
+
+  async function removeAttachment(attachment) {
+    if (!attachment.saved) {
+      setAttachments((current) => current.filter((item) => item.id !== attachment.id));
+      return;
+    }
+    try {
+      const updatedTask = await deleteAttachment(id, attachment.id);
+      setAttachments(mapAttachmentRows(updatedTask.attachments || []));
+      toast.success("Attachment deleted.");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Unable to delete attachment.");
+    }
+  }
+
   async function submit() {
     if (submitting) return; // guard against double-clicks
     if (!details.client) {
@@ -202,10 +251,29 @@ export default function AddTask() {
         // In create mode, auto-set to submitted_to_fta if FTA toggle is on, else not_started.
         status: isEditMode ? savedStatus : (effectiveFta ? "submitted_to_fta" : "not_started"),
       };
+      let savedTask;
       if (isEditMode) {
-        await updateTask(id, payload);
+        savedTask = await updateTask(id, payload);
       } else {
-        await createTask(payload);
+        savedTask = await createTask(payload);
+      }
+
+      const pendingAttachments = attachments.filter((attachment) => !attachment.saved && attachment.file);
+      if (pendingAttachments.length) {
+        const groupedByDescription = pendingAttachments.reduce((acc, attachment) => {
+          const key = attachment.description || "";
+          if (!acc[key]) acc[key] = [];
+          acc[key].push(attachment.file);
+          return acc;
+        }, {});
+        const taskId = savedTask?._id || id;
+        for (const [description, files] of Object.entries(groupedByDescription)) {
+          const formData = new FormData();
+          files.forEach((file) => formData.append("files", file));
+          formData.append("description", description);
+          savedTask = await uploadAttachment(taskId, formData);
+        }
+        setAttachments(mapAttachmentRows(savedTask?.attachments || []));
       }
       toast.success(isEditMode ? "Task updated successfully." : "Task created successfully.");
       navigate("/tasks/list");
@@ -238,6 +306,15 @@ export default function AddTask() {
             <Field label="Assign To" field="taskAssignedTo"><select className="input" value={details.assigned} onChange={(e) => setDetails({ ...details, assigned: e.target.value })}><option value="">Unassigned</option>{state.users.map((u) => <option key={u.id} value={u._id}>{u.name}</option>)}</select></Field>
             <Field label="Due Date*" field="taskDueDate"><input className="input" type="date" value={details.dueDate} onChange={(e) => handleRecurrenceChange({ dueDate: e.target.value })} /></Field>
             <Field label="Description / Notes" field="taskDescription"><textarea className="input textarea" value={details.description} onChange={(e) => setDetails({ ...details, description: e.target.value })} /></Field>
+          </div>
+          <div className="mt-4 space-y-3">
+            <AttachmentUploadZone
+              description={attachmentDescription}
+              onDescriptionChange={setAttachmentDescription}
+              onFiles={handleAttachmentFiles}
+              isUploading={isUploadingAttachments || submitting}
+            />
+            <AttachmentList attachments={attachments} onDelete={removeAttachment} />
           </div>
 
           {/* ── Period section ─────────────────────────────────────────── */}
@@ -394,6 +471,120 @@ function Field({ label, field, children }) {
   return <label htmlFor={field}><span className="field-label">{label}</span>{control}</label>;
 }
 function ToggleRow({ label, checked, onChange }) { return <div className="mt-4 flex items-center justify-between rounded-xl border border-[#e2e8f0] p-3"><span className="font-extrabold">{label}</span><Toggle checked={checked} onChange={onChange} /></div>; }
+
+function AttachmentUploadZone({ description, onDescriptionChange, onFiles, isUploading }) {
+  const inputId = "task-attachment-upload";
+  return (
+    <div
+      className={`upload-zone transition hover:bg-slate-100 ${isUploading ? "pointer-events-none opacity-70" : ""}`}
+      onDragOver={(event) => event.preventDefault()}
+      onDrop={(event) => {
+        event.preventDefault();
+        onFiles(event.dataTransfer.files, description);
+      }}
+    >
+      <UploadCloud className="mb-2 text-[#1e3a8a]" size={28} />
+      <div className="text-[15px] font-extrabold text-slate-800">{isUploading ? "Uploading..." : "Upload attachments"}</div>
+      <div className="mt-1 text-[12px] font-semibold text-slate-500">Choose one or more files. You can open selected files immediately.</div>
+      <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+        <Field label="Attachment Description" field="task-attachment-description">
+          <input
+            className="input"
+            value={description}
+            placeholder="Optional attachment note"
+            onChange={(event) => onDescriptionChange(event.target.value)}
+          />
+        </Field>
+        <label htmlFor={inputId} className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#1e3a8a] px-4 text-[14px] font-bold text-white transition hover:bg-[#1d4ed8]">
+          <UploadCloud size={16} />
+          {isUploading ? "Uploading..." : "Upload files"}
+        </label>
+      </div>
+      <input
+        id={inputId}
+        name="taskAttachmentUpload"
+        className="hidden"
+        type="file"
+        multiple
+        accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx"
+        onChange={(event) => {
+          onFiles(event.target.files, description);
+          event.target.value = "";
+        }}
+      />
+    </div>
+  );
+}
+
+function AttachmentList({ attachments, onDelete }) {
+  if (!attachments.length) {
+    return <div className="rounded-xl border border-dashed border-slate-200 px-3 py-4 text-[12px] font-semibold text-slate-500">No attachments added yet.</div>;
+  }
+  return (
+    <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+      {attachments.map((attachment) => (
+        <div key={attachment.id || attachment.name} className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-white px-3 py-2">
+          <div className="min-w-0">
+            <div className="truncate text-[13px] font-bold text-slate-800">{attachment.name}</div>
+            <div className="text-[11px] font-semibold text-slate-500">
+              {[attachment.size, attachment.description, attachment.uploadedOn, attachment.uploadedBy].filter(Boolean).join(" • ") || (attachment.saved ? "Uploaded" : "Pending save")}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="ghost" disabled={!attachment.url && !attachment.file} onClick={() => openAttachmentFile(attachment)}>Open</Button>
+            <Button size="sm" variant="danger" onClick={() => onDelete(attachment)}>Delete</Button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function formatFileSize(size) {
+  if (!size) return "";
+  if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(2).replace(/\.?0+$/, "")} MB`;
+  if (size >= 1024) return `${Math.round(size / 1024)} KB`;
+  return `${size} B`;
+}
+
+function toPendingAttachment(file, description) {
+  return {
+    id: `${file.name}-${file.lastModified}-${file.size}`,
+    name: file.name,
+    size: formatFileSize(file.size),
+    type: file.type || file.name.split(".").pop()?.toUpperCase() || "File",
+    description,
+    uploadedOn: "Pending save",
+    uploadedBy: "You",
+    file,
+    saved: false,
+  };
+}
+
+function mapAttachmentRows(items = []) {
+  return items.map((attachment) => ({
+    id: attachment._id,
+    name: attachment.name,
+    size: attachment.size,
+    type: attachment.fileType,
+    description: attachment.description || "",
+    uploadedOn: attachment.uploadedAt?.slice?.(0, 10) || "",
+    uploadedBy: attachment.uploadedBy?.name || "You",
+    url: attachment.url,
+    saved: true,
+  }));
+}
+
+function openAttachmentFile(attachment) {
+  if (attachment?.url) {
+    window.open(attachment.url, "_blank", "noopener,noreferrer");
+    return;
+  }
+  if (!attachment?.file) return;
+  const objectUrl = URL.createObjectURL(attachment.file);
+  window.open(objectUrl, "_blank", "noopener,noreferrer");
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+}
 
 // --- RECURRING TASK HIGH-PRECISION DATE CALCULATORS ---
 

@@ -9,6 +9,7 @@ const router = express.Router();
 // All client routes are protected; finer-grained create/delete rules are layered with role middleware.
 router.use(auth);
 router.get("/", ctrl.listClients);
+router.get("/expiry-alerts", ctrl.expiryAlerts);
 router.get("/export", adminManager, ctrl.exportClients);
 router.post("/", adminOnly, body("clientType").isIn(["legal", "natural"]), body("legalName").notEmpty(), ctrl.createClient);
 router.post("/bulk-upload", adminOnly, ctrl.bulkUpload);

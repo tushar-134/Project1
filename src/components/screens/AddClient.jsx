@@ -68,6 +68,13 @@ const FINANCIAL_YEAR_OPTIONS = [
   "Dec - Nov",
 ];
 
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+const ISSUING_AUTHORITY_OPTIONS = [
+  { id: "India", label: "India" },
+  { id: "Dubai", label: "Dubai" },
+];
+
 function normalizeFinancialYearEnd(value) {
   if (!value) return "Jan - Dec";
   if (FINANCIAL_YEAR_OPTIONS.includes(value)) return value;
@@ -79,6 +86,46 @@ function normalizeFinancialYearEnd(value) {
   if (normalized === "30 september" || normalized === "september") return "Oct - Sep";
 
   return "Jan - Dec";
+}
+
+function parseFinancialYearStartMonth(value) {
+  const normalized = normalizeFinancialYearEnd(value);
+  const startMonthLabel = normalized.split("-")[0]?.trim()?.slice(0, 3);
+  const monthIndex = MONTH_NAMES.findIndex((month) => month.toLowerCase() === startMonthLabel?.toLowerCase());
+  return monthIndex >= 0 ? monthIndex : 0;
+}
+
+function toOrdinal(value) {
+  const remainder10 = value % 10;
+  const remainder100 = value % 100;
+  if (remainder10 === 1 && remainder100 !== 11) return `${value}st`;
+  if (remainder10 === 2 && remainder100 !== 12) return `${value}nd`;
+  if (remainder10 === 3 && remainder100 !== 13) return `${value}rd`;
+  return `${value}th`;
+}
+
+function getVatFilingFrequencyOptions(financialYearEnd) {
+  const startMonth = parseFinancialYearStartMonth(financialYearEnd);
+  return Array.from({ length: 12 }, (_, index) => {
+    const rangeStart = (startMonth + index) % 12;
+    const rangeEnd = (rangeStart + 2) % 12;
+    const value = `${MONTH_NAMES[rangeStart]}-${MONTH_NAMES[rangeEnd]}`;
+    return {
+      value,
+      label: `${toOrdinal(index + 1)} Quarter (${value})`,
+    };
+  });
+}
+
+function normalizeVatFilingFrequency(value, financialYearEnd) {
+  const options = getVatFilingFrequencyOptions(financialYearEnd);
+  if (!value) return options[0]?.value || "Jan-Mar";
+
+  const normalizedValue = String(value).trim().toLowerCase().replace(/\s+/g, "");
+  const matchingOption = options.find((option) => option.value.toLowerCase().replace(/\s+/g, "") === normalizedValue);
+  if (matchingOption) return matchingOption.value;
+
+  return options[0]?.value || "Jan-Mar";
 }
 
 export default function AddClient() {
@@ -103,9 +150,10 @@ export default function AddClient() {
   const [form, setForm] = useState({
     clientType: "", fileNo: "", legalName: "", tradeName: "", fye: "Jan - Dec", jurisdiction: "Mainland", assigned: "",
     country: "United Arab Emirates", emirate: "Dubai", street: "", poBox: "", postalCode: "", differentAddress: false, correspondence: "",
-    vatTrn: "", vatStatus: "Registered", vatDate: "", vatFreq: "Quarterly", ctTin: "", ctStatus: "Not Registered", ctDate: "", group: "", newGroup: "",
+    vatTrn: "", vatStatus: "Registered", vatDate: "", vatFreq: "Jan-Mar", ctTin: "", ctStatus: "Not Registered", ctDate: "", group: "", newGroup: "",
   });
-  const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "Dubai Economy", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }]);
+  const vatFilingFrequencyOptions = useMemo(() => getVatFilingFrequencyOptions(form.fye), [form.fye]);
+  const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "Dubai", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }]);
 
   const [contacts, setContacts] = useState([{
     name: "",
@@ -136,6 +184,7 @@ export default function AddClient() {
   const [visiblePortalPasswords, setVisiblePortalPasswords] = useState({});
   const [attachments, setAttachments] = useState([]);
   const [attachmentDescription, setAttachmentDescription] = useState("");
+  const [authoritySearches, setAuthoritySearches] = useState({});
   const [customFieldModal, setCustomFieldModal] = useState(false);
   const [customFieldValues, setCustomFieldValues] = useState({});
   const [selectedFieldKeys, setSelectedFieldKeys] = useState([]);
@@ -204,6 +253,14 @@ export default function AddClient() {
     }, delay);
     return () => window.clearTimeout(timer);
   }, [groupSearch, loadGroupOptions]);
+
+  useEffect(() => {
+    setForm((current) => {
+      const normalizedVatFrequency = normalizeVatFilingFrequency(current.vatFreq, current.fye);
+      return normalizedVatFrequency === current.vatFreq ? current : { ...current, vatFreq: normalizedVatFrequency };
+    });
+  }, [form.fye]);
+
   useEffect(() => {
     if (!isEditMode) return;
     getClient(id).then((client) => {
@@ -232,7 +289,7 @@ export default function AddClient() {
         vatTrn: client.vatDetails?.trn || "",
         vatStatus: client.vatDetails?.status === "registered" ? "Registered" : client.vatDetails?.status === "applying" ? "Applying / In Progress" : client.vatDetails?.status === "exempt" ? "Exempt" : "Not Registered",
         vatDate: client.vatDetails?.registrationDate?.slice?.(0, 10) || "",
-        vatFreq: client.vatDetails?.filingFrequency ? `${client.vatDetails.filingFrequency[0].toUpperCase()}${client.vatDetails.filingFrequency.slice(1)}` : "Quarterly",
+        vatFreq: normalizeVatFilingFrequency(client.vatDetails?.filingFrequency, normalizeFinancialYearEnd(client.financialYearEnd || client.ctDetails?.financialYearEnd || "")),
         ctTin: client.ctDetails?.tin || "",
         ctStatus: client.ctDetails?.status === "registered" ? "Registered" : client.ctDetails?.status === "applying" ? "Pending" : "Not Registered",
         ctDate: client.ctDetails?.registrationDate?.slice?.(0, 10) || "",
@@ -265,7 +322,7 @@ export default function AddClient() {
         documentName: licence.documentUrl ? licence.documentUrl.split("/").pop() : "",
         documentFile: null,
         documents: mapExistingDocuments(licence.documents, licence.documentUrl),
-      })) : [{ number: "", issue: "", expiry: "", authority: "Dubai Economy", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }]);
+      })) : [{ number: "", issue: "", expiry: "", authority: "Dubai", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }]);
       setContacts((client.contactPersons || []).length ? client.contactPersons.map((person) => ({
         name: person.fullName || "",
         designation: person.designation || "",
@@ -621,6 +678,17 @@ export default function AddClient() {
       }
     }
     const shouldValidateContacts = !continueToNext || tab >= 2;
+    const shouldValidateTradeLicences = !continueToNext || tab >= 1;
+    if (shouldValidateTradeLicences) {
+      const missingLicenceNumberWithFilesIndex = licences.findIndex((licence) =>
+        !String(licence.number || "").trim() &&
+        (licence.documents || []).some((document) => document?.file || document?.url),
+      );
+      if (missingLicenceNumberWithFilesIndex >= 0) {
+        toast.error(`Trade licence ${missingLicenceNumberWithFilesIndex + 1}: licence number is required before uploading documents.`);
+        return false;
+      }
+    }
     if (shouldValidateContacts) {
       const emiratesIdPattern = /^\d{3}-\d{4}-\d{7}-\d$/;
       const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -671,6 +739,11 @@ export default function AddClient() {
     try {
       const includeTradeLicences = !continueToNext || tab >= 1;
       const includeContactPersons = !continueToNext || tab >= 2;
+      const preparedTradeLicences = includeTradeLicences
+        ? licences
+          .map((licence, originalIndex) => ({ licence, originalIndex }))
+          .filter(({ licence }) => String(licence.number || "").trim())
+        : [];
       // The screen state is intentionally tab-oriented and user-friendly; this transform is
       // where we fold it back into the nested API contract expected by the Mongo model.
       const payload = {
@@ -690,20 +763,19 @@ export default function AddClient() {
         customFields: { qrmpPreference: form.qrmp, auditFirmName: form.auditFirm, bankName: form.bank, iban: form.iban },
       };
       if (includeVatCt) {
-        payload.vatDetails = { trn: form.vatTrn, status: form.vatStatus === "Registered" ? "registered" : form.vatStatus === "Applying / In Progress" ? "applying" : form.vatStatus === "Exempt" ? "exempt" : "not_registered", registrationDate: form.vatDate, filingFrequency: form.vatFreq.toLowerCase() };
+        payload.vatDetails = { trn: form.vatTrn, status: form.vatStatus === "Registered" ? "registered" : form.vatStatus === "Applying / In Progress" ? "applying" : form.vatStatus === "Exempt" ? "exempt" : "not_registered", registrationDate: form.vatDate, filingFrequency: normalizeVatFilingFrequency(form.vatFreq, form.fye) };
         payload.ctDetails = { tin: form.ctTin, status: form.ctStatus === "Registered" ? "registered" : form.ctStatus === "Pending" ? "applying" : "not_registered", registrationDate: form.ctDate, financialYearEnd: form.fye };
       }
       if (includeTradeLicences) {
-        payload.tradeLicences = licences
-          .filter((l) => String(l.number || "").trim())
-          .map((l) => ({
-            licenceNumber: l.number,
-            issueDate: l.issue,
-            expiryDate: l.expiry,
-            issuingAuthority: l.authority,
-            licenceType: l.type?.toLowerCase() || "commercial",
-            officialEmail: l.email,
-            documentUrl: l.documentUrl || undefined,
+        payload.tradeLicences = preparedTradeLicences
+          .map(({ licence }) => ({
+            licenceNumber: licence.number,
+            issueDate: licence.issue,
+            expiryDate: licence.expiry,
+            issuingAuthority: licence.authority,
+            licenceType: licence.type?.toLowerCase() || "commercial",
+            officialEmail: licence.email,
+            documentUrl: licence.documentUrl || undefined,
           }));
       }
       if (includeContactPersons) {
@@ -731,14 +803,21 @@ export default function AddClient() {
         }));
       }
       payload.customFields = Object.fromEntries(Object.entries(customFieldValues).filter(([k]) => selectedFieldKeys.includes(k)));
-      const pendingAttachments = attachments.filter((attachment) => !attachment.saved && attachment.file);
-      const pendingLicenceDocuments = licences
-        .map((licence, index) => ({ index, files: (licence.documents || []).filter((document) => !document.saved && document.file).map((document) => document.file) }))
-        .filter((item) => item.files.length);
-      const pendingContactDocuments = contacts.flatMap((contact, index) => ([
-        contact.eidDocuments?.some((document) => !document.saved && document.file) ? { index, files: contact.eidDocuments.filter((document) => !document.saved && document.file).map((document) => document.file), section: "emiratesId" } : null,
-        contact.passportDocuments?.some((document) => !document.saved && document.file) ? { index, files: contact.passportDocuments.filter((document) => !document.saved && document.file).map((document) => document.file), section: "passport" } : null,
-      ].filter(Boolean)));
+      const includeAttachments = !continueToNext || tab >= 7;
+      const pendingAttachments = includeAttachments
+        ? attachments.filter((attachment) => !attachment.saved && attachment.file)
+        : [];
+      const pendingLicenceDocuments = includeTradeLicences
+        ? preparedTradeLicences
+          .map(({ licence }, index) => ({ index, files: (licence.documents || []).filter((document) => !document.saved && document.file).map((document) => document.file) }))
+          .filter((item) => item.files.length)
+        : [];
+      const pendingContactDocuments = includeContactPersons
+        ? contacts.flatMap((contact, index) => ([
+          contact.eidDocuments?.some((document) => !document.saved && document.file) ? { index, files: contact.eidDocuments.filter((document) => !document.saved && document.file).map((document) => document.file), section: "emiratesId" } : null,
+          contact.passportDocuments?.some((document) => !document.saved && document.file) ? { index, files: contact.passportDocuments.filter((document) => !document.saved && document.file).map((document) => document.file), section: "passport" } : null,
+        ].filter(Boolean)))
+        : [];
       if (isEditMode) {
         await updateClient(id, payload);
         if (pendingLicenceDocuments.length) {
@@ -799,6 +878,9 @@ export default function AddClient() {
 
   const goPrevious = () => setTab((current) => Math.max(current - 1, 0));
   const saveAndContinue = () => saveClient({ continueToNext: true });
+  const setAuthoritySearch = (index, value) => {
+    setAuthoritySearches((current) => ({ ...current, [index]: value }));
+  };
   const togglePortalPassword = (index) => {
     setVisiblePortalPasswords((current) => ({ ...current, [index]: !current[index] }));
   };
@@ -834,7 +916,15 @@ export default function AddClient() {
               isUserSearchLoading={isUserSearchLoading}
             />
           )}
-          {tab === 1 && <Repeat title="Trade Licence" items={licences} setItems={setLicences} blank={{ number: "", issue: "", expiry: "", authority: "", type: "", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }} render={(lic, i, patch) => <div className="grid gap-3 md:grid-cols-3"><Field label="Licence Number*" field={`licence-number-${i}`}><input className="input" value={lic.number} onChange={(e) => patch(i, { number: e.target.value })} /></Field><Field label="Issue Date" field={`licence-issue-${i}`}><input className="input" type="date" value={lic.issue} onChange={(e) => patch(i, { issue: e.target.value })} /></Field><Field label="Expiry Date" field={`licence-expiry-${i}`}><input className="input" type="date" value={lic.expiry} onChange={(e) => patch(i, { expiry: e.target.value })} /></Field><Field label="Issuing Authority" field={`licence-authority-${i}`}><input className="input" value={lic.authority} onChange={(e) => patch(i, { authority: e.target.value })} /></Field><Field label="Licence Type" field={`licence-type-${i}`}><input className="input" value={lic.type} onChange={(e) => patch(i, { type: e.target.value })} /></Field><Field label="Official Email" field={`licence-email-${i}`}><input className="input" value={lic.email} onChange={(e) => patch(i, { email: e.target.value })} /></Field><div className="md:col-span-3"><DocumentUploadZone id={`trade-licence-upload-${i}`} title="Upload trade licence documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={lic.documents || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleTradeLicenceFile(i, files)} onDeleteDocument={(document) => removeTradeLicenceDocument(i, document)} /></div></div>} />}
+          {tab === 1 && <Repeat title="Trade Licence" items={licences} setItems={setLicences} blank={{ number: "", issue: "", expiry: "", authority: "Dubai", type: "", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }} render={(lic, i, patch) => {
+            const authoritySearch = authoritySearches[i] || "";
+            const authorityOptions = lic.authority && !ISSUING_AUTHORITY_OPTIONS.some((option) => option.id === lic.authority)
+              ? [{ id: lic.authority, label: lic.authority }, ...ISSUING_AUTHORITY_OPTIONS]
+              : ISSUING_AUTHORITY_OPTIONS;
+            const filteredAuthorityOptions = authorityOptions.filter((option) => option.label.toLowerCase().includes(authoritySearch.trim().toLowerCase()));
+
+            return <div className="grid gap-3 md:grid-cols-3"><Field label="Licence Number*" field={`licence-number-${i}`}><input className="input" value={lic.number} onChange={(e) => patch(i, { number: e.target.value })} /></Field><Field label="Issue Date" field={`licence-issue-${i}`}><input className="input" type="date" value={lic.issue} onChange={(e) => patch(i, { issue: e.target.value })} /></Field><Field label="Expiry Date" field={`licence-expiry-${i}`}><input className="input" type="date" value={lic.expiry} onChange={(e) => patch(i, { expiry: e.target.value })} /></Field><Field label="Issuing Authority" field={`licence-authority-${i}`}><SearchableSelect id={`licence-authority-${i}`} value={lic.authority} options={filteredAuthorityOptions} searchValue={authoritySearch} onSearchChange={(value) => setAuthoritySearch(i, value)} onChange={(value) => patch(i, { authority: value })} getLabel={(option) => option.label} placeholder="Select Issuing Authority" searchPlaceholder="Search authority..." loading={false} emptyLabel="No matching authority" /></Field><Field label="Licence Type" field={`licence-type-${i}`}><input className="input" value={lic.type} onChange={(e) => patch(i, { type: e.target.value })} /></Field><Field label="Official Email" field={`licence-email-${i}`}><input className="input" value={lic.email} onChange={(e) => patch(i, { email: e.target.value })} /></Field><div className="md:col-span-3"><DocumentUploadZone id={`trade-licence-upload-${i}`} title="Upload trade licence documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={lic.documents || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleTradeLicenceFile(i, files)} onDeleteDocument={(document) => removeTradeLicenceDocument(i, document)} /></div></div>;
+          }} />}
           {tab === 2 && (
             <Repeat
               title="Contact Person"
@@ -870,18 +960,22 @@ export default function AddClient() {
                   <label className="flex items-center gap-2 font-bold" htmlFor={`contact-primary-${i}`}><input id={`contact-primary-${i}`} name={`contactPrimary${i}`} type="checkbox" checked={c.primary} onChange={(e) => {
                     const checked = e.target.checked;
                     setContacts((current) => current.map((entry, idx) => idx === i ? { ...entry, primary: checked } : checked ? { ...entry, primary: false } : entry));
-                  }} /> Primary Contact</label>
-                  <Field label="Emirates ID Number" field={`contact-eid-${i}`}><input className="input" placeholder="784-XXXX-XXXXXXX-X" value={c.eid} onChange={(e) => patch(i, { eid: formatEmiratesIdInput(e.target.value) })} /></Field>
-                  <Field label="Emirates ID Issue Date" field={`contact-eid-issue-${i}`}><input className="input" type="date" value={c.eidIssue} onChange={(e) => patch(i, { eidIssue: e.target.value })} /></Field>
-                  <Field label="Emirates ID Expiry" field={`contact-eid-expiry-${i}`}><input className="input" type="date" value={c.eidExpiry} onChange={(e) => patch(i, { eidExpiry: e.target.value })} /></Field>
-                  <Field label="Passport Number" field={`contact-passport-${i}`}><input className="input" value={c.passport} onChange={(e) => patch(i, { passport: e.target.value })} /></Field>
-                  <Field label="Passport Issue Date" field={`contact-passport-issue-${i}`}><input className="input" type="date" value={c.passportIssue} onChange={(e) => patch(i, { passportIssue: e.target.value })} /></Field>
-                  <Field label="Passport Expiry" field={`contact-passport-expiry-${i}`}><input className="input" type="date" value={c.passportExpiry} onChange={(e) => patch(i, { passportExpiry: e.target.value })} /></Field>
-                  <Field label="Passport Issuing Country" field={`contact-passport-country-${i}`}><><input className="input" list="passport-issuing-countries" value={c.issuingCountry} onChange={(e) => patch(i, { issuingCountry: e.target.value })} /><datalist id="passport-issuing-countries">{countries.map((country) => <option key={country} value={country} />)}</datalist></></Field>
-                  <div className="md:col-span-3 grid gap-3 md:grid-cols-2">
-                    <DocumentUploadZone id={`contact-eid-upload-${i}`} title="Upload Emirates ID documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.eidDocuments || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "emiratesId")} onDeleteDocument={(document) => removeContactDocument(i, "emiratesId", document)} />
-                    <DocumentUploadZone id={`contact-passport-upload-${i}`} title="Upload passport documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.passportDocuments || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "passport")} onDeleteDocument={(document) => removeContactDocument(i, "passport", document)} />
-                  </div>
+                  }} /> Official Contact</label>
+                  {c.primary && (
+                    <>
+                      <Field label="Emirates ID Number" field={`contact-eid-${i}`}><input className="input" placeholder="784-XXXX-XXXXXXX-X" value={c.eid} onChange={(e) => patch(i, { eid: formatEmiratesIdInput(e.target.value) })} /></Field>
+                      <Field label="Emirates ID Issue Date" field={`contact-eid-issue-${i}`}><input className="input" type="date" value={c.eidIssue} onChange={(e) => patch(i, { eidIssue: e.target.value })} /></Field>
+                      <Field label="Emirates ID Expiry" field={`contact-eid-expiry-${i}`}><input className="input" type="date" value={c.eidExpiry} onChange={(e) => patch(i, { eidExpiry: e.target.value })} /></Field>
+                      <Field label="Passport Number" field={`contact-passport-${i}`}><input className="input" value={c.passport} onChange={(e) => patch(i, { passport: e.target.value })} /></Field>
+                      <Field label="Passport Issue Date" field={`contact-passport-issue-${i}`}><input className="input" type="date" value={c.passportIssue} onChange={(e) => patch(i, { passportIssue: e.target.value })} /></Field>
+                      <Field label="Passport Expiry" field={`contact-passport-expiry-${i}`}><input className="input" type="date" value={c.passportExpiry} onChange={(e) => patch(i, { passportExpiry: e.target.value })} /></Field>
+                      <Field label="Passport Issuing Country" field={`contact-passport-country-${i}`}><><input className="input" list="passport-issuing-countries" value={c.issuingCountry} onChange={(e) => patch(i, { issuingCountry: e.target.value })} /><datalist id="passport-issuing-countries">{countries.map((country) => <option key={country} value={country} />)}</datalist></></Field>
+                      <div className="md:col-span-3 grid gap-3 md:grid-cols-2">
+                        <DocumentUploadZone id={`contact-eid-upload-${i}`} title="Upload Emirates ID documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.eidDocuments || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "emiratesId")} onDeleteDocument={(document) => removeContactDocument(i, "emiratesId", document)} />
+                        <DocumentUploadZone id={`contact-passport-upload-${i}`} title="Upload passport documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.passportDocuments || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "passport")} onDeleteDocument={(document) => removeContactDocument(i, "passport", document)} />
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
             />
@@ -904,9 +998,9 @@ export default function AddClient() {
               </Field>
               <Field label="VAT Filing Frequency" field="client-vat-frequency">
                 <select className="input" value={form.vatFreq} onChange={(e) => update("vatFreq", e.target.value)}>
-                  <option>Monthly</option>
-                  <option>Quarterly</option>
-                  <option>Annual</option>
+                  {vatFilingFrequencyOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
                 </select>
               </Field>
               <Field label="CT Registration Number (TIN)" field="client-ct-tin">
@@ -1162,7 +1256,7 @@ export default function AddClient() {
               </div>
             </div>
           )}
-          {tab === 7 && <div className="space-y-3"><AttachmentUploadZone description={attachmentDescription} onDescriptionChange={setAttachmentDescription} onFiles={uploadFiles} isUploading={isUploading} /><div className="overflow-x-auto"><table className="table min-w-max"><thead><tr><th>Name</th><th>Size</th><th>Type</th><th>Description</th><th>Uploaded On</th><th>Uploaded By</th><th>Actions</th></tr></thead><tbody>{attachments.length === 0 && <tr><td colSpan={7} className="text-center text-slate-500">No attachments uploaded yet.</td></tr>}{attachments.map((a) => <tr key={a.id || a.name}><td>{a.name}</td><td>{a.size}</td><td>{a.type}</td><td>{a.description || "-"}</td><td>{a.uploadedOn}</td><td>{a.uploadedBy}</td><td><Button size="sm" variant="ghost" disabled={!a.url} onClick={() => a.url && window.open(a.url, "_blank", "noopener,noreferrer")}>Open</Button> {(currentUser?.role === "admin" || !a.saved) && <Button size="sm" variant="danger" onClick={() => removeAttachment(a)}>Delete</Button>}</td></tr>)}</tbody></table></div></div>}
+          {tab === 7 && <div className="space-y-3"><AttachmentUploadZone description={attachmentDescription} onDescriptionChange={setAttachmentDescription} onFiles={uploadFiles} isUploading={isUploading} /><div className="overflow-x-auto"><table className="table min-w-max"><thead><tr><th>Name</th><th>Size</th><th>Type</th><th>Description</th><th>Uploaded On</th><th>Uploaded By</th><th>Actions</th></tr></thead><tbody>{attachments.length === 0 && <tr><td colSpan={7} className="text-center text-slate-500">No attachments uploaded yet.</td></tr>}{attachments.map((a) => <tr key={a.id || a.name}><td>{a.name}</td><td>{a.size}</td><td>{a.type}</td><td>{a.description || "-"}</td><td>{a.uploadedOn}</td><td>{a.uploadedBy}</td><td><Button size="sm" variant="ghost" disabled={!a.url && !a.file} onClick={() => openDocumentFile(a)}>Open</Button> {(currentUser?.role === "admin" || !a.saved) && <Button size="sm" variant="danger" onClick={() => removeAttachment(a)}>Delete</Button>}</td></tr>)}</tbody></table></div></div>}
         </div>
         <div className="flex flex-col gap-3 border-t border-[#e2e8f0] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
           <Button variant="ghost" onClick={goPrevious} disabled={isFirstTab || isSaving}>Previous</Button>
@@ -1264,6 +1358,17 @@ function DocumentUploadZone({ id, title, subtitle, documents, isUploading, onFil
   );
 }
 
+function openDocumentFile(document) {
+  if (document?.url) {
+    window.open(document.url, "_blank", "noopener,noreferrer");
+    return;
+  }
+  if (!document?.file) return;
+  const objectUrl = URL.createObjectURL(document.file);
+  window.open(objectUrl, "_blank", "noopener,noreferrer");
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+}
+
 function DocumentList({ documents, canDelete, onDeleteDocument }) {
   if (!documents?.length) {
     return <div className="rounded-xl border border-dashed border-slate-200 px-3 py-4 text-[12px] font-semibold text-slate-500">No files uploaded yet.</div>;
@@ -1277,7 +1382,7 @@ function DocumentList({ documents, canDelete, onDeleteDocument }) {
             <div className="text-[11px] font-semibold text-slate-500">{[document.size, document.uploadedOn, document.uploadedBy].filter(Boolean).join(" • ") || (document.saved ? "Uploaded" : "Pending save")}</div>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="ghost" disabled={!document.url} onClick={() => document.url && window.open(document.url, "_blank", "noopener,noreferrer")}>Open</Button>
+            <Button size="sm" variant="ghost" disabled={!document.url && !document.file} onClick={() => openDocumentFile(document)}>Open</Button>
             {((canDelete && !String(document.id || "").includes("/")) || !document.saved) && <Button size="sm" variant="danger" onClick={() => onDeleteDocument(document)}>Delete</Button>}
           </div>
         </div>
