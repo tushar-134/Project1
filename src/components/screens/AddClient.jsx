@@ -68,6 +68,11 @@ const FINANCIAL_YEAR_OPTIONS = [
   "Dec - Nov",
 ];
 
+const ISSUING_AUTHORITY_OPTIONS = [
+  { id: "India", label: "India" },
+  { id: "Dubai", label: "Dubai" },
+];
+
 function normalizeFinancialYearEnd(value) {
   if (!value) return "Jan - Dec";
   if (FINANCIAL_YEAR_OPTIONS.includes(value)) return value;
@@ -105,7 +110,7 @@ export default function AddClient() {
     country: "United Arab Emirates", emirate: "Dubai", street: "", poBox: "", postalCode: "", differentAddress: false, correspondence: "",
     vatTrn: "", vatStatus: "Registered", vatDate: "", vatFreq: "Quarterly", ctTin: "", ctStatus: "Not Registered", ctDate: "", group: "", newGroup: "",
   });
-  const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "Dubai Economy", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }]);
+  const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "Dubai", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }]);
 
   const [contacts, setContacts] = useState([{
     name: "",
@@ -136,6 +141,7 @@ export default function AddClient() {
   const [visiblePortalPasswords, setVisiblePortalPasswords] = useState({});
   const [attachments, setAttachments] = useState([]);
   const [attachmentDescription, setAttachmentDescription] = useState("");
+  const [authoritySearches, setAuthoritySearches] = useState({});
   const [customFieldModal, setCustomFieldModal] = useState(false);
   const [customFieldValues, setCustomFieldValues] = useState({});
   const [selectedFieldKeys, setSelectedFieldKeys] = useState([]);
@@ -265,7 +271,7 @@ export default function AddClient() {
         documentName: licence.documentUrl ? licence.documentUrl.split("/").pop() : "",
         documentFile: null,
         documents: mapExistingDocuments(licence.documents, licence.documentUrl),
-      })) : [{ number: "", issue: "", expiry: "", authority: "Dubai Economy", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }]);
+      })) : [{ number: "", issue: "", expiry: "", authority: "Dubai", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }]);
       setContacts((client.contactPersons || []).length ? client.contactPersons.map((person) => ({
         name: person.fullName || "",
         designation: person.designation || "",
@@ -821,6 +827,9 @@ export default function AddClient() {
 
   const goPrevious = () => setTab((current) => Math.max(current - 1, 0));
   const saveAndContinue = () => saveClient({ continueToNext: true });
+  const setAuthoritySearch = (index, value) => {
+    setAuthoritySearches((current) => ({ ...current, [index]: value }));
+  };
   const togglePortalPassword = (index) => {
     setVisiblePortalPasswords((current) => ({ ...current, [index]: !current[index] }));
   };
@@ -856,7 +865,15 @@ export default function AddClient() {
               isUserSearchLoading={isUserSearchLoading}
             />
           )}
-          {tab === 1 && <Repeat title="Trade Licence" items={licences} setItems={setLicences} blank={{ number: "", issue: "", expiry: "", authority: "", type: "", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }} render={(lic, i, patch) => <div className="grid gap-3 md:grid-cols-3"><Field label="Licence Number*" field={`licence-number-${i}`}><input className="input" value={lic.number} onChange={(e) => patch(i, { number: e.target.value })} /></Field><Field label="Issue Date" field={`licence-issue-${i}`}><input className="input" type="date" value={lic.issue} onChange={(e) => patch(i, { issue: e.target.value })} /></Field><Field label="Expiry Date" field={`licence-expiry-${i}`}><input className="input" type="date" value={lic.expiry} onChange={(e) => patch(i, { expiry: e.target.value })} /></Field><Field label="Issuing Authority" field={`licence-authority-${i}`}><input className="input" value={lic.authority} onChange={(e) => patch(i, { authority: e.target.value })} /></Field><Field label="Licence Type" field={`licence-type-${i}`}><input className="input" value={lic.type} onChange={(e) => patch(i, { type: e.target.value })} /></Field><Field label="Official Email" field={`licence-email-${i}`}><input className="input" value={lic.email} onChange={(e) => patch(i, { email: e.target.value })} /></Field><div className="md:col-span-3"><DocumentUploadZone id={`trade-licence-upload-${i}`} title="Upload trade licence documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={lic.documents || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleTradeLicenceFile(i, files)} onDeleteDocument={(document) => removeTradeLicenceDocument(i, document)} /></div></div>} />}
+          {tab === 1 && <Repeat title="Trade Licence" items={licences} setItems={setLicences} blank={{ number: "", issue: "", expiry: "", authority: "Dubai", type: "", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }} render={(lic, i, patch) => {
+            const authoritySearch = authoritySearches[i] || "";
+            const authorityOptions = lic.authority && !ISSUING_AUTHORITY_OPTIONS.some((option) => option.id === lic.authority)
+              ? [{ id: lic.authority, label: lic.authority }, ...ISSUING_AUTHORITY_OPTIONS]
+              : ISSUING_AUTHORITY_OPTIONS;
+            const filteredAuthorityOptions = authorityOptions.filter((option) => option.label.toLowerCase().includes(authoritySearch.trim().toLowerCase()));
+
+            return <div className="grid gap-3 md:grid-cols-3"><Field label="Licence Number*" field={`licence-number-${i}`}><input className="input" value={lic.number} onChange={(e) => patch(i, { number: e.target.value })} /></Field><Field label="Issue Date" field={`licence-issue-${i}`}><input className="input" type="date" value={lic.issue} onChange={(e) => patch(i, { issue: e.target.value })} /></Field><Field label="Expiry Date" field={`licence-expiry-${i}`}><input className="input" type="date" value={lic.expiry} onChange={(e) => patch(i, { expiry: e.target.value })} /></Field><Field label="Issuing Authority" field={`licence-authority-${i}`}><SearchableSelect id={`licence-authority-${i}`} value={lic.authority} options={filteredAuthorityOptions} searchValue={authoritySearch} onSearchChange={(value) => setAuthoritySearch(i, value)} onChange={(value) => patch(i, { authority: value })} getLabel={(option) => option.label} placeholder="Select Issuing Authority" searchPlaceholder="Search authority..." loading={false} emptyLabel="No matching authority" /></Field><Field label="Licence Type" field={`licence-type-${i}`}><input className="input" value={lic.type} onChange={(e) => patch(i, { type: e.target.value })} /></Field><Field label="Official Email" field={`licence-email-${i}`}><input className="input" value={lic.email} onChange={(e) => patch(i, { email: e.target.value })} /></Field><div className="md:col-span-3"><DocumentUploadZone id={`trade-licence-upload-${i}`} title="Upload trade licence documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={lic.documents || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleTradeLicenceFile(i, files)} onDeleteDocument={(document) => removeTradeLicenceDocument(i, document)} /></div></div>;
+          }} />}
           {tab === 2 && (
             <Repeat
               title="Contact Person"
