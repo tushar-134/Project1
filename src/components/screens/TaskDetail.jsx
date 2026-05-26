@@ -1,4 +1,4 @@
-import { ArrowLeft, Calendar, Clock, FileText, User, Tag, Briefcase, AlertTriangle, RotateCw } from "lucide-react";
+import { ArrowLeft, Calendar, Clock, FileText, User, Tag, Briefcase, AlertTriangle, RotateCw, MessageSquare } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -79,6 +79,9 @@ export default function TaskDetail() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [remarkText, setRemarkText] = useState("");
+  const [remarkSaving, setRemarkSaving] = useState(false);
+  const [remarkError, setRemarkError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -93,6 +96,8 @@ export default function TaskDetail() {
         if (active) {
           setTask(taskData);
           setLogs(logsData);
+          setRemarkText(taskData?.remarks || "");
+          setRemarkError("");
         }
       } catch (err) {
         if (active) setError(err.response?.data?.message || "Failed to load task details");
@@ -131,6 +136,24 @@ export default function TaskDetail() {
   const displayStatus = statusFromApi[task.status] || task.status;
   const displayCategory = categoryLabels[task.category] || task.category;
   const overdue = daysOverdue(task.dueDate, task.status);
+  const canEditRemarks = canManage || (currentUser?.role === "task_only" && String(task.assignedTo?._id) === String(currentUser?._id || currentUser?.id));
+
+  async function handleRemarkSave() {
+    if (remarkSaving) return;
+    setRemarkSaving(true);
+    setRemarkError(null);
+    try {
+      const updatedTask = await taskService.updateRemarks(task._id, remarkText);
+      setTask((current) => ({ ...current, remarks: updatedTask.remarks || "", updatedAt: updatedTask.updatedAt || current.updatedAt }));
+      setRemarkText(updatedTask.remarks || "");
+      const logsData = await taskService.getLogs(id);
+      setLogs(logsData);
+    } catch (err) {
+      setRemarkError(err.response?.data?.message || "Failed to update remark");
+    } finally {
+      setRemarkSaving(false);
+    }
+  }
 
   return (
     <div className="space-y-5">
@@ -297,6 +320,37 @@ export default function TaskDetail() {
             <p className="text-[13px] leading-relaxed text-slate-700">{task.description}</p>
           </div>
         )}
+
+        <div className="task-detail-description">
+          <div className="task-detail-field-label mb-2">
+            <MessageSquare size={13} /> Remarks
+          </div>
+          {canEditRemarks ? (
+            <>
+              <textarea
+                id="task-detail-remark"
+                name="taskDetailRemark"
+                className="input min-h-28"
+                placeholder="Add context, blockers, or follow-up notes for this task."
+                value={remarkText}
+                onChange={(event) => setRemarkText(event.target.value)}
+                disabled={remarkSaving}
+              />
+              {remarkError && (
+                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">
+                  {remarkError}
+                </div>
+              )}
+              <div className="mt-3 flex justify-end">
+                <Button size="sm" onClick={handleRemarkSave} disabled={remarkSaving}>
+                  {remarkSaving ? "Saving..." : "Save Remark"}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <p className="text-[13px] leading-relaxed text-slate-700">{task.remarks || "No remark added"}</p>
+          )}
+        </div>
 
         {/* Timestamps */}
         <div className="task-detail-timestamps">
