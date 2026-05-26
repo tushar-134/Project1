@@ -55,7 +55,7 @@ const clientSchema = new mongoose.Schema({
     trn: String,
     status: { type: String, enum: ["registered", "applying", "not_registered", "exempt"], default: "not_registered" },
     registrationDate: Date,
-    filingFrequency: { type: String, enum: ["monthly", "quarterly", "annual"], default: "quarterly" },
+    filingFrequency: { type: String, default: "Jan-Mar" },
   },
   ctDetails: {
     tin: String,

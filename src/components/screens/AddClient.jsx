@@ -68,6 +68,8 @@ const FINANCIAL_YEAR_OPTIONS = [
   "Dec - Nov",
 ];
 
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 const ISSUING_AUTHORITY_OPTIONS = [
   { id: "India", label: "India" },
   { id: "Dubai", label: "Dubai" },
@@ -84,6 +86,46 @@ function normalizeFinancialYearEnd(value) {
   if (normalized === "30 september" || normalized === "september") return "Oct - Sep";
 
   return "Jan - Dec";
+}
+
+function parseFinancialYearStartMonth(value) {
+  const normalized = normalizeFinancialYearEnd(value);
+  const startMonthLabel = normalized.split("-")[0]?.trim()?.slice(0, 3);
+  const monthIndex = MONTH_NAMES.findIndex((month) => month.toLowerCase() === startMonthLabel?.toLowerCase());
+  return monthIndex >= 0 ? monthIndex : 0;
+}
+
+function toOrdinal(value) {
+  const remainder10 = value % 10;
+  const remainder100 = value % 100;
+  if (remainder10 === 1 && remainder100 !== 11) return `${value}st`;
+  if (remainder10 === 2 && remainder100 !== 12) return `${value}nd`;
+  if (remainder10 === 3 && remainder100 !== 13) return `${value}rd`;
+  return `${value}th`;
+}
+
+function getVatFilingFrequencyOptions(financialYearEnd) {
+  const startMonth = parseFinancialYearStartMonth(financialYearEnd);
+  return Array.from({ length: 12 }, (_, index) => {
+    const rangeStart = (startMonth + index) % 12;
+    const rangeEnd = (rangeStart + 2) % 12;
+    const value = `${MONTH_NAMES[rangeStart]}-${MONTH_NAMES[rangeEnd]}`;
+    return {
+      value,
+      label: `${toOrdinal(index + 1)} Quarter (${value})`,
+    };
+  });
+}
+
+function normalizeVatFilingFrequency(value, financialYearEnd) {
+  const options = getVatFilingFrequencyOptions(financialYearEnd);
+  if (!value) return options[0]?.value || "Jan-Mar";
+
+  const normalizedValue = String(value).trim().toLowerCase().replace(/\s+/g, "");
+  const matchingOption = options.find((option) => option.value.toLowerCase().replace(/\s+/g, "") === normalizedValue);
+  if (matchingOption) return matchingOption.value;
+
+  return options[0]?.value || "Jan-Mar";
 }
 
 export default function AddClient() {
@@ -108,8 +150,9 @@ export default function AddClient() {
   const [form, setForm] = useState({
     clientType: "", fileNo: "", legalName: "", tradeName: "", fye: "Jan - Dec", jurisdiction: "Mainland", assigned: "",
     country: "United Arab Emirates", emirate: "Dubai", street: "", poBox: "", postalCode: "", differentAddress: false, correspondence: "",
-    vatTrn: "", vatStatus: "Registered", vatDate: "", vatFreq: "Quarterly", ctTin: "", ctStatus: "Not Registered", ctDate: "", group: "", newGroup: "",
+    vatTrn: "", vatStatus: "Registered", vatDate: "", vatFreq: "Jan-Mar", ctTin: "", ctStatus: "Not Registered", ctDate: "", group: "", newGroup: "",
   });
+  const vatFilingFrequencyOptions = useMemo(() => getVatFilingFrequencyOptions(form.fye), [form.fye]);
   const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "Dubai", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }]);
 
   const [contacts, setContacts] = useState([{
@@ -210,6 +253,14 @@ export default function AddClient() {
     }, delay);
     return () => window.clearTimeout(timer);
   }, [groupSearch, loadGroupOptions]);
+
+  useEffect(() => {
+    setForm((current) => {
+      const normalizedVatFrequency = normalizeVatFilingFrequency(current.vatFreq, current.fye);
+      return normalizedVatFrequency === current.vatFreq ? current : { ...current, vatFreq: normalizedVatFrequency };
+    });
+  }, [form.fye]);
+
   useEffect(() => {
     if (!isEditMode) return;
     getClient(id).then((client) => {
@@ -238,7 +289,7 @@ export default function AddClient() {
         vatTrn: client.vatDetails?.trn || "",
         vatStatus: client.vatDetails?.status === "registered" ? "Registered" : client.vatDetails?.status === "applying" ? "Applying / In Progress" : client.vatDetails?.status === "exempt" ? "Exempt" : "Not Registered",
         vatDate: client.vatDetails?.registrationDate?.slice?.(0, 10) || "",
-        vatFreq: client.vatDetails?.filingFrequency ? `${client.vatDetails.filingFrequency[0].toUpperCase()}${client.vatDetails.filingFrequency.slice(1)}` : "Quarterly",
+        vatFreq: normalizeVatFilingFrequency(client.vatDetails?.filingFrequency, normalizeFinancialYearEnd(client.financialYearEnd || client.ctDetails?.financialYearEnd || "")),
         ctTin: client.ctDetails?.tin || "",
         ctStatus: client.ctDetails?.status === "registered" ? "Registered" : client.ctDetails?.status === "applying" ? "Pending" : "Not Registered",
         ctDate: client.ctDetails?.registrationDate?.slice?.(0, 10) || "",
@@ -712,7 +763,7 @@ export default function AddClient() {
         customFields: { qrmpPreference: form.qrmp, auditFirmName: form.auditFirm, bankName: form.bank, iban: form.iban },
       };
       if (includeVatCt) {
-        payload.vatDetails = { trn: form.vatTrn, status: form.vatStatus === "Registered" ? "registered" : form.vatStatus === "Applying / In Progress" ? "applying" : form.vatStatus === "Exempt" ? "exempt" : "not_registered", registrationDate: form.vatDate, filingFrequency: form.vatFreq.toLowerCase() };
+        payload.vatDetails = { trn: form.vatTrn, status: form.vatStatus === "Registered" ? "registered" : form.vatStatus === "Applying / In Progress" ? "applying" : form.vatStatus === "Exempt" ? "exempt" : "not_registered", registrationDate: form.vatDate, filingFrequency: normalizeVatFilingFrequency(form.vatFreq, form.fye) };
         payload.ctDetails = { tin: form.ctTin, status: form.ctStatus === "Registered" ? "registered" : form.ctStatus === "Pending" ? "applying" : "not_registered", registrationDate: form.ctDate, financialYearEnd: form.fye };
       }
       if (includeTradeLicences) {
@@ -947,9 +998,9 @@ export default function AddClient() {
               </Field>
               <Field label="VAT Filing Frequency" field="client-vat-frequency">
                 <select className="input" value={form.vatFreq} onChange={(e) => update("vatFreq", e.target.value)}>
-                  <option>Monthly</option>
-                  <option>Quarterly</option>
-                  <option>Annual</option>
+                  {vatFilingFrequencyOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
                 </select>
               </Field>
               <Field label="CT Registration Number (TIN)" field="client-ct-tin">
