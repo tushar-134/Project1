@@ -1072,15 +1072,15 @@ export default function AddClient() {
                   </div>
                 </div>
               )}
-              <Field label="CT Registration Number (TIN)" field="client-ct-tin">
-                <input className="input" value={form.ctTin} onChange={(e) => update("ctTin", e.target.value)} />
-              </Field>
               <Field label="CT Registration Status" field="client-ct-status">
                 <select className="input" value={form.ctStatus} onChange={(e) => update("ctStatus", e.target.value)}>
                   <option>Registered</option>
                   <option>Not Registered</option>
                   <option>Pending</option>
                 </select>
+              </Field>
+              <Field label="CT Registration Number (TIN)" field="client-ct-tin">
+                <input className="input" value={form.ctTin} onChange={(e) => update("ctTin", e.target.value)} />
               </Field>
               <Field label="CT Registration Date" field="client-ct-date">
                 <input className="input" type="date" value={form.ctDate} onChange={(e) => update("ctDate", e.target.value)} />
