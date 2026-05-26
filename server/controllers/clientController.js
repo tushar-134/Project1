@@ -469,37 +469,121 @@ exports.deleteClient = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
+// ─── Shared bulk-upload helpers ────────────────────────────────────────────────
+
+const VALID_JURISDICTIONS = ["mainland", "freezone", "designated_zone", "offshore"];
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function normalizeBulkJurisdiction(raw) {
+  const value = String(raw || "mainland").trim().toLowerCase().replace(/\s+/g, "_");
+  if (value === "free_zone") return "freezone";
+  return VALID_JURISDICTIONS.includes(value) ? value : "mainland";
+}
+
+function validateBulkRow(row) {
+  const errors = [];
+  if (!String(row.legalName || "").trim()) errors.push("legalName is required.");
+  const clientType = String(row.clientType || "legal").trim().toLowerCase();
+  if (!["legal", "natural"].includes(clientType)) errors.push("clientType must be 'legal' or 'natural'.");
+  const trn = String(row.vatTrn || row.trn || "").trim();
+  if (trn && !/^1\d{14}$/.test(trn)) errors.push("VAT TRN must be a 15-digit number starting with 1.");
+  if (!String(row.contactName || "").trim()) errors.push("contactName is required.");
+  const email = String(row.contactEmail || "").trim();
+  if (!email) errors.push("contactEmail is required.");
+  else if (!EMAIL_PATTERN.test(email)) errors.push("contactEmail is invalid.");
+  if (!String(row.contactMobile || "").trim()) errors.push("contactMobile is required.");
+  else if (!/^\d+$/.test(String(row.contactMobile).trim())) errors.push("contactMobile must contain only digits.");
+  return errors;
+}
+
+async function resolveAssignedUser(emailId) {
+  const email = String(emailId || "").trim().toLowerCase();
+  if (!email) return undefined;
+  const user = await User.findOne({ email, isActive: true }).select("_id");
+  return user?._id || undefined;
+}
+
+function buildClientPayload(row, userId) {
+  const trn = String(row.vatTrn || row.trn || "").trim();
+  const licence = String(row.licenceNumber || "").trim();
+  const contactCountryCode = String(row.contactCountryCode || "+971").trim();
+  return {
+    clientType: String(row.clientType || "legal").trim().toLowerCase(),
+    legalName: String(row.legalName || "").trim(),
+    tradeName: String(row.tradeName || "").trim() || undefined,
+    jurisdiction: normalizeBulkJurisdiction(row.jurisdiction),
+    vatDetails: trn ? { trn } : undefined,
+    tradeLicences: licence ? [{ licenceNumber: licence }] : [],
+    contactPersons: [{
+      fullName: String(row.contactName || "").trim(),
+      email: String(row.contactEmail || "").trim(),
+      mobile: {
+        countryCode: contactCountryCode,
+        number: String(row.contactMobile || "").trim(),
+      },
+      isPrimary: true,
+    }],
+    createdBy: userId,
+  };
+}
+
+// ─── v1: JSON-based bulk upload (updated with contacts + per-row results) ─────
+
 exports.bulkUpload = async (req, res, next) => {
   try {
-    // Bulk upload accepts already-parsed rows from the browser so the backend can focus on validation and dedupe.
     const rows = Array.isArray(req.body.rows) ? req.body.rows : req.body;
-    let added = 0, skipped = 0;
-    const errors = [];
-    for (const row of rows) {
+    const results = [];
+    let added = 0, failed = 0;
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const serial = row.serial || i + 1;
+      const legalName = String(row.legalName || row.name || "").trim();
+
       try {
-        const trn = row.vatTrn || row.trn || row["VAT TRN"];
-        const licence = row.licenceNumber || row.licence || row["Trade Licence No."];
+        // Validate row fields
+        const validationErrors = validateBulkRow(row);
+        if (validationErrors.length) {
+          results.push({ serial, status: "error", legalName, error: validationErrors.join(" ") });
+          failed++;
+          continue;
+        }
+
+        const trn = String(row.vatTrn || row.trn || "").trim();
+        const licence = String(row.licenceNumber || "").trim();
+
+        // Duplicate check
         const exists = await findDuplicateClient({
-          legalName: row.legalName || row.name,
+          legalName,
           vatDetails: { trn },
           tradeLicences: licence ? [{ licenceNumber: licence }] : [],
         });
-        if (exists) { skipped += 1; continue; }
-        await Client.create({
-          fileNo: await nextClientFileNo(),
-          clientType: row.clientType || "legal",
-          legalName: row.legalName || row.name,
-          jurisdiction: row.jurisdiction || "mainland",
-          vatDetails: { trn },
-          tradeLicences: licence ? [{ licenceNumber: licence }] : [],
-          createdBy: req.user._id,
-        });
-        added += 1;
-      } catch (error) { errors.push({ row, message: error.message }); }
+        if (exists) {
+          results.push({ serial, status: "error", legalName, error: duplicateMessage(exists, { legalName, vatDetails: { trn }, tradeLicences: licence ? [{ licenceNumber: licence }] : [] }) });
+          failed++;
+          continue;
+        }
+
+        // Resolve assigned user by email
+        const assignedUser = await resolveAssignedUser(row.assignedUserEmailId || row.assignedUser);
+
+        const payload = buildClientPayload(row, req.user._id);
+        if (assignedUser) payload.assignedUser = assignedUser;
+        payload.fileNo = await nextClientFileNo();
+
+        const client = await Client.create(payload);
+        results.push({ serial, status: "success", legalName, clientId: client._id });
+        added++;
+      } catch (error) {
+        results.push({ serial, status: "error", legalName, error: error.message });
+        failed++;
+      }
     }
-    res.json({ added, skipped, errors });
+    res.json({ results, summary: { total: rows.length, added, failed } });
   } catch (error) { next(error); }
 };
+
+// ─── exportClients ─────────────────────────────────────────────────────────────
 
 exports.exportClients = async (req, res, next) => {
   try {
