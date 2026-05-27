@@ -1,4 +1,4 @@
-import { Download, RefreshCw, Search, SlidersHorizontal, X } from "lucide-react";
+import { Download, RefreshCw, Search, X } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -15,12 +15,11 @@ import TaskDrawer from "../ui/TaskDrawer.jsx";
 
 const ALL_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed"];
 const BASE_STATUSES = ["Not Yet Started", "WIP", "Completed"]; // for non-FTA tasks
-const FILTER_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed", "All"];
-// Chip filter includes "Active" (all non-completed). Column dropdown uses FILTER_STATUSES without "Active".
-const CHIP_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed", "Active", "All"];
-// Category order for stable display
-const CAT_ORDER = ["VAT", "Corporate Tax", "Audit", "Accounting", "MIS Reporting", "E-Invoicing", "VAT Refund", "Other"];
-const TASK_TABLE_COLUMNS = 8;
+// "Active" = all non-completed/non-approved; surfaced in both column filter and scope logic
+const FILTER_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed", "Active", "All"];
+const SCOPE_OPTIONS = ["By Month", "Overdue", "All"];
+// Column count updated: +2 for Created Date and Last Modified
+const TASK_TABLE_COLUMNS = 10;
 const PAGE_SIZE = 20;
 
 const STATUS_PILL = {
@@ -41,6 +40,9 @@ function createEmptyColumnFilters() {
     status: "",
     remarks: "",
     recurring: "",
+    scope: "",
+    createdAt: "",
+    updatedAt: "",
   };
 }
 
@@ -49,10 +51,6 @@ function getCurrentMonthValue() {
   const year = today.getFullYear();
   const month = String(today.getMonth() + 1).padStart(2, "0");
   return `${year}-${month}`;
-}
-
-function normalizeText(value) {
-  return String(value || "").trim().toLowerCase();
 }
 
 function sortStrings(values) {
@@ -70,7 +68,19 @@ function buildActiveColumnFilterSummary(filters) {
     filters.status ? `Status: ${filters.status}` : null,
     filters.remarks ? `Remark: ${filters.remarks}` : null,
     filters.recurring ? `Recurring: ${filters.recurring === "recurring" ? "Recurring" : "One-time"}` : null,
+    filters.scope ? `Scope: ${filters.scope}` : null,
+    filters.createdAt ? `Created: ${filters.createdAt}` : null,
+    filters.updatedAt ? `Modified: ${filters.updatedAt}` : null,
   ].filter(Boolean);
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return "—";
+  try {
+    return new Date(dateStr).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  } catch {
+    return dateStr;
+  }
 }
 
 function StatusPill({ status }) {
@@ -89,9 +99,10 @@ export default function TaskList() {
   const [searchParams] = useSearchParams();
   const { fetchTasks, updateStatus, updateAssignee, exportTasks } = useTasks();
   const initialMonth = searchParams.get("month") || getCurrentMonthValue();
-  const [cat, setCat] = useState(searchParams.get("category") || "All");
-  const [status, setStatus] = useState("Not Yet Started");
-  const [scope, setScope] = useState("By Month");
+
+  // Scope & month still live as top-level state (drive server query) but are now
+  // controlled from the column filter row rather than the old chip section.
+  const [scope, setScope] = useState(searchParams.get("scope") || "By Month");
   const [month, setMonth] = useState(initialMonth);
   const [drawerTaskId, setDrawerTaskId] = useState(null);
   const [page, setPage] = useState(1);
@@ -110,10 +121,8 @@ export default function TaskList() {
   }, [canManage]);
 
   const serverFilters = useMemo(() => ({
-    category: deferredColumnFilters.category || (cat !== "All" ? cat : undefined),
-    // "Active" chip = all non-completed; otherwise the column filter takes priority, then the chip.
-    status: deferredColumnFilters.status ||
-      (status === "Active" ? "Active" : (status !== "All" ? status : undefined)),
+    category: deferredColumnFilters.category || undefined,
+    status: deferredColumnFilters.status || undefined,
     month: scope === "By Month" ? month : undefined,
     overdue: scope === "Overdue" ? "true" : undefined,
     taskId: deferredColumnFilters.taskId || undefined,
@@ -123,7 +132,10 @@ export default function TaskList() {
     assigned: deferredColumnFilters.assigned || undefined,
     remarks: deferredColumnFilters.remarks || undefined,
     recurring: deferredColumnFilters.recurring || undefined,
-  }), [cat, deferredColumnFilters, month, scope, status]);
+    createdAt: deferredColumnFilters.createdAt || undefined,
+    updatedAt: deferredColumnFilters.updatedAt || undefined,
+  }), [deferredColumnFilters, month, scope]);
+
   const requestParams = useMemo(() => ({ ...serverFilters, page, limit: PAGE_SIZE }), [page, serverFilters]);
   const filterRef = useRef(requestParams);
   filterRef.current = requestParams;
@@ -146,29 +158,24 @@ export default function TaskList() {
   const typeOptions = sortStrings(state.tasks.map((task) => task.type));
   const assigneeOptions = sortStrings(state.tasks.map((task) => task.assigned));
   const clientSuggestions = sortStrings(state.tasks.map((task) => task.client));
-  const availableCats = useMemo(() => ["All", ...CAT_ORDER], []);
   const rows = state.tasks;
 
   const completedCount = rows.filter((task) => task.status === "Completed").length;
   const workingCount = rows.length - completedCount;
   const activeCount = rows.filter((task) => task.status === "Not Yet Started" || task.status === "WIP").length;
   const activeColumnFilters = buildActiveColumnFilterSummary(columnFilters);
-  const activeTopFilterCount =
-    (cat !== "All" ? 1 : 0) +
-    (status !== "All" ? 1 : 0) +
-    (scope !== "By Month" ? 1 : 0) +
-    (scope === "By Month" && month !== initialMonth ? 1 : 0);
-  const activeFilterCount = activeTopFilterCount + activeColumnFilters.length;
   const hasColumnFilters = activeColumnFilters.length > 0;
-  const hasActiveFilters = activeFilterCount > 0;
+  const hasActiveFilters = hasColumnFilters || scope !== "By Month" || month !== initialMonth;
 
   const updateColumnFilter = (key, value) => {
     setPage(1);
-    // Keep the status chip and the column status dropdown in sync — only one can be active at a time.
-    if (key === "status" && value) {
-      setStatus("All");
-    }
     setColumnFilters((current) => ({ ...current, [key]: value }));
+  };
+
+  // Scope is managed via the column-filter row Scope dropdown
+  const updateScope = (value) => {
+    setPage(1);
+    setScope(value);
   };
 
   const clearColumnFilters = () => {
@@ -178,18 +185,13 @@ export default function TaskList() {
 
   const resetAllFilters = () => {
     setPage(1);
-    setCat("All");
-    setStatus("All");
     setScope("By Month");
     setMonth(initialMonth);
     setColumnFilters(createEmptyColumnFilters());
   };
 
   const exportCsv = async () =>
-    downloadBlob(
-      await exportTasks(serverFilters),
-      "tasks.csv",
-    );
+    downloadBlob(await exportTasks(serverFilters), "tasks.csv");
 
   const renderTaskRow = (task) => {
     const canEditTask =
@@ -275,12 +277,21 @@ export default function TaskList() {
             <span className="text-[12px] font-semibold text-slate-500">One-time</span>
           )}
         </td>
+        {/* Created Date */}
+        <td>
+          <span className="text-[12px] text-slate-600">{formatDate(task.createdAt)}</span>
+        </td>
+        {/* Last Modified Date */}
+        <td>
+          <span className="text-[12px] text-slate-600">{formatDate(task.updatedAt)}</span>
+        </td>
       </tr>
     );
   };
 
   return (
     <div className="space-y-5">
+      {/* ── Page header ── */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="page-kicker">Task Control</div>
@@ -294,88 +305,62 @@ export default function TaskList() {
         )}
       </div>
 
+      {/* ── Filter card ── */}
       <Card className="overflow-hidden">
-        <div className="task-list-toolbar border-b border-slate-200 px-4 py-4 sm:px-5">
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="max-w-2xl">
-              <div className="flex items-center gap-2 text-[14px] font-extrabold text-slate-900">
-                <SlidersHorizontal size={16} className="text-[#1e3a8a]" />
-                Filter and review tasks
-              </div>
-              <p className="mt-1 text-[12px] font-medium text-slate-500">
-                Tasks are shown in one list, newest activity first, and completed work appears in the same table when you filter for it.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <InfoPill tone="navy" label={`${workingCount} working`} />
-              <InfoPill tone="orange" label={`${activeCount} active tasks`} />
-              <InfoPill tone="green" label={`${completedCount} completed`} />
-              <InfoPill tone="slate" label={`${meta.total} matches`} />
-              {tasksLoading && <InfoPill tone="amber" label="Refreshing" />}
-              {hasActiveFilters && <InfoPill tone="blue" label={`${activeFilterCount} active filters`} />}
-            </div>
+        {/* Toolbar header: stats + Month + actions */}
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-5 py-3.5">
+          {/* Stats pills */}
+          <div className="flex flex-wrap items-center gap-2">
+            <InfoPill tone="navy" label={`${workingCount} working`} />
+            <InfoPill tone="orange" label={`${activeCount} active tasks`} />
+            <InfoPill tone="green" label={`${completedCount} completed`} />
+            <InfoPill tone="slate" label={`${meta.total} matches`} />
+            {tasksLoading && <InfoPill tone="amber" label="Refreshing…" />}
+            {hasColumnFilters && (
+              <InfoPill tone="blue" label={`${activeColumnFilters.length} filter${activeColumnFilters.length > 1 ? "s" : ""} active`} />
+            )}
           </div>
 
-          <div className="mt-4 space-y-3">
-            <FilterChips label="Category" items={availableCats} value={cat} setValue={(value) => {
-              setPage(1);
-              setCat(value);
-            }} />
-            <FilterChips label="Status" items={CHIP_STATUSES} value={status} setValue={(value) => {
-              setPage(1);
-              setStatus(value);
-              // Clear the column status dropdown so the two filters don't conflict.
-              if (value !== "All") {
-                setColumnFilters((current) => ({ ...current, status: "" }));
-              }
-            }} />
+          {/* Month selector + action buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            <label htmlFor="task-list-month" className={`flex items-center gap-1.5 ${scope !== "By Month" ? "opacity-50" : ""}`}>
+              <span className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Month</span>
+              <input
+                id="task-list-month"
+                name="taskListMonth"
+                className="input h-8 w-[130px] text-[13px]"
+                type="month"
+                value={month}
+                disabled={scope !== "By Month"}
+                onChange={(event) => {
+                  setPage(1);
+                  setMonth(event.target.value);
+                }}
+              />
+            </label>
 
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(220px,auto)_auto] lg:items-end">
-              <FilterChips label="Scope" items={["By Month", "Overdue", "All"]} value={scope} setValue={(value) => {
-                setPage(1);
-                setScope(value);
-              }} compact />
-
-              <label htmlFor="task-list-month" className={`task-list-field ${scope !== "By Month" ? "opacity-60" : ""}`}>
-                <span className="task-list-field-label">Month</span>
-                <input
-                  id="task-list-month"
-                  name="taskListMonth"
-                  className="input"
-                  type="month"
-                  value={month}
-                  disabled={scope !== "By Month"}
-                  onChange={(event) => {
-                    setPage(1);
-                    setMonth(event.target.value);
-                  }}
-                />
-              </label>
-
-              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                <Button variant="ghost" size="sm" onClick={refetchTasks} disabled={tasksLoading}>
-                  <RefreshCw size={15} className={tasksLoading ? "animate-spin" : ""} />
-                  Refresh
-                </Button>
-                {hasColumnFilters && (
-                  <Button variant="ghost" size="sm" onClick={clearColumnFilters}>
-                    <X size={15} />
-                    Clear columns
-                  </Button>
-                )}
-                {hasActiveFilters && (
-                  <Button variant="ghost" size="sm" onClick={resetAllFilters}>
-                    Reset all
-                  </Button>
-                )}
-              </div>
-            </div>
+            <Button variant="ghost" size="sm" onClick={refetchTasks} disabled={tasksLoading}>
+              <RefreshCw size={14} className={tasksLoading ? "animate-spin" : ""} />
+              Refresh
+            </Button>
+            {hasColumnFilters && (
+              <Button variant="ghost" size="sm" onClick={clearColumnFilters}>
+                <X size={14} />
+                Clear columns
+              </Button>
+            )}
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={resetAllFilters}>
+                Reset all
+              </Button>
+            )}
           </div>
         </div>
 
-        <div className="px-4 py-4 sm:px-5">
+        {/* ── Column filters ── */}
+        <div className="px-5 py-4">
           <div className="task-list-column-grid">
+            {/* Task ID */}
             <FilterField label="Task ID" htmlFor="task-filter-id">
               <div className="task-list-input-wrap">
                 <Search size={14} className="task-list-input-icon" aria-hidden="true" />
@@ -390,6 +375,7 @@ export default function TaskList() {
               </div>
             </FilterField>
 
+            {/* Client */}
             <FilterField label="Client" htmlFor="task-filter-client">
               <div className="task-list-input-wrap">
                 <Search size={14} className="task-list-input-icon" aria-hidden="true" />
@@ -410,6 +396,7 @@ export default function TaskList() {
               </datalist>
             </FilterField>
 
+            {/* Category */}
             <FilterField label="Category" htmlFor="task-filter-category">
               <select
                 id="task-filter-category"
@@ -419,13 +406,12 @@ export default function TaskList() {
               >
                 <option value="">All categories</option>
                 {categoryOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
+                  <option key={option} value={option}>{option}</option>
                 ))}
               </select>
             </FilterField>
 
+            {/* Task Type */}
             <FilterField label="Task Type" htmlFor="task-filter-type">
               <select
                 id="task-filter-type"
@@ -435,13 +421,12 @@ export default function TaskList() {
               >
                 <option value="">All task types</option>
                 {typeOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
+                  <option key={option} value={option}>{option}</option>
                 ))}
               </select>
             </FilterField>
 
+            {/* Due Date */}
             <FilterField label="Due Date" htmlFor="task-filter-due-date">
               <input
                 id="task-filter-due-date"
@@ -452,6 +437,7 @@ export default function TaskList() {
               />
             </FilterField>
 
+            {/* Assigned */}
             <FilterField label="Assigned" htmlFor="task-filter-assigned">
               <select
                 id="task-filter-assigned"
@@ -461,13 +447,12 @@ export default function TaskList() {
               >
                 <option value="">All assignees</option>
                 {assigneeOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
+                  <option key={option} value={option}>{option}</option>
                 ))}
               </select>
             </FilterField>
 
+            {/* Status — now includes Active option */}
             <FilterField label="Status" htmlFor="task-filter-status">
               <select
                 id="task-filter-status"
@@ -476,14 +461,13 @@ export default function TaskList() {
                 onChange={(event) => updateColumnFilter("status", event.target.value)}
               >
                 <option value="">All statuses</option>
-                {FILTER_STATUSES.filter((option) => option !== "All").map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
+                {FILTER_STATUSES.filter((s) => s !== "All").map((option) => (
+                  <option key={option} value={option}>{option}</option>
                 ))}
               </select>
             </FilterField>
 
+            {/* Remark */}
             <FilterField label="Remark" htmlFor="task-filter-remarks">
               <div className="task-list-input-wrap">
                 <Search size={14} className="task-list-input-icon" aria-hidden="true" />
@@ -498,6 +482,7 @@ export default function TaskList() {
               </div>
             </FilterField>
 
+            {/* Recurring */}
             <FilterField label="Recurring" htmlFor="task-filter-recurring">
               <select
                 id="task-filter-recurring"
@@ -510,12 +495,49 @@ export default function TaskList() {
                 <option value="one-time">One-time</option>
               </select>
             </FilterField>
+
+            {/* Scope — replaces the removed chip row */}
+            <FilterField label="Scope" htmlFor="task-filter-scope">
+              <select
+                id="task-filter-scope"
+                className="input"
+                value={scope}
+                onChange={(event) => updateScope(event.target.value)}
+              >
+                {SCOPE_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </FilterField>
+
+            {/* Created Date filter */}
+            <FilterField label="Created Date" htmlFor="task-filter-created">
+              <input
+                id="task-filter-created"
+                className="input"
+                type="date"
+                value={columnFilters.createdAt}
+                onChange={(event) => updateColumnFilter("createdAt", event.target.value)}
+              />
+            </FilterField>
+
+            {/* Last Modified filter */}
+            <FilterField label="Last Modified" htmlFor="task-filter-updated">
+              <input
+                id="task-filter-updated"
+                className="input"
+                type="date"
+                value={columnFilters.updatedAt}
+                onChange={(event) => updateColumnFilter("updatedAt", event.target.value)}
+              />
+            </FilterField>
           </div>
 
+          {/* Active filter tags */}
           {hasColumnFilters && (
             <div className="mt-3 flex flex-wrap gap-2">
               {activeColumnFilters.map((item) => (
-                <span key={item} className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-600">
+                <span key={item} className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-700 ring-1 ring-blue-100">
                   {item}
                 </span>
               ))}
@@ -525,7 +547,7 @@ export default function TaskList() {
       </Card>
 
       {isTaskOnly && (
-        <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-2.5 text-[12px] font-medium text-blue-700">
+        <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-2.5 text-[12px] font-medium text-blue-700">
           You can update status and remarks only for tasks assigned to you.
         </div>
       )}
@@ -606,6 +628,8 @@ function TaskTableState({ tasks, tasksLoading, taskError, hasActiveFilters, empt
           <th>Assigned</th>
           <th>Status</th>
           <th>Recurring</th>
+          <th>Created Date</th>
+          <th>Last Modified</th>
         </tr>
       </thead>
       <tbody>
@@ -652,24 +676,6 @@ function TaskTableState({ tasks, tasksLoading, taskError, hasActiveFilters, empt
   );
 }
 
-function FilterChips({ label, items, value, setValue }) {
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="mr-1 text-[11px] font-extrabold uppercase tracking-[0.08em] text-slate-500">{label}</span>
-      {items.map((item) => (
-        <button
-          key={item}
-          type="button"
-          onClick={() => setValue(item)}
-          className={`task-filter-chip ${value === item ? "task-filter-chip-active" : "task-filter-chip-idle"}`}
-        >
-          {item}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function FilterField({ label, htmlFor, children }) {
   return (
     <label htmlFor={htmlFor} className="task-list-field">
@@ -688,7 +694,6 @@ function InfoPill({ tone, label }) {
     blue: "bg-blue-50 text-blue-700",
     green: "bg-emerald-50 text-emerald-700",
   };
-
   return (
     <span className={`inline-flex rounded-full px-3 py-1 text-[11px] font-extrabold ${tones[tone] || tones.slate}`}>
       {label}
