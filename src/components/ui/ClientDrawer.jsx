@@ -17,7 +17,11 @@ function formatDate(dateStr) {
 
 function openDocumentFile(document) {
   if (!document?.url) return;
-  window.open(resolveMediaUrl(document.url), "_blank", "noopener,noreferrer");
+  const resolvedUrl = resolveMediaUrl(document.url);
+  const openUrl = /\.pdf($|\?)/i.test(resolvedUrl) && resolvedUrl.includes("res.cloudinary.com")
+    ? resolvedUrl.replace(/\.pdf($|\?)/i, ".jpg$1")
+    : resolvedUrl;
+  window.open(openUrl, "_blank", "noopener,noreferrer");
 }
 
 function mapAttachmentItem(file, subcategory = "") {
