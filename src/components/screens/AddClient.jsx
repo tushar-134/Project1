@@ -663,24 +663,23 @@ export default function AddClient() {
 
   async function handleContactDocument(contactIndex, files, section) {
     const contact = contacts[contactIndex];
-    if (isEditMode && !contact?.persisted) {
-      toast.error(`Save the new contact person first, then upload ${section === "passport" ? "passport" : "Emirates ID"} documents.`);
-      return;
-    }
     const selected = Array.from(files || []);
     if (!selected.length) return;
+    // Stage files in local state for any unsaved contact row (persisted: false) in both
+    // Add mode and Edit mode — saveClient() will flush them to the API after saving the record.
+    const shouldStage = !isEditMode || !contact?.persisted;
     if (section === "passport") {
       setContacts((current) => current.map((item, index) => index === contactIndex ? {
         ...item,
-        passportDocuments: !isEditMode ? [...(item.passportDocuments || []), ...selected.map(toPendingDocument)] : item.passportDocuments,
+        passportDocuments: shouldStage ? [...(item.passportDocuments || []), ...selected.map(toPendingDocument)] : item.passportDocuments,
       } : item));
     } else {
       setContacts((current) => current.map((item, index) => index === contactIndex ? {
         ...item,
-        eidDocuments: !isEditMode ? [...(item.eidDocuments || []), ...selected.map(toPendingDocument)] : item.eidDocuments,
+        eidDocuments: shouldStage ? [...(item.eidDocuments || []), ...selected.map(toPendingDocument)] : item.eidDocuments,
       } : item));
     }
-    if (!isEditMode) {
+    if (shouldStage) {
       toast.success(`${section === "passport" ? "Passport" : "Emirates ID"} ${selected.length === 1 ? "file" : "files"} added. Save the client to upload ${selected.length === 1 ? "it" : "them"}.`);
       return;
     }
