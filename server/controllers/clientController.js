@@ -8,6 +8,7 @@ const Notification = require("../models/Notification");
 const ActivityLog = require("../models/ActivityLog");
 const { nextClientFileNo } = require("../utils/autoId");
 const { normalizeDialCode, normalizePhoneNumber } = require("../utils/phoneUtils");
+const { buildUploadedFileUrl, normalizeStoredUploadUrl } = require("../utils/uploadUrl");
 
 // Managers can assign clients to themselves or task_only users only — not to other managers or admins.
 async function ensureManagerCanAssignClient(req, assignedUser) {
@@ -231,9 +232,7 @@ function validateVatTrn(vatDetails = {}) {
 }
 
 function toUploadedFile(file, req) {
-  const url = file.path?.startsWith?.("http")
-    ? file.path
-    : `${req.protocol}://${req.get("host")}/uploads/${file.filename}`;
+  const url = buildUploadedFileUrl(file, req);
   return {
     name: file.originalname,
     size: `${Math.round(file.size / 1024)} KB`,
@@ -329,7 +328,7 @@ function normalizeTradeLicencesForPersistence(tradeLicences = [], existingTradeL
     return {
       ...licence,
       documents,
-      documentUrl: licence?.documentUrl || documents[documents.length - 1]?.url || existing.documentUrl || "",
+      documentUrl: normalizeStoredUploadUrl(licence?.documentUrl || documents[documents.length - 1]?.url || existing.documentUrl || ""),
     };
   });
 }
@@ -366,14 +365,14 @@ function normalizeContactPersonsForPersistence(contactPersons = [], existingCont
         documents: emiratesIdDocuments,
         frontDocuments,
         backDocuments,
-        documentUrl: contact?.emiratesId?.documentUrl || emiratesIdDocuments[emiratesIdDocuments.length - 1]?.url || existingEmiratesId.documentUrl || "",
-        frontDocumentUrl: contact?.emiratesId?.frontDocumentUrl || frontDocuments[frontDocuments.length - 1]?.url || existingEmiratesId.frontDocumentUrl || "",
-        backDocumentUrl: contact?.emiratesId?.backDocumentUrl || backDocuments[backDocuments.length - 1]?.url || existingEmiratesId.backDocumentUrl || "",
+        documentUrl: normalizeStoredUploadUrl(contact?.emiratesId?.documentUrl || emiratesIdDocuments[emiratesIdDocuments.length - 1]?.url || existingEmiratesId.documentUrl || ""),
+        frontDocumentUrl: normalizeStoredUploadUrl(contact?.emiratesId?.frontDocumentUrl || frontDocuments[frontDocuments.length - 1]?.url || existingEmiratesId.frontDocumentUrl || ""),
+        backDocumentUrl: normalizeStoredUploadUrl(contact?.emiratesId?.backDocumentUrl || backDocuments[backDocuments.length - 1]?.url || existingEmiratesId.backDocumentUrl || ""),
       },
       passport: {
         ...(contact.passport || {}),
         documents: passportDocuments,
-        documentUrl: contact?.passport?.documentUrl || passportDocuments[passportDocuments.length - 1]?.url || existingPassport.documentUrl || "",
+        documentUrl: normalizeStoredUploadUrl(contact?.passport?.documentUrl || passportDocuments[passportDocuments.length - 1]?.url || existingPassport.documentUrl || ""),
       },
     };
   });

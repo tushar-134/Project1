@@ -6,6 +6,7 @@ const Notification = require("../models/Notification");
 const ActivityLog = require("../models/ActivityLog");
 const auditLogger = require("../utils/auditLogger");
 const { nextTaskId } = require("../utils/autoId");
+const { buildUploadedFileUrl } = require("../utils/uploadUrl");
 
 // Human-readable status labels for notification messages
 const STATUS_LABEL = {
@@ -39,9 +40,7 @@ function parsePagination(query = {}, defaultLimit = 20) {
 }
 
 function toUploadedFile(file, req) {
-  const fileUrl = file.path && /^https?:\/\//i.test(String(file.path || ""))
-    ? file.path
-    : `${req.protocol}://${req.get("host")}/uploads/${file.filename}`;
+  const fileUrl = buildUploadedFileUrl(file, req);
   return {
     name: file.originalname || file.filename || "File",
     size: file.size ? `${(file.size / 1024 / 1024).toFixed(file.size >= 1024 * 1024 ? 2 : 3).replace(/\.?0+$/, "")} MB` : "",

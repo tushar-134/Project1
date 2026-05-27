@@ -1639,16 +1639,31 @@ function SearchableSelect({ id, value, options, searchValue, onSearchChange, onC
 
   return (
     <div ref={containerRef} className="relative">
-      <button
-        id={id}
-        name={id}
-        type="button"
-        className="input flex items-center justify-between text-left"
-        onClick={() => setOpen((current) => !current)}
-      >
-        <span className={selected ? "truncate text-slate-900" : "truncate text-slate-400"}>{selectedLabel}</span>
-        <ChevronDown size={16} className={`ml-2 shrink-0 text-slate-400 transition ${open ? "rotate-180" : ""}`} />
-      </button>
+      <div className="relative">
+        <input
+          id={id}
+          name={id}
+          type="text"
+          readOnly
+          role="combobox"
+          aria-expanded={open}
+          aria-haspopup="listbox"
+          className={`input cursor-pointer pr-10 ${selected ? "text-slate-900" : "text-slate-400"}`}
+          value={selected ? selectedLabel : ""}
+          placeholder={placeholder}
+          onClick={() => setOpen((current) => !current)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setOpen((current) => !current);
+            }
+            if (event.key === "Escape") {
+              setOpen(false);
+            }
+          }}
+        />
+        <ChevronDown size={16} className={`pointer-events-none absolute right-3 top-1/2 ml-2 shrink-0 -translate-y-1/2 text-slate-400 transition ${open ? "rotate-180" : ""}`} />
+      </div>
       {open && (
         <div className="absolute z-20 mt-1 w-full rounded-xl border border-slate-200 bg-white p-2 shadow-xl ring-1 ring-slate-900/5">
           <div className="relative mb-2">
