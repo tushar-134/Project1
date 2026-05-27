@@ -625,15 +625,14 @@ export default function AddClient() {
 
   async function handleTradeLicenceFile(licenceIndex, files) {
     const licence = licences[licenceIndex];
-    if (isEditMode && !licence?.persisted) {
-      toast.error("Save the new trade licence first, then upload its documents.");
-      return;
-    }
     const currentDocuments = licences[licenceIndex]?.documents || [];
     const { accepted: selected, skipped } = uniqueTradeLicenceFiles(files, currentDocuments);
     if (skipped) toast.error(skipped === 1 ? "This trade licence file is already added." : `${skipped} duplicate trade licence files were skipped.`);
     if (!selected.length) return;
-    if (!isEditMode) {
+    // If the licence row hasn't been saved to the DB yet (persisted: false), stage the files
+    // in local state — they'll be uploaded by saveClient() once the record exists.
+    // This is the same staged-upload pattern already used in Add mode.
+    if (!isEditMode || !licence?.persisted) {
       setLicences((current) => current.map((item, index) => index === licenceIndex ? {
         ...item,
         documents: [...(item.documents || []), ...selected.map(toPendingDocument)],
