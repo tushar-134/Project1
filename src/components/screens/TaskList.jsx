@@ -350,7 +350,7 @@ export default function TaskList() {
       </div>
 
       {/* ── Filter card ── */}
-      <Card className="overflow-hidden">
+      <Card>
         {/* Toolbar header: stats + Month + actions */}
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-5 py-3.5">
           {/* Stats pills */}
