@@ -1,0 +1,146 @@
+import { Folders, Settings2, Users, LayoutGrid } from "lucide-react";
+import { useState } from "react";
+import { useAuth } from "../../context/AuthContext.jsx";
+import { canManageCategories, canManageGroups, canViewUsers } from "../../utils/permissions.js";
+import UsersScreen from "./Users.jsx";
+import CustomFieldsScreen from "./CustomFields.jsx";
+import ClientGroupsScreen from "./ClientGroups.jsx";
+
+// Each tab is self-contained; add future settings categories here without touching layout code.
+function buildTabs(role) {
+  const tabs = [];
+
+  if (canViewUsers(role)) {
+    tabs.push({
+      id: "users",
+      label: "User Management",
+      description: "Manage team members, roles, and access control",
+      icon: Users,
+      category: "People",
+      component: UsersScreen,
+    });
+  }
+
+  if (canManageCategories(role)) {
+    tabs.push({
+      id: "custom-fields",
+      label: "Custom Fields",
+      description: "Extend client profiles with additional data fields",
+      icon: Settings2,
+      category: "Data & Fields",
+      component: CustomFieldsScreen,
+    });
+  }
+
+  if (canManageGroups(role)) {
+    tabs.push({
+      id: "groups",
+      label: "Client Groups",
+      description: "Organise clients into logical business groups",
+      icon: Folders,
+      category: "Client Organisation",
+      component: ClientGroupsScreen,
+    });
+  }
+
+  return tabs;
+}
+
+export default function Settings() {
+  const { currentUser } = useAuth();
+  const role = currentUser?.role;
+  const tabs = buildTabs(role);
+  const [activeId, setActiveId] = useState(tabs[0]?.id ?? "");
+
+  const activeTab = tabs.find((t) => t.id === activeId);
+  const ActiveComponent = activeTab?.component ?? null;
+
+  if (!tabs.length) {
+    return (
+      <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 text-slate-400">
+        <LayoutGrid size={40} strokeWidth={1.5} />
+        <div className="text-sm font-bold">No settings available for your role.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* ── Page header ── */}
+      <div>
+        <div className="page-kicker">Administration</div>
+        <h1 className="screen-title">Settings</h1>
+        <p className="mt-1 text-[13px] text-slate-500">
+          Manage users, data fields, and organisational preferences from one place.
+        </p>
+      </div>
+
+      {/* ── Main layout: vertical sidebar tabs + content panel ── */}
+      <div className="flex gap-5 min-h-[600px]">
+
+        {/* Sidebar tab list */}
+        <div className="w-[220px] min-w-[220px] shrink-0 space-y-1">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = tab.id === activeId;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveId(tab.id)}
+                className={`
+                  group w-full rounded-xl px-4 py-3 text-left transition-all
+                  ${isActive
+                    ? "bg-[#1e3a8a] text-white shadow-lg shadow-blue-900/20"
+                    : "bg-white text-slate-700 border border-[#e2e8f0] hover:border-blue-200 hover:bg-blue-50/60"}
+                `}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition-colors
+                      ${isActive ? "bg-white/15 text-white" : "bg-slate-100 text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-700"}`}
+                  >
+                    <Icon size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className={`truncate text-[13px] font-extrabold leading-tight ${isActive ? "text-white" : "text-slate-800"}`}>
+                      {tab.label}
+                    </div>
+                    <div className={`mt-0.5 truncate text-[10px] font-semibold uppercase tracking-wider ${isActive ? "text-white/65" : "text-slate-400"}`}>
+                      {tab.category}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Content panel */}
+        <div className="min-w-0 flex-1 rounded-2xl border border-[#e2e8f0] bg-white shadow-sm">
+          {/* Panel header */}
+          {activeTab && (
+            <div className="border-b border-[#e2e8f0] px-6 py-5"
+              style={{ background: "linear-gradient(135deg, rgba(30,58,138,.025), rgba(30,58,138,.065))" }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#1e3a8a] text-white shadow-md">
+                  <activeTab.icon size={20} />
+                </div>
+                <div>
+                  <div className="text-[17px] font-black text-slate-900">{activeTab.label}</div>
+                  <div className="text-[12px] font-medium text-slate-500">{activeTab.description}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Screen content — rendered inside the panel */}
+          <div className="p-6">
+            {ActiveComponent && <ActiveComponent />}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
