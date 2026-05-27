@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { clientService } from "../../services/clientService.js";
+import { resolveMediaUrl } from "../../utils/mediaUrl.js";
 import { canManageClients } from "../../utils/permissions.js";
 import Button from "./Button.jsx";
 import Card from "./Card.jsx";
@@ -16,7 +17,53 @@ function formatDate(dateStr) {
 
 function openDocumentFile(document) {
   if (!document?.url) return;
-  window.open(document.url, "_blank", "noopener,noreferrer");
+  window.open(resolveMediaUrl(document.url), "_blank", "noopener,noreferrer");
+}
+
+function mapAttachmentItem(file, subcategory = "") {
+  return {
+    id: file?._id || `${subcategory}-${file?.url || file?.name || "attachment"}`,
+    name: file?.name || file?.url?.split("/").pop() || "Attachment",
+    size: file?.size || "",
+    description: file?.description || "",
+    uploadedBy: file?.uploadedBy?.name || "",
+    url: file?.url || "",
+    subcategory,
+  };
+}
+
+function collectAttachmentGroups(client) {
+  if (!client) return [];
+
+  const groups = [];
+  const appendGroup = (title, items) => {
+    if (items.length) groups.push({ title, items });
+  };
+
+  appendGroup("General Attachments", (client.attachments || []).map((file) => mapAttachmentItem(file)));
+  appendGroup(
+    "Trade Licence",
+    (client.tradeLicences || []).flatMap((licence, index) =>
+      (licence.documents || []).map((file) => mapAttachmentItem(file, licence.licenceNumber || `Trade Licence ${index + 1}`))),
+  );
+  appendGroup(
+    "Emirates ID",
+    (client.contactPersons || []).flatMap((person, index) => {
+      const label = person.fullName || `Contact ${index + 1}`;
+      return [
+        ...((person.emiratesId?.documents || []).map((file) => mapAttachmentItem(file, label))),
+        ...((person.emiratesId?.frontDocuments || []).map((file) => mapAttachmentItem(file, `${label} Front`))),
+        ...((person.emiratesId?.backDocuments || []).map((file) => mapAttachmentItem(file, `${label} Back`))),
+      ];
+    }),
+  );
+  appendGroup(
+    "Passport",
+    (client.contactPersons || []).flatMap((person, index) =>
+      (person.passport?.documents || []).map((file) => mapAttachmentItem(file, person.fullName || `Contact ${index + 1}`))),
+  );
+
+  return groups;
 }
 
 function DetailRow({ label, value }) {
@@ -76,7 +123,7 @@ export default function ClientDrawer({ clientId, onClose }) {
 
   const primaryContact = client?.contactPersons?.find((person) => person.isPrimary) || client?.contactPersons?.[0];
   const tradeLicences = client?.tradeLicences || [];
-  const attachments = client?.attachments || [];
+  const attachmentGroups = collectAttachmentGroups(client);
 
   return (
     <>
@@ -177,19 +224,24 @@ export default function ClientDrawer({ clientId, onClose }) {
                 <div className="mb-4 flex items-center gap-2 text-[16px] font-extrabold text-slate-900">
                   <Mail size={16} /> Attachments
                 </div>
-                {!attachments.length ? (
+                {!attachmentGroups.length ? (
                   <div className="text-[13px] font-semibold text-slate-500">No attachments uploaded yet.</div>
                 ) : (
-                  <div className="space-y-2">
-                    {attachments.map((attachment) => (
-                      <div key={attachment._id || attachment.url} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
-                        <div className="min-w-0">
-                          <div className="truncate text-[13px] font-bold text-slate-800">{attachment.name}</div>
-                          <div className="text-[11px] font-semibold text-slate-500">
-                            {[attachment.size, attachment.description, attachment.uploadedBy?.name].filter(Boolean).join(" • ")}
+                  <div className="space-y-4">
+                    {attachmentGroups.map((group) => (
+                      <div key={group.title} className="space-y-2">
+                        <div className="text-[12px] font-bold uppercase tracking-wider text-slate-400">{group.title}</div>
+                        {group.items.map((attachment) => (
+                          <div key={attachment.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+                            <div className="min-w-0">
+                              <div className="truncate text-[13px] font-bold text-slate-800">{attachment.name}</div>
+                              <div className="text-[11px] font-semibold text-slate-500">
+                                {[attachment.subcategory, attachment.size, attachment.description, attachment.uploadedBy].filter(Boolean).join(" • ")}
+                              </div>
+                            </div>
+                            <Button size="sm" variant="ghost" disabled={!attachment.url} onClick={() => openDocumentFile(attachment)}>Open</Button>
                           </div>
-                        </div>
-                        <Button size="sm" variant="ghost" disabled={!attachment.url} onClick={() => openDocumentFile(attachment)}>Open</Button>
+                        ))}
                       </div>
                     ))}
                   </div>

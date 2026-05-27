@@ -625,6 +625,10 @@ export default function AddClient() {
 
   async function handleTradeLicenceFile(licenceIndex, files) {
     const licence = licences[licenceIndex];
+    if (isEditMode && !licence?.persisted) {
+      toast.error("Save the new trade licence first, then upload its documents.");
+      return;
+    }
     const currentDocuments = licences[licenceIndex]?.documents || [];
     const { accepted: selected, skipped } = uniqueTradeLicenceFiles(files, currentDocuments);
     if (skipped) toast.error(skipped === 1 ? "This trade licence file is already added." : `${skipped} duplicate trade licence files were skipped.`);
@@ -663,6 +667,10 @@ export default function AddClient() {
 
   async function handleContactDocument(contactIndex, files, section) {
     const contact = contacts[contactIndex];
+    if (isEditMode && !contact?.persisted) {
+      toast.error(`Save the new contact person first, then upload ${section === "passport" ? "passport" : "Emirates ID"} documents.`);
+      return;
+    }
     const selected = Array.from(files || []);
     if (!selected.length) return;
     // Stage files in local state for any unsaved contact row (persisted: false) in both
