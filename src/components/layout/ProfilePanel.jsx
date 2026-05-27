@@ -202,7 +202,7 @@ export default function ProfilePanel({ open, initialTab = "profile", onClose }) 
   return (
     <>
       <button className="fixed inset-0 z-40 bg-slate-950/35" onClick={onClose} aria-label="Close profile panel" />
-      <aside className="fixed right-0 top-0 z-50 flex h-dvh w-full max-w-[420px] flex-col border-l border-slate-200 bg-white shadow-2xl">
+      <aside className="fixed right-0 top-0 z-50 flex h-dvh w-full md:w-[50vw] md:max-w-[50vw] flex-col border-l border-slate-200 bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div>
             <div className="text-[16px] font-extrabold text-slate-900">Profile</div>
