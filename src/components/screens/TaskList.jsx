@@ -181,7 +181,6 @@ export default function TaskList() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { fetchTasks, updateStatus, updateAssignee, exportTasks } = useTasks();
-  const { fetchClients } = useClients();
   const initialMonth = searchParams.get("month") || getCurrentMonthValue();
 
   // Scope & month still live as top-level state (drive server query) but are now
@@ -214,11 +213,15 @@ export default function TaskList() {
   const canManage = canManageTasks(currentUser?.role);
   const isTaskOnly = currentUser?.role === "task_only";
   const { fetchUsers } = useUsers();
+  const { fetchClients } = useClients();
   const tasksLoading = Boolean(state.loading.tasks);
   const taskError = state.errors.tasks;
 
   useEffect(() => {
-    if (canManage) fetchUsers().catch(() => {});
+    if (canManage) {
+      fetchUsers().catch(() => {});
+      fetchClients({ limit: 1000 }).catch(() => {});
+    }
   }, [canManage]);
 
   useEffect(() => {
@@ -287,6 +290,7 @@ export default function TaskList() {
     },
     [columnFilters.category, state.categories],
   );
+
   const assigneeOptions = useMemo(
     () => buildNormalizedOptions(state.users.map((user) => user.name)),
     [state.users],
