@@ -182,7 +182,6 @@ export default function TaskList() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { fetchTasks, updateStatus, updateAssignee, exportTasks } = useTasks();
-  const { fetchClients } = useClients();
   const initialMonth = searchParams.get("month") || getCurrentMonthValue();
 
   // Scope & month still live as top-level state (drive server query) but are now
