@@ -62,21 +62,22 @@ exports.dashboardStats = async (req, res, next) => {
         .limit(10),
     ]);
 
-    // Category breakdown — aggregation scoped to month
-    const matchStage = {
-      status: { $ne: "completed" },
+    // Category breakdown — aggregation scoped to month, split by active vs closed
+    const catMatchStage = {
       ...(dueDate ? { dueDate } : {}),
       ...roleScope,
     };
     const catAgg = await Task.aggregate([
-      { $match: matchStage },
+      { $match: catMatchStage },
       { $group: {
         _id: "$category",
-        pending: { $sum: 1 },
-        overdue: { $sum: { $cond: [{ $lt: ["$dueDate", now] }, 1, 0] } },
+        active: { $sum: { $cond: [{ $ne: ["$status", "completed"] }, 1, 0] } },
+        closed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
+        pending: { $sum: { $cond: [{ $ne: ["$status", "completed"] }, 1, 0] } },
+        overdue: { $sum: { $cond: [{ $and: [{ $ne: ["$status", "completed"] }, { $lt: ["$dueDate", now] }] }, 1, 0] } },
       }},
     ]);
-    const categoryBreakdown = catAgg.map((c) => ({ category: c._id, pending: c.pending, overdue: c.overdue }));
+    const categoryBreakdown = catAgg.map((c) => ({ category: c._id, active: c.active, closed: c.closed, pending: c.pending, overdue: c.overdue }));
     res.json({ totalClients, pendingTasks, overdueTasks, ftaPending, categoryBreakdown, recentActivity });
   } catch (error) { next(error); }
 };

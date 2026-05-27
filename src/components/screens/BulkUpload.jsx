@@ -289,6 +289,12 @@ export default function BulkUpload() {
         return null;
       };
 
+      // Helper function to extract file extension
+      const getExt = (fname) => {
+        const dotIdx = fname.lastIndexOf(".");
+        return dotIdx !== -1 ? fname.substring(dotIdx + 1) : "pdf";
+      };
+
       // 3. For each successful row, check for and upload documents sequentially
       for (const rowResult of rowResultsList) {
         if (rowResult.status !== "success") continue;
@@ -301,10 +307,11 @@ export default function BulkUpload() {
         const licence = String(row.licenceNumber || row.licence || "").trim();
         
         // Match & Upload Trade Licence Document
-        const licenceFileObj = licence ? findFile("licenses", licence) : null;
+        const licenceFileObj = findFile("licenses", serial);
         if (licenceFileObj) {
+          const ext = getExt(licenceFileObj.name);
           const formData = new FormData();
-          formData.append("files", licenceFileObj.blob, licenceFileObj.name);
+          formData.append("files", licenceFileObj.blob, `trade_license.${ext}`);
           formData.append("section", "tradeLicences");
           formData.append("index", "0");
           formData.append("description", `Trade licence document for ${licence}`);
@@ -318,8 +325,9 @@ export default function BulkUpload() {
         // Match & Upload Passport Document
         const passportFileObj = findFile("passports", serial);
         if (passportFileObj) {
+          const ext = getExt(passportFileObj.name);
           const formData = new FormData();
-          formData.append("files", passportFileObj.blob, passportFileObj.name);
+          formData.append("files", passportFileObj.blob, `passport.${ext}`);
           formData.append("section", "passport");
           formData.append("index", "0");
           formData.append("description", `Passport document for contact 1`);
@@ -333,8 +341,9 @@ export default function BulkUpload() {
         // Match & Upload Emirates ID Document
         const eidFileObj = findFile("emirate_ids", serial);
         if (eidFileObj) {
+          const ext = getExt(eidFileObj.name);
           const formData = new FormData();
-          formData.append("files", eidFileObj.blob, eidFileObj.name);
+          formData.append("files", eidFileObj.blob, `emirates_id.${ext}`);
           formData.append("section", "emiratesId");
           formData.append("index", "0");
           formData.append("description", `Emirates ID document for contact 1`);
@@ -371,8 +380,7 @@ export default function BulkUpload() {
   const instructions = [
     "Download the sample template and extract the ZIP.",
     "Fill mandatory columns: legalName, contactName, contactEmail, contactMobile.",
-    "Place trade licence scans in licenses/ folder, named as licenceNumber.ext (e.g. TL-1001.pdf).",
-    "Place passport & emirate ID scans in passports/ and emirate_ids/ folders, named as serial.ext (e.g. 1.pdf).",
+    "Place trade licence, passport & emirate ID scans in their respective folders (licenses/, passports/, emirate_ids/), all named as serial.ext (e.g. 1.pdf).",
     "Select the entire folder below and review results.",
   ];
 
