@@ -1,10 +1,11 @@
-import { Folders, Settings2, Users, LayoutGrid } from "lucide-react";
+import { Boxes, Folders, Settings2, Users, LayoutGrid } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { canManageCategories, canManageGroups, canViewUsers } from "../../utils/permissions.js";
 import UsersScreen from "./Users.jsx";
 import CustomFieldsScreen from "./CustomFields.jsx";
 import ClientGroupsScreen from "./ClientGroups.jsx";
+import CategoriesScreen from "./Categories.jsx";
 
 // Each tab is self-contained; add future settings categories here without touching layout code.
 function buildTabs(role) {
@@ -40,6 +41,17 @@ function buildTabs(role) {
       icon: Folders,
       category: "Client Organisation",
       component: ClientGroupsScreen,
+    });
+  }
+
+  if (canManageCategories(role)) {
+    tabs.push({
+      id: "categories",
+      label: "Categories & Types",
+      description: "Manage task categories and their associated task types",
+      icon: Boxes,
+      category: "Task Taxonomy",
+      component: CategoriesScreen,
     });
   }
 
