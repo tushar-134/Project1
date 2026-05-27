@@ -1,4 +1,4 @@
-import { Camera, ExternalLink, Grip, RotateCcw, ShieldCheck, X } from "lucide-react";
+import { Camera, ExternalLink, Grip, LayoutGrid, RotateCcw, Settings2, ShieldCheck, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
@@ -201,34 +201,53 @@ export default function ProfilePanel({ open, initialTab = "profile", onClose }) 
 
   return (
     <>
-      <button className="fixed inset-0 z-40 bg-slate-950/35" onClick={onClose} aria-label="Close profile panel" />
-      <aside className="fixed right-0 top-0 z-50 flex h-dvh w-full md:w-[50vw] md:max-w-[50vw] flex-col border-l border-slate-200 bg-white shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <div>
-            <div className="text-[16px] font-extrabold text-slate-900">Profile</div>
-            <div className="text-[12px] font-semibold text-slate-500">Account overview and settings</div>
+      <button className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-[2px]" onClick={onClose} aria-label="Close profile panel" />
+      <aside className="fixed right-0 top-0 z-50 flex h-dvh w-full md:w-[50vw] md:max-w-[50vw] flex-col bg-white shadow-2xl" style={{ borderLeft: '1px solid #e2e8f0' }}>
+
+        {/* ── Gradient banner header ── */}
+        <div
+          className="relative overflow-hidden px-6 py-5"
+          style={{ background: 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #2563eb 100%)' }}
+        >
+          {/* decorative blobs */}
+          <div className="pointer-events-none absolute -right-6 -top-6 h-32 w-32 rounded-full opacity-20" style={{ background: 'radial-gradient(circle, #60a5fa, transparent 70%)' }} />
+          <div className="pointer-events-none absolute bottom-0 left-1/3 h-16 w-40 opacity-10" style={{ background: 'radial-gradient(ellipse, #818cf8, transparent 70%)' }} />
+          <div className="relative z-10 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="grid h-10 w-10 place-items-center rounded-xl bg-white/15 backdrop-blur-sm">
+                <UserAvatar user={profile} size="sm" />
+              </div>
+              <div>
+                <div className="text-[16px] font-black text-white">{profile?.name || 'My Account'}</div>
+                <div className="text-[11px] font-semibold text-blue-200/80">{roleLabel} &middot; Account overview</div>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="grid h-9 w-9 place-items-center rounded-xl text-white/70 transition hover:bg-white/15 hover:text-white"
+              aria-label="Close"
+            >
+              <X size={17} />
+            </button>
           </div>
-          <button onClick={onClose} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50">
-            <X size={16} />
-          </button>
         </div>
 
-        <div className="border-b border-slate-100 px-5 py-3">
-          <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1">
-            <button
-              type="button"
-              onClick={() => setActiveTab("profile")}
-              className={`rounded-lg px-3 py-2 text-[13px] font-bold transition ${activeTab === "profile" ? "bg-[#1e3a8a] text-white" : "text-slate-600 hover:bg-slate-50"}`}
-            >
-              Profile
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("settings")}
-              className={`rounded-lg px-3 py-2 text-[13px] font-bold transition ${activeTab === "settings" ? "bg-[#1e3a8a] text-white" : "text-slate-600 hover:bg-slate-50"}`}
-            >
-              Settings
-            </button>
+        {/* ── Tab switcher ── */}
+        <div className="border-b border-slate-100 bg-slate-50/70 px-5 py-3">
+          <div className="relative inline-flex gap-1 rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
+            {['profile', 'settings'].map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className="relative z-10 rounded-xl px-5 py-2 text-[13px] font-bold capitalize transition-all duration-150"
+                style={activeTab === tab
+                  ? { background: 'linear-gradient(135deg,#1e3a8a,#2563eb)', color: 'white', boxShadow: '0 2px 10px #1e3a8a44' }
+                  : { color: '#64748b' }}
+              >
+                {tab}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -273,33 +292,54 @@ export default function ProfilePanel({ open, initialTab = "profile", onClose }) 
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+
+              {/* ── Settings Hub shortcut ── */}
+              <button
+                type="button"
+                onClick={() => { onClose(); navigate('/settings'); }}
+                className="group w-full overflow-hidden rounded-2xl text-left transition-all duration-200 hover:scale-[1.015] hover:shadow-lg"
+                style={{ background: 'linear-gradient(135deg,#1e3a8a 0%,#2563eb 100%)' }}
+              >
+                <div className="relative flex items-center gap-4 px-5 py-4">
+                  <div className="pointer-events-none absolute -right-4 -top-4 h-20 w-20 rounded-full opacity-20" style={{ background: 'radial-gradient(circle,#60a5fa,transparent 70%)' }} />
+                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white/20 backdrop-blur-sm">
+                    <LayoutGrid size={20} className="text-white" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[14px] font-black text-white">Open Settings Hub</div>
+                    <div className="text-[11px] font-medium text-blue-200/80">Users · Custom Fields · Groups · Preferences</div>
+                  </div>
+                  <ExternalLink size={16} className="shrink-0 text-white/60 transition group-hover:text-white" />
+                </div>
+              </button>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md">
                 <div className="flex items-start gap-3">
                   <div className="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-[#1e3a8a]">
                     <Camera size={18} />
                   </div>
                   <div>
                     <div className="text-[15px] font-extrabold text-slate-900">Profile Photo</div>
-                    <div className="mt-1 text-[13px] font-semibold text-slate-500">Every user can manage their own profile photo from this panel.</div>
+                    <div className="mt-1 text-[13px] font-medium text-slate-500">Every user can manage their own profile photo from this panel.</div>
                   </div>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md">
                 <div className="flex items-start gap-3">
                   <div className="grid h-10 w-10 place-items-center rounded-xl bg-amber-50 text-amber-600">
                     <ShieldCheck size={18} />
                   </div>
-                  <div>
-                  <div className="text-[15px] font-extrabold text-slate-900">Protected Account Details</div>
-                  <div className="mt-1 text-[13px] font-semibold text-slate-500">
+                  <div className="flex-1">
+                    <div className="text-[15px] font-extrabold text-slate-900">Protected Account Details</div>
+                    <div className="mt-1 text-[13px] font-medium text-slate-500">
                       Mobile number, role, and account status stay under admin access.
-                  </div>
-                  <div className="mt-4">
-                    {profile?.role === "admin" ? (
-                      <Button onClick={() => { onClose(); navigate("/settings/users"); }}>
-                          <ExternalLink size={16} />
-                          Open User Management
+                    </div>
+                    <div className="mt-4">
+                      {profile?.role === 'admin' ? (
+                        <Button onClick={() => { onClose(); navigate('/settings'); }}>
+                          <Settings2 size={16} />
+                          Open Settings Hub
                         </Button>
                       ) : (
                         <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[12px] font-semibold text-slate-500">
