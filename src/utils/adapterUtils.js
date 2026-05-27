@@ -83,6 +83,9 @@ export function mapTask(task) {
     ftaStatus: task.ftaStatus,
     // Needed so TaskList can gate "Submitted to FTA" to FTA-tracked tasks only (BRD 5.4)
     isAwaitingFta: task.isAwaitingFta ?? false,
+    // Date audit fields — used in TaskList for Created Date & Last Modified Date columns
+    createdAt: task.createdAt ? task.createdAt.slice(0, 10) : null,
+    updatedAt: task.updatedAt ? task.updatedAt.slice(0, 10) : null,
   };
 }
 

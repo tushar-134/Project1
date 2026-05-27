@@ -633,7 +633,10 @@ export default function AddClient() {
     const { accepted: selected, skipped } = uniqueTradeLicenceFiles(files, currentDocuments);
     if (skipped) toast.error(skipped === 1 ? "This trade licence file is already added." : `${skipped} duplicate trade licence files were skipped.`);
     if (!selected.length) return;
-    if (!isEditMode) {
+    // If the licence row hasn't been saved to the DB yet (persisted: false), stage the files
+    // in local state — they'll be uploaded by saveClient() once the record exists.
+    // This is the same staged-upload pattern already used in Add mode.
+    if (!isEditMode || !licence?.persisted) {
       setLicences((current) => current.map((item, index) => index === licenceIndex ? {
         ...item,
         documents: [...(item.documents || []), ...selected.map(toPendingDocument)],
@@ -670,18 +673,21 @@ export default function AddClient() {
     }
     const selected = Array.from(files || []);
     if (!selected.length) return;
+    // Stage files in local state for any unsaved contact row (persisted: false) in both
+    // Add mode and Edit mode — saveClient() will flush them to the API after saving the record.
+    const shouldStage = !isEditMode || !contact?.persisted;
     if (section === "passport") {
       setContacts((current) => current.map((item, index) => index === contactIndex ? {
         ...item,
-        passportDocuments: !isEditMode ? [...(item.passportDocuments || []), ...selected.map(toPendingDocument)] : item.passportDocuments,
+        passportDocuments: shouldStage ? [...(item.passportDocuments || []), ...selected.map(toPendingDocument)] : item.passportDocuments,
       } : item));
     } else {
       setContacts((current) => current.map((item, index) => index === contactIndex ? {
         ...item,
-        eidDocuments: !isEditMode ? [...(item.eidDocuments || []), ...selected.map(toPendingDocument)] : item.eidDocuments,
+        eidDocuments: shouldStage ? [...(item.eidDocuments || []), ...selected.map(toPendingDocument)] : item.eidDocuments,
       } : item));
     }
-    if (!isEditMode) {
+    if (shouldStage) {
       toast.success(`${section === "passport" ? "Passport" : "Emirates ID"} ${selected.length === 1 ? "file" : "files"} added. Save the client to upload ${selected.length === 1 ? "it" : "them"}.`);
       return;
     }

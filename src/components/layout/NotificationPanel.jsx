@@ -47,16 +47,9 @@ export default function NotificationPanel({ open, onClose }) {
   // Which notification ID is being dismissed (CSS animation)
   const [dismissing, setDismissing] = useState(new Set());
 
-  // ── Polling & refresh on open ─────────────────────────────────────────────
-  useEffect(() => {
-    fetchNotifications().catch(() => {});
-    const id = setInterval(() => fetchNotifications().catch(() => {}), 60_000);
-    return () => clearInterval(id);
-  }, []);
-
   useEffect(() => {
     if (open) fetchNotifications().catch(() => {});
-  }, [open]);
+  }, [open, fetchNotifications]);
 
   // ── Click a single notification: read → animate out → navigate → close panel
   function handleNotificationClick(event, item) {

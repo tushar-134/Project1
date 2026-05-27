@@ -262,18 +262,27 @@ export default function ClientVisitForm() {
   }
 
   return (
-    <div className="space-y-5 pb-24">
-      <div className="flex items-start gap-4">
+    <div className="space-y-5">
+      <div className="flex items-center gap-4">
         <button
           type="button"
           onClick={() => navigate("/client-visits")}
-          className="grid h-12 w-12 place-items-center rounded-2xl border border-[#dbe4f0] bg-white text-slate-600 transition hover:bg-slate-50"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-[#dbe4f0] bg-white text-slate-600 transition hover:bg-slate-50"
         >
           <ArrowLeft size={18} />
         </button>
-        <div>
+        <div className="min-w-0 flex-1">
           <div className="page-kicker">Field Operations</div>
           <h1 className="screen-title">{isEditMode ? "Edit Visit" : "Schedule New Visit"}</h1>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button variant="ghost" onClick={() => navigate("/client-visits")} disabled={saving}>
+            Cancel
+          </Button>
+          <Button onClick={saveVisit} disabled={saving}>
+            <Save size={15} />
+            {saving ? (isEditMode ? "Saving..." : "Scheduling...") : (isEditMode ? "Save Changes" : "Schedule Visit")}
+          </Button>
         </div>
       </div>
 
@@ -399,30 +408,27 @@ export default function ClientVisitForm() {
             <div className="mt-1 text-[14px] font-medium text-slate-500">Select one or more users for this visit</div>
           </div>
 
-          <div className="flex shrink-0 flex-wrap gap-2 px-6 py-3">
+          <div className="flex shrink-0 flex-wrap gap-1.5 px-4 py-3">
             {selectedUsers.length ? selectedUsers.map((user) => (
-              <div key={user._id || user.id} className="inline-flex max-w-full items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-2">
-                <UserAvatar user={user} size="sm" className="h-8 w-8 p-0 text-[11px]" />
-                <div className="min-w-0">
-                  <div className="truncate text-[13px] font-black text-slate-900">{user.name}</div>
-                  <div className="truncate text-[11px] font-semibold text-slate-500">{user.role}</div>
-                </div>
+              <div key={user._id || user.id} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-2 py-1">
+                <UserAvatar user={user} size="sm" className="h-6 w-6 p-0 text-[10px]" />
+                <div className="truncate text-[12px] font-bold text-slate-900">{user.name}</div>
                 {currentUser?.role !== "task_only" && (
-                  <button type="button" className="text-[11px] font-black text-slate-500 hover:text-slate-700" onClick={() => toggleAssignedUser(user._id || user.id)}>
-                    Remove
+                  <button type="button" className="text-[11px] font-black text-slate-400 hover:text-slate-700" onClick={() => toggleAssignedUser(user._id || user.id)}>
+                    ×
                   </button>
                 )}
               </div>
             )) : (
-              <div className="rounded-xl border border-dashed border-slate-300 px-3 py-2 text-[12px] font-medium text-slate-500">
+              <div className="rounded-xl border border-dashed border-slate-300 px-3 py-1.5 text-[12px] font-medium text-slate-500">
                 No users assigned yet.
               </div>
             )}
           </div>
 
-          <div className="border-t border-[#e2e8f0] px-6 py-3">
-            <div className="flex h-9 items-center gap-2 rounded-lg border border-[#e2e8f0] bg-white px-3 text-[13px] transition focus-within:ring-2 focus-within:[--tw-ring-color:rgb(30_58_138_/_0.16)] focus-within:border-[#1e3a8a]">
-              <Search className="shrink-0 text-slate-400" size={16} />
+          <div className="border-t border-[#e2e8f0] px-4 py-3">
+            <div className="flex h-8 items-center gap-2 rounded-lg border border-[#e2e8f0] bg-white px-3 text-[13px] transition focus-within:ring-2 focus-within:[--tw-ring-color:rgb(30_58_138_/_0.16)] focus-within:border-[#1e3a8a]">
+              <Search className="shrink-0 text-slate-400" size={14} />
               <input
                 className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[13px] text-slate-900 outline-none placeholder:text-slate-400"
                 value={userSearch}
@@ -432,8 +438,8 @@ export default function ClientVisitForm() {
             </div>
           </div>
 
-          <div className="h-[180px] overflow-y-auto px-6 pb-4 md:h-[210px] lg:h-[240px]">
-            <div className="space-y-2">
+          <div className="h-[180px] overflow-y-auto px-4 pb-4 md:h-[210px] lg:h-[240px]">
+            <div className="space-y-1">
               {userOptions.map((user) => {
                 const userId = user._id || user.id;
                 const checked = form.assignedUsers.includes(userId);
@@ -443,33 +449,20 @@ export default function ClientVisitForm() {
                     type="button"
                     onClick={() => toggleAssignedUser(userId)}
                     disabled={currentUser?.role === "task_only"}
-                    className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-3 text-left transition ${
+                    className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-left transition ${
                       checked ? "border-blue-200 bg-blue-50" : "border-transparent bg-white hover:border-[#dbe4f0] hover:bg-slate-50"
                     } ${currentUser?.role === "task_only" ? "cursor-default" : ""}`}
                   >
-                    <UserAvatar user={user} size="sm" className="h-10 w-10 p-0 text-[12px]" />
+                    <UserAvatar user={user} size="sm" className="h-8 w-8 shrink-0 p-0 text-[11px]" />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[14px] font-black text-slate-900">{user.name}</div>
-                      <div className="truncate text-[12px] font-semibold text-slate-500">{user.role}</div>
+                      <div className="truncate text-[13px] font-bold text-slate-900">{user.name}</div>
                     </div>
-                    <div className={`grid h-5 w-5 place-items-center rounded-full border ${checked ? "border-[#1e3a8a] bg-[#1e3a8a] text-white" : "border-slate-300 bg-white text-transparent"}`}>
-                      <UsersRound size={11} />
+                    <div className={`grid h-4 w-4 shrink-0 place-items-center rounded-full border ${checked ? "border-[#1e3a8a] bg-[#1e3a8a] text-white" : "border-slate-300 bg-white text-transparent"}`}>
+                      <UsersRound size={9} />
                     </div>
                   </button>
                 );
               })}
-            </div>
-          </div>
-
-          <div className="mt-auto border-t border-[#e2e8f0] bg-white/95 px-5 py-4 shadow-[0_-12px_30px_rgba(15,23,42,0.08)] backdrop-blur">
-            <div className="flex flex-col gap-3">
-              <Button onClick={saveVisit} disabled={saving}>
-                <Save size={16} />
-                {saving ? (isEditMode ? "Saving..." : "Scheduling...") : (isEditMode ? "Save Changes" : "Schedule Visit")}
-              </Button>
-              <Button variant="ghost" onClick={() => navigate("/client-visits")} disabled={saving}>
-                Cancel
-              </Button>
             </div>
           </div>
         </Card>

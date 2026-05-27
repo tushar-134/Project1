@@ -5,9 +5,17 @@ import ProfilePanel from "./ProfilePanel.jsx";
 import ExpiryAlertPanel from "./ExpiryAlertPanel.jsx";
 import { useAuth } from "../../context/AuthContext";
 import { useApp } from "../../context/AppContext";
+import { useNotifications } from "../../hooks/useNotifications";
+import { clientService } from "../../services/clientService";
 import { ROLE_LABELS } from "../../utils/permissions.js";
 import ClientDrawer from "../ui/ClientDrawer.jsx";
 import UserAvatar from "../ui/UserAvatar.jsx";
+
+const POLL_INTERVAL_MS = 60_000;
+const OPEN_REFRESH_STALE_MS = 30_000;
+const LEADER_KEY = "project1:topbar-poll-leader";
+const LEADER_TTL_MS = 75_000;
+const LEADER_HEARTBEAT_MS = 15_000;
 
 export default function TopBar({ title, onMenuClick }) {
   const [open, setOpen] = useState(false);
@@ -21,8 +29,119 @@ export default function TopBar({ title, onMenuClick }) {
   const menuRef = useRef(null);
   const { currentUser } = useAuth();
   const { state } = useApp();
+  const { fetchNotifications } = useNotifications();
   const roleLabel = ROLE_LABELS[currentUser?.role] || currentUser?.role || "User";
   const [expirySummary, setExpirySummary] = useState({ total: 0, expiredCount: 0, expiringSoonCount: 0 });
+  const [expiryPayload, setExpiryPayload] = useState({ alerts: [], expiredCount: 0, expiringSoonCount: 0, total: 0 });
+  const [expiryLoading, setExpiryLoading] = useState(false);
+  const [expiryError, setExpiryError] = useState("");
+  const notificationsBusyRef = useRef(false);
+  const expiryBusyRef = useRef(false);
+  const lastNotificationsFetchRef = useRef(0);
+  const lastExpiryFetchRef = useRef(0);
+  const tabIdRef = useRef(
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `tab-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  );
+  const [, setIsPollLeader] = useState(false);
+
+  function readLeaderLease() {
+    try {
+      const raw = window.localStorage.getItem(LEADER_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function writeLeaderLease() {
+    const lease = {
+      id: tabIdRef.current,
+      expiresAt: Date.now() + LEADER_TTL_MS,
+    };
+    try {
+      window.localStorage.setItem(LEADER_KEY, JSON.stringify(lease));
+    } catch {
+      return null;
+    }
+    return lease;
+  }
+
+  function releaseLeaderLease() {
+    const currentLease = readLeaderLease();
+    if (currentLease?.id === tabIdRef.current) {
+      try {
+        window.localStorage.removeItem(LEADER_KEY);
+      } catch {
+        // Ignore storage failures during unload.
+      }
+    }
+  }
+
+  function syncLeaderState() {
+    if (typeof window === "undefined") return false;
+    const now = Date.now();
+    const currentLease = readLeaderLease();
+    let nextLease = currentLease;
+
+    if (!currentLease || currentLease.expiresAt <= now || currentLease.id === tabIdRef.current) {
+      nextLease = writeLeaderLease() || currentLease;
+    }
+
+    const ownsLease = Boolean(nextLease?.id === tabIdRef.current && nextLease.expiresAt > now);
+    setIsPollLeader(ownsLease);
+    return ownsLease;
+  }
+
+  async function refreshNotifications({ force = false, minAge = 0 } = {}) {
+    if (notificationsBusyRef.current) return;
+    if (!force && Date.now() - lastNotificationsFetchRef.current < minAge) return;
+    notificationsBusyRef.current = true;
+    try {
+      await fetchNotifications();
+      lastNotificationsFetchRef.current = Date.now();
+    } finally {
+      notificationsBusyRef.current = false;
+    }
+  }
+
+  async function refreshExpiryAlerts({ force = false, minAge = 0 } = {}) {
+    if (expiryBusyRef.current) return;
+    if (!force && Date.now() - lastExpiryFetchRef.current < minAge) return;
+    expiryBusyRef.current = true;
+    setExpiryLoading(true);
+    setExpiryError("");
+    try {
+      const data = await clientService.expiryAlerts();
+      setExpiryPayload(data);
+      setExpirySummary(data);
+      lastExpiryFetchRef.current = Date.now();
+    } catch {
+      setExpiryError("Unable to load expiry alerts.");
+    } finally {
+      expiryBusyRef.current = false;
+      setExpiryLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    function onStorage(event) {
+      if (event.key === LEADER_KEY) syncLeaderState();
+    }
+
+    syncLeaderState();
+    window.addEventListener("storage", onStorage);
+    const heartbeatId = window.setInterval(() => {
+      if (document.visibilityState === "visible") syncLeaderState();
+    }, LEADER_HEARTBEAT_MS);
+
+    return () => {
+      window.clearInterval(heartbeatId);
+      window.removeEventListener("storage", onStorage);
+      releaseLeaderLease();
+    };
+  }, []);
 
   useEffect(() => {
     // Clicking outside the bell/panel cluster should close notifications without affecting the rest of the page.
@@ -34,6 +153,31 @@ export default function TopBar({ title, onMenuClick }) {
     document.addEventListener("pointerdown", onPointerDown);
     return () => document.removeEventListener("pointerdown", onPointerDown);
   }, []);
+
+  useEffect(() => {
+    function refreshVisibleData() {
+      if (document.visibilityState !== "visible") return;
+      if (!syncLeaderState()) return;
+      refreshNotifications({ minAge: OPEN_REFRESH_STALE_MS }).catch(() => {});
+      refreshExpiryAlerts({ minAge: OPEN_REFRESH_STALE_MS }).catch(() => {});
+    }
+
+    refreshVisibleData();
+    const id = window.setInterval(refreshVisibleData, POLL_INTERVAL_MS);
+    document.addEventListener("visibilitychange", refreshVisibleData);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", refreshVisibleData);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (open) refreshNotifications({ minAge: OPEN_REFRESH_STALE_MS }).catch(() => {});
+  }, [open]);
+
+  useEffect(() => {
+    if (expiryOpen) refreshExpiryAlerts({ minAge: OPEN_REFRESH_STALE_MS }).catch(() => {});
+  }, [expiryOpen]);
 
   return (
     <header className="relative flex min-h-[52px] shrink-0 items-center justify-between gap-3 border-b border-[#e2e8f0] bg-white px-3 py-2 sm:px-4 lg:px-6">
@@ -60,8 +204,10 @@ export default function TopBar({ title, onMenuClick }) {
           <ExpiryAlertPanel
             open={expiryOpen}
             onClose={() => setExpiryOpen(false)}
-            onSummaryChange={setExpirySummary}
             onOpenClient={(clientId) => setDrawerClientId(clientId)}
+            payload={expiryPayload}
+            loading={expiryLoading}
+            error={expiryError}
           />
         </div>
         <button onClick={() => setOpen((v) => !v)} className="relative grid h-9 w-9 place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-600 hover:bg-slate-50" aria-label="Notifications" aria-expanded={open}>

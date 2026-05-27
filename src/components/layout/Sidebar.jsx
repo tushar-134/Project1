@@ -1,10 +1,10 @@
 import { NavLink } from "react-router-dom";
 import { useEffect } from "react";
-import { X, Boxes, ClipboardList, ContactRound, FilePlus2, Files, LayoutDashboard, LogOut, Upload, Users, UserRoundPlus, Folders, PieChart, Landmark, Settings2, MapPinned } from "lucide-react";
+import { X, ClipboardList, ContactRound, FilePlus2, Files, LayoutDashboard, LogOut, Upload, UserRoundPlus, PieChart, Landmark, Settings2, MapPinned } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useApp } from "../../context/AppContext";
 import { useTasks } from "../../hooks/useTasks";
-import { canCreateClients, canManageCategories, canManageClients, canManageGroups, canManageUsers, canManageTasks, canViewClientVisits, canViewContacts, canViewFtaTracker, canViewReports, canViewUsers, ROLE_LABELS } from "../../utils/permissions.js";
+import { canCreateClients, canManageCategories, canManageGroups, canManageClients, canManageTasks, canViewClientVisits, canViewContacts, canViewFtaTracker, canViewReports, canViewUsers, ROLE_LABELS } from "../../utils/permissions.js";
 import UserAvatar from "../ui/UserAvatar.jsx";
 
 export const navItems = [
@@ -18,15 +18,12 @@ export const navItems = [
     { label: "Add Task", to: "/tasks/add", icon: FilePlus2 },
     { label: "Task List", to: "/tasks/list", icon: ClipboardList },
     { label: "FTA Tracker", to: "/tasks/fta-tracker", icon: Landmark, badge: "3" },
-    { label: "Categories & Types", to: "/tasks/categories", icon: Boxes },
   ]},
   { section: "Field Operations", links: [
     { label: "Client Visits", to: "/client-visits", icon: MapPinned },
   ]},
   { section: "Settings", links: [
-    { label: "Users", to: "/settings/users", icon: Users },
-    { label: "Custom Fields", to: "/settings/custom-fields", icon: Settings2 },
-    { label: "Client Groups", to: "/settings/groups", icon: Folders },
+    { label: "Settings", to: "/settings", icon: Settings2 },
     { label: "Reports", to: "/reports", icon: PieChart },
   ]},
   { section: "Contacts", links: [
@@ -56,14 +53,8 @@ export default function Sidebar({ open = false, onClose = () => {}, mobile = fal
             return canManageTasks(role);
           case "/tasks/fta-tracker":
             return canViewFtaTracker(role);
-          case "/tasks/categories":
-            return canManageCategories(role);
-          case "/settings/users":
-            return canViewUsers(role);
-          case "/settings/custom-fields":
-            return canManageCategories(role); // Admins only
-          case "/settings/groups":
-            return canManageGroups(role);
+          case "/settings":
+            return canViewUsers(role) || canManageCategories(role) || canManageGroups(role);
           case "/reports":
             return canViewReports(role);
           case "/contacts":
