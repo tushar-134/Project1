@@ -1,4 +1,4 @@
-import { Download, Pencil, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
+import { Columns, Download, Pencil, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -12,6 +12,32 @@ import Card from "../ui/Card.jsx";
 import ClientDrawer from "../ui/ClientDrawer.jsx";
 import Table from "../ui/Table.jsx";
 
+// ─── Column definitions ────────────────────────────────────────────────────
+// key         : stable id used as the export "columns" param and visibility key
+// label       : header label shown in the table
+// defaultOn   : whether the column is visible by default
+// description : short tooltip / subtitle in the column picker
+const COLUMN_DEFS = [
+  { key: "client",    label: "Client",        defaultOn: true,  description: "Name, type & jurisdiction" },
+  { key: "group",     label: "Group",         defaultOn: true,  description: "Client group membership" },
+  { key: "compliance",label: "Compliance",    defaultOn: true,  description: "Licence & VAT TRN" },
+  { key: "contact",   label: "Contact",       defaultOn: true,  description: "Primary contact details" },
+  { key: "createdAt", label: "Created Date",  defaultOn: false, description: "Date the client was added" },
+  { key: "createdBy", label: "Created By",    defaultOn: false, description: "Staff member who created the client" },
+];
+
+// Keys that map to table columns the server knows about for CSV export.
+// The "client" key maps to several server columns (name, jurisdiction, type).
+const EXPORT_KEY_MAP = {
+  client:     ["fileNo", "name", "jurisdiction", "type"],
+  group:      ["group"],
+  compliance: ["vatTrn"],
+  contact:    [], // contact info is not in the server export – omit silently
+  createdAt:  ["createdAt"],
+  createdBy:  ["createdBy"],
+};
+
+// ─── Filter helpers ────────────────────────────────────────────────────────
 const EMPTY_COLUMN_FILTERS = {
   client: "",
   jurisdiction: "",
@@ -21,15 +47,8 @@ const EMPTY_COLUMN_FILTERS = {
   contact: "",
 };
 const PAGE_SIZE = 20;
-const CLIENT_TABLE_COLUMNS = 5; // Client, Group, Compliance, Contact, Actions
 
-const JURISDICTION_OPTIONS = [
-  "Mainland",
-  "Free Zone",
-  "Designated Zone",
-  "Offshore",
-];
-
+const JURISDICTION_OPTIONS = ["Mainland", "Free Zone", "Designated Zone", "Offshore"];
 const TYPE_OPTIONS = ["Legal Person", "Natural Person"];
 
 function buildActiveFilterSummary(columnFilters, query) {
@@ -44,12 +63,20 @@ function buildActiveFilterSummary(columnFilters, query) {
   return chips;
 }
 
+function formatDate(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}-${d.getFullYear()}`;
+}
+
+// ─── Sub-components ────────────────────────────────────────────────────────
 function InfoPill({ tone, label }) {
   const tones = {
-    navy: "bg-[#dbe7ff] text-[#1e3a8a]",
+    navy:  "bg-[#dbe7ff] text-[#1e3a8a]",
     slate: "bg-slate-100 text-slate-600",
     amber: "bg-amber-100 text-amber-700",
-    blue: "bg-blue-50 text-blue-700",
+    blue:  "bg-blue-50 text-blue-700",
     green: "bg-emerald-50 text-emerald-700",
   };
   return (
@@ -80,6 +107,111 @@ function LoadingRows({ columns }) {
   ));
 }
 
+// ─── Column Customizer Popover ─────────────────────────────────────────────
+function ColumnCustomizer({ visibility, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  // Close when clicking outside
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  const visibleCount = Object.values(visibility).filter(Boolean).length;
+
+  return (
+    <div ref={ref} className="relative">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setOpen((prev) => !prev)}
+        aria-expanded={open}
+        aria-haspopup="true"
+        id="col-customizer-btn"
+      >
+        <Columns size={15} />
+        Columns
+        {visibleCount < COLUMN_DEFS.length && (
+          <span className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#1e3a8a] text-[9px] font-extrabold text-white">
+            {visibleCount}
+          </span>
+        )}
+      </Button>
+
+      {open && (
+        <div
+          role="dialog"
+          aria-label="Customize visible columns"
+          className="absolute right-0 top-full z-50 mt-2 w-72 rounded-2xl border border-slate-200 bg-white shadow-xl"
+          style={{ boxShadow: "0 8px 32px rgba(30,58,138,0.12)" }}
+        >
+          <div className="border-b border-slate-100 px-4 py-3">
+            <div className="text-[13px] font-extrabold text-slate-900">Visible Columns</div>
+            <div className="mt-0.5 text-[11px] font-medium text-slate-500">
+              Toggle columns shown in the table and exported to CSV.
+            </div>
+          </div>
+          <ul className="px-3 py-3 space-y-1">
+            {COLUMN_DEFS.map((col) => {
+              const checked = visibility[col.key] ?? col.defaultOn;
+              return (
+                <li key={col.key}>
+                  <label
+                    htmlFor={`col-toggle-${col.key}`}
+                    className="flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2 hover:bg-slate-50 transition-colors"
+                  >
+                    <input
+                      id={`col-toggle-${col.key}`}
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => onChange(col.key, e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 accent-[#1e3a8a]"
+                    />
+                    <span className="flex-1">
+                      <span className="block text-[12px] font-bold text-slate-800">{col.label}</span>
+                      <span className="block text-[11px] font-medium text-slate-400">{col.description}</span>
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="border-t border-slate-100 px-4 py-3 flex justify-between">
+            <button
+              type="button"
+              className="text-[11px] font-bold text-[#1e3a8a] hover:underline"
+              onClick={() => {
+                const all = {};
+                COLUMN_DEFS.forEach((c) => { all[c.key] = true; });
+                COLUMN_DEFS.forEach((c) => onChange(c.key, true));
+                // bulk reset — call onChange for each
+              }}
+            >
+              Show all
+            </button>
+            <button
+              type="button"
+              className="text-[11px] font-bold text-slate-500 hover:underline"
+              onClick={() => {
+                // Reset to defaults
+                COLUMN_DEFS.forEach((c) => onChange(c.key, c.defaultOn));
+              }}
+            >
+              Reset to defaults
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main component ────────────────────────────────────────────────────────
 export default function ClientList() {
   const { state } = useApp();
   const { currentUser } = useAuth();
@@ -91,12 +223,30 @@ export default function ClientList() {
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1, workingTasksTotal: 0 });
   const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
   const [drawerClientId, setDrawerClientId] = useState(null);
+
+  // Column visibility state: key → boolean. Undefined means "use defaultOn".
+  const [colVisibility, setColVisibility] = useState(() => {
+    const init = {};
+    COLUMN_DEFS.forEach((c) => { init[c.key] = c.defaultOn; });
+    return init;
+  });
+
   const canManage = canManageClients(currentUser?.role);
   const canCreate = canCreateClients(currentUser?.role);
   const clientsLoading = Boolean(state.loading.clients);
   const clientError = state.errors.clients;
   const deferredQuery = useDeferredValue(query);
   const deferredColumnFilters = useDeferredValue(columnFilters);
+
+  // Visible columns list (ordered by COLUMN_DEFS order)
+  const visibleColumns = useMemo(
+    () => COLUMN_DEFS.filter((c) => colVisibility[c.key] !== false),
+    [colVisibility]
+  );
+  const isVisible = useCallback((key) => colVisibility[key] !== false, [colVisibility]);
+
+  // Total visible columns count for colspan (client + optional cols + actions)
+  const tableColSpan = visibleColumns.length + (canManage ? 1 : 0);
 
   const requestParams = useMemo(() => ({
     page,
@@ -140,8 +290,6 @@ export default function ClientList() {
   const hasColumnFilters = Object.values(columnFilters).some(Boolean);
   const hasActiveFilters = Boolean(query.trim()) || hasColumnFilters;
   const activeFilterCount = activeColumnFilters.length;
-
-  // Counts derived from current page rows
   const workingCount = rows.filter((c) => (c.activeTasks || 0) > 0).length;
 
   const updateColumnFilter = (key, value) => {
@@ -161,17 +309,27 @@ export default function ClientList() {
     setColumnFilters(EMPTY_COLUMN_FILTERS);
   };
 
-  const exportCsv = async () => downloadBlob(await exportClients({
-    search: deferredQuery.trim() || undefined,
-    client: deferredColumnFilters.client.trim() || undefined,
-    jurisdiction: deferredColumnFilters.jurisdiction || undefined,
-    type: deferredColumnFilters.type || undefined,
-    group: deferredColumnFilters.group.trim() || undefined,
-    compliance: deferredColumnFilters.compliance.trim() || undefined,
-    contact: deferredColumnFilters.contact.trim() || undefined,
-  }), "clients.csv");
+  const updateColVisibility = useCallback((key, value) => {
+    setColVisibility((prev) => ({ ...prev, [key]: value }));
+  }, []);
 
-  const tableColSpan = canManage ? 5 : 4;
+  // Build the `columns` param for the CSV export — only server-mappable keys that are visible
+  const exportCsv = async () => {
+    const serverCols = visibleColumns
+      .flatMap((c) => EXPORT_KEY_MAP[c.key] || [])
+      .filter(Boolean);
+    const params = {
+      search: deferredQuery.trim() || undefined,
+      client: deferredColumnFilters.client.trim() || undefined,
+      jurisdiction: deferredColumnFilters.jurisdiction || undefined,
+      type: deferredColumnFilters.type || undefined,
+      group: deferredColumnFilters.group.trim() || undefined,
+      compliance: deferredColumnFilters.compliance.trim() || undefined,
+      contact: deferredColumnFilters.contact.trim() || undefined,
+      columns: serverCols.join(",") || undefined,
+    };
+    downloadBlob(await exportClients(params), "clients.csv");
+  };
 
   return (
     <div className="space-y-5">
@@ -245,6 +403,9 @@ export default function ClientList() {
             </label>
 
             <div className="flex flex-wrap items-center gap-2 pb-0.5">
+              {/* Column customizer */}
+              <ColumnCustomizer visibility={colVisibility} onChange={updateColVisibility} />
+
               <Button variant="ghost" size="sm" onClick={refetchClients} disabled={clientsLoading}>
                 <RefreshCw size={15} className={clientsLoading ? "animate-spin" : ""} />
                 Refresh
@@ -383,11 +544,13 @@ export default function ClientList() {
         <Table>
           <thead>
             <tr>
-              <th>Client</th>
-              <th>Group</th>
-              <th>Compliance</th>
-              <th>Contact Details</th>
-              {canManage && <th>Actions</th>}
+              {isVisible("client")     && <th>Client</th>}
+              {isVisible("group")      && <th>Group</th>}
+              {isVisible("compliance") && <th>Compliance</th>}
+              {isVisible("contact")    && <th>Contact Details</th>}
+              {isVisible("createdAt")  && <th>Created Date</th>}
+              {isVisible("createdBy")  && <th>Created By</th>}
+              {canManage               && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -430,41 +593,61 @@ export default function ClientList() {
 
             {!clientsLoading && !clientError && rows.map((client) => (
               <tr key={client.id}>
-                <td>
-                  <button
-                    type="button"
-                    className="task-id-link font-extrabold text-left"
-                    onClick={() => setDrawerClientId(client.id)}
-                    title="Open client details"
-                  >
-                    {client.name}
-                  </button>
-                  <div className="mt-1 flex flex-wrap gap-2">
-                    <span className="text-[12px] font-semibold text-slate-500">{client.jurisdiction}</span>
-                    <Badge color={client.type === "Legal Person" ? "bg-blue-50 text-[#1e3a8a]" : "bg-emerald-50 text-[#059669]"}>
-                      {client.type}
-                    </Badge>
-                    {client.activeTasks > 0 && (
-                      <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-extrabold text-amber-700">
-                        {client.activeTasks} active {client.activeTasks === 1 ? "task" : "tasks"}
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td>{client.group ? <span className="rounded-full bg-purple-50 px-2 py-1 text-[11px] font-extrabold text-[#7c3aed]">{client.group}</span> : "-"}</td>
-                <td>
-                  <div className="space-y-1">
-                    <div><span className="font-semibold text-slate-500">Licence:</span> {client.licence || "-"}</div>
-                    <div><span className="font-semibold text-slate-500">VAT TRN:</span> {client.vatTrn || "-"}</div>
-                  </div>
-                </td>
-                <td>
-                  <div className="space-y-1">
-                    <div><span className="font-semibold text-slate-500">Contact:</span> <span className="font-semibold text-slate-800">{client.contact || "-"}</span></div>
-                    <div className="text-[12px] text-slate-500"><span className="font-semibold">Phone No:</span> {client.mobile || "-"}</div>
-                    <div className="text-[12px] text-slate-500 break-all"><span className="font-semibold">Email:</span> {client.email || "-"}</div>
-                  </div>
-                </td>
+                {isVisible("client") && (
+                  <td>
+                    <button
+                      type="button"
+                      className="task-id-link font-extrabold text-left"
+                      onClick={() => setDrawerClientId(client.id)}
+                      title="Open client details"
+                    >
+                      {client.name}
+                    </button>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      <span className="text-[12px] font-semibold text-slate-500">{client.jurisdiction}</span>
+                      <Badge color={client.type === "Legal Person" ? "bg-blue-50 text-[#1e3a8a]" : "bg-emerald-50 text-[#059669]"}>
+                        {client.type}
+                      </Badge>
+                      {client.activeTasks > 0 && (
+                        <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-extrabold text-amber-700">
+                          {client.activeTasks} active {client.activeTasks === 1 ? "task" : "tasks"}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                )}
+                {isVisible("group") && (
+                  <td>{client.group ? <span className="rounded-full bg-purple-50 px-2 py-1 text-[11px] font-extrabold text-[#7c3aed]">{client.group}</span> : "—"}</td>
+                )}
+                {isVisible("compliance") && (
+                  <td>
+                    <div className="space-y-1">
+                      <div><span className="font-semibold text-slate-500">Licence:</span> {client.licence || "—"}</div>
+                      <div><span className="font-semibold text-slate-500">VAT TRN:</span> {client.vatTrn || "—"}</div>
+                    </div>
+                  </td>
+                )}
+                {isVisible("contact") && (
+                  <td>
+                    <div className="space-y-1">
+                      <div><span className="font-semibold text-slate-500">Contact:</span> <span className="font-semibold text-slate-800">{client.contact || "—"}</span></div>
+                      <div className="text-[12px] text-slate-500"><span className="font-semibold">Phone No:</span> {client.mobile || "—"}</div>
+                      <div className="text-[12px] text-slate-500 break-all"><span className="font-semibold">Email:</span> {client.email || "—"}</div>
+                    </div>
+                  </td>
+                )}
+                {isVisible("createdAt") && (
+                  <td>
+                    <span className="text-[12px] font-semibold text-slate-700">{formatDate(client.createdAt)}</span>
+                  </td>
+                )}
+                {isVisible("createdBy") && (
+                  <td>
+                    {client.createdByName
+                      ? <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-700">{client.createdByName}</span>
+                      : <span className="text-[12px] text-slate-400">—</span>}
+                  </td>
+                )}
                 {canManage && (
                   <td>
                     <div className="flex gap-1">
