@@ -1,4 +1,4 @@
-import { Download, RefreshCw, Search, X } from "lucide-react";
+import { Columns, Download, RefreshCw, Search, X } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -12,6 +12,19 @@ import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import Table from "../ui/Table.jsx";
 import TaskDrawer from "../ui/TaskDrawer.jsx";
+
+const COLUMN_DEFS = [
+  { key: "taskId", label: "Task ID", defaultOn: true, description: "Unique task identifier" },
+  { key: "client", label: "Client", defaultOn: true, description: "Client name" },
+  { key: "category", label: "Category", defaultOn: true, description: "Task category (e.g. VAT)" },
+  { key: "type", label: "Task Type", defaultOn: true, description: "Specific task type" },
+  { key: "dueDate", label: "Due Date", defaultOn: true, description: "Task deadline" },
+  { key: "assigned", label: "Assigned", defaultOn: true, description: "Staff member assigned" },
+  { key: "status", label: "Status", defaultOn: true, description: "Current task status" },
+  { key: "recurring", label: "Recurring", defaultOn: false, description: "Whether task repeats" },
+  { key: "createdAt", label: "Created Date", defaultOn: false, description: "When task was created" },
+  { key: "updatedAt", label: "Last Modified", defaultOn: false, description: "When task was last updated" },
+];
 
 const ALL_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed"];
 const BASE_STATUSES = ["Not Yet Started", "WIP", "Completed"]; // for non-FTA tasks
@@ -108,6 +121,23 @@ export default function TaskList() {
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1 });
   const [columnFilters, setColumnFilters] = useState(() => createEmptyColumnFilters());
+  const [colVisibility, setColVisibility] = useState(() => {
+    const init = {};
+    COLUMN_DEFS.forEach((c) => { init[c.key] = c.defaultOn; });
+    return init;
+  });
+
+  const visibleColumns = useMemo(
+    () => COLUMN_DEFS.filter((c) => colVisibility[c.key] !== false),
+    [colVisibility]
+  );
+  const isVisible = useCallback((key) => colVisibility[key] !== false, [colVisibility]);
+  const tableColSpan = visibleColumns.length;
+
+  const updateColVisibility = useCallback((key, value) => {
+    setColVisibility((prev) => ({ ...prev, [key]: value }));
+  }, []);
+
   const deferredColumnFilters = useDeferredValue(columnFilters);
 
   const canManage = canManageTasks(currentUser?.role);
@@ -202,89 +232,103 @@ export default function TaskList() {
 
     return (
       <tr key={task.id}>
-        <td className="font-extrabold text-[#1e3a8a]">
-          <button
-            className="task-id-link"
-            onClick={() => (canManage ? setDrawerTaskId(task.id) : navigate(`/tasks/${task.id}`))}
-            title={canManage ? "Open task details" : "View task details"}
-          >
-            {task.taskId}
-          </button>
-        </td>
-        <td>{task.client}</td>
-        <td>
-          <Badge>{task.category}</Badge>
-        </td>
-        <td>{task.type}</td>
-        <td>
-          <div>{task.dueDate}</div>
-          {task.overdueDays > 0 && (
-            <span className="mt-1 inline-flex rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-extrabold text-[#dc2626]">
-              {task.overdueDays}d overdue
-            </span>
-          )}
-        </td>
-        <td>
-          {canManage ? (
-            <select
-              id={`task-assignee-${task.id}`}
-              className="input h-8 min-w-36"
-              value={task.assignedId || ""}
-              onChange={(event) => {
-                const selected = state.users.find((user) => user._id === event.target.value || user.id === event.target.value);
-                updateAssignee(task.id, event.target.value || null, selected?.name || "Unassigned")
-                  .catch(() => refetchTasks());
-              }}
+        {isVisible("taskId") && (
+          <td className="font-extrabold text-[#1e3a8a]">
+            <button
+              className="task-id-link"
+              onClick={() => (canManage ? setDrawerTaskId(task.id) : navigate(`/tasks/${task.id}`))}
+              title={canManage ? "Open task details" : "View task details"}
             >
-              <option value="">Unassigned</option>
-              {state.users.map((user) => (
-                <option key={user._id || user.id} value={user._id || user.id}>
-                  {user.name}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <span>{task.assigned}</span>
-          )}
-        </td>
-        <td>
-          {canChangeStatus && !isStatusLocked ? (
-            <select
-              id={`task-status-${task.id}`}
-              name={`taskStatus${task.id}`}
-              className="input h-8 min-w-40"
-              value={task.displayStatus ?? task.status}
-              onChange={(event) =>
-                updateStatus(task.id, event.target.value)
-                  .then(() => refetchTasks())
-                  .catch(() => refetchTasks())
-              }
-            >
-              {ALL_STATUSES.map((item) => (
-                <option key={item}>{item}</option>
-              ))}
-            </select>
-          ) : (
-            <StatusPill status={task.status} />
-          )}
-        </td>
-        <td>
-          {task.recurring ? (
-            <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-extrabold text-[#1e3a8a]">
-              Recurring
-            </span>
-          ) : (
-            <span className="text-[12px] font-semibold text-slate-500">One-time</span>
-          )}
-        </td>
-        {/* Created Date */}
-        <td>
-          <span className="text-[12px] text-slate-600">{formatDate(task.createdAt)}</span>
-        </td>
-        {/* Last Modified Date */}
-        <td>
-          <span className="text-[12px] text-slate-600">{formatDate(task.updatedAt)}</span>
-        </td>
+              {task.taskId}
+            </button>
+          </td>
+        )}
+        {isVisible("client") && <td>{task.client}</td>}
+        {isVisible("category") && (
+          <td>
+            <Badge>{task.category}</Badge>
+          </td>
+        )}
+        {isVisible("type") && <td>{task.type}</td>}
+        {isVisible("dueDate") && (
+          <td>
+            <div>{task.dueDate}</div>
+            {task.overdueDays > 0 && (
+              <span className="mt-1 inline-flex rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-extrabold text-[#dc2626]">
+                {task.overdueDays}d overdue
+              </span>
+            )}
+          </td>
+        )}
+        {isVisible("assigned") && (
+          <td>
+            {canManage ? (
+              <select
+                id={`task-assignee-${task.id}`}
+                className="input h-8 min-w-36"
+                value={task.assignedId || ""}
+                onChange={(event) => {
+                  const selected = state.users.find((user) => user._id === event.target.value || user.id === event.target.value);
+                  updateAssignee(task.id, event.target.value || null, selected?.name || "Unassigned")
+                    .catch(() => refetchTasks());
+                }}
+              >
+                <option value="">Unassigned</option>
+                {state.users.map((user) => (
+                  <option key={user._id || user.id} value={user._id || user.id}>
+                    {user.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span>{task.assigned}</span>
+            )}
+          </td>
+        )}
+        {isVisible("status") && (
+          <td>
+            {canChangeStatus && !isStatusLocked ? (
+              <select
+                id={`task-status-${task.id}`}
+                name={`taskStatus${task.id}`}
+                className="input h-8 min-w-40"
+                value={task.displayStatus ?? task.status}
+                onChange={(event) =>
+                  updateStatus(task.id, event.target.value)
+                    .then(() => refetchTasks())
+                    .catch(() => refetchTasks())
+                }
+              >
+                {ALL_STATUSES.map((item) => (
+                  <option key={item}>{item}</option>
+                ))}
+              </select>
+            ) : (
+              <StatusPill status={task.status} />
+            )}
+          </td>
+        )}
+        {isVisible("recurring") && (
+          <td>
+            {task.recurring ? (
+              <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-extrabold text-[#1e3a8a]">
+                Recurring
+              </span>
+            ) : (
+              <span className="text-[12px] font-semibold text-slate-500">One-time</span>
+            )}
+          </td>
+        )}
+        {isVisible("createdAt") && (
+          <td>
+            <span className="text-[12px] text-slate-600">{formatDate(task.createdAt)}</span>
+          </td>
+        )}
+        {isVisible("updatedAt") && (
+          <td>
+            <span className="text-[12px] text-slate-600">{formatDate(task.updatedAt)}</span>
+          </td>
+        )}
       </tr>
     );
   };
@@ -338,6 +382,8 @@ export default function TaskList() {
                 }}
               />
             </label>
+
+            <ColumnCustomizer visibility={colVisibility} onChange={updateColVisibility} />
 
             <Button variant="ghost" size="sm" onClick={refetchTasks} disabled={tasksLoading}>
               <RefreshCw size={14} className={tasksLoading ? "animate-spin" : ""} />
@@ -572,6 +618,8 @@ export default function TaskList() {
           emptyDescription="Adjust a filter or create a new task to start filling this list."
           onReset={resetAllFilters}
           onRetry={refetchTasks}
+          isVisible={isVisible}
+          tableColSpan={tableColSpan}
         >
           {rows.map(renderTaskRow)}
         </TaskTableState>
@@ -615,29 +663,29 @@ function TaskSection({ title, subtitle, accentClassName, children }) {
   );
 }
 
-function TaskTableState({ tasks, tasksLoading, taskError, hasActiveFilters, emptyTitle, emptyDescription, onReset, onRetry, children }) {
+function TaskTableState({ tasks, tasksLoading, taskError, hasActiveFilters, emptyTitle, emptyDescription, onReset, onRetry, isVisible, tableColSpan, children }) {
   return (
     <Table className="task-list-table">
       <thead>
         <tr>
-          <th>Task ID</th>
-          <th>Client</th>
-          <th>Category</th>
-          <th>Task Type</th>
-          <th>Due Date</th>
-          <th>Assigned</th>
-          <th>Status</th>
-          <th>Recurring</th>
-          <th>Created Date</th>
-          <th>Last Modified</th>
+          {isVisible("taskId") && <th>Task ID</th>}
+          {isVisible("client") && <th>Client</th>}
+          {isVisible("category") && <th>Category</th>}
+          {isVisible("type") && <th>Task Type</th>}
+          {isVisible("dueDate") && <th>Due Date</th>}
+          {isVisible("assigned") && <th>Assigned</th>}
+          {isVisible("status") && <th>Status</th>}
+          {isVisible("recurring") && <th>Recurring</th>}
+          {isVisible("createdAt") && <th>Created Date</th>}
+          {isVisible("updatedAt") && <th>Last Modified</th>}
         </tr>
       </thead>
       <tbody>
-        {tasksLoading && !tasks.length && <LoadingRows columns={TASK_TABLE_COLUMNS} />}
+        {tasksLoading && !tasks.length && <LoadingRows columns={tableColSpan} />}
 
         {!tasksLoading && taskError && (
           <tr>
-            <td colSpan={TASK_TABLE_COLUMNS} className="px-4 py-10">
+            <td colSpan={tableColSpan} className="px-4 py-10">
               <div className="rounded-2xl border border-red-100 bg-red-50 px-5 py-5 text-center">
                 <div className="text-[14px] font-extrabold text-red-700">Unable to load tasks</div>
                 <div className="mt-1 text-[12px] font-medium text-red-600">{taskError}</div>
@@ -654,7 +702,7 @@ function TaskTableState({ tasks, tasksLoading, taskError, hasActiveFilters, empt
 
         {!tasksLoading && !taskError && !tasks.length && (
           <tr>
-            <td colSpan={TASK_TABLE_COLUMNS} className="px-4 py-10">
+            <td colSpan={tableColSpan} className="px-4 py-10">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-6 text-center">
                 <div className="text-[14px] font-extrabold text-slate-900">{emptyTitle}</div>
                 <div className="mt-1 text-[12px] font-medium text-slate-500">{emptyDescription}</div>
@@ -711,4 +759,105 @@ function LoadingRows({ columns }) {
       ))}
     </tr>
   ));
+}
+
+
+// ─── Column Customizer Popover ─────────────────────────────────────────────
+function ColumnCustomizer({ visibility, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  // Close when clicking outside
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  const visibleCount = Object.values(visibility).filter(Boolean).length;
+
+  return (
+    <div ref={ref} className="relative">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => setOpen((prev) => !prev)}
+        aria-expanded={open}
+        aria-haspopup="true"
+        id="col-customizer-btn"
+      >
+        <Columns size={15} />
+        Columns
+        {visibleCount < COLUMN_DEFS.length && (
+          <span className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#1e3a8a] text-[9px] font-extrabold text-white">
+            {visibleCount}
+          </span>
+        )}
+      </Button>
+
+      {open && (
+        <div
+          role="dialog"
+          aria-label="Customize visible columns"
+          className="absolute right-0 top-full z-50 mt-2 w-72 rounded-2xl border border-slate-200 bg-white shadow-xl"
+          style={{ boxShadow: "0 8px 32px rgba(30,58,138,0.12)" }}
+        >
+          <div className="border-b border-slate-100 px-4 py-3">
+            <div className="text-[13px] font-extrabold text-slate-900">Visible Columns</div>
+            <div className="mt-0.5 text-[11px] font-medium text-slate-500">
+              Toggle columns shown in the table.
+            </div>
+          </div>
+          <ul className="px-3 py-3 space-y-1 max-h-60 overflow-y-auto">
+            {COLUMN_DEFS.map((col) => {
+              const checked = visibility[col.key] ?? col.defaultOn;
+              return (
+                <li key={col.key}>
+                  <label
+                    htmlFor={`col-toggle-${col.key}`}
+                    className="flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2 hover:bg-slate-50 transition-colors"
+                  >
+                    <input
+                      id={`col-toggle-${col.key}`}
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => onChange(col.key, e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 accent-[#1e3a8a]"
+                    />
+                    <span className="flex-1">
+                      <span className="block text-[12px] font-bold text-slate-800">{col.label}</span>
+                      <span className="block text-[11px] font-medium text-slate-400">{col.description}</span>
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="border-t border-slate-100 px-4 py-3 flex justify-between">
+            <button
+              type="button"
+              className="text-[11px] font-bold text-[#1e3a8a] hover:underline"
+              onClick={() => {
+                COLUMN_DEFS.forEach((c) => onChange(c.key, true));
+              }}
+            >
+              Show all
+            </button>
+            <button
+              type="button"
+              className="text-[11px] font-bold text-slate-500 hover:underline"
+              onClick={() => {
+                COLUMN_DEFS.forEach((c) => onChange(c.key, c.defaultOn));
+              }}
+            >
+              Reset to defaults
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
