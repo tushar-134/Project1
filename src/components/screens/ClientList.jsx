@@ -156,7 +156,7 @@ function ColumnCustomizer({ visibility, onChange }) {
               Toggle columns shown in the table and exported to CSV.
             </div>
           </div>
-          <ul className="px-3 py-3 space-y-1">
+          <ul className="px-3 py-3 space-y-1 max-h-60 overflow-y-auto">
             {COLUMN_DEFS.map((col) => {
               const checked = visibility[col.key] ?? col.defaultOn;
               return (
@@ -356,7 +356,7 @@ export default function ClientList() {
       </div>
 
       {/* Filter & review toolbar — mirrors TaskList design */}
-      <Card className="overflow-hidden">
+      <Card>
         <div className="task-list-toolbar border-b border-slate-200 px-4 py-4 sm:px-5">
           {/* Header row: title + summary pills */}
           <div className="flex flex-wrap items-start justify-between gap-4">
