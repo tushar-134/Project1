@@ -67,9 +67,19 @@ function getCurrentMonthValue() {
   return `${year}-${month}`;
 }
 
-function sortStrings(values) {
-  return [...new Set(values.filter(Boolean))].sort((left, right) => String(left).localeCompare(String(right)));
+// Deduplicate strings case-insensitively, preserving the first-seen casing, then sort
+function sortUniqueStrings(values) {
+  const seen = new Map();
+  for (const v of values) {
+    if (!v) continue;
+    const key = String(v).toLowerCase();
+    if (!seen.has(key)) seen.set(key, String(v));
+  }
+  return [...seen.values()].sort((a, b) => a.localeCompare(b));
 }
+
+// Keep a backwards-compat alias used in a few places
+const sortStrings = sortUniqueStrings;
 
 function buildActiveColumnFilterSummary(filters) {
   return [
@@ -189,11 +199,47 @@ export default function TaskList() {
     refetchTasks().catch(() => {});
   }, [refetchTasks, requestParams]);
 
-  // Map filter dropdown options from global data where available, fallback to currently visible tasks
-  const categoryOptions = sortStrings(state.categories?.length ? state.categories.map((c) => c.name) : state.tasks.map((task) => task.category));
-  const typeOptions = sortStrings(state.categories?.length ? state.categories.flatMap((c) => c.taskTypes) : state.tasks.map((task) => task.type));
-  const assigneeOptions = sortStrings(state.users?.length ? state.users.map((u) => u.name) : state.tasks.map((task) => task.assigned));
-  const clientSuggestions = sortStrings(state.clients?.length ? state.clients.map((c) => c.name) : state.tasks.map((task) => task.client));
+  // Category options: only show categories that actually appear in visible tasks.
+  // Falls back to all global categories if no tasks have loaded yet.
+  const taskCategoryNames = useMemo(
+    () => new Set(state.tasks.map((t) => t.category?.toLowerCase()).filter(Boolean)),
+    [state.tasks]
+  );
+  const categoryOptions = useMemo(() => {
+    if (state.categories?.length) {
+      const fromGlobal = state.categories
+        .filter((c) => !taskCategoryNames.size || taskCategoryNames.has(c.name.toLowerCase()))
+        .map((c) => c.name);
+      return fromGlobal.length ? sortUniqueStrings(fromGlobal) : sortUniqueStrings(state.tasks.map((t) => t.category));
+    }
+    return sortUniqueStrings(state.tasks.map((t) => t.category));
+  }, [state.categories, state.tasks, taskCategoryNames]);
+
+  // Task Type options: cascade from selected category; deduplicate case-insensitively.
+  const typeOptions = useMemo(() => {
+    const selectedCat = columnFilters.category;
+    if (state.categories?.length) {
+      const matchedCats = selectedCat
+        ? state.categories.filter((c) => c.name.toLowerCase() === selectedCat.toLowerCase())
+        : state.categories.filter((c) => !taskCategoryNames.size || taskCategoryNames.has(c.name.toLowerCase()));
+      const types = matchedCats.flatMap((c) => c.taskTypes || []);
+      if (types.length) return sortUniqueStrings(types);
+    }
+    // Fallback: derive from visible tasks (filtered by selected category if set)
+    const tasksToSearch = selectedCat
+      ? state.tasks.filter((t) => t.category?.toLowerCase() === selectedCat.toLowerCase())
+      : state.tasks;
+    return sortUniqueStrings(tasksToSearch.map((t) => t.type));
+  }, [state.categories, state.tasks, columnFilters.category, taskCategoryNames]);
+
+  const assigneeOptions = useMemo(
+    () => sortUniqueStrings(state.users?.length ? state.users.map((u) => u.name) : state.tasks.map((t) => t.assigned)),
+    [state.users, state.tasks]
+  );
+  const clientSuggestions = useMemo(
+    () => sortUniqueStrings(state.clients?.length ? state.clients.map((c) => c.name) : state.tasks.map((t) => t.client)),
+    [state.clients, state.tasks]
+  );
   const rows = state.tasks;
 
   const completedCount = rows.filter((task) => task.status === "Completed").length;
