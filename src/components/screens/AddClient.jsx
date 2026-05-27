@@ -159,7 +159,7 @@ export default function AddClient() {
   const vatFilingFrequencyOptions = useMemo(() => getVatFilingFrequencyOptions(form.fye), [form.fye]);
   const shouldShowVatRegistrationFields = form.vatStatus !== "Not Registered";
   const shouldShowCtRegistrationFields = form.ctStatus !== "Not Registered";
-  const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "Dubai", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }]);
+  const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "Dubai", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
 
   const [contacts, setContacts] = useState([{
     name: "",
@@ -185,6 +185,7 @@ export default function AddClient() {
     passportDocumentName: "",
     passportDocumentFile: null,
     passportDocuments: [],
+    persisted: false,
   }]);
   const [portals, setPortals] = useState([blankPortal]);
   const [visiblePortalPasswords, setVisiblePortalPasswords] = useState({});
@@ -419,7 +420,8 @@ export default function AddClient() {
         documentName: licence.documentUrl ? licence.documentUrl.split("/").pop() : "",
         documentFile: null,
         documents: mapExistingDocuments(licence.documents, licence.documentUrl),
-      })) : [{ number: "", issue: "", expiry: "", authority: "Dubai", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }]);
+        persisted: true,
+      })) : [{ number: "", issue: "", expiry: "", authority: "Dubai", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
       setContacts((client.contactPersons || []).length ? client.contactPersons.map((person) => ({
         name: person.fullName || "",
         designation: person.designation || "",
@@ -444,6 +446,7 @@ export default function AddClient() {
         passportDocumentName: person.passport?.documentUrl ? person.passport.documentUrl.split("/").pop() : "",
         passportDocumentFile: null,
         passportDocuments: mapExistingDocuments(person.passport?.documents, person.passport?.documentUrl),
+        persisted: true,
       })) : [{
         name: "",
         designation: "",
@@ -468,6 +471,7 @@ export default function AddClient() {
         passportDocumentName: "",
         passportDocumentFile: null,
         passportDocuments: [],
+        persisted: false,
       }]);
       setPortals((client.portalLogins || []).length ? client.portalLogins.map((portal) => ({
         name: portal.portalName || "",
@@ -573,6 +577,7 @@ export default function AddClient() {
           documentName: documents.at(-1)?.name || "",
           documentFile: null,
           documents,
+          persisted: true,
         };
       }));
     }
@@ -592,6 +597,7 @@ export default function AddClient() {
           passportDocumentName: passportDocuments.at(-1)?.name || "",
           passportDocumentFile: null,
           passportDocuments,
+          persisted: true,
         };
       }));
     }
@@ -618,6 +624,11 @@ export default function AddClient() {
   }
 
   async function handleTradeLicenceFile(licenceIndex, files) {
+    const licence = licences[licenceIndex];
+    if (isEditMode && !licence?.persisted) {
+      toast.error("Save the new trade licence first, then upload its documents.");
+      return;
+    }
     const currentDocuments = licences[licenceIndex]?.documents || [];
     const { accepted: selected, skipped } = uniqueTradeLicenceFiles(files, currentDocuments);
     if (skipped) toast.error(skipped === 1 ? "This trade licence file is already added." : `${skipped} duplicate trade licence files were skipped.`);
@@ -652,6 +663,11 @@ export default function AddClient() {
   }
 
   async function handleContactDocument(contactIndex, files, section) {
+    const contact = contacts[contactIndex];
+    if (isEditMode && !contact?.persisted) {
+      toast.error(`Save the new contact person first, then upload ${section === "passport" ? "passport" : "Emirates ID"} documents.`);
+      return;
+    }
     const selected = Array.from(files || []);
     if (!selected.length) return;
     if (section === "passport") {
@@ -966,7 +982,8 @@ export default function AddClient() {
         ].filter(Boolean)))
         : [];
       if (isEditMode) {
-        await updateClient(id, payload);
+        const updatedClient = await updateClient(id, payload);
+        applyClientDocuments(updatedClient);
         if (pendingLicenceDocuments.length) {
           for (const licenceDocument of pendingLicenceDocuments) {
             await uploadTradeLicenceFiles(id, licenceDocument.index, licenceDocument.files);
@@ -1067,7 +1084,7 @@ export default function AddClient() {
               isUserSearchLoading={isUserSearchLoading}
             />
           )}
-          {tab === 1 && <Repeat title="Trade Licence" items={licences} setItems={setLicences} blank={{ number: "", issue: "", expiry: "", authority: "Dubai", type: "", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [] }} render={(lic, i, patch) => {
+          {tab === 1 && <Repeat title="Trade Licence" items={licences} setItems={setLicences} blank={{ number: "", issue: "", expiry: "", authority: "Dubai", type: "", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }} render={(lic, i, patch) => {
             const authoritySearch = authoritySearches[i] || "";
             const authorityOptions = lic.authority && !ISSUING_AUTHORITY_OPTIONS.some((option) => option.id === lic.authority)
               ? [{ id: lic.authority, label: lic.authority }, ...ISSUING_AUTHORITY_OPTIONS]
@@ -1085,7 +1102,7 @@ export default function AddClient() {
               title="Contact Person"
               items={contacts}
               setItems={setContacts}
-              blank={{ name: "", designation: "", email: "", code: "", mobile: "", whatsapp: "", alternate: "", primary: false, eid: "", eidIssue: "", eidExpiry: "", passport: "", passportIssue: "", passportExpiry: "", issuingCountry: "United Arab Emirates", eidDocumentUrl: "", eidDocumentName: "", eidDocumentFile: null, eidDocuments: [], passportDocumentUrl: "", passportDocumentName: "", passportDocumentFile: null, passportDocuments: [] }}
+              blank={{ name: "", designation: "", email: "", code: "", mobile: "", whatsapp: "", alternate: "", primary: false, eid: "", eidIssue: "", eidExpiry: "", passport: "", passportIssue: "", passportExpiry: "", issuingCountry: "United Arab Emirates", eidDocumentUrl: "", eidDocumentName: "", eidDocumentFile: null, eidDocuments: [], passportDocumentUrl: "", passportDocumentName: "", passportDocumentFile: null, passportDocuments: [], persisted: false }}
               render={(c, i, patch) => (
                 <div className="grid gap-3 md:grid-cols-3">
                   <Field label="Full Name*" field={`contact-name-${i}`}><input className="input" value={c.name} onChange={(e) => patch(i, { name: e.target.value })} /></Field>
