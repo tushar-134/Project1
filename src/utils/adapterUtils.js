@@ -52,6 +52,8 @@ export function mapClient(client) {
     mobile: client.contactPersons?.[0]?.mobile ? `${client.contactPersons[0].mobile.countryCode || ""} ${client.contactPersons[0].mobile.number || ""}` : "",
     email: client.contactPersons?.[0]?.email || "",
     activeTasks: client.activeTasks || 0,
+    createdAt: client.createdAt || null,
+    createdByName: client.createdBy?.name || null,
   };
 }
 

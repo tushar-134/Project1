@@ -682,8 +682,61 @@ exports.bulkUpload = async (req, res, next) => {
 
 exports.exportClients = async (req, res, next) => {
   try {
-    const clients = await Client.find(await buildClientListQuery(req)).populate("group", "name");
-    const csv = ["File No,Name,Jurisdiction,Group,VAT TRN"].concat(clients.map((c) => [c.fileNo, c.legalName, c.jurisdiction, c.group?.name || "", c.vatDetails?.trn || ""].map((v) => `"${String(v).replaceAll('"', '""')}"`).join(","))).join("\n");
+    const clients = await Client.find(await buildClientListQuery(req))
+      .populate("group", "name")
+      .populate("createdBy", "name");
+
+    // columns param is a comma-separated list of column keys the user has visible.
+    // If not provided, all columns are exported.
+    const ALL_COLUMNS = ["fileNo", "name", "jurisdiction", "type", "group", "vatTrn", "createdAt", "createdBy"];
+    const requestedColumns = req.query.columns
+      ? String(req.query.columns).split(",").map((c) => c.trim()).filter(Boolean)
+      : ALL_COLUMNS;
+    const activeColumns = ALL_COLUMNS.filter((c) => requestedColumns.includes(c));
+
+    const HEADER_MAP = {
+      fileNo: "File No",
+      name: "Name",
+      jurisdiction: "Jurisdiction",
+      type: "Type",
+      group: "Group",
+      vatTrn: "VAT TRN",
+      createdAt: "Created Date",
+      createdBy: "Created By",
+    };
+
+    const typeLabel = (c) => (c.clientType === "natural" ? "Natural Person" : "Legal Person");
+    const jurisLabel = (c) => {
+      const map = { mainland: "Mainland", freezone: "Free Zone", designated_zone: "Designated Zone", offshore: "Offshore" };
+      return map[c.jurisdiction] || c.jurisdiction || "";
+    };
+    const formatDate = (d) => {
+      if (!d) return "";
+      const date = new Date(d);
+      if (Number.isNaN(date.getTime())) return "";
+      return `${String(date.getDate()).padStart(2, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${date.getFullYear()}`;
+    };
+
+    const getCell = (c, col) => {
+      switch (col) {
+        case "fileNo": return c.fileNo || "";
+        case "name": return c.legalName || "";
+        case "jurisdiction": return jurisLabel(c);
+        case "type": return typeLabel(c);
+        case "group": return c.group?.name || "";
+        case "vatTrn": return c.vatDetails?.trn || "";
+        case "createdAt": return formatDate(c.createdAt);
+        case "createdBy": return c.createdBy?.name || "";
+        default: return "";
+      }
+    };
+
+    const headerRow = activeColumns.map((col) => `"${HEADER_MAP[col]}"`).join(",");
+    const dataRows = clients.map((c) =>
+      activeColumns.map((col) => `"${String(getCell(c, col)).replaceAll('"', '""')}"`).join(",")
+    );
+    const csv = [headerRow, ...dataRows].join("\n");
+
     // Bug #2 Fix: res.attachment() was removed in Express 5; use setHeader instead.
     res.setHeader("Content-Disposition", 'attachment; filename="clients.csv"')
        .setHeader("Content-Type", "text/csv")
