@@ -45,6 +45,16 @@ const CATEGORY_LABELS = {
   EInv: "E-Invoicing",
   Refund: "VAT Refund",
 };
+const OPTION_ACRONYMS = new Map([
+  ["ct", "CT"],
+  ["einv", "EInv"],
+  ["esr", "ESR"],
+  ["fta", "FTA"],
+  ["mis", "MIS"],
+  ["trn", "TRN"],
+  ["ubo", "UBO"],
+  ["vat", "VAT"],
+]);
 
 const STATUS_PILL = {
   "Not Yet Started": { bg: "bg-slate-100", text: "text-slate-600" },
@@ -77,8 +87,34 @@ function getCurrentMonthValue() {
   return `${year}-${month}`;
 }
 
-function sortStrings(values) {
-  return [...new Set(values.filter(Boolean))].sort((left, right) => String(left).localeCompare(String(right)));
+function formatOptionLabel(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .map((word) => {
+      const acronym = OPTION_ACRONYMS.get(word.toLocaleLowerCase());
+      if (acronym) return acronym;
+      if (/^[A-Z0-9&/-]{2,}$/.test(word)) return word;
+      return `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}`;
+    })
+    .join(" ");
+}
+
+function normalizeOptionKey(value) {
+  return formatOptionLabel(value).toLocaleLowerCase();
+}
+
+function buildNormalizedOptions(values) {
+  const options = new Map();
+  values.forEach((value) => {
+    const rawValue = String(value || "").trim().replace(/\s+/g, " ");
+    const label = formatOptionLabel(rawValue);
+    if (!label) return;
+    const key = normalizeOptionKey(label);
+    if (!options.has(key)) options.set(key, { value: rawValue, label });
+  });
+  return [...options.values()].sort((left, right) => left.label.localeCompare(right.label));
 }
 
 function displayCategoryName(category) {
@@ -240,19 +276,23 @@ export default function TaskList() {
   }, [refetchTasks, requestParams]);
 
   const categoryOptions = useMemo(
-    () => sortStrings(state.categories.map((category) => category.name)),
+    () => buildNormalizedOptions(state.categories.map((category) => category.name)),
     [state.categories],
   );
   const typeOptions = useMemo(
-    () => sortStrings(state.categories.flatMap((category) => category.taskTypes || [])),
-    [state.categories],
+    () => {
+      const selectedCategory = state.categories.find((category) => category.name === columnFilters.category);
+      const sourceCategories = selectedCategory ? [selectedCategory] : state.categories;
+      return buildNormalizedOptions(sourceCategories.flatMap((category) => category.taskTypes || []));
+    },
+    [columnFilters.category, state.categories],
   );
   const assigneeOptions = useMemo(
-    () => sortStrings(state.users.map((user) => user.name)),
+    () => buildNormalizedOptions(state.users.map((user) => user.name)),
     [state.users],
   );
   const clientSuggestions = useMemo(
-    () => sortStrings(state.clients.map((client) => client.name || client.legalName)),
+    () => buildNormalizedOptions(state.clients.map((client) => client.name || client.legalName)),
     [state.clients],
   );
   const rows = state.tasks;
@@ -266,7 +306,11 @@ export default function TaskList() {
 
   const updateColumnFilter = (key, value) => {
     setPage(1);
-    setColumnFilters((current) => ({ ...current, [key]: value }));
+    setColumnFilters((current) => ({
+      ...current,
+      [key]: value,
+      ...(key === "category" ? { type: "" } : {}),
+    }));
   };
 
   // Scope is managed via the column-filter row Scope dropdown
@@ -504,7 +548,7 @@ export default function TaskList() {
               </div>
               <datalist id="task-client-suggestions">
                 {clientSuggestions.map((client) => (
-                  <option key={client} value={client} />
+                  <option key={client.value} value={client.value} />
                 ))}
               </datalist>
             </FilterField>
@@ -519,7 +563,7 @@ export default function TaskList() {
               >
                 <option value="">All categories</option>
                 {categoryOptions.map((option) => (
-                  <option key={option} value={option}>{displayCategoryName(option)}</option>
+                  <option key={option.value} value={option.value}>{displayCategoryName(option.value)}</option>
                 ))}
               </select>
             </FilterField>
@@ -534,7 +578,7 @@ export default function TaskList() {
               >
                 <option value="">All task types</option>
                 {typeOptions.map((option) => (
-                  <option key={option} value={option}>{option}</option>
+                  <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
             </FilterField>
@@ -560,7 +604,7 @@ export default function TaskList() {
               >
                 <option value="">All assignees</option>
                 {assigneeOptions.map((option) => (
-                  <option key={option} value={option}>{option}</option>
+                  <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
             </FilterField>
