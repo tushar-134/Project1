@@ -4,7 +4,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useUsers } from "../../hooks/useUsers.js";
-import { useTasks } from "../../hooks/useTasks";
+import { useTasks } from "../../hooks/useTasks.js";
+import { useClients } from "../../hooks/useClients.js";
 import { downloadBlob } from "../../utils/adapterUtils";
 import { canManageTasks } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
@@ -143,11 +144,15 @@ export default function TaskList() {
   const canManage = canManageTasks(currentUser?.role);
   const isTaskOnly = currentUser?.role === "task_only";
   const { fetchUsers } = useUsers();
+  const { fetchClients } = useClients();
   const tasksLoading = Boolean(state.loading.tasks);
   const taskError = state.errors.tasks;
 
   useEffect(() => {
-    if (canManage) fetchUsers().catch(() => {});
+    if (canManage) {
+      fetchUsers().catch(() => {});
+      fetchClients({ limit: 1000 }).catch(() => {});
+    }
   }, [canManage]);
 
   const serverFilters = useMemo(() => ({
@@ -184,10 +189,11 @@ export default function TaskList() {
     refetchTasks().catch(() => {});
   }, [refetchTasks, requestParams]);
 
-  const categoryOptions = sortStrings(state.tasks.map((task) => task.category));
-  const typeOptions = sortStrings(state.tasks.map((task) => task.type));
-  const assigneeOptions = sortStrings(state.tasks.map((task) => task.assigned));
-  const clientSuggestions = sortStrings(state.tasks.map((task) => task.client));
+  // Map filter dropdown options from global data where available, fallback to currently visible tasks
+  const categoryOptions = sortStrings(state.categories?.length ? state.categories.map((c) => c.name) : state.tasks.map((task) => task.category));
+  const typeOptions = sortStrings(state.categories?.length ? state.categories.flatMap((c) => c.taskTypes) : state.tasks.map((task) => task.type));
+  const assigneeOptions = sortStrings(state.users?.length ? state.users.map((u) => u.name) : state.tasks.map((task) => task.assigned));
+  const clientSuggestions = sortStrings(state.clients?.length ? state.clients.map((c) => c.name) : state.tasks.map((task) => task.client));
   const rows = state.tasks;
 
   const completedCount = rows.filter((task) => task.status === "Completed").length;
