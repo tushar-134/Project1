@@ -11,6 +11,9 @@ import { ROLE_LABELS } from "../../utils/permissions.js";
 import ClientDrawer from "../ui/ClientDrawer.jsx";
 import UserAvatar from "../ui/UserAvatar.jsx";
 
+const POLL_INTERVAL_MS = 60_000;
+const OPEN_REFRESH_STALE_MS = 30_000;
+
 export default function TopBar({ title, onMenuClick }) {
   const [open, setOpen] = useState(false);
   const [expiryOpen, setExpiryOpen] = useState(false);
@@ -31,19 +34,24 @@ export default function TopBar({ title, onMenuClick }) {
   const [expiryError, setExpiryError] = useState("");
   const notificationsBusyRef = useRef(false);
   const expiryBusyRef = useRef(false);
+  const lastNotificationsFetchRef = useRef(0);
+  const lastExpiryFetchRef = useRef(0);
 
-  async function refreshNotifications() {
+  async function refreshNotifications({ force = false, minAge = 0 } = {}) {
     if (notificationsBusyRef.current) return;
+    if (!force && Date.now() - lastNotificationsFetchRef.current < minAge) return;
     notificationsBusyRef.current = true;
     try {
       await fetchNotifications();
+      lastNotificationsFetchRef.current = Date.now();
     } finally {
       notificationsBusyRef.current = false;
     }
   }
 
-  async function refreshExpiryAlerts() {
+  async function refreshExpiryAlerts({ force = false, minAge = 0 } = {}) {
     if (expiryBusyRef.current) return;
+    if (!force && Date.now() - lastExpiryFetchRef.current < minAge) return;
     expiryBusyRef.current = true;
     setExpiryLoading(true);
     setExpiryError("");
@@ -51,6 +59,7 @@ export default function TopBar({ title, onMenuClick }) {
       const data = await clientService.expiryAlerts();
       setExpiryPayload(data);
       setExpirySummary(data);
+      lastExpiryFetchRef.current = Date.now();
     } catch {
       setExpiryError("Unable to load expiry alerts.");
     } finally {
@@ -73,12 +82,12 @@ export default function TopBar({ title, onMenuClick }) {
   useEffect(() => {
     function refreshVisibleData() {
       if (document.visibilityState !== "visible") return;
-      refreshNotifications().catch(() => {});
-      refreshExpiryAlerts().catch(() => {});
+      refreshNotifications({ minAge: OPEN_REFRESH_STALE_MS }).catch(() => {});
+      refreshExpiryAlerts({ minAge: OPEN_REFRESH_STALE_MS }).catch(() => {});
     }
 
     refreshVisibleData();
-    const id = window.setInterval(refreshVisibleData, 60_000);
+    const id = window.setInterval(refreshVisibleData, POLL_INTERVAL_MS);
     document.addEventListener("visibilitychange", refreshVisibleData);
     return () => {
       window.clearInterval(id);
@@ -87,11 +96,11 @@ export default function TopBar({ title, onMenuClick }) {
   }, []);
 
   useEffect(() => {
-    if (open) refreshNotifications().catch(() => {});
+    if (open) refreshNotifications({ minAge: OPEN_REFRESH_STALE_MS }).catch(() => {});
   }, [open]);
 
   useEffect(() => {
-    if (expiryOpen) refreshExpiryAlerts().catch(() => {});
+    if (expiryOpen) refreshExpiryAlerts({ minAge: OPEN_REFRESH_STALE_MS }).catch(() => {});
   }, [expiryOpen]);
 
   return (
