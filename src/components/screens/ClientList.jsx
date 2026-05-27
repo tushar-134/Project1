@@ -31,8 +31,8 @@ const COLUMN_DEFS = [
 const EXPORT_KEY_MAP = {
   client:     ["fileNo", "name", "jurisdiction", "type"],
   group:      ["group"],
-  compliance: ["vatTrn"],
-  contact:    [], // contact info is not in the server export – omit silently
+  compliance: ["licence", "vatTrn"],
+  contact:    ["contact", "mobile", "email"],
   createdAt:  ["createdAt"],
   createdBy:  ["createdBy"],
 };
@@ -45,6 +45,8 @@ const EMPTY_COLUMN_FILTERS = {
   group: "",
   compliance: "",
   contact: "",
+  createdAt: "",
+  createdBy: "",
 };
 const PAGE_SIZE = 20;
 
@@ -60,6 +62,8 @@ function buildActiveFilterSummary(columnFilters, query) {
   if (columnFilters.group) chips.push(`Group: ${columnFilters.group}`);
   if (columnFilters.compliance) chips.push(`Compliance: ${columnFilters.compliance}`);
   if (columnFilters.contact) chips.push(`Contact: ${columnFilters.contact}`);
+  if (columnFilters.createdAt) chips.push(`Created: ${columnFilters.createdAt}`);
+  if (columnFilters.createdBy) chips.push(`Created By: ${columnFilters.createdBy}`);
   return chips;
 }
 
@@ -153,7 +157,7 @@ function ColumnCustomizer({ visibility, onChange }) {
           <div className="border-b border-slate-100 px-4 py-3">
             <div className="text-[13px] font-extrabold text-slate-900">Visible Columns</div>
             <div className="mt-0.5 text-[11px] font-medium text-slate-500">
-              Toggle columns shown in the table and exported to CSV.
+              Toggle columns shown in the table and exported to Excel.
             </div>
           </div>
           <ul className="px-3 py-3 space-y-1 max-h-60 overflow-y-auto">
@@ -258,6 +262,8 @@ export default function ClientList() {
     group: deferredColumnFilters.group.trim() || undefined,
     compliance: deferredColumnFilters.compliance.trim() || undefined,
     contact: deferredColumnFilters.contact.trim() || undefined,
+    createdAt: deferredColumnFilters.createdAt || undefined,
+    createdBy: deferredColumnFilters.createdBy.trim() || undefined,
   }), [deferredColumnFilters, deferredQuery, page]);
 
   const filterRef = useRef(requestParams);
@@ -313,7 +319,7 @@ export default function ClientList() {
     setColVisibility((prev) => ({ ...prev, [key]: value }));
   }, []);
 
-  // Build the `columns` param for the CSV export — only server-mappable keys that are visible
+  // Build the `columns` param for the Excel export — only server-mappable keys that are visible
   const exportCsv = async () => {
     const serverCols = visibleColumns
       .flatMap((c) => EXPORT_KEY_MAP[c.key] || [])
@@ -326,9 +332,11 @@ export default function ClientList() {
       group: deferredColumnFilters.group.trim() || undefined,
       compliance: deferredColumnFilters.compliance.trim() || undefined,
       contact: deferredColumnFilters.contact.trim() || undefined,
+      createdAt: deferredColumnFilters.createdAt || undefined,
+      createdBy: deferredColumnFilters.createdBy.trim() || undefined,
       columns: serverCols.join(",") || undefined,
     };
-    downloadBlob(await exportClients(params), "clients.csv");
+    downloadBlob(await exportClients(params), "clients.xlsx");
   };
 
   return (
@@ -508,6 +516,30 @@ export default function ClientList() {
                   placeholder="Name, phone or email"
                   value={columnFilters.contact}
                   onChange={(e) => updateColumnFilter("contact", e.target.value)}
+                />
+              </div>
+            </FilterField>
+
+            <FilterField label="Created Month" htmlFor="client-filter-created-at">
+              <input
+                id="client-filter-created-at"
+                className="input"
+                type="month"
+                value={columnFilters.createdAt}
+                onChange={(e) => updateColumnFilter("createdAt", e.target.value)}
+              />
+            </FilterField>
+
+            <FilterField label="Created By" htmlFor="client-filter-created-by">
+              <div className="task-list-input-wrap">
+                <Search size={14} className="task-list-input-icon" aria-hidden="true" />
+                <input
+                  id="client-filter-created-by"
+                  className="input"
+                  type="search"
+                  placeholder="Staff name"
+                  value={columnFilters.createdBy}
+                  onChange={(e) => updateColumnFilter("createdBy", e.target.value)}
                 />
               </div>
             </FilterField>
