@@ -29,11 +29,21 @@ function sanitizeBaseName(file) {
   return `${base || "upload"}-${Date.now()}-${crypto.randomBytes(4).toString("hex")}${extension}`;
 }
 
+function cloudinaryUploadParams(req, file) {
+  const isImage = String(file?.mimetype || "").startsWith("image/");
+  return {
+    folder: "filing-buddy",
+    resource_type: isImage ? "image" : "raw",
+    use_filename: true,
+    unique_filename: true,
+  };
+}
+
 function createStorage() {
   if (isRealCloudinaryConfig()) {
     return new CloudinaryStorage({
       cloudinary,
-      params: { folder: "filing-buddy", resource_type: "auto" },
+      params: cloudinaryUploadParams,
     });
   }
 
