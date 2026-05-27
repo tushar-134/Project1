@@ -1,11 +1,10 @@
 function getApiOrigin() {
-  const configured = String(import.meta.env.VITE_API_URL || "").trim();
-  if (!configured) return window.location.origin;
+  const configured = String(import.meta.env.VITE_API_URL || "http://localhost:5000/api").trim();
   try {
     const url = new URL(configured, window.location.origin);
     return url.origin;
   } catch {
-    return window.location.origin;
+    return "http://localhost:5000";
   }
 }
 
