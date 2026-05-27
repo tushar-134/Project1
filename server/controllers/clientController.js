@@ -68,7 +68,7 @@ function buildClientSearchClause(value) {
 }
 
 async function buildClientListQuery(req) {
-  const { search, jurisdiction, type, group, assignedUser, client, compliance, contact } = req.query;
+  const { search, jurisdiction, type, group, assignedUser, client, compliance, contact, createdAt, createdBy } = req.query;
   const query = { isActive: true };
   const andClauses = [];
 
@@ -123,6 +123,19 @@ async function buildClientListQuery(req) {
         { "contactPersons.mobile.countryCode": pattern },
       ],
     });
+  }
+  if (createdAt) {
+    // createdAt is expected as "YYYY-MM" from the month input
+    const [year, month] = String(createdAt).split("-");
+    if (year && month) {
+      const startDate = new Date(Number(year), Number(month) - 1, 1);
+      const endDate   = new Date(Number(year), Number(month), 1);
+      andClauses.push({ createdAt: { $gte: startDate, $lt: endDate } });
+    }
+  }
+  if (createdBy) {
+    const matchedUserIds = await User.find({ name: buildPattern(createdBy) }).distinct("_id");
+    andClauses.push({ createdBy: { $in: matchedUserIds } });
   }
   if (andClauses.length) query.$and = andClauses;
   return query;
@@ -602,26 +615,31 @@ exports.exportClients = async (req, res, next) => {
       .populate("group", "name")
       .populate("createdBy", "name");
 
-    // columns param is a comma-separated list of column keys the user has visible.
-    // If not provided, all columns are exported.
-    const ALL_COLUMNS = ["fileNo", "name", "jurisdiction", "type", "group", "vatTrn", "createdAt", "createdBy"];
+    const XLSX = require("xlsx");
+
+    // columns param: comma-separated list of server column keys the user has visible.
+    const ALL_COLUMNS = ["fileNo", "name", "jurisdiction", "type", "group", "licence", "vatTrn", "contact", "mobile", "email", "createdAt", "createdBy"];
     const requestedColumns = req.query.columns
       ? String(req.query.columns).split(",").map((c) => c.trim()).filter(Boolean)
       : ALL_COLUMNS;
     const activeColumns = ALL_COLUMNS.filter((c) => requestedColumns.includes(c));
 
     const HEADER_MAP = {
-      fileNo: "File No",
-      name: "Name",
-      jurisdiction: "Jurisdiction",
-      type: "Type",
-      group: "Group",
-      vatTrn: "VAT TRN",
-      createdAt: "Created Date",
-      createdBy: "Created By",
+      fileNo:      "File No",
+      name:        "Name",
+      jurisdiction:"Jurisdiction",
+      type:        "Type",
+      group:       "Group",
+      licence:     "Licence No",
+      vatTrn:      "VAT TRN",
+      contact:     "Contact Name",
+      mobile:      "Mobile No",
+      email:       "Email",
+      createdAt:   "Created Date",
+      createdBy:   "Created By",
     };
 
-    const typeLabel = (c) => (c.clientType === "natural" ? "Natural Person" : "Legal Person");
+    const typeLabel  = (c) => (c.clientType === "natural" ? "Natural Person" : "Legal Person");
     const jurisLabel = (c) => {
       const map = { mainland: "Mainland", freezone: "Free Zone", designated_zone: "Designated Zone", offshore: "Offshore" };
       return map[c.jurisdiction] || c.jurisdiction || "";
@@ -635,28 +653,38 @@ exports.exportClients = async (req, res, next) => {
 
     const getCell = (c, col) => {
       switch (col) {
-        case "fileNo": return c.fileNo || "";
-        case "name": return c.legalName || "";
-        case "jurisdiction": return jurisLabel(c);
-        case "type": return typeLabel(c);
-        case "group": return c.group?.name || "";
-        case "vatTrn": return c.vatDetails?.trn || "";
-        case "createdAt": return formatDate(c.createdAt);
-        case "createdBy": return c.createdBy?.name || "";
-        default: return "";
+        case "fileNo":       return c.fileNo || "";
+        case "name":        return c.legalName || "";
+        case "jurisdiction":return jurisLabel(c);
+        case "type":        return typeLabel(c);
+        case "group":       return c.group?.name || "";
+        case "licence":     return c.tradeLicences?.[0]?.licenceNumber || "";
+        case "vatTrn":      return c.vatDetails?.trn || "";
+        case "contact":     return c.contactPersons?.find((p) => p.isPrimary)?.fullName || c.contactPersons?.[0]?.fullName || "";
+        case "mobile":      return c.contactPersons?.[0]?.mobile ? `${c.contactPersons[0].mobile.countryCode || ""} ${c.contactPersons[0].mobile.number || ""}`.trim() : "";
+        case "email":       return c.contactPersons?.[0]?.email || "";
+        case "createdAt":   return formatDate(c.createdAt);
+        case "createdBy":   return c.createdBy?.name || "";
+        default:            return "";
       }
     };
 
-    const headerRow = activeColumns.map((col) => `"${HEADER_MAP[col]}"`).join(",");
-    const dataRows = clients.map((c) =>
-      activeColumns.map((col) => `"${String(getCell(c, col)).replaceAll('"', '""')}"`).join(",")
-    );
-    const csv = [headerRow, ...dataRows].join("\n");
+    // Build array of row objects for xlsx
+    const headers = activeColumns.reduce((acc, col) => { acc[col] = HEADER_MAP[col]; return acc; }, {});
+    const rows = clients.map((c) => {
+      const row = {};
+      activeColumns.forEach((col) => { row[HEADER_MAP[col]] = getCell(c, col); });
+      return row;
+    });
 
-    // Bug #2 Fix: res.attachment() was removed in Express 5; use setHeader instead.
-    res.setHeader("Content-Disposition", 'attachment; filename="clients.csv"')
-       .setHeader("Content-Type", "text/csv")
-       .send(csv);
+    const worksheet = XLSX.utils.json_to_sheet(rows, { header: activeColumns.map((col) => HEADER_MAP[col]) });
+    const workbook  = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Clients");
+    const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+    res.setHeader("Content-Disposition", 'attachment; filename="clients.xlsx"')
+       .setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+       .send(buffer);
   } catch (error) { next(error); }
 };
 
