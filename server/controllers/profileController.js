@@ -1,25 +1,12 @@
-const fs = require("fs");
-const path = require("path");
 const User = require("../models/User");
+const { buildUploadedFileUrl, normalizeStoredUploadUrl } = require("../utils/uploadUrl");
 
 function resolveStoredProfilePhotoUrl(value) {
-  const url = String(value || "").trim();
-  if (!url) return "";
-  try {
-    const parsed = new URL(url);
-    if (!parsed.pathname.startsWith("/uploads/")) return url;
-    const filename = path.basename(parsed.pathname);
-    const filePath = path.join(__dirname, "..", "uploads", filename);
-    return fs.existsSync(filePath) ? url : "";
-  } catch {
-    return url;
-  }
+  return normalizeStoredUploadUrl(value);
 }
 
 function toUploadedFile(file, req) {
-  const url = file.path?.startsWith?.("http")
-    ? file.path
-    : `${req.protocol}://${req.get("host")}/uploads/${file.filename}`;
+  const url = buildUploadedFileUrl(file, req);
   return {
     name: file.originalname,
     size: `${Math.round(file.size / 1024)} KB`,

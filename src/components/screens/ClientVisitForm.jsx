@@ -287,10 +287,10 @@ export default function ClientVisitForm() {
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[1.55fr_1fr]">
-        <Card className="p-6">
+        <Card className="flex h-full flex-col p-6">
           <div className="mb-5 text-[18px] font-black text-slate-900">Visit Information</div>
 
-          <div className="space-y-5">
+          <div className="flex flex-1 flex-col gap-5">
             <div>
               <div className="mb-2 text-[11px] font-black uppercase tracking-wider text-slate-500">Client Type *</div>
               <div className="flex flex-wrap gap-5">
@@ -396,13 +396,13 @@ export default function ClientVisitForm() {
               </Field>
             </div>
 
-            <Field label="Remarks / Notes">
-              <textarea className="input min-h-[140px] py-3" value={form.remarks} onChange={(event) => updateField("remarks", event.target.value)} />
+            <Field label="Remarks / Notes" className="flex flex-1 flex-col">
+              <textarea className="input h-full min-h-[140px] py-3" value={form.remarks} onChange={(event) => updateField("remarks", event.target.value)} />
             </Field>
           </div>
         </Card>
 
-        <Card className="flex min-h-[540px] flex-col overflow-hidden p-0">
+        <Card className="flex h-full min-h-[540px] flex-col overflow-hidden p-0">
           <div className="border-b border-[#e2e8f0] px-6 py-5">
             <div className="text-[18px] font-black text-slate-900">Assigned Users *</div>
             <div className="mt-1 text-[14px] font-medium text-slate-500">Select one or more users for this visit</div>
@@ -438,7 +438,7 @@ export default function ClientVisitForm() {
             </div>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+          <div className="h-[180px] overflow-y-auto px-4 pb-4 md:h-[210px] lg:h-[240px]">
             <div className="space-y-1">
               {userOptions.map((user) => {
                 const userId = user._id || user.id;
@@ -471,9 +471,9 @@ export default function ClientVisitForm() {
   );
 }
 
-function Field({ label, children }) {
+function Field({ label, children, className = "" }) {
   return (
-    <label className="block space-y-2">
+    <label className={`block space-y-2 ${className}`}>
       <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">{label}</span>
       {children}
     </label>

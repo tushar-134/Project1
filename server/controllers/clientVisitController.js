@@ -5,6 +5,7 @@ const Client = require("../models/Client");
 const User = require("../models/User");
 const { nextVisitId } = require("../utils/autoId");
 const { buildSimplePdf } = require("../utils/simplePdf");
+const { normalizeStoredUploadUrl } = require("../utils/uploadUrl");
 
 const populateVisit = [
   { path: "client", select: "legalName fileNo assignedUser registeredAddress correspondenceAddress" },
@@ -119,8 +120,13 @@ function visitClientLocation(visit) {
 }
 
 function serializeVisit(visit) {
+  const assignedUsers = (visit.assignedUsers || []).map((entry) => ({
+    ...(entry.toObject?.() || entry),
+    selfieUrl: normalizeStoredUploadUrl(entry.selfieUrl),
+  }));
   return {
     ...visit.toObject({ virtuals: true }),
+    assignedUsers,
     clientName: visitClientName(visit),
     clientLocation: visitClientLocation(visit),
     teamLead: visit.assignedUsers?.[0]?.user || null,

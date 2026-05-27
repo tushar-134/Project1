@@ -1,22 +1,11 @@
-const fs = require("fs");
-const path = require("path");
 const { validationResult } = require("express-validator");
 const User = require("../models/User");
 const generateToken = require("../utils/generateToken");
 const jwt = require("jsonwebtoken");
+const { normalizeStoredUploadUrl } = require("../utils/uploadUrl");
 
 function resolveStoredProfilePhotoUrl(value) {
-  const url = String(value || "").trim();
-  if (!url) return "";
-  try {
-    const parsed = new URL(url);
-    if (!parsed.pathname.startsWith("/uploads/")) return url;
-    const filename = path.basename(parsed.pathname);
-    const filePath = path.join(__dirname, "..", "uploads", filename);
-    return fs.existsSync(filePath) ? url : "";
-  } catch {
-    return url;
-  }
+  return normalizeStoredUploadUrl(value);
 }
 
 function publicUser(user) {

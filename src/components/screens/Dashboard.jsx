@@ -1,4 +1,4 @@
-import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock, FileText } from "lucide-react";
+import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock, FileText, Briefcase, Landmark, PieChart, Files, ClipboardList, Boxes } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -23,6 +23,27 @@ const categoryLabels = {
 
 function displayCategoryName(category) {
   return categoryLabels[category?.name] || category?.name || "";
+}
+
+function getTileMeta(name) {
+  switch (name) {
+    case "VAT":
+      return { icon: <Landmark size={18} />, color: "text-[#0284c7]" };
+    case "Corporate Tax":
+      return { icon: <Briefcase size={18} />, color: "text-[#1e3a8a]" };
+    case "Audit":
+      return { icon: <ClipboardList size={18} />, color: "text-[#4f46e5]" };
+    case "Accounting":
+      return { icon: <Boxes size={18} />, color: "text-[#059669]" };
+    case "MIS Reporting":
+      return { icon: <PieChart size={18} />, color: "text-[#eab308]" };
+    case "E-Invoicing":
+      return { icon: <Files size={18} />, color: "text-[#16a34a]" };
+    case "VAT Refund":
+      return { icon: <CheckCircle2 size={18} />, color: "text-[#dc2626]" };
+    default:
+      return { icon: <FileText size={18} />, color: "text-slate-500" };
+  }
 }
 
 export default function Dashboard() {
@@ -96,22 +117,31 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {tiles.map(([name, pending, overdue]) => (
-          <Card key={name} className="cursor-pointer p-4 transition hover:-translate-y-0.5 hover:shadow-md" onClick={() => openTasks(name)}>
-            <div className="mb-3 h-1 w-10 rounded-full bg-[#eab308]" />
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-[13px] font-extrabold">{name}</div>
-                <div className="mt-1 text-[12px] font-semibold text-slate-500">Open service tasks</div>
+        {tiles.map(([name, pending, overdue]) => {
+          const { icon, color } = getTileMeta(name);
+          return (
+            <Card 
+              key={name} 
+              className="flex items-center justify-between gap-3 p-4 cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md" 
+              onClick={() => openTasks(name)}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`grid h-10 w-10 place-items-center rounded-xl bg-slate-50 ${color}`}>
+                  {icon}
+                </div>
+                <div>
+                  <div className="text-[11px] font-extrabold uppercase text-slate-500">{name}</div>
+                  <div className="text-[24px] font-black">{pending}</div>
+                </div>
               </div>
-              <div className="grid h-9 w-9 place-items-center rounded-lg bg-slate-50 text-[#1e3a8a]"><CheckCircle2 size={17} /></div>
-            </div>
-            <div className="mt-4 flex items-center justify-between">
-              <div className="text-[24px] font-black">{pending}</div>
-              {overdue > 0 && <span className="rounded-full bg-red-50 px-2 py-1 text-[11px] font-extrabold text-[#dc2626]">{overdue} overdue</span>}
-            </div>
-          </Card>
-        ))}
+              {overdue > 0 && (
+                <span className="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-extrabold text-[#dc2626]">
+                  {overdue} overdue
+                </span>
+              )}
+            </Card>
+          );
+        })}
       </div>
 
       <Card>

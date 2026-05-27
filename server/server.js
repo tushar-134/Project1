@@ -15,6 +15,7 @@ const { notFound, errorMiddleware } = require("./middleware/errorMiddleware");
 const { maybeGenerateNextRecurringTask } = require("./controllers/taskController");
 
 const app = express();
+app.set("trust proxy", 1);
 // The frontend has been opened through both localhost and 127.0.0.1 during local runs,
 // so we allow both dev origins here to avoid misleading "invalid credentials" UI errors.
 const allowedOrigins = new Set([
