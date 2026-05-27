@@ -1,4 +1,4 @@
-import { Columns, Download, Pencil, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Columns, Download, Pencil, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -209,6 +209,138 @@ function ColumnCustomizer({ visibility, onChange }) {
               Reset to defaults
             </button>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Month / Year Picker Popover ───────────────────────────────────────────
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function MonthYearPicker({ value, onChange }) {
+  // value is "YYYY-MM" or ""
+  const [open, setOpen]   = useState(false);
+  const ref               = useRef(null);
+  const now               = new Date();
+  const parsed            = value ? { year: Number(value.split("-")[0]), month: Number(value.split("-")[1]) - 1 } : null;
+  const [viewYear, setViewYear] = useState(parsed?.year ?? now.getFullYear());
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  const displayLabel = parsed
+    ? `${MONTH_NAMES[parsed.month]} ${parsed.year}`
+    : "All months";
+
+  const selectMonth = (monthIdx) => {
+    const mm = String(monthIdx + 1).padStart(2, "0");
+    onChange(`${viewYear}-${mm}`);
+    setOpen(false);
+  };
+
+  const clear = (e) => { e.stopPropagation(); onChange(""); };
+
+  return (
+    <div ref={ref} className="relative">
+      {/* Trigger button styled like the other inputs */}
+      <button
+        type="button"
+        id="client-filter-created-at"
+        onClick={() => setOpen((v) => !v)}
+        className="input flex w-full items-center justify-between gap-1 text-left"
+        style={{ minWidth: 0 }}
+      >
+        <span className={`text-[13px] font-semibold truncate ${parsed ? "text-slate-800" : "text-slate-400"}`}>
+          {displayLabel}
+        </span>
+        <span className="flex shrink-0 items-center gap-1">
+          {parsed && (
+            <span
+              role="button"
+              tabIndex={0}
+              aria-label="Clear month filter"
+              onClick={clear}
+              onKeyDown={(e) => e.key === "Enter" && clear(e)}
+              className="grid h-4 w-4 place-items-center rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors"
+            >
+              <X size={11} />
+            </span>
+          )}
+          <ChevronRight size={13} className={`text-slate-400 transition-transform ${open ? "rotate-90" : ""}`} />
+        </span>
+      </button>
+
+      {open && (
+        <div
+          className="absolute left-0 top-full z-50 mt-1 w-64 rounded-2xl border border-slate-200 bg-white shadow-xl"
+          style={{ boxShadow: "0 8px 32px rgba(30,58,138,0.12)" }}
+        >
+          {/* Year navigation */}
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+            <button
+              type="button"
+              onClick={() => setViewYear((y) => y - 1)}
+              className="grid h-7 w-7 place-items-center rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
+              aria-label="Previous year"
+            >
+              <ChevronLeft size={15} />
+            </button>
+            <span className="text-[13px] font-extrabold text-slate-900">{viewYear}</span>
+            <button
+              type="button"
+              onClick={() => setViewYear((y) => y + 1)}
+              disabled={viewYear >= now.getFullYear()}
+              className="grid h-7 w-7 place-items-center rounded-lg hover:bg-slate-100 text-slate-600 transition-colors disabled:opacity-30"
+              aria-label="Next year"
+            >
+              <ChevronRight size={15} />
+            </button>
+          </div>
+
+          {/* Month grid */}
+          <div className="grid grid-cols-3 gap-1.5 px-3 py-3">
+            {MONTH_NAMES.map((name, idx) => {
+              const isSelected = parsed && parsed.year === viewYear && parsed.month === idx;
+              const isFuture   = viewYear === now.getFullYear() && idx > now.getMonth();
+              return (
+                <button
+                  key={name}
+                  type="button"
+                  disabled={isFuture}
+                  onClick={() => selectMonth(idx)}
+                  className={[
+                    "rounded-xl py-2 text-[12px] font-bold transition-colors",
+                    isSelected
+                      ? "bg-[#1e3a8a] text-white shadow-sm"
+                      : isFuture
+                      ? "cursor-not-allowed text-slate-300"
+                      : "text-slate-700 hover:bg-slate-100",
+                  ].join(" ")}
+                >
+                  {name}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Clear row */}
+          {parsed && (
+            <div className="border-t border-slate-100 px-4 py-2.5">
+              <button
+                type="button"
+                onClick={() => { onChange(""); setOpen(false); }}
+                className="text-[11px] font-bold text-slate-500 hover:text-[#1e3a8a] hover:underline transition-colors"
+              >
+                Clear filter
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -521,12 +653,9 @@ export default function ClientList() {
             </FilterField>
 
             <FilterField label="Created Month" htmlFor="client-filter-created-at">
-              <input
-                id="client-filter-created-at"
-                className="input"
-                type="month"
+              <MonthYearPicker
                 value={columnFilters.createdAt}
-                onChange={(e) => updateColumnFilter("createdAt", e.target.value)}
+                onChange={(val) => updateColumnFilter("createdAt", val)}
               />
             </FilterField>
 

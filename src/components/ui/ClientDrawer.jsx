@@ -1,4 +1,4 @@
-import { Building2, ExternalLink, FileText, Mail, MapPin, Phone, User, X } from "lucide-react";
+import { Building2, Clock, ExternalLink, FileText, Mail, MapPin, Phone, User, UserCheck, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -129,6 +129,8 @@ export default function ClientDrawer({ clientId, onClose }) {
                   <DetailRow label="Financial Year End" value={client.financialYearEnd} />
                   <DetailRow label="Assigned User" value={client.assignedUser?.name} />
                   <DetailRow label="Group" value={client.group?.name} />
+                  <DetailRow label="Created Date" value={formatDate(client.createdAt)} />
+                  <DetailRow label="Created By" value={client.createdBy?.name} />
                 </div>
               </Card>
 
