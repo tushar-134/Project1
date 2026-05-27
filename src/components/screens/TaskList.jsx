@@ -81,6 +81,33 @@ function sortUniqueStrings(values) {
 // Keep a backwards-compat alias used in a few places
 const sortStrings = sortUniqueStrings;
 
+/**
+ * Convert a string to Title Case while preserving all-uppercase acronyms
+ * (e.g. "VAT return" → "VAT Return", "fta filing" → "FTA Filing").
+ */
+function toTitleCase(str) {
+  return String(str).replace(/\S+/g, (word) => {
+    // Preserve acronyms that are already fully uppercase (VAT, FTA, UAE, …)
+    if (word.length > 1 && word === word.toUpperCase()) return word;
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  });
+}
+
+/**
+ * Deduplicate an array of strings case-insensitively, normalize each entry to
+ * title case (preserving acronyms), and return a sorted array.
+ * Use this for task-type / category dropdowns where casing is inconsistent.
+ */
+function normalizeOptions(values) {
+  const seen = new Map();
+  for (const v of values) {
+    if (!v) continue;
+    const key = String(v).toLowerCase();
+    if (!seen.has(key)) seen.set(key, toTitleCase(String(v)));
+  }
+  return [...seen.values()].sort((a, b) => a.localeCompare(b));
+}
+
 function buildActiveColumnFilterSummary(filters) {
   return [
     filters.taskId ? `Task ID: ${filters.taskId}` : null,
@@ -210,26 +237,32 @@ export default function TaskList() {
       const fromGlobal = state.categories
         .filter((c) => !taskCategoryNames.size || taskCategoryNames.has(c.name.toLowerCase()))
         .map((c) => c.name);
-      return fromGlobal.length ? sortUniqueStrings(fromGlobal) : sortUniqueStrings(state.tasks.map((t) => t.category));
+      return fromGlobal.length
+        ? normalizeOptions(fromGlobal)
+        : normalizeOptions(state.tasks.map((t) => t.category));
     }
-    return sortUniqueStrings(state.tasks.map((t) => t.category));
+    return normalizeOptions(state.tasks.map((t) => t.category));
   }, [state.categories, state.tasks, taskCategoryNames]);
 
-  // Task Type options: cascade from selected category; deduplicate case-insensitively.
+  // Task Type options: cascade from selected category; deduplicate + normalize to title case.
+  // When a category is selected only its taskTypes are shown; otherwise all types across
+  // categories visible in the current task list are included.
   const typeOptions = useMemo(() => {
     const selectedCat = columnFilters.category;
     if (state.categories?.length) {
       const matchedCats = selectedCat
+        // Narrow to the chosen category only
         ? state.categories.filter((c) => c.name.toLowerCase() === selectedCat.toLowerCase())
+        // No category selected → include every category that appears in the loaded tasks
         : state.categories.filter((c) => !taskCategoryNames.size || taskCategoryNames.has(c.name.toLowerCase()));
       const types = matchedCats.flatMap((c) => c.taskTypes || []);
-      if (types.length) return sortUniqueStrings(types);
+      if (types.length) return normalizeOptions(types);
     }
-    // Fallback: derive from visible tasks (filtered by selected category if set)
+    // Fallback: derive from loaded tasks (scoped to selected category when set)
     const tasksToSearch = selectedCat
       ? state.tasks.filter((t) => t.category?.toLowerCase() === selectedCat.toLowerCase())
       : state.tasks;
-    return sortUniqueStrings(tasksToSearch.map((t) => t.type));
+    return normalizeOptions(tasksToSearch.map((t) => t.type));
   }, [state.categories, state.tasks, columnFilters.category, taskCategoryNames]);
 
   const assigneeOptions = useMemo(
