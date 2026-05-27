@@ -1,6 +1,5 @@
 import { AlertTriangle, CalendarClock, ExternalLink, FileBadge2, IdCard } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { clientService } from "../../services/clientService";
+import { useMemo } from "react";
 
 const TYPE_META = {
   licence: {
@@ -32,35 +31,7 @@ function formatExpiryDate(value) {
   });
 }
 
-export default function ExpiryAlertPanel({ open, onClose, onSummaryChange, onOpenClient }) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [payload, setPayload] = useState({ alerts: [], expiredCount: 0, expiringSoonCount: 0, total: 0 });
-
-  async function loadAlerts() {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await clientService.expiryAlerts();
-      setPayload(data);
-      onSummaryChange?.(data);
-    } catch {
-      setError("Unable to load expiry alerts.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    loadAlerts();
-    const id = setInterval(loadAlerts, 60_000);
-    return () => clearInterval(id);
-  }, []);
-
-  useEffect(() => {
-    if (open) loadAlerts();
-  }, [open]);
-
+export default function ExpiryAlertPanel({ open, onClose, onOpenClient, payload, loading, error }) {
   const grouped = useMemo(() => ({
     expired: payload.alerts.filter((item) => item.status === "expired"),
     expiringSoon: payload.alerts.filter((item) => item.status === "expiring_soon"),

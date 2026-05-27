@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useCallback, useRef } from "react";
 import { useApp } from "../context/AppContext";
 import { notificationService } from "../services/notificationService";
 
@@ -8,7 +8,7 @@ export function useNotifications() {
   // Track IDs that are being dismissed so polling doesn't resurrect them.
   const dismissingRef = useRef(new Set());
 
-  async function fetchNotifications() {
+  const fetchNotifications = useCallback(async function fetchNotifications() {
     // The API returns both the latest items and the unread count in one call for the bell badge.
     const requestId = ++latestRequestRef.current;
     const data = await notificationService.list();
@@ -21,9 +21,9 @@ export function useNotifications() {
     dispatch({ type: "SET_RESOURCE", resource: "notifications", payload: unreadOnly });
     dispatch({ type: "SET_RESOURCE", resource: "unreadCount", payload: data.unreadCount });
     return data;
-  }
+  }, [dispatch]);
 
-  async function markRead(id) {
+  const markRead = useCallback(async (id) => {
     // Track that this ID is being dismissed so polling doesn't bring it back.
     dismissingRef.current.add(id);
     // Remove from panel immediately so it disappears after the user reads it.
@@ -35,9 +35,9 @@ export function useNotifications() {
     } finally {
       dismissingRef.current.delete(id);
     }
-  }
+  }, [dispatch]);
 
-  async function markAllRead() {
+  const markAllRead = useCallback(async () => {
     // Clear the panel immediately, then tell the server.
     dispatch({ type: "MARK_ALL_NOTIFICATIONS_READ" });
     try {
@@ -45,7 +45,7 @@ export function useNotifications() {
     } catch {
       // If the API fails, the next poll will re-sync
     }
-  }
+  }, [dispatch]);
 
   return { fetchNotifications, markRead, markAllRead };
 }
