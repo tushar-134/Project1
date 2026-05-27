@@ -78,6 +78,15 @@ router.post(
 );
 
 router.patch(
+  "/:id/attendance",
+  canAccess,
+  body("checkInTime").notEmpty().withMessage("Check-in time is required.").matches(/^([01]\d|2[0-3]):([0-5]\d)$/).withMessage("Check-in time is invalid."),
+  body("checkOutTime").optional({ nullable: true, checkFalsy: true }).matches(/^([01]\d|2[0-3]):([0-5]\d)$/).withMessage("Check-out time is invalid."),
+  body("visitSummary").optional().isString().withMessage("Visit Remark must be valid."),
+  ctrl.updateAttendance
+);
+
+router.patch(
   "/:id/status",
   canManage,
   body("status").isIn(["planned", "in_progress", "completed", "cancelled"]).withMessage("Status is invalid."),

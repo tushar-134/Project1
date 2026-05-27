@@ -1,14 +1,11 @@
-import { AlertTriangle, Calendar, Clock3, ExternalLink, MapPin, NotebookPen, User, UsersRound, X } from "lucide-react";
+import { AlertTriangle, Calendar, Clock3, ExternalLink, MapPin, NotebookPen, Pencil, Save, User, UsersRound, X, XCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../context/AuthContext.jsx";
 import { clientVisitService } from "../../services/clientVisitService.js";
 import Button from "./Button.jsx";
 import Card from "./Card.jsx";
 import StatusPill from "./StatusPill.jsx";
 import UserAvatar from "./UserAvatar.jsx";
-
-const VISIT_STATUS_OPTIONS = ["planned", "in_progress", "completed", "cancelled"];
 
 function titleStatus(value) {
   return String(value || "")
@@ -31,14 +28,30 @@ function formatDateTime(value) {
   return `${date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })} at ${date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}`;
 }
 
+function formatTimeInput(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function visitTimeToInput(value) {
+  const match = String(value || "").trim().match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/i);
+  if (!match) return "";
+  let hours = Number(match[1]) % 12;
+  if (match[3].toUpperCase() === "PM") hours += 12;
+  return `${String(hours).padStart(2, "0")}:${match[2]}`;
+}
+
 export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisitUpdated = () => {} }) {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
   const [visit, setVisit] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [statusSaving, setStatusSaving] = useState(false);
-  const [actingUser, setActingUser] = useState("");
+  const [attendanceSaving, setAttendanceSaving] = useState(false);
+  const [attendanceEditing, setAttendanceEditing] = useState(true);
+  const [attendanceForm, setAttendanceForm] = useState({ checkInTime: "", checkOutTime: "", visitSummary: "" });
 
   const loadVisit = useCallback(async (active = true) => {
     setLoading(true);
@@ -52,6 +65,17 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
       if (active) setLoading(false);
     }
   }, [visitId]);
+
+  useEffect(() => {
+    if (!visit) return;
+    const firstAssignedUser = visit.assignedUsers?.[0] || {};
+    setAttendanceForm({
+      checkInTime: formatTimeInput(firstAssignedUser.checkInAt) || visitTimeToInput(visit.visitTime),
+      checkOutTime: formatTimeInput(firstAssignedUser.checkOutAt),
+      visitSummary: firstAssignedUser.visitSummary || "",
+    });
+    setAttendanceEditing(!firstAssignedUser.checkInAt && visit.status !== "cancelled");
+  }, [visit]);
 
   useEffect(() => {
     if (!visitId) return undefined;
@@ -74,45 +98,33 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
 
   if (!visitId) return null;
 
-  async function handleStatusChange(nextStatus) {
-    if (!canManage || !visit || nextStatus === visit.status || statusSaving) return;
+  async function handleCancelVisit() {
+    if (!canManage || !visit || visit.status === "cancelled" || statusSaving) return;
     setStatusSaving(true);
     try {
-      const updated = await clientVisitService.updateStatus(visit._id, nextStatus);
+      const updated = await clientVisitService.updateStatus(visit._id, "cancelled");
       setVisit(updated);
       onVisitUpdated(updated);
     } catch (err) {
-      setError(err.response?.data?.message || "Unable to update visit status.");
+      setError(err.response?.data?.message || "Unable to cancel visit.");
     } finally {
       setStatusSaving(false);
     }
   }
 
-  async function handleCheckIn(entry) {
+  async function handleAttendanceSave() {
     if (!visit) return;
-    setActingUser(entry._id);
+    setAttendanceSaving(true);
+    setError("");
     try {
-      const updated = await clientVisitService.checkIn(visit._id, canManage ? { userId: entry.user?._id || entry.user } : {});
+      const updated = await clientVisitService.updateAttendance(visit._id, attendanceForm);
       setVisit(updated);
       onVisitUpdated(updated);
+      setAttendanceEditing(false);
     } catch (err) {
-      setError(err.response?.data?.message || "Unable to complete check-in.");
+      setError(err.response?.data?.message || "Unable to save visit timing.");
     } finally {
-      setActingUser("");
-    }
-  }
-
-  async function handleCheckOut(entry) {
-    if (!visit) return;
-    setActingUser(entry._id);
-    try {
-      const updated = await clientVisitService.checkOut(visit._id, canManage ? { userId: entry.user?._id || entry.user } : {});
-      setVisit(updated);
-      onVisitUpdated(updated);
-    } catch (err) {
-      setError(err.response?.data?.message || "Unable to complete check-out.");
-    } finally {
-      setActingUser("");
+      setAttendanceSaving(false);
     }
   }
 
@@ -132,16 +144,22 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
         <div className="flex items-center justify-between border-b border-[#e2e8f0] bg-white px-5 py-4">
           <div>
             <div className="page-kicker">Client Visit</div>
-            <div className="mt-1 flex items-center gap-3">
-              <div className="text-[18px] font-black text-[#1e3a8a]">{visit?.visitId || "Loading visit"}</div>
-              {visit && <StatusPill status={titleStatus(visit.status)} />}
-            </div>
+              <div className="mt-1 flex items-center gap-3">
+                <div className="task-id-link text-[18px] font-black">{visit?.visitId || "Loading visit"}</div>
+                {visit && <StatusPill status={titleStatus(visit.status)} />}
+              </div>
           </div>
           <div className="flex items-center gap-2">
             {canManage && visit && (
               <Button variant="ghost" size="sm" onClick={openEditPage}>
                 <ExternalLink size={15} />
                 Edit page
+              </Button>
+            )}
+            {canManage && visit && (
+              <Button variant="danger" size="sm" onClick={handleCancelVisit} disabled={statusSaving || visit.status === "cancelled"}>
+                <XCircle size={15} />
+                {statusSaving ? "Cancelling..." : "Cancel"}
               </Button>
             )}
             <button
@@ -189,25 +207,12 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
                       </span>
                     </div>
                   </div>
-                  {canManage && (
-                    <div className="min-w-[220px]">
-                      <label className="mb-1 block text-[11px] font-black uppercase tracking-wider text-slate-400">
-                        Visit Status
-                      </label>
-                      <select
-                        className="input h-9"
-                        value={visit.status}
-                        onChange={(event) => handleStatusChange(event.target.value)}
-                        disabled={statusSaving}
-                      >
-                        {VISIT_STATUS_OPTIONS.map((status) => (
-                          <option key={status} value={status}>
-                            {titleStatus(status)}
-                          </option>
-                        ))}
-                      </select>
+                  <div className="min-w-[160px]">
+                    <div className="mb-1 text-[11px] font-black uppercase tracking-wider text-slate-400">
+                      Visit Status
                     </div>
-                  )}
+                    <StatusPill status={titleStatus(visit.status)} />
+                  </div>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -219,50 +224,67 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
               </Card>
 
               <Card className="p-5">
-                <div className="mb-3 text-[16px] font-black text-slate-900">Assigned Users</div>
-                <div className="space-y-3">
-                  {(visit.assignedUsers || []).map((entry) => {
-                    const targetUserId = String(entry.user?._id || entry.user);
-                    const canAct = canManage || String(currentUser?._id || currentUser?.id) === targetUserId;
-                    return (
-                      <div key={entry._id} className="rounded-2xl border border-[#e2e8f0] bg-white p-4">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <UserAvatar user={entry.user} size="sm" />
-                            <div>
-                              <div className="font-black text-slate-900">{entry.user?.name || "Unknown User"}</div>
-                              <div className="text-[12px] font-semibold text-slate-500">{entry.user?.role || entry.user?.email || "-"}</div>
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            {!entry.checkInAt && canAct && (
-                              <Button size="sm" variant="success" onClick={() => handleCheckIn(entry)} disabled={actingUser === entry._id || visit.status === "cancelled"}>
-                                {actingUser === entry._id ? "Working..." : "Check In"}
-                              </Button>
-                            )}
-                            {entry.checkInAt && !entry.checkOutAt && canAct && (
-                              <Button size="sm" variant="primary" onClick={() => handleCheckOut(entry)} disabled={actingUser === entry._id || visit.status === "cancelled"}>
-                                {actingUser === entry._id ? "Working..." : "Check Out"}
-                              </Button>
-                            )}
-                          </div>
-                        </div>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-[16px] font-black text-slate-900">Visit Timing</div>
+                  {!attendanceEditing && visit.status !== "cancelled" && (
+                    <Button size="sm" variant="ghost" onClick={() => setAttendanceEditing(true)}>
+                      <Pencil size={14} />
+                      Edit
+                    </Button>
+                  )}
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label>
+                    <span className="field-label">Check In</span>
+                    <input
+                      className="input"
+                      type="time"
+                      value={attendanceForm.checkInTime}
+                      onChange={(event) => setAttendanceForm((current) => ({ ...current, checkInTime: event.target.value }))}
+                      disabled={!attendanceEditing || attendanceSaving || visit.status === "cancelled"}
+                    />
+                  </label>
+                  <label>
+                    <span className="field-label">Check Out</span>
+                    <input
+                      className="input"
+                      type="time"
+                      value={attendanceForm.checkOutTime}
+                      onChange={(event) => setAttendanceForm((current) => ({ ...current, checkOutTime: event.target.value }))}
+                      disabled={!attendanceEditing || attendanceSaving || visit.status === "cancelled"}
+                    />
+                  </label>
+                </div>
+                <label className="mt-3 block">
+                  <span className="field-label">Visit Remark</span>
+                  <textarea
+                    className="input min-h-[110px] py-3"
+                    value={attendanceForm.visitSummary}
+                    onChange={(event) => setAttendanceForm((current) => ({ ...current, visitSummary: event.target.value }))}
+                    disabled={!attendanceEditing || attendanceSaving || visit.status === "cancelled"}
+                    placeholder="Add visit notes or outcome..."
+                  />
+                </label>
+                <div className="mt-3 flex justify-end">
+                  <Button onClick={handleAttendanceSave} disabled={!attendanceEditing || attendanceSaving || visit.status === "cancelled"}>
+                    <Save size={15} />
+                    {attendanceSaving ? "Saving..." : "Save"}
+                  </Button>
+                </div>
+              </Card>
 
-                        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                          <Detail label="Check In" icon={<Clock3 size={13} />}>{formatDateTime(entry.checkInAt)}</Detail>
-                          <Detail label="Check Out" icon={<Clock3 size={13} />}>{formatDateTime(entry.checkOutAt)}</Detail>
-                          <Detail label="Duration" icon={<Clock3 size={13} />}>
-                            {entry.durationMinutes ? `${entry.durationMinutes} min` : "-"}
-                          </Detail>
-                        </div>
-                        {(entry.visitSummary || entry.notes) && (
-                          <div className="mt-3 rounded-xl bg-slate-50 p-3 text-[12px] font-medium text-slate-600">
-                            {entry.visitSummary || entry.notes}
-                          </div>
-                        )}
+              <Card className="p-5">
+                <div className="mb-3 text-[16px] font-black text-slate-900">Assigned Users</div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {(visit.assignedUsers || []).map((entry) => (
+                    <div key={entry._id} className="flex items-center gap-3 rounded-2xl border border-[#e2e8f0] bg-white p-4">
+                      <UserAvatar user={entry.user} size="sm" />
+                      <div className="min-w-0">
+                        <div className="truncate font-black text-slate-900">{entry.user?.name || "Unknown User"}</div>
+                        <div className="truncate text-[12px] font-semibold text-slate-500">{entry.user?.role || entry.user?.email || "-"}</div>
                       </div>
-                    );
-                  })}
+                    </div>
+                  ))}
                 </div>
               </Card>
 

@@ -209,7 +209,7 @@ export default function ClientVisits() {
                 <td>
                   <button
                     type="button"
-                    className="font-black text-[#1e3a8a] transition hover:underline"
+                    className="task-id-link"
                     onClick={() => setDrawerVisitId(visit._id)}
                   >
                     {visit.visitId}
