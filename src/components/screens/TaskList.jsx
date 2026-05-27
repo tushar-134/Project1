@@ -45,6 +45,16 @@ const CATEGORY_LABELS = {
   EInv: "E-Invoicing",
   Refund: "VAT Refund",
 };
+const OPTION_ACRONYMS = new Map([
+  ["ct", "CT"],
+  ["einv", "EInv"],
+  ["esr", "ESR"],
+  ["fta", "FTA"],
+  ["mis", "MIS"],
+  ["trn", "TRN"],
+  ["ubo", "UBO"],
+  ["vat", "VAT"],
+]);
 
 const STATUS_PILL = {
   "Not Yet Started": { bg: "bg-slate-100", text: "text-slate-600" },
@@ -77,45 +87,34 @@ function getCurrentMonthValue() {
   return `${year}-${month}`;
 }
 
-// Deduplicate strings case-insensitively, preserving the first-seen casing, then sort
-function sortUniqueStrings(values) {
-  const seen = new Map();
-  for (const v of values) {
-    if (!v) continue;
-    const key = String(v).toLowerCase();
-    if (!seen.has(key)) seen.set(key, String(v));
-  }
-  return [...seen.values()].sort((a, b) => a.localeCompare(b));
+function formatOptionLabel(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .split(" ")
+    .map((word) => {
+      const acronym = OPTION_ACRONYMS.get(word.toLocaleLowerCase());
+      if (acronym) return acronym;
+      if (/^[A-Z0-9&/-]{2,}$/.test(word)) return word;
+      return `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}`;
+    })
+    .join(" ");
 }
 
-// Keep a backwards-compat alias used in a few places
-const sortStrings = sortUniqueStrings;
+function normalizeOptionKey(value) {
+  return formatOptionLabel(value).toLocaleLowerCase();
+}
 
-/**
- * Convert a string to Title Case while preserving all-uppercase acronyms
- * (e.g. "VAT return" → "VAT Return", "fta filing" → "FTA Filing").
- */
-function toTitleCase(str) {
-  return String(str).replace(/\S+/g, (word) => {
-    // Preserve acronyms that are already fully uppercase (VAT, FTA, UAE, …)
-    if (word.length > 1 && word === word.toUpperCase()) return word;
-    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+function buildNormalizedOptions(values) {
+  const options = new Map();
+  values.forEach((value) => {
+    const rawValue = String(value || "").trim().replace(/\s+/g, " ");
+    const label = formatOptionLabel(rawValue);
+    if (!label) return;
+    const key = normalizeOptionKey(label);
+    if (!options.has(key)) options.set(key, { value: rawValue, label });
   });
-}
-
-/**
- * Deduplicate an array of strings case-insensitively, normalize each entry to
- * title case (preserving acronyms), and return a sorted array.
- * Use this for task-type / category dropdowns where casing is inconsistent.
- */
-function normalizeOptions(values) {
-  const seen = new Map();
-  for (const v of values) {
-    if (!v) continue;
-    const key = String(v).toLowerCase();
-    if (!seen.has(key)) seen.set(key, toTitleCase(String(v)));
-  }
-  return [...seen.values()].sort((a, b) => a.localeCompare(b));
+  return [...options.values()].sort((left, right) => left.label.localeCompare(right.label));
 }
 
 function displayCategoryName(category) {
@@ -279,52 +278,26 @@ export default function TaskList() {
     refetchTasks().catch(() => {});
   }, [refetchTasks, requestParams]);
 
-  // Category options: only show categories that actually appear in visible tasks.
-  // Falls back to all global categories if no tasks have loaded yet.
-  const taskCategoryNames = useMemo(
-    () => new Set(state.tasks.map((t) => t.category?.toLowerCase()).filter(Boolean)),
-    [state.tasks]
+  const categoryOptions = useMemo(
+    () => buildNormalizedOptions(state.categories.map((category) => category.name)),
+    [state.categories],
   );
-  const categoryOptions = useMemo(() => {
-    if (state.categories?.length) {
-      const fromGlobal = state.categories
-        .filter((c) => !taskCategoryNames.size || taskCategoryNames.has(c.name.toLowerCase()))
-        .map((c) => c.name);
-      return fromGlobal.length
-        ? normalizeOptions(fromGlobal)
-        : normalizeOptions(state.tasks.map((t) => t.category));
-    }
-    return normalizeOptions(state.tasks.map((t) => t.category));
-  }, [state.categories, state.tasks, taskCategoryNames]);
-
-  // Task Type options: cascade from selected category; deduplicate + normalize to title case.
-  // When a category is selected only its taskTypes are shown; otherwise all types across
-  // categories visible in the current task list are included.
-  const typeOptions = useMemo(() => {
-    const selectedCat = columnFilters.category;
-    if (state.categories?.length) {
-      const matchedCats = selectedCat
-        // Narrow to the chosen category only
-        ? state.categories.filter((c) => c.name.toLowerCase() === selectedCat.toLowerCase())
-        // No category selected → include every category that appears in the loaded tasks
-        : state.categories.filter((c) => !taskCategoryNames.size || taskCategoryNames.has(c.name.toLowerCase()));
-      const types = matchedCats.flatMap((c) => c.taskTypes || []);
-      if (types.length) return normalizeOptions(types);
-    }
-    // Fallback: derive from loaded tasks (scoped to selected category when set)
-    const tasksToSearch = selectedCat
-      ? state.tasks.filter((t) => t.category?.toLowerCase() === selectedCat.toLowerCase())
-      : state.tasks;
-    return normalizeOptions(tasksToSearch.map((t) => t.type));
-  }, [state.categories, state.tasks, columnFilters.category, taskCategoryNames]);
+  const typeOptions = useMemo(
+    () => {
+      const selectedCategory = state.categories.find((category) => category.name === columnFilters.category);
+      const sourceCategories = selectedCategory ? [selectedCategory] : state.categories;
+      return buildNormalizedOptions(sourceCategories.flatMap((category) => category.taskTypes || []));
+    },
+    [columnFilters.category, state.categories],
+  );
 
   const assigneeOptions = useMemo(
-    () => sortUniqueStrings(state.users?.length ? state.users.map((u) => u.name) : state.tasks.map((t) => t.assigned)),
-    [state.users, state.tasks]
+    () => buildNormalizedOptions(state.users.map((user) => user.name)),
+    [state.users],
   );
   const clientSuggestions = useMemo(
-    () => sortUniqueStrings(state.clients?.length ? state.clients.map((c) => c.name || c.legalName) : state.tasks.map((t) => t.client)),
-    [state.clients, state.tasks]
+    () => buildNormalizedOptions(state.clients.map((client) => client.name || client.legalName)),
+    [state.clients],
   );
   const rows = state.tasks;
 
@@ -337,7 +310,11 @@ export default function TaskList() {
 
   const updateColumnFilter = (key, value) => {
     setPage(1);
-    setColumnFilters((current) => ({ ...current, [key]: value }));
+    setColumnFilters((current) => ({
+      ...current,
+      [key]: value,
+      ...(key === "category" ? { type: "" } : {}),
+    }));
   };
 
   // Scope is managed via the column-filter row Scope dropdown
@@ -575,7 +552,7 @@ export default function TaskList() {
               </div>
               <datalist id="task-client-suggestions">
                 {clientSuggestions.map((client) => (
-                  <option key={client} value={client} />
+                  <option key={client.value} value={client.value} />
                 ))}
               </datalist>
             </FilterField>
@@ -590,7 +567,7 @@ export default function TaskList() {
               >
                 <option value="">All categories</option>
                 {categoryOptions.map((option) => (
-                  <option key={option} value={option}>{displayCategoryName(option)}</option>
+                  <option key={option.value} value={option.value}>{displayCategoryName(option.value)}</option>
                 ))}
               </select>
             </FilterField>
@@ -605,7 +582,7 @@ export default function TaskList() {
               >
                 <option value="">All task types</option>
                 {typeOptions.map((option) => (
-                  <option key={option} value={option}>{option}</option>
+                  <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
             </FilterField>
@@ -631,7 +608,7 @@ export default function TaskList() {
               >
                 <option value="">All assignees</option>
                 {assigneeOptions.map((option) => (
-                  <option key={option} value={option}>{option}</option>
+                  <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
             </FilterField>
