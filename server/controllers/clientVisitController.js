@@ -70,6 +70,15 @@ function combineDateAndLegacyTime(dateValue, timeValue) {
   return date;
 }
 
+function combineDateAndTimeInput(dateValue, timeValue) {
+  const match = String(timeValue || "").trim().match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  if (!match) return null;
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return null;
+  date.setHours(Number(match[1]), Number(match[2]), 0, 0);
+  return date;
+}
+
 function normalizeLegacyRange(checkInAt, checkOutAt) {
   if (!checkInAt || !checkOutAt) return { checkInAt, checkOutAt };
   if (checkOutAt >= checkInAt) return { checkInAt, checkOutAt };
@@ -613,6 +622,44 @@ exports.checkOut = async (req, res, next) => {
     assignedUser.notes = String(req.body.notes || assignedUser.notes || "").trim();
     visit.status = deriveStatus(visit.assignedUsers, visit.status);
     appendActivity(visit, req.user._id, "Check-Out Completed", `${assignedUser.user?.name || "Assigned user"} checked out`);
+    await visit.save();
+    res.json(serializeVisit(await visit.populate(populateVisit)));
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.updateAttendance = async (req, res, next) => {
+  try {
+    if (getErrors(req, res)) return;
+    const visit = await getVisitOr404(req, res);
+    if (!visit) return;
+    if (visit.status === "cancelled") {
+      return res.status(400).json({ message: "Cancelled visits cannot be updated." });
+    }
+
+    const checkInAt = combineDateAndTimeInput(visit.visitDate, req.body.checkInTime);
+    const checkOutAt = req.body.checkOutTime
+      ? combineDateAndTimeInput(visit.visitDate, req.body.checkOutTime)
+      : null;
+    if (!checkInAt) {
+      return res.status(400).json({ message: "Check-in time is required." });
+    }
+    if (req.body.checkOutTime && !checkOutAt) {
+      return res.status(400).json({ message: "Check-out time is invalid." });
+    }
+
+    const normalizedRange = normalizeLegacyRange(checkInAt, checkOutAt);
+    const visitSummary = String(req.body.visitSummary || "").trim();
+    visit.assignedUsers = (visit.assignedUsers || []).map((entry) => {
+      entry.checkInAt = normalizedRange.checkInAt;
+      entry.checkOutAt = normalizedRange.checkOutAt;
+      entry.durationMinutes = durationMinutes(normalizedRange.checkInAt, normalizedRange.checkOutAt);
+      entry.visitSummary = visitSummary;
+      return entry;
+    });
+    visit.status = deriveStatus(visit.assignedUsers, visit.status);
+    appendActivity(visit, req.user._id, "Visit Attendance Updated", "Visit timing and remarks updated");
     await visit.save();
     res.json(serializeVisit(await visit.populate(populateVisit)));
   } catch (error) {

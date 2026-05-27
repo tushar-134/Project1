@@ -105,11 +105,7 @@ export default function Categories() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="page-kicker">Task Taxonomy</div>
-          <h2 className="screen-title">Categories &amp; Task Types</h2>
-        </div>
+      <div className="flex justify-end">
         <Button onClick={openCreateModal}><Plus size={16} />New Category</Button>
       </div>
 

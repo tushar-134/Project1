@@ -84,7 +84,7 @@ export default function Dashboard() {
   );
   const tiles = tileOrder.map((name) => {
     const metric = tileMetrics.get(name);
-    return [name, metric?.pending || 0, metric?.overdue || 0];
+    return [name, metric?.active || 0, metric?.closed || 0, metric?.overdue || 0];
   });
   const openTasks = (category) => {
     const params = new URLSearchParams({ category, month: selectedMonth });
@@ -117,28 +117,39 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {tiles.map(([name, pending, overdue]) => {
+        {tiles.map(([name, active, closed, overdue]) => {
           const { icon, color } = getTileMeta(name);
           return (
             <Card 
               key={name} 
-              className="flex items-center justify-between gap-3 p-4 cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md" 
+              className="cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md overflow-hidden" 
               onClick={() => openTasks(name)}
             >
-              <div className="flex items-center gap-3">
-                <div className={`grid h-10 w-10 place-items-center rounded-xl bg-slate-50 ${color}`}>
-                  {icon}
+              {/* Tile header — category name + icon + overdue badge */}
+              <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-2">
+                <div className="flex items-center gap-2.5">
+                  <div className={`grid h-8 w-8 place-items-center rounded-lg bg-slate-50 ${color}`}>
+                    {icon}
+                  </div>
+                  <div className="text-[12px] font-extrabold uppercase tracking-wide text-slate-600">{name}</div>
                 </div>
-                <div>
-                  <div className="text-[11px] font-extrabold uppercase text-slate-500">{name}</div>
-                  <div className="text-[24px] font-black">{pending}</div>
+                {overdue > 0 && (
+                  <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-extrabold text-[#dc2626]">
+                    {overdue} overdue
+                  </span>
+                )}
+              </div>
+              {/* Split body — Active | Closed */}
+              <div className="grid grid-cols-2 divide-x divide-[#e2e8f0] border-t border-[#e2e8f0]">
+                <div className="px-4 py-3 text-center">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Pending</div>
+                  <div className="mt-0.5 text-[22px] font-black text-slate-800">{active}</div>
+                </div>
+                <div className="px-4 py-3 text-center">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-[#0284c7]">Closed</div>
+                  <div className="mt-0.5 text-[22px] font-black text-slate-800">{closed}</div>
                 </div>
               </div>
-              {overdue > 0 && (
-                <span className="rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-extrabold text-[#dc2626]">
-                  {overdue} overdue
-                </span>
-              )}
             </Card>
           );
         })}

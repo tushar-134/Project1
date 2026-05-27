@@ -19,7 +19,6 @@ import AddTask from "./components/screens/AddTask.jsx";
 import TaskList from "./components/screens/TaskList.jsx";
 import TaskDetail from "./components/screens/TaskDetail.jsx";
 import FtaTracker from "./components/screens/FtaTracker.jsx";
-import Categories from "./components/screens/Categories.jsx";
 import Users from "./components/screens/Users.jsx";
 import CustomFields from "./components/screens/CustomFields.jsx";
 import ClientGroups from "./components/screens/ClientGroups.jsx";
@@ -53,7 +52,7 @@ createRoot(document.getElementById("root")).render(
               <Route path="/tasks/list" element={<TaskList />} />
               <Route path="/tasks/:id" element={<ProtectedRoute roles={["admin", "manager", "task_only"]}><TaskDetail /></ProtectedRoute>} />
               <Route path="/tasks/fta-tracker" element={<ProtectedRoute roles={["admin", "manager", "task_only"]}><FtaTracker /></ProtectedRoute>} />
-              <Route path="/tasks/categories" element={<ProtectedRoute roles={["admin"]}><Categories /></ProtectedRoute>} />
+              <Route path="/tasks/categories" element={<Navigate to="/settings" replace />} />
               <Route path="/settings" element={<ProtectedRoute roles={["admin", "manager"]}><Settings /></ProtectedRoute>} />
               {/* Legacy deep-links redirect to the unified settings hub */}
               <Route path="/settings/users" element={<Navigate to="/settings" replace />} />

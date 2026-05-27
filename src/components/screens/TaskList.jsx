@@ -4,9 +4,11 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useUsers } from "../../hooks/useUsers.js";
-import { useTasks } from "../../hooks/useTasks.js";
-import { useClients } from "../../hooks/useClients.js";
-import { downloadBlob } from "../../utils/adapterUtils";
+import { useTasks } from "../../hooks/useTasks";
+import { useClients } from "../../hooks/useClients";
+import { categoryService } from "../../services/categoryService";
+import { clientService } from "../../services/clientService";
+import { downloadBlob, mapCategory, mapClient } from "../../utils/adapterUtils";
 import { canManageTasks } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
@@ -35,6 +37,14 @@ const SCOPE_OPTIONS = ["By Month", "Overdue", "All"];
 // Column count updated: +2 for Created Date and Last Modified
 const TASK_TABLE_COLUMNS = 10;
 const PAGE_SIZE = 20;
+const LOOKUP_PAGE_SIZE = 100;
+
+const CATEGORY_LABELS = {
+  CT: "Corporate Tax",
+  MIS: "MIS Reporting",
+  EInv: "E-Invoicing",
+  Refund: "VAT Refund",
+};
 
 const STATUS_PILL = {
   "Not Yet Started": { bg: "bg-slate-100", text: "text-slate-600" },
@@ -108,11 +118,34 @@ function normalizeOptions(values) {
   return [...seen.values()].sort((a, b) => a.localeCompare(b));
 }
 
+function displayCategoryName(category) {
+  return CATEGORY_LABELS[category] || category || "";
+}
+
+async function fetchAllClientsForLookup() {
+  const firstPage = await clientService.list({ page: 1, limit: LOOKUP_PAGE_SIZE });
+  const rawFirstClients = Array.isArray(firstPage) ? firstPage : (firstPage.clients || firstPage.items || []);
+  const firstClients = rawFirstClients.map(mapClient);
+  const pages = Number(firstPage.pages) || 1;
+  if (pages <= 1) return firstClients;
+
+  const remaining = await Promise.all(
+    Array.from({ length: pages - 1 }, (_, index) =>
+      clientService.list({ page: index + 2, limit: LOOKUP_PAGE_SIZE })
+    )
+  );
+  return remaining.reduce((items, pageData) => {
+    const rawPageClients = Array.isArray(pageData) ? pageData : (pageData.clients || pageData.items || []);
+    const pageClients = rawPageClients.map(mapClient);
+    return [...items, ...pageClients];
+  }, firstClients);
+}
+
 function buildActiveColumnFilterSummary(filters) {
   return [
     filters.taskId ? `Task ID: ${filters.taskId}` : null,
     filters.client ? `Client: ${filters.client}` : null,
-    filters.category ? `Category: ${filters.category}` : null,
+    filters.category ? `Category: ${displayCategoryName(filters.category)}` : null,
     filters.type ? `Task Type: ${filters.type}` : null,
     filters.dueDate ? `Due Date: ${filters.dueDate}` : null,
     filters.assigned ? `Assigned: ${filters.assigned}` : null,
@@ -144,11 +177,12 @@ function StatusPill({ status }) {
 }
 
 export default function TaskList() {
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { fetchTasks, updateStatus, updateAssignee, exportTasks } = useTasks();
+  const { fetchClients } = useClients();
   const initialMonth = searchParams.get("month") || getCurrentMonthValue();
 
   // Scope & month still live as top-level state (drive server query) but are now
@@ -191,6 +225,26 @@ export default function TaskList() {
       fetchClients({ limit: 1000 }).catch(() => {});
     }
   }, [canManage]);
+
+  useEffect(() => {
+    categoryService.list()
+      .then((data) => dispatch({ type: "SET_RESOURCE", resource: "categories", payload: data.map(mapCategory) }))
+      .catch(() => {});
+  }, [dispatch]);
+
+  useEffect(() => {
+    let active = true;
+    fetchAllClientsForLookup()
+      .then((clients) => {
+        if (active) dispatch({ type: "SET_RESOURCE", resource: "clients", payload: clients });
+      })
+      .catch(() => {
+        fetchClients({ limit: LOOKUP_PAGE_SIZE }).catch(() => {});
+      });
+    return () => {
+      active = false;
+    };
+  }, [dispatch, fetchClients]);
 
   const serverFilters = useMemo(() => ({
     category: deferredColumnFilters.category || undefined,
@@ -270,7 +324,7 @@ export default function TaskList() {
     [state.users, state.tasks]
   );
   const clientSuggestions = useMemo(
-    () => sortUniqueStrings(state.clients?.length ? state.clients.map((c) => c.name) : state.tasks.map((t) => t.client)),
+    () => sortUniqueStrings(state.clients?.length ? state.clients.map((c) => c.name || c.legalName) : state.tasks.map((t) => t.client)),
     [state.clients, state.tasks]
   );
   const rows = state.tasks;
@@ -537,7 +591,7 @@ export default function TaskList() {
               >
                 <option value="">All categories</option>
                 {categoryOptions.map((option) => (
-                  <option key={option} value={option}>{option}</option>
+                  <option key={option} value={option}>{displayCategoryName(option)}</option>
                 ))}
               </select>
             </FilterField>

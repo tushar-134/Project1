@@ -13,6 +13,9 @@ import UserAvatar from "../ui/UserAvatar.jsx";
 
 const POLL_INTERVAL_MS = 60_000;
 const OPEN_REFRESH_STALE_MS = 30_000;
+const LEADER_KEY = "project1:topbar-poll-leader";
+const LEADER_TTL_MS = 75_000;
+const LEADER_HEARTBEAT_MS = 15_000;
 
 export default function TopBar({ title, onMenuClick }) {
   const [open, setOpen] = useState(false);
@@ -36,6 +39,60 @@ export default function TopBar({ title, onMenuClick }) {
   const expiryBusyRef = useRef(false);
   const lastNotificationsFetchRef = useRef(0);
   const lastExpiryFetchRef = useRef(0);
+  const tabIdRef = useRef(
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `tab-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  );
+  const [, setIsPollLeader] = useState(false);
+
+  function readLeaderLease() {
+    try {
+      const raw = window.localStorage.getItem(LEADER_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function writeLeaderLease() {
+    const lease = {
+      id: tabIdRef.current,
+      expiresAt: Date.now() + LEADER_TTL_MS,
+    };
+    try {
+      window.localStorage.setItem(LEADER_KEY, JSON.stringify(lease));
+    } catch {
+      return null;
+    }
+    return lease;
+  }
+
+  function releaseLeaderLease() {
+    const currentLease = readLeaderLease();
+    if (currentLease?.id === tabIdRef.current) {
+      try {
+        window.localStorage.removeItem(LEADER_KEY);
+      } catch {
+        // Ignore storage failures during unload.
+      }
+    }
+  }
+
+  function syncLeaderState() {
+    if (typeof window === "undefined") return false;
+    const now = Date.now();
+    const currentLease = readLeaderLease();
+    let nextLease = currentLease;
+
+    if (!currentLease || currentLease.expiresAt <= now || currentLease.id === tabIdRef.current) {
+      nextLease = writeLeaderLease() || currentLease;
+    }
+
+    const ownsLease = Boolean(nextLease?.id === tabIdRef.current && nextLease.expiresAt > now);
+    setIsPollLeader(ownsLease);
+    return ownsLease;
+  }
 
   async function refreshNotifications({ force = false, minAge = 0 } = {}) {
     if (notificationsBusyRef.current) return;
@@ -69,6 +126,24 @@ export default function TopBar({ title, onMenuClick }) {
   }
 
   useEffect(() => {
+    function onStorage(event) {
+      if (event.key === LEADER_KEY) syncLeaderState();
+    }
+
+    syncLeaderState();
+    window.addEventListener("storage", onStorage);
+    const heartbeatId = window.setInterval(() => {
+      if (document.visibilityState === "visible") syncLeaderState();
+    }, LEADER_HEARTBEAT_MS);
+
+    return () => {
+      window.clearInterval(heartbeatId);
+      window.removeEventListener("storage", onStorage);
+      releaseLeaderLease();
+    };
+  }, []);
+
+  useEffect(() => {
     // Clicking outside the bell/panel cluster should close notifications without affecting the rest of the page.
     function onPointerDown(event) {
       if (wrapRef.current && !wrapRef.current.contains(event.target)) setOpen(false);
@@ -82,6 +157,7 @@ export default function TopBar({ title, onMenuClick }) {
   useEffect(() => {
     function refreshVisibleData() {
       if (document.visibilityState !== "visible") return;
+      if (!syncLeaderState()) return;
       refreshNotifications({ minAge: OPEN_REFRESH_STALE_MS }).catch(() => {});
       refreshExpiryAlerts({ minAge: OPEN_REFRESH_STALE_MS }).catch(() => {});
     }

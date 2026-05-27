@@ -9,6 +9,9 @@ const ActivityLog = require("../models/ActivityLog");
 const { nextClientFileNo } = require("../utils/autoId");
 const { normalizeDialCode, normalizePhoneNumber } = require("../utils/phoneUtils");
 const { buildUploadedFileUrl, normalizeStoredUploadUrl } = require("../utils/uploadUrl");
+const { createTtlCache } = require("../utils/ttlCache");
+
+const expiryAlertsCache = createTtlCache(30_000);
 
 // Managers can assign clients to themselves or task_only users only — not to other managers or admins.
 async function ensureManagerCanAssignClient(req, assignedUser) {
@@ -773,6 +776,9 @@ exports.exportClients = async (req, res, next) => {
 
 exports.expiryAlerts = async (req, res, next) => {
   try {
+    const cacheKey = `${req.user.role}:${req.user._id}`;
+    const cached = expiryAlertsCache.get(cacheKey);
+    if (cached) return res.json(cached);
     const query = { isActive: true };
     if (req.user.role === "task_only") {
       const assignedClientIds = await Task.find({ assignedTo: req.user._id }).distinct("client");
@@ -839,12 +845,14 @@ exports.expiryAlerts = async (req, res, next) => {
       return new Date(a.expiryDate) - new Date(b.expiryDate);
     });
 
-    res.json({
+    const payload = {
       expiredCount: alerts.filter((item) => item.status === "expired").length,
       expiringSoonCount: alerts.filter((item) => item.status === "expiring_soon").length,
       total: alerts.length,
       alerts,
-    });
+    };
+    expiryAlertsCache.set(cacheKey, payload);
+    res.json(payload);
   } catch (error) { next(error); }
 };
 
