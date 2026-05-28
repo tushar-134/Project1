@@ -356,7 +356,6 @@ export default function ClientList() {
   const { fetchClients, deleteClient, exportClients } = useClients();
   const [query, setQuery] = useState(searchParams.get("search") || "");
   const [page, setPage] = useState(1);
-  const [filtersOpen, setFiltersOpen] = useState(true);
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1, workingTasksTotal: 0 });
   const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
   const [drawerClientId, setDrawerClientId] = useState(null);
@@ -430,6 +429,7 @@ export default function ClientList() {
   const hasActiveFilters = Boolean(query.trim()) || hasColumnFilters;
   const activeFilterCount = activeColumnFilters.length;
   const workingCount = rows.filter((c) => (c.activeTasks || 0) > 0).length;
+  const draftCount = rows.filter((client) => client.isDraft).length;
 
   const updateColumnFilter = (key, value) => {
     setPage(1);
@@ -475,273 +475,224 @@ export default function ClientList() {
   return (
     <div className="space-y-5">
 
-      {/* Filter accordion */}
+      {/* Filter & review toolbar — mirrors TaskList design */}
       <Card>
-        {/* ── Accordion header / toggle ── */}
-        <button
-          type="button"
-          id="filter-accordion-toggle"
-          aria-expanded={filtersOpen}
-          aria-controls="filter-accordion-body"
-          onClick={() => setFiltersOpen((v) => !v)}
-          className={[
-            "w-full flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-5 text-left select-none",
-            "border-b transition-all duration-200 rounded-t-xl",
-            hasColumnFilters
-              ? "bg-blue-50/70 border-blue-100 hover:bg-blue-50"
-              : "bg-slate-50 border-slate-200 hover:bg-slate-100",
-          ].join(" ")}
-        >
-          {/* Left: icon badge + label + hint */}
-          <div className="flex items-center gap-3 min-w-0">
-            <span className={[
-              "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg shadow-sm transition-all duration-200",
-              hasColumnFilters
-                ? "bg-[#1e3a8a] text-white"
-                : "bg-white text-[#1e3a8a] border border-slate-200",
-            ].join(" ")}>
-              <SlidersHorizontal size={16} />
-            </span>
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500">
-                  Filter Options
-                </span>
-                {hasActiveFilters && (
-                  <span className="inline-flex rounded-full bg-[#1e3a8a] px-2 py-0.5 text-[10px] font-extrabold text-white shadow-sm">
-                    {activeFilterCount} active
-                  </span>
-                )}
+        <div className="task-list-toolbar border-b border-slate-200 px-4 py-4 sm:px-5">
+          {/* Header row: title + summary pills */}
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-2xl">
+              <div className="flex items-center gap-2 text-[14px] font-extrabold text-slate-900">
+                <SlidersHorizontal size={16} className="text-[#1e3a8a]" />
+                Filter and review clients
               </div>
-              <p className="mt-0.5 text-[11px] font-medium text-slate-400 truncate">
-                {filtersOpen ? "Click to collapse" : "Click to expand and filter clients"}
+              <p className="mt-1 text-[12px] font-medium text-slate-500">
+                Use the filters below to narrow the client list by name, type, jurisdiction, group, or contact details.
               </p>
             </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <InfoPill tone="navy" label={`${workingCount} with active tasks`} />
+              <InfoPill tone="slate" label={`${meta.total} total`} />
+              {draftCount > 0 && <InfoPill tone="amber" label={`${draftCount} incomplete`} />}
+              {meta.workingTasksTotal > 0 && (
+                <InfoPill tone="green" label={`${meta.workingTasksTotal} active tasks`} />
+              )}
+              {clientsLoading && <InfoPill tone="amber" label="Refreshing" />}
+              {hasActiveFilters && <InfoPill tone="blue" label={`${activeFilterCount} active filters`} />}
+            </div>
           </div>
 
-          {/* Centre: stats pills */}
-          <div className="flex flex-wrap items-center gap-2">
-            <InfoPill tone="navy" label={`${workingCount} with active tasks`} />
-            <InfoPill tone="slate" label={`${meta.total} total`} />
-            {meta.workingTasksTotal > 0 && (
-              <InfoPill tone="green" label={`${meta.workingTasksTotal} active tasks`} />
-            )}
-            {clientsLoading && <InfoPill tone="amber" label="Refreshing" />}
-            {hasActiveFilters && <InfoPill tone="blue" label={`${activeFilterCount} filtered`} />}
-          </div>
+          {/* Global search + action buttons row */}
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <label htmlFor="client-search" className="task-list-field flex-1 min-w-[200px]">
+              <span className="task-list-field-label">Search</span>
+              <div className="task-list-input-wrap">
+                <Search size={14} className="task-list-input-icon" aria-hidden="true" />
+                <input
+                  id="client-search"
+                  name="clientSearch"
+                  className="input"
+                  type="search"
+                  placeholder="Name, TRN, licence, contact, email…"
+                  value={query}
+                  onChange={(e) => {
+                    setPage(1);
+                    setQuery(e.target.value);
+                  }}
+                />
+              </div>
+            </label>
 
-          {/* Right: chevron enclosed in pill */}
-          <span className={[
-            "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all duration-200",
-            hasColumnFilters
-              ? "bg-[#1e3a8a]/10 text-[#1e3a8a]"
-              : "bg-white text-slate-400 border border-slate-200",
-          ].join(" ")}>
-            <ChevronDown
-              size={15}
-              className={`transition-transform duration-300 ${filtersOpen ? "rotate-180" : "rotate-0"}`}
-            />
-          </span>
-        </button>
+            <div className="flex flex-wrap items-center gap-2 pb-0.5">
+              {/* Column customizer */}
+              <ColumnCustomizer visibility={colVisibility} onChange={updateColVisibility} />
 
-        {/* ── Accordion body ── */}
-        <div
-          id="filter-accordion-body"
-          style={{
-            display: filtersOpen ? "block" : "none",
-          }}
-        >
-          <div className="border-t border-slate-100 px-4 py-4 sm:px-5">
-            {/* Global search + action buttons row */}
-            <div className="flex flex-wrap items-end gap-3">
-              <label htmlFor="client-search" className="task-list-field flex-1 min-w-[200px]">
-                <span className="task-list-field-label">Search</span>
-                <div className="task-list-input-wrap">
-                  <Search size={14} className="task-list-input-icon" aria-hidden="true" />
-                  <input
-                    id="client-search"
-                    name="clientSearch"
-                    className="input"
-                    type="search"
-                    placeholder="Name, TRN, licence, contact, email…"
-                    value={query}
-                    onChange={(e) => {
-                      setPage(1);
-                      setQuery(e.target.value);
-                    }}
-                  />
-                </div>
-              </label>
+              {/* Icon-only action buttons: Refresh, Import, Export */}
+              <button
+                type="button"
+                title="Refresh client list"
+                onClick={refetchClients}
+                disabled={clientsLoading}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-[#1e3a8a] disabled:opacity-50"
+              >
+                <RefreshCw size={15} className={clientsLoading ? "animate-spin" : ""} />
+              </button>
 
-              <div className="flex flex-wrap items-center gap-2 pb-0.5">
-                {/* Column customizer */}
-                <ColumnCustomizer visibility={colVisibility} onChange={updateColVisibility} />
-
-                {/* Icon-only action buttons: Refresh, Import, Export */}
+              {canManage && canCreate && (
                 <button
                   type="button"
-                  title="Refresh client list"
-                  onClick={refetchClients}
-                  disabled={clientsLoading}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-[#1e3a8a] disabled:opacity-50"
+                  title="Import clients"
+                  onClick={() => navigate("/clients/bulk-upload")}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-[#1e3a8a]"
                 >
-                  <RefreshCw size={15} className={clientsLoading ? "animate-spin" : ""} />
+                  <Upload size={15} />
                 </button>
-
-                {canManage && canCreate && (
-                  <button
-                    type="button"
-                    title="Import clients"
-                    onClick={() => navigate("/clients/bulk-upload")}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-[#1e3a8a]"
-                  >
-                    <Upload size={15} />
-                  </button>
-                )}
-                {canManage && (
-                  <button
-                    type="button"
-                    title="Export clients to Excel"
-                    onClick={exportCsv}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-[#1e3a8a]"
-                  >
-                    <Download size={15} />
-                  </button>
-                )}
-
-                {hasColumnFilters && (
-                  <Button variant="ghost" size="sm" onClick={clearColumnFilters}>
-                    <X size={15} />
-                    Clear
-                  </Button>
-                )}
-                {hasActiveFilters && (
-                  <Button variant="ghost" size="sm" onClick={resetAllFilters}>
-                    Reset all
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {/* Column filter grid */}
-            <div className="mt-4 task-list-column-grid">
-              <FilterField label="Client Name" htmlFor="client-filter-name">
-                <div className="task-list-input-wrap">
-                  <Search size={14} className="task-list-input-icon" aria-hidden="true" />
-                  <input
-                    id="client-filter-name"
-                    className="input"
-                    type="search"
-                    placeholder="Search client"
-                    value={columnFilters.client}
-                    onChange={(e) => updateColumnFilter("client", e.target.value)}
-                  />
-                </div>
-              </FilterField>
-
-              <FilterField label="Jurisdiction" htmlFor="client-filter-jurisdiction">
-                <select
-                  id="client-filter-jurisdiction"
-                  className="input"
-                  value={columnFilters.jurisdiction}
-                  onChange={(e) => updateColumnFilter("jurisdiction", e.target.value)}
+              )}
+              {canManage && (
+                <button
+                  type="button"
+                  title="Export clients to Excel"
+                  onClick={exportCsv}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-[#1e3a8a]"
                 >
-                  <option value="">All jurisdictions</option>
-                  {JURISDICTION_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </FilterField>
+                  <Download size={15} />
+                </button>
+              )}
 
-              <FilterField label="Type" htmlFor="client-filter-type">
-                <select
-                  id="client-filter-type"
-                  className="input"
-                  value={columnFilters.type}
-                  onChange={(e) => updateColumnFilter("type", e.target.value)}
-                >
-                  <option value="">All types</option>
-                  {TYPE_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </FilterField>
-
-              <FilterField label="Group" htmlFor="client-filter-group">
-                <div className="task-list-input-wrap">
-                  <Search size={14} className="task-list-input-icon" aria-hidden="true" />
-                  <input
-                    id="client-filter-group"
-                    className="input"
-                    type="search"
-                    placeholder="Search group"
-                    value={columnFilters.group}
-                    onChange={(e) => updateColumnFilter("group", e.target.value)}
-                  />
-                </div>
-              </FilterField>
-
-              <FilterField label="Compliance" htmlFor="client-filter-compliance">
-                <div className="task-list-input-wrap">
-                  <Search size={14} className="task-list-input-icon" aria-hidden="true" />
-                  <input
-                    id="client-filter-compliance"
-                    className="input"
-                    type="search"
-                    placeholder="TRN or licence no."
-                    value={columnFilters.compliance}
-                    onChange={(e) => updateColumnFilter("compliance", e.target.value)}
-                  />
-                </div>
-              </FilterField>
-
-              <FilterField label="Contact" htmlFor="client-filter-contact">
-                <div className="task-list-input-wrap">
-                  <Search size={14} className="task-list-input-icon" aria-hidden="true" />
-                  <input
-                    id="client-filter-contact"
-                    className="input"
-                    type="search"
-                    placeholder="Name, phone or email"
-                    value={columnFilters.contact}
-                    onChange={(e) => updateColumnFilter("contact", e.target.value)}
-                  />
-                </div>
-              </FilterField>
-
-              <FilterField label="Created Month" htmlFor="client-filter-created-at">
-                <MonthYearPicker
-                  value={columnFilters.createdAt}
-                  onChange={(val) => updateColumnFilter("createdAt", val)}
-                />
-              </FilterField>
-
-              <FilterField label="Created By" htmlFor="client-filter-created-by">
-                <div className="task-list-input-wrap">
-                  <Search size={14} className="task-list-input-icon" aria-hidden="true" />
-                  <input
-                    id="client-filter-created-by"
-                    className="input"
-                    type="search"
-                    placeholder="Staff name"
-                    value={columnFilters.createdBy}
-                    onChange={(e) => updateColumnFilter("createdBy", e.target.value)}
-                  />
-                </div>
-              </FilterField>
+              {hasColumnFilters && (
+                <Button variant="ghost" size="sm" onClick={clearColumnFilters}>
+                  <X size={15} />
+                  Clear columns
+                </Button>
+              )}
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={resetAllFilters}>
+                  Reset all
+                </Button>
+              )}
             </div>
-
-            {/* Active filter chips */}
-            {hasActiveFilters && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {activeColumnFilters.map((item) => (
-                  <span key={item} className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-600">
-                    {item}
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
+        </div>
+
+        {/* Column filter grid — styled exactly like TaskList */}
+        <div className="px-4 py-4 sm:px-5">
+          <div className="task-list-column-grid">
+            <FilterField label="Client Name" htmlFor="client-filter-name">
+              <div className="task-list-input-wrap">
+                <Search size={14} className="task-list-input-icon" aria-hidden="true" />
+                <input
+                  id="client-filter-name"
+                  className="input"
+                  type="search"
+                  placeholder="Search client"
+                  value={columnFilters.client}
+                  onChange={(e) => updateColumnFilter("client", e.target.value)}
+                />
+              </div>
+            </FilterField>
+
+            <FilterField label="Jurisdiction" htmlFor="client-filter-jurisdiction">
+              <select
+                id="client-filter-jurisdiction"
+                className="input"
+                value={columnFilters.jurisdiction}
+                onChange={(e) => updateColumnFilter("jurisdiction", e.target.value)}
+              >
+                <option value="">All jurisdictions</option>
+                {JURISDICTION_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </FilterField>
+
+            <FilterField label="Type" htmlFor="client-filter-type">
+              <select
+                id="client-filter-type"
+                className="input"
+                value={columnFilters.type}
+                onChange={(e) => updateColumnFilter("type", e.target.value)}
+              >
+                <option value="">All types</option>
+                {TYPE_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            </FilterField>
+
+            <FilterField label="Group" htmlFor="client-filter-group">
+              <div className="task-list-input-wrap">
+                <Search size={14} className="task-list-input-icon" aria-hidden="true" />
+                <input
+                  id="client-filter-group"
+                  className="input"
+                  type="search"
+                  placeholder="Search group"
+                  value={columnFilters.group}
+                  onChange={(e) => updateColumnFilter("group", e.target.value)}
+                />
+              </div>
+            </FilterField>
+
+            <FilterField label="Compliance" htmlFor="client-filter-compliance">
+              <div className="task-list-input-wrap">
+                <Search size={14} className="task-list-input-icon" aria-hidden="true" />
+                <input
+                  id="client-filter-compliance"
+                  className="input"
+                  type="search"
+                  placeholder="TRN or licence no."
+                  value={columnFilters.compliance}
+                  onChange={(e) => updateColumnFilter("compliance", e.target.value)}
+                />
+              </div>
+            </FilterField>
+
+            <FilterField label="Contact" htmlFor="client-filter-contact">
+              <div className="task-list-input-wrap">
+                <Search size={14} className="task-list-input-icon" aria-hidden="true" />
+                <input
+                  id="client-filter-contact"
+                  className="input"
+                  type="search"
+                  placeholder="Name, phone or email"
+                  value={columnFilters.contact}
+                  onChange={(e) => updateColumnFilter("contact", e.target.value)}
+                />
+              </div>
+            </FilterField>
+
+            <FilterField label="Created Month" htmlFor="client-filter-created-at">
+              <MonthYearPicker
+                value={columnFilters.createdAt}
+                onChange={(val) => updateColumnFilter("createdAt", val)}
+              />
+            </FilterField>
+
+            <FilterField label="Created By" htmlFor="client-filter-created-by">
+              <div className="task-list-input-wrap">
+                <Search size={14} className="task-list-input-icon" aria-hidden="true" />
+                <input
+                  id="client-filter-created-by"
+                  className="input"
+                  type="search"
+                  placeholder="Staff name"
+                  value={columnFilters.createdBy}
+                  onChange={(e) => updateColumnFilter("createdBy", e.target.value)}
+                />
+              </div>
+            </FilterField>
+          </div>
+
+          {/* Active filter chips */}
+          {hasActiveFilters && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {activeColumnFilters.map((item) => (
+                <span key={item} className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-600">
+                  {item}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </Card>
 
@@ -804,13 +755,18 @@ export default function ClientList() {
                     <button
                       type="button"
                       className="task-id-link font-extrabold text-left"
-                      onClick={() => setDrawerClientId(client.id)}
-                      title="Open client details"
+                      onClick={() => client.isDraft ? navigate(`/clients/edit/${client.id}`) : setDrawerClientId(client.id)}
+                      title={client.isDraft ? "Resume incomplete client" : "Open client details"}
                     >
                       {client.name}
                     </button>
                     <div className="mt-1 flex flex-wrap gap-2">
                       <span className="text-[12px] font-semibold text-slate-500">{client.jurisdiction}</span>
+                      {client.isDraft && (
+                        <Badge color="bg-amber-100 text-amber-700">
+                          Incomplete
+                        </Badge>
+                      )}
                       <Badge color={client.type === "Legal Person" ? "bg-blue-50 text-[#1e3a8a]" : "bg-emerald-50 text-[#059669]"}>
                         {client.type}
                       </Badge>
