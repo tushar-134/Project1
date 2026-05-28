@@ -1,4 +1,4 @@
-import { ChevronDown, Columns, Download, RefreshCw, Search, SlidersHorizontal, X } from "lucide-react";
+import { ChevronDown, Columns, Download, MessageSquare, RefreshCw, Search, SlidersHorizontal, X } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -16,6 +16,212 @@ import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import Table from "../ui/Table.jsx";
 import TaskDrawer from "../ui/TaskDrawer.jsx";
+
+// ─── Status multi-select dropdown ─────────────────────────────────────────────
+function StatusMultiSelect({ value, onChange }) {
+  // value is a comma-separated string of selected statuses e.g. "WIP,Completed"
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const selected = value ? value.split(",").map((s) => s.trim()).filter(Boolean) : [];
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const toggle = (status) => {
+    const next = selected.includes(status)
+      ? selected.filter((s) => s !== status)
+      : [...selected, status];
+    onChange(next.join(","));
+  };
+
+  const label = selected.length === 0 ? "All statuses" : selected.length === 1 ? selected[0] : `${selected.length} selected`;
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        id="task-filter-status"
+        onClick={() => setOpen((v) => !v)}
+        className={["input flex w-full items-center justify-between gap-2 text-left",
+          selected.length ? "border-[#1e3a8a] ring-1 ring-[#1e3a8a]/20" : "",
+        ].join(" ")}
+      >
+        <span className={`truncate text-[13px] font-semibold ${selected.length ? "text-[#1e3a8a]" : "text-slate-400"}`}>{label}</span>
+        <span className="flex shrink-0 items-center gap-1">
+          {selected.length > 0 && (
+            <span
+              role="button" tabIndex={0} aria-label="Clear status filter"
+              onClick={(e) => { e.stopPropagation(); onChange(""); }}
+              onKeyDown={(e) => e.key === "Enter" && onChange("")}
+              className="grid h-4 w-4 place-items-center rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors"
+            ><X size={11} /></span>
+          )}
+          <ChevronDown size={13} className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+        </span>
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full z-50 mt-1 w-52 rounded-2xl border border-slate-200 bg-white shadow-xl"
+          style={{ boxShadow: "0 8px 32px rgba(30,58,138,0.12)" }}>
+          <ul className="px-2 py-2 space-y-0.5">
+            {FILTER_STATUSES.filter((s) => s !== "All").map((status) => (
+              <li key={status}>
+                <label className="flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2 hover:bg-slate-50 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(status)}
+                    onChange={() => toggle(status)}
+                    className="h-4 w-4 rounded border-slate-300 accent-[#1e3a8a]"
+                  />
+                  <span className="text-[12px] font-semibold text-slate-700">{status}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          {selected.length > 0 && (
+            <div className="border-t border-slate-100 px-4 py-2">
+              <button type="button" onClick={() => onChange("")}
+                className="text-[11px] font-bold text-slate-500 hover:text-[#1e3a8a] hover:underline transition-colors">
+                Clear filter
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Comments modal ────────────────────────────────────────────────────────────
+function CommentsModal({ task, currentUser, onClose, onCommentAdded }) {
+  const [text, setText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+  const bottomRef = useRef(null);
+
+  // Scroll to bottom whenever comments change
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [task?.comments?.length]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onCommentAdded(task.id, trimmed);
+      setText("");
+    } catch {
+      setError("Failed to post comment. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const comments = task?.comments || [];
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
+      role="dialog" aria-modal="true" aria-label={`Comments for ${task?.taskId}`}
+    >
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      {/* Panel */}
+      <div className="relative z-10 flex w-full max-w-lg flex-col rounded-t-3xl sm:rounded-3xl bg-white shadow-2xl"
+        style={{ maxHeight: "90vh" }}>
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <MessageSquare size={16} className="text-[#1e3a8a]" />
+              <span className="text-[14px] font-extrabold text-slate-900">Comments</span>
+              {comments.length > 0 && (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#1e3a8a] px-1.5 text-[10px] font-extrabold text-white">
+                  {comments.length}
+                </span>
+              )}
+            </div>
+            <div className="mt-0.5 text-[11px] font-medium text-slate-500">
+              {task?.taskId} · {task?.client}
+            </div>
+          </div>
+          <button type="button" onClick={onClose}
+            className="grid h-8 w-8 place-items-center rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Comment thread */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+          {comments.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <MessageSquare size={32} className="mb-3 text-slate-200" />
+              <div className="text-[13px] font-bold text-slate-400">No comments yet</div>
+              <div className="mt-1 text-[11px] font-medium text-slate-300">Be the first to add a comment below.</div>
+            </div>
+          )}
+          {comments.map((c, idx) => {
+            const authorName = c.addedBy?.name || "Unknown";
+            const isMe = String(c.addedBy?._id || c.addedBy) === String(currentUser?._id || currentUser?.id);
+            const { date, time } = formatDateTime(c.createdAt);
+            return (
+              <div key={c._id || idx} className={`flex gap-3 ${isMe ? "flex-row-reverse" : ""}`}>
+                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold ${
+                  isMe ? "bg-[#1e3a8a] text-white" : "bg-slate-100 text-slate-600"
+                }`}>
+                  {authorName.charAt(0).toUpperCase()}
+                </div>
+                <div className={`flex flex-col gap-1 max-w-[80%] ${isMe ? "items-end" : ""}`}>
+                  <div className={`rounded-2xl px-3.5 py-2.5 text-[13px] font-medium leading-relaxed ${
+                    isMe ? "bg-[#1e3a8a] text-white rounded-tr-sm" : "bg-slate-50 text-slate-800 rounded-tl-sm border border-slate-100"
+                  }`}>
+                    {c.text}
+                  </div>
+                  <div className={`flex items-center gap-1.5 text-[10px] font-medium text-slate-400 ${isMe ? "flex-row-reverse" : ""}`}>
+                    <span>{authorName}</span>
+                    <span>·</span>
+                    <span>{date}</span>
+                    {time && <><span>·</span><span>{time}</span></>}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <div ref={bottomRef} />
+        </div>
+
+        {/* Compose box */}
+        <form onSubmit={handleSubmit} className="border-t border-slate-100 px-5 py-4">
+          {error && <div className="mb-2 rounded-xl bg-red-50 px-3 py-2 text-[12px] font-bold text-red-600">{error}</div>}
+          <div className="flex gap-2">
+            <textarea
+              rows={2}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(e); } }}
+              placeholder="Add a comment… (Enter to send, Shift+Enter for new line)"
+              className="input flex-1 resize-none text-[13px]"
+              disabled={submitting}
+            />
+            <button
+              type="submit"
+              disabled={!text.trim() || submitting}
+              className="self-end rounded-xl bg-[#1e3a8a] px-4 py-2 text-[12px] font-extrabold text-white transition-all hover:bg-[#1e40af] disabled:opacity-40"
+            >
+              {submitting ? "…" : "Send"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 const COLUMN_DEFS = [
   { key: "taskId", label: "Task ID", defaultOn: true, description: "Unique task identifier" },
@@ -208,7 +414,7 @@ export default function TaskList() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { fetchTasks, updateStatus, updateAssignee, exportTasks } = useTasks();
+  const { fetchTasks, updateStatus, updateAssignee, addComment, exportTasks } = useTasks();
   const initialMonth = searchParams.get("month") || getCurrentMonthValue();
 
   // Scope & month still live as top-level state (drive server query) but are now
@@ -216,6 +422,7 @@ export default function TaskList() {
   const [scope, setScope] = useState(searchParams.get("scope") || "By Month");
   const [month, setMonth] = useState(initialMonth);
   const [drawerTaskId, setDrawerTaskId] = useState(null);
+  const [commentTaskId, setCommentTaskId] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1 });
@@ -481,6 +688,22 @@ export default function TaskList() {
             )}
           </td>
         )}
+        {/* Comments button — always visible as last action column */}
+        <td>
+          <button
+            type="button"
+            title="View / add comments"
+            onClick={() => setCommentTaskId(task.id)}
+            className="relative inline-flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100 hover:text-[#1e3a8a] transition-colors"
+          >
+            <MessageSquare size={15} />
+            {task.comments?.length > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#1e3a8a] px-1 text-[9px] font-extrabold text-white">
+                {task.comments.length}
+              </span>
+            )}
+          </button>
+        </td>
         {isVisible("createdAt") && (
           <td>
             {(() => { const { date, time } = formatDateTime(task.createdAt); return (
@@ -746,19 +969,12 @@ export default function TaskList() {
               </select>
             </FilterField>
 
-            {/* Status — now includes Active option */}
+            {/* Status — multi-select */}
             <FilterField label="Status" htmlFor="task-filter-status">
-              <select
-                id="task-filter-status"
-                className="input"
+              <StatusMultiSelect
                 value={columnFilters.status}
-                onChange={(event) => updateColumnFilter("status", event.target.value)}
-              >
-                <option value="">All statuses</option>
-                {FILTER_STATUSES.filter((s) => s !== "All").map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
+                onChange={(val) => updateColumnFilter("status", val)}
+              />
             </FilterField>
 
             {/* Remark */}
@@ -895,6 +1111,21 @@ export default function TaskList() {
       {canManage && drawerTaskId && (
         <TaskDrawer taskId={drawerTaskId} canManage={canManage} onClose={() => setDrawerTaskId(null)} />
       )}
+
+      {commentTaskId && (() => {
+        const commentTask = rows.find((t) => t.id === commentTaskId);
+        return commentTask ? (
+          <CommentsModal
+            task={commentTask}
+            currentUser={currentUser}
+            onClose={() => setCommentTaskId(null)}
+            onCommentAdded={async (id, text) => {
+              await addComment(id, text);
+              refetchTasks().catch(() => {});
+            }}
+          />
+        ) : null;
+      })()}
     </div>
   );
 }

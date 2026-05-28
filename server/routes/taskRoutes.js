@@ -18,6 +18,7 @@ router.delete("/:id", adminOnly, ctrl.deleteTask);
 router.patch("/:id/status", requireRoles("admin", "manager", "task_only"), body("status").isIn(["not_started", "wip", "completed", "submitted_to_fta"]), ctrl.updateStatus);
 router.patch("/:id/assignee", adminManager, ctrl.updateAssignee);
 router.patch("/:id/remarks", requireRoles("admin", "manager", "task_only"), body("remarks").optional().isString(), ctrl.updateRemarks);
+router.post("/:id/comments", requireRoles("admin", "manager", "task_only"), body("text").notEmpty().isString(), ctrl.addComment);
 router.patch("/:id/fta-status", adminManager, body("ftaStatus").isIn(["in_review", "additional_query", "approved"]), ctrl.updateFtaStatus);
 router.post("/:id/attachments", adminManager, upload.fields([{ name: "file", maxCount: 10 }, { name: "files", maxCount: 10 }]), ctrl.uploadTaskAttachment);
 router.delete("/:id/attachments/:attachId", adminManager, ctrl.deleteTaskAttachment);

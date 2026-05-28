@@ -10,6 +10,7 @@ export const taskService = {
   updateStatus: (id, status) => api.patch(`/tasks/${id}/status`, { status }).then((res) => res.data),
   updateAssignee: (id, assignedTo) => api.patch(`/tasks/${id}/assignee`, { assignedTo }).then((res) => res.data),
   updateRemarks: (id, remarks) => api.patch(`/tasks/${id}/remarks`, { remarks }).then((res) => res.data),
+  addComment: (id, text) => api.post(`/tasks/${id}/comments`, { text }).then((res) => res.data),
   ftaTracker: (params) => api.get("/tasks/fta-tracker", { params }).then((res) => res.data),
   updateFtaStatus: (id, ftaStatus) => api.patch(`/tasks/${id}/fta-status`, { ftaStatus }).then((res) => res.data),
   uploadAttachment: (id, formData) => api.post(`/tasks/${id}/attachments`, formData).then((res) => res.data),
