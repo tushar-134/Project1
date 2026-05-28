@@ -221,10 +221,27 @@ export default function TaskList() {
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1 });
   const [columnFilters, setColumnFilters] = useState(() => createInitialColumnFilters(searchParams));
   const [colVisibility, setColVisibility] = useState(() => {
+    // Restore from localStorage so column choices persist across refreshes
+    // and navigation. Fall back to COLUMN_DEFS defaults if nothing is saved.
+    try {
+      const saved = localStorage.getItem("task_list_columns");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Merge with defaults so any newly-added columns still get their defaultOn value
+        const init = {};
+        COLUMN_DEFS.forEach((c) => { init[c.key] = c.key in parsed ? parsed[c.key] : c.defaultOn; });
+        return init;
+      }
+    } catch { /* ignore parse errors */ }
     const init = {};
     COLUMN_DEFS.forEach((c) => { init[c.key] = c.defaultOn; });
     return init;
   });
+
+  // Persist column visibility to localStorage whenever it changes
+  useEffect(() => {
+    try { localStorage.setItem("task_list_columns", JSON.stringify(colVisibility)); } catch { /* ignore quota errors */ }
+  }, [colVisibility]);
 
   const visibleColumns = useMemo(
     () => COLUMN_DEFS.filter((c) => colVisibility[c.key] !== false),
