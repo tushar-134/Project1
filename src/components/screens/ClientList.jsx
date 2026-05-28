@@ -429,6 +429,7 @@ export default function ClientList() {
   const hasActiveFilters = Boolean(query.trim()) || hasColumnFilters;
   const activeFilterCount = activeColumnFilters.length;
   const workingCount = rows.filter((c) => (c.activeTasks || 0) > 0).length;
+  const draftCount = rows.filter((client) => client.isDraft).length;
 
   const updateColumnFilter = (key, value) => {
     setPage(1);
@@ -513,6 +514,7 @@ export default function ClientList() {
             <div className="flex flex-wrap items-center gap-2">
               <InfoPill tone="navy" label={`${workingCount} with active tasks`} />
               <InfoPill tone="slate" label={`${meta.total} total`} />
+              {draftCount > 0 && <InfoPill tone="amber" label={`${draftCount} incomplete`} />}
               {meta.workingTasksTotal > 0 && (
                 <InfoPill tone="green" label={`${meta.workingTasksTotal} active tasks`} />
               )}
@@ -759,13 +761,18 @@ export default function ClientList() {
                     <button
                       type="button"
                       className="task-id-link font-extrabold text-left"
-                      onClick={() => setDrawerClientId(client.id)}
-                      title="Open client details"
+                      onClick={() => client.isDraft ? navigate(`/clients/edit/${client.id}`) : setDrawerClientId(client.id)}
+                      title={client.isDraft ? "Resume incomplete client" : "Open client details"}
                     >
                       {client.name}
                     </button>
                     <div className="mt-1 flex flex-wrap gap-2">
                       <span className="text-[12px] font-semibold text-slate-500">{client.jurisdiction}</span>
+                      {client.isDraft && (
+                        <Badge color="bg-amber-100 text-amber-700">
+                          Incomplete
+                        </Badge>
+                      )}
                       <Badge color={client.type === "Legal Person" ? "bg-blue-50 text-[#1e3a8a]" : "bg-emerald-50 text-[#059669]"}>
                         {client.type}
                       </Badge>
