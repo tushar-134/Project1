@@ -1,11 +1,10 @@
 import { NavLink } from "react-router-dom";
 import { useEffect } from "react";
-import { X, ClipboardList, ContactRound, FilePlus2, Files, LayoutDashboard, LogOut, Upload, UserRoundPlus, PieChart, Landmark, Settings2, MapPinned } from "lucide-react";
+import { X, ClipboardList, ContactRound, FilePlus2, Files, LayoutDashboard, Upload, UserRoundPlus, PieChart, Landmark, Settings2, MapPinned } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useApp } from "../../context/AppContext";
 import { useTasks } from "../../hooks/useTasks";
-import { canCreateClients, canManageCategories, canManageGroups, canManageClients, canManageTasks, canViewClientVisits, canViewContacts, canViewFtaTracker, canViewReports, canViewUsers, ROLE_LABELS } from "../../utils/permissions.js";
-import UserAvatar from "../ui/UserAvatar.jsx";
+import { canCreateClients, canManageCategories, canManageGroups, canManageClients, canManageTasks, canViewClientVisits, canViewContacts, canViewFtaTracker, canViewReports, canViewUsers } from "../../utils/permissions.js";
 
 export const navItems = [
   { section: "Main", links: [{ label: "Dashboard", to: "/dashboard", icon: LayoutDashboard }] },
@@ -32,7 +31,7 @@ export const navItems = [
 ];
 
 export default function Sidebar({ open = false, onClose = () => {}, mobile = false }) {
-  const { currentUser, logout } = useAuth();
+  const { currentUser } = useAuth();
   const { state } = useApp();
   const { fetchFtaTracker } = useTasks();
   const role = currentUser?.role;
@@ -105,19 +104,6 @@ export default function Sidebar({ open = false, onClose = () => {}, mobile = fal
           </div>
         ))}
       </nav>
-      <div className="m-3 rounded-xl bg-white/10 p-3">
-        <div className="flex items-center gap-2">
-          <UserAvatar user={currentUser} size="sm" />
-          <div className="min-w-0">
-            <div className="truncate text-[12px] font-extrabold">{currentUser?.name}</div>
-            <div className="text-[10px] font-bold text-white/60">{ROLE_LABELS[currentUser?.role] || currentUser?.role}</div>
-          </div>
-        </div>
-        <button onClick={logout} className="mt-3 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/10 text-[12px] font-extrabold text-white/85 transition hover:bg-white/20 hover:text-white">
-          <LogOut size={15} />
-          Logout
-        </button>
-      </div>
     </aside>
   );
 }

@@ -1,13 +1,13 @@
-import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock, FileText, Briefcase, Landmark, PieChart, Files, ClipboardList, Boxes } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock, FileText, Briefcase, Landmark, PieChart, Files, ClipboardList, Boxes, GripVertical, RotateCcw, Settings2, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { categoryService } from "../../services/categoryService.js";
 import { reportService } from "../../services/reportService";
 import { mapCategory } from "../../utils/adapterUtils.js";
-import { DEFAULT_DASHBOARD_TILE_ORDER, loadDashboardTileOrder, subscribeDashboardTileOrder } from "../../utils/dashboardPreferences.js";
-import { canManageTasks, ROLE_LABELS } from "../../utils/permissions.js";
+import { clearDashboardTileOrder, clearDashboardTileVisibility, DEFAULT_DASHBOARD_TILE_ORDER, loadDashboardTileOrder, loadDashboardTileVisibility, saveDashboardTileOrder, saveDashboardTileVisibility, subscribeDashboardTileOrder } from "../../utils/dashboardPreferences.js";
+import { canManageTasks } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
 import Card from "../ui/Card.jsx";
 import StatusPill from "../ui/StatusPill.jsx";
@@ -61,8 +61,13 @@ export default function Dashboard() {
   const [month, setMonth] = useState(new Date(2026, 4, 1));
   const [drawerTaskId, setDrawerTaskId] = useState(null);
   const [tileOrder, setTileOrder] = useState(DEFAULT_DASHBOARD_TILE_ORDER);
+  const [visibleTileNames, setVisibleTileNames] = useState(DEFAULT_DASHBOARD_TILE_ORDER);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [draftTileOrder, setDraftTileOrder] = useState(DEFAULT_DASHBOARD_TILE_ORDER);
+  const [draftVisibleTileNames, setDraftVisibleTileNames] = useState(DEFAULT_DASHBOARD_TILE_ORDER);
+  const [draggingTile, setDraggingTile] = useState("");
+  const settingsRef = useRef(null);
   const monthText = month.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
-  const roleLabel = ROLE_LABELS[currentUser?.role] || currentUser?.role || "User";
   const canManage = canManageTasks(currentUser?.role);
   const moveMonth = (delta) => setMonth(new Date(month.getFullYear(), month.getMonth() + delta, 1));
   useEffect(() => {
@@ -81,19 +86,71 @@ export default function Dashboard() {
   }, [state.categories]);
   useEffect(() => {
     setTileOrder(loadDashboardTileOrder(currentUser, availableTileNames));
+    setVisibleTileNames(loadDashboardTileVisibility(currentUser, availableTileNames));
     return subscribeDashboardTileOrder((event) => {
       setTileOrder(event.detail?.order || loadDashboardTileOrder(currentUser, availableTileNames));
+      setVisibleTileNames(event.detail?.visible || loadDashboardTileVisibility(currentUser, availableTileNames));
     });
   }, [currentUser, availableTileNames]);
+  useEffect(() => {
+    if (!settingsOpen) return;
+    setDraftTileOrder(tileOrder);
+    setDraftVisibleTileNames(visibleTileNames);
+  }, [settingsOpen, tileOrder, visibleTileNames]);
+  useEffect(() => {
+    if (!settingsOpen) return undefined;
+    const closeOnOutsideClick = (event) => {
+      if (settingsRef.current && !settingsRef.current.contains(event.target)) {
+        setSettingsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
+  }, [settingsOpen]);
   const stats = state.dashboardStats || {};
   const selectedMonth = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
   const tileMetrics = new Map(
     (stats.categoryBreakdown || []).map((item) => [categoryLabels[item.category] || item.category, item])
   );
-  const tiles = tileOrder.map((name) => {
+  const visibleTileSet = new Set(visibleTileNames);
+  const tiles = tileOrder.filter((name) => visibleTileSet.has(name)).map((name) => {
     const metric = tileMetrics.get(name);
     return [name, metric?.active || 0, metric?.closed || 0, metric?.overdue || 0];
   });
+  const draftVisibleSet = new Set(draftVisibleTileNames);
+  const moveDraftTile = (targetName) => {
+    if (!draggingTile || draggingTile === targetName) return;
+    const fromIndex = draftTileOrder.indexOf(draggingTile);
+    const toIndex = draftTileOrder.indexOf(targetName);
+    if (fromIndex < 0 || toIndex < 0) return;
+    const next = [...draftTileOrder];
+    next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, draggingTile);
+    setDraftTileOrder(next);
+  };
+  const toggleDraftTile = (name) => {
+    setDraftVisibleTileNames((current) => {
+      if (current.includes(name)) {
+        return current.length > 1 ? current.filter((item) => item !== name) : current;
+      }
+      return draftTileOrder.filter((item) => item === name || current.includes(item));
+    });
+  };
+  const saveDashboardSettings = () => {
+    const nextOrder = saveDashboardTileOrder(currentUser, draftTileOrder, availableTileNames);
+    const nextVisible = saveDashboardTileVisibility(currentUser, draftVisibleTileNames, availableTileNames);
+    setTileOrder(nextOrder);
+    setVisibleTileNames(nextVisible);
+    setSettingsOpen(false);
+  };
+  const resetDashboardSettings = () => {
+    const nextOrder = clearDashboardTileOrder(currentUser, availableTileNames);
+    const nextVisible = clearDashboardTileVisibility(currentUser, availableTileNames);
+    setDraftTileOrder(nextOrder);
+    setDraftVisibleTileNames(nextVisible);
+    setTileOrder(nextOrder);
+    setVisibleTileNames(nextVisible);
+  };
   const openTasks = (category) => {
     const params = new URLSearchParams({
       category: getCategoryFilterValue(state.categories, category),
@@ -105,20 +162,81 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="page-kicker">Practice Overview</div>
-          <h2 className="screen-title">Dashboard</h2>
-          <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[12px] font-extrabold text-slate-700 shadow-[inset_0_0_0_1px_#e2e8f0]">
-            <span className="text-slate-500">Logged in as</span>
-            <span>{currentUser?.name || "User"}</span>
-            <span className="rounded-full bg-[#1e3a8a] px-2 py-0.5 text-[11px] text-white">{roleLabel}</span>
+      <div className="flex justify-end">
+        <div className="relative flex items-center gap-2" ref={settingsRef}>
+          <div className="flex h-9 items-center overflow-hidden rounded-lg border border-[#e2e8f0] bg-white">
+            <button onClick={() => moveMonth(-1)} className="grid h-9 w-9 place-items-center hover:bg-slate-50"><ChevronLeft size={16} /></button>
+            <div className="min-w-36 px-3 text-center text-[12px] font-extrabold">{monthText}</div>
+            <button onClick={() => moveMonth(1)} className="grid h-9 w-9 place-items-center hover:bg-slate-50"><ChevronRight size={16} /></button>
           </div>
-        </div>
-        <div className="flex h-9 items-center overflow-hidden rounded-lg border border-[#e2e8f0] bg-white">
-          <button onClick={() => moveMonth(-1)} className="grid h-9 w-9 place-items-center hover:bg-slate-50"><ChevronLeft size={16} /></button>
-          <div className="min-w-36 px-3 text-center text-[12px] font-extrabold">{monthText}</div>
-          <button onClick={() => moveMonth(1)} className="grid h-9 w-9 place-items-center hover:bg-slate-50"><ChevronRight size={16} /></button>
+          <button
+            type="button"
+            onClick={() => setSettingsOpen((open) => !open)}
+            className="grid h-9 w-9 place-items-center rounded-lg border border-[#e2e8f0] bg-white text-[#1e3a8a] shadow-sm transition hover:bg-slate-50"
+            aria-label="Dashboard card priority settings"
+            title="Dashboard Card Priority"
+          >
+            <Settings2 size={17} />
+          </button>
+          {settingsOpen && (
+            <div className="absolute right-0 top-11 z-30 w-[340px] max-w-[calc(100vw-2rem)] rounded-2xl border border-[#dbe4f0] bg-white shadow-[0_18px_45px_rgba(15,23,42,0.18)]">
+              <div className="flex items-center justify-between border-b border-[#e2e8f0] px-4 py-3">
+                <div>
+                  <div className="text-[14px] font-black text-slate-900">Dashboard Card Priority</div>
+                  <div className="text-[11px] font-semibold text-slate-500">Select cards and drag to arrange.</div>
+                </div>
+                <button type="button" onClick={() => setSettingsOpen(false)} className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-slate-100">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="max-h-[360px] space-y-2 overflow-y-auto p-3">
+                {draftTileOrder.map((name, index) => {
+                  const checked = draftVisibleSet.has(name);
+                  return (
+                    <div
+                      key={name}
+                      draggable
+                      onDragStart={() => setDraggingTile(name)}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={() => moveDraftTile(name)}
+                      onDragEnd={() => setDraggingTile("")}
+                      className={`flex cursor-grab items-center justify-between gap-3 rounded-xl border bg-white px-3 py-2 transition ${draggingTile === name ? "border-[#1e3a8a] opacity-70" : "border-slate-200 hover:border-[#1e3a8a]/40"} ${checked ? "" : "opacity-55"}`}
+                      title="Drag to reorder"
+                    >
+                      <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleDraftTile(name)}
+                          className="h-4 w-4 rounded border-slate-300 text-[#1e3a8a] focus:ring-[#1e3a8a]"
+                        />
+                        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-slate-100 text-[11px] font-extrabold text-slate-500">{index + 1}</span>
+                        <span className="truncate text-[13px] font-bold text-slate-800">{name}</span>
+                      </label>
+                      <GripVertical size={16} className="shrink-0 text-slate-400" />
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex items-center justify-between border-t border-[#e2e8f0] px-3 py-3">
+                <button
+                  type="button"
+                  onClick={resetDashboardSettings}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg px-3 text-[12px] font-extrabold text-slate-600 hover:bg-slate-100"
+                >
+                  <RotateCcw size={14} />
+                  Reset
+                </button>
+                <button
+                  type="button"
+                  onClick={saveDashboardSettings}
+                  className="h-9 rounded-lg bg-[#1e3a8a] px-4 text-[12px] font-extrabold text-white shadow-sm hover:bg-[#172f70]"
+                >
+                  Save Settings
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
