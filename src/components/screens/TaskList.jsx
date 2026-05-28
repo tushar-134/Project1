@@ -1,4 +1,4 @@
-import { Columns, Download, RefreshCw, Search, X } from "lucide-react";
+import { ChevronDown, Columns, Download, RefreshCw, Search, X } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -213,6 +213,7 @@ export default function TaskList() {
   const [scope, setScope] = useState(searchParams.get("scope") || "By Month");
   const [month, setMonth] = useState(initialMonth);
   const [drawerTaskId, setDrawerTaskId] = useState(null);
+  const [filtersOpen, setFiltersOpen] = useState(true);
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1 });
   const [columnFilters, setColumnFilters] = useState(() => createInitialColumnFilters(searchParams));
@@ -475,19 +476,6 @@ export default function TaskList() {
 
   return (
     <div className="space-y-5">
-      {/* ── Page header ── */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="page-kicker">Task Control</div>
-          <h2 className="screen-title">Task List</h2>
-        </div>
-        {canManage && (
-          <Button variant="ghost" onClick={exportCsv}>
-            <Download size={16} />
-            Export CSV
-          </Button>
-        )}
-      </div>
 
       {/* ── Filter card ── */}
       <Card>
@@ -525,14 +513,31 @@ export default function TaskList() {
 
             <ColumnCustomizer visibility={colVisibility} onChange={updateColVisibility} />
 
-            <Button variant="ghost" size="sm" onClick={refetchTasks} disabled={tasksLoading}>
+            <button
+              className="grid h-8 w-8 place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
+              onClick={refetchTasks}
+              disabled={tasksLoading}
+              aria-label="Refresh task list"
+              title="Refresh"
+            >
               <RefreshCw size={14} className={tasksLoading ? "animate-spin" : ""} />
-              Refresh
-            </Button>
+            </button>
+
+            {canManage && (
+              <button
+                className="grid h-8 w-8 place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-600 transition hover:bg-slate-50"
+                onClick={exportCsv}
+                aria-label="Export tasks as CSV"
+                title="Export CSV"
+              >
+                <Download size={14} />
+              </button>
+            )}
+
             {hasColumnFilters && (
               <Button variant="ghost" size="sm" onClick={clearColumnFilters}>
                 <X size={14} />
-                Clear columns
+                Clear
               </Button>
             )}
             {hasActiveFilters && (
@@ -543,9 +548,45 @@ export default function TaskList() {
           </div>
         </div>
 
-        {/* ── Column filters ── */}
-        <div className="px-5 py-4">
-          <div className="task-list-column-grid">
+        {/* ── Column filters accordion ── */}
+        <div>
+          {/* Accordion toggle */}
+          <button
+            type="button"
+            id="filter-accordion-toggle"
+            aria-expanded={filtersOpen}
+            aria-controls="filter-accordion-body"
+            onClick={() => setFiltersOpen((prev) => !prev)}
+            className="flex w-full items-center justify-between gap-2 border-t border-slate-100 px-5 py-2.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-slate-500 transition hover:bg-slate-50/70"
+          >
+            <span className="flex items-center gap-2">
+              <span>Filter Options</span>
+              {hasColumnFilters && (
+                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#1e3a8a] text-[9px] font-extrabold text-white">
+                  {activeColumnFilters.length}
+                </span>
+              )}
+            </span>
+            <ChevronDown
+              size={14}
+              className={`text-slate-400 transition-transform duration-200 ${filtersOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+
+          {/* Accordion body */}
+          <div
+            id="filter-accordion-body"
+            role="region"
+            aria-labelledby="filter-accordion-toggle"
+            style={{
+              display: "grid",
+              gridTemplateRows: filtersOpen ? "1fr" : "0fr",
+              transition: "grid-template-rows 0.25s ease",
+            }}
+          >
+            <div style={{ overflow: "hidden" }}>
+              <div className="px-5 py-4">
+                <div className="task-list-column-grid">
             {/* Task ID */}
             <FilterField label="Task ID" htmlFor="task-filter-id">
               <div className="task-list-input-wrap">
@@ -719,16 +760,19 @@ export default function TaskList() {
             </FilterField>
           </div>
 
-          {/* Active filter tags */}
-          {hasColumnFilters && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {activeColumnFilters.map((item) => (
-                <span key={item} className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-700 ring-1 ring-blue-100">
-                  {item}
-                </span>
-              ))}
+                {/* Active filter tags */}
+                {hasColumnFilters && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {activeColumnFilters.map((item) => (
+                      <span key={item} className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-700 ring-1 ring-blue-100">
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          )}
+          </div>
         </div>
       </Card>
 
