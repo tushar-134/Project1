@@ -158,12 +158,15 @@ function buildActiveColumnFilterSummary(filters) {
   ].filter(Boolean);
 }
 
-function formatDate(dateStr) {
-  if (!dateStr) return "—";
+function formatDateTime(dateStr) {
+  if (!dateStr) return { date: "—", time: null };
   try {
-    return new Date(dateStr).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+    const d = new Date(dateStr);
+    const date = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+    const time = d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: true });
+    return { date, time };
   } catch {
-    return dateStr;
+    return { date: dateStr, time: null };
   }
 }
 
@@ -460,12 +463,22 @@ export default function TaskList() {
         )}
         {isVisible("createdAt") && (
           <td>
-            <span className="text-[12px] text-slate-600">{formatDate(task.createdAt)}</span>
+            {(() => { const { date, time } = formatDateTime(task.createdAt); return (
+              <span className="flex flex-col gap-0.5">
+                <span className="text-[12px] font-medium text-slate-700">{date}</span>
+                {time && <span className="text-[10px] font-medium text-slate-400">{time}</span>}
+              </span>
+            ); })()}
           </td>
         )}
         {isVisible("updatedAt") && (
           <td>
-            <span className="text-[12px] text-slate-600">{formatDate(task.updatedAt)}</span>
+            {(() => { const { date, time } = formatDateTime(task.updatedAt); return (
+              <span className="flex flex-col gap-0.5">
+                <span className="text-[12px] font-medium text-slate-700">{date}</span>
+                {time && <span className="text-[10px] font-medium text-slate-400">{time}</span>}
+              </span>
+            ); })()}
           </td>
         )}
       </tr>
