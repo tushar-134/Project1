@@ -663,10 +663,6 @@ export default function AddClient() {
 
   async function handleContactDocument(contactIndex, files, section) {
     const contact = contacts[contactIndex];
-    if (isEditMode && !contact?.persisted) {
-      toast.error(`Save the new contact person first, then upload ${section === "passport" ? "passport" : "Emirates ID"} documents.`);
-      return;
-    }
     const selected = Array.from(files || []);
     if (!selected.length) return;
     // Stage files in local state for any unsaved contact row (persisted: false) in both
