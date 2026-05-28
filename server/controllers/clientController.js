@@ -161,13 +161,11 @@ async function findExistingFileNo(fileNo, excludeId) {
 
 function buildDuplicateClauses(data) {
   const clauses = [];
-  const legalName = data.legalName?.trim();
   const vatTrn = data.vatDetails?.trn?.trim();
   const licenceNumbers = (data.tradeLicences || [])
     .map((licence) => licence?.licenceNumber?.trim())
     .filter(Boolean);
 
-  if (legalName) clauses.push({ legalName: new RegExp(`^${escapeRegex(legalName)}$`, "i") });
   if (vatTrn) clauses.push({ "vatDetails.trn": vatTrn });
   licenceNumbers.forEach((licenceNumber) => clauses.push({ "tradeLicences.licenceNumber": licenceNumber }));
 
@@ -188,7 +186,6 @@ async function findDuplicateClient(data, excludeId) {
 }
 
 function duplicateMessage(client, payload) {
-  const legalName = payload.legalName?.trim();
   const vatTrn = payload.vatDetails?.trn?.trim();
   const licenceNumbers = new Set(
     (payload.tradeLicences || [])
@@ -196,9 +193,6 @@ function duplicateMessage(client, payload) {
       .filter(Boolean),
   );
 
-  if (legalName && client.legalName?.trim().toLowerCase() === legalName.toLowerCase()) {
-    return `A client with legal name "${legalName}" already exists.`;
-  }
   if (vatTrn && client.vatDetails?.trn === vatTrn) {
     return `A client with VAT TRN "${vatTrn}" already exists.`;
   }
@@ -207,6 +201,30 @@ function duplicateMessage(client, payload) {
     return `A client with trade licence "${matchingLicence.licenceNumber}" already exists.`;
   }
   return "A matching client already exists.";
+}
+
+function validateLegalName(value) {
+  return String(value || "").trim().length > 0;
+}
+
+function clientLifecycle(client) {
+  const contact = (client.contactPersons || []).find((person) => String(person?.fullName || "").trim());
+  const hasContactPhone = Boolean(String(contact?.mobile?.number || "").trim());
+  const hasContactEmail = Boolean(String(contact?.email || "").trim());
+  const hasTradeLicence = (client.tradeLicences || []).some((licence) => String(licence?.licenceNumber || "").trim());
+  const missingFields = [];
+
+  if (!String(client.jurisdiction || "").trim()) missingFields.push("jurisdiction");
+  if (!hasTradeLicence) missingFields.push("trade licence");
+  if (!contact) missingFields.push("contact person");
+  if (contact && !hasContactPhone) missingFields.push("contact phone");
+  if (contact && !hasContactEmail) missingFields.push("contact email");
+
+  return {
+    lifecycleStatus: missingFields.length ? "draft" : "complete",
+    isDraft: missingFields.length > 0,
+    missingFields,
+  };
 }
 
 function findInvalidContactMobile(contactPersons = []) {
@@ -408,6 +426,7 @@ exports.listClients = async (req, res, next) => {
     const enrichedClients = clients.map((client) => {
       const obj = client.toObject ? client.toObject() : client;
       obj.activeTasks = taskCountMap[String(client._id)] || 0;
+      Object.assign(obj, clientLifecycle(client));
       return obj;
     });
 
@@ -432,6 +451,8 @@ exports.createClient = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+    req.body.legalName = String(req.body.legalName || "").trim();
+    if (!validateLegalName(req.body.legalName)) return res.status(400).json({ message: "Legal name is required." });
     const clientAssignError = await ensureManagerCanAssignClient(req, req.body.assignedUser);
     if (clientAssignError) return res.status(clientAssignError.status).json({ message: clientAssignError.message });
     const vatTrnError = validateVatTrn(req.body.vatDetails);
@@ -484,6 +505,10 @@ exports.updateClient = async (req, res, next) => {
     const client = await Client.findById(req.params.id);
     if (!client || !client.isActive) return res.status(404).json({ message: "Client not found" });
     const originalFileNo = client.fileNo;
+    if ("legalName" in req.body) {
+      req.body.legalName = String(req.body.legalName || "").trim();
+      if (!validateLegalName(req.body.legalName)) return res.status(400).json({ message: "Legal name is required." });
+    }
     if ("assignedUser" in req.body) {
       const clientAssignError = await ensureManagerCanAssignClient(req, req.body.assignedUser);
       if (clientAssignError) return res.status(clientAssignError.status).json({ message: clientAssignError.message });
@@ -664,12 +689,11 @@ exports.bulkUpload = async (req, res, next) => {
 
         // Duplicate check
         const exists = await findDuplicateClient({
-          legalName,
           vatDetails: { trn },
           tradeLicences: licence ? [{ licenceNumber: licence }] : [],
         });
         if (exists) {
-          results.push({ serial, status: "error", legalName, error: duplicateMessage(exists, { legalName, vatDetails: { trn }, tradeLicences: licence ? [{ licenceNumber: licence }] : [] }) });
+          results.push({ serial, status: "error", legalName, error: duplicateMessage(exists, { vatDetails: { trn }, tradeLicences: licence ? [{ licenceNumber: licence }] : [] }) });
           failed++;
           continue;
         }

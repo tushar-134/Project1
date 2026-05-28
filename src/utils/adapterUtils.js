@@ -37,6 +37,8 @@ export function mapClient(client) {
     designated_zone: "Designated Zone",
     offshore: "Offshore",
   };
+  const missingFields = Array.isArray(client.missingFields) ? client.missingFields : [];
+  const isDraft = Boolean(client.isDraft || client.lifecycleStatus === "draft" || missingFields.length);
   return {
     ...client,
     id: client._id,
@@ -54,6 +56,9 @@ export function mapClient(client) {
     activeTasks: client.activeTasks || 0,
     createdAt: client.createdAt || null,
     createdByName: client.createdBy?.name || null,
+    isDraft,
+    lifecycleStatus: isDraft ? "draft" : "complete",
+    missingFields,
   };
 }
 

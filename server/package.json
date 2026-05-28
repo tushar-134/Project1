@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "seed": "node seed.js"
+    "seed": "node seed.js",
+    "migrate:drop-client-legal-name-unique": "node scripts/dropClientLegalNameUniqueIndex.js"
   },
   "keywords": [],
   "author": "",

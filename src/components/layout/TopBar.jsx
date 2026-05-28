@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, Bell, ChevronDown, Menu, Settings, UserCircle2 } from "lucide-react";
+import { AlertTriangle, Bell, ChevronDown, LogOut, Menu, UserCircle2 } from "lucide-react";
 import NotificationPanel from "./NotificationPanel.jsx";
 import ProfilePanel from "./ProfilePanel.jsx";
 import ExpiryAlertPanel from "./ExpiryAlertPanel.jsx";
@@ -27,7 +27,7 @@ export default function TopBar({ title, onMenuClick }) {
   const wrapRef = useRef(null);
   const expiryRef = useRef(null);
   const menuRef = useRef(null);
-  const { currentUser } = useAuth();
+  const { currentUser, logout } = useAuth();
   const { state } = useApp();
   const { fetchNotifications } = useNotifications();
   const roleLabel = ROLE_LABELS[currentUser?.role] || currentUser?.role || "User";
@@ -247,13 +247,12 @@ export default function TopBar({ title, onMenuClick }) {
                 type="button"
                 onClick={() => {
                   setMenuOpen(false);
-                  setProfileTab("settings");
-                  setProfileOpen(true);
+                  logout();
                 }}
                 className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
               >
-                <Settings size={16} />
-                Settings
+                <LogOut size={16} />
+                Logout
               </button>
             </div>
           )}

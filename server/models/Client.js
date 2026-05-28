@@ -13,7 +13,17 @@ const uploadedFileSchema = new mongoose.Schema({
 const clientSchema = new mongoose.Schema({
   fileNo: { type: String, unique: true },
   clientType: { type: String, enum: ["legal", "natural"], required: true },
-  legalName: { type: String, required: true, trim: true },
+  legalName: {
+    type: String,
+    required: true,
+    trim: true,
+    validate: {
+      validator(value) {
+        return String(value || "").trim().length > 0;
+      },
+      message: "Legal name is required.",
+    },
+  },
   tradeName: String,
   financialYearEnd: String,
   jurisdiction: { type: String, enum: ["mainland", "freezone", "designated_zone", "offshore"] },

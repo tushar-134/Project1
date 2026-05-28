@@ -11,7 +11,7 @@ router.use(auth);
 router.get("/", ctrl.listClients);
 router.get("/expiry-alerts", ctrl.expiryAlerts);
 router.get("/export", adminManager, ctrl.exportClients);
-router.post("/", adminOnly, body("clientType").isIn(["legal", "natural"]), body("legalName").notEmpty(), ctrl.createClient);
+router.post("/", adminOnly, body("clientType").isIn(["legal", "natural"]), body("legalName").trim().notEmpty().withMessage("Legal name is required."), ctrl.createClient);
 router.post("/bulk-upload", adminOnly, ctrl.bulkUpload);
 router.get("/:id", ctrl.getClient);
 router.put("/:id", adminManager, ctrl.updateClient);
