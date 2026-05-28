@@ -4,12 +4,13 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useApp } from "../../context/AppContext.jsx";
 import { useTasks } from "../../hooks/useTasks";
+import { sortOptionsWithOtherLast } from "../../utils/optionSort";
 import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import Table from "../ui/Table.jsx";
 
-const CATEGORY_FILTERS = ["All", "VAT", "Corporate Tax", "Audit", "Accounting", "MIS Reporting", "E-Invoicing", "VAT Refund", "Other"];
+const CATEGORY_FILTERS = ["All", ...sortOptionsWithOtherLast(["VAT", "Corporate Tax", "Audit", "Accounting", "MIS Reporting", "E-Invoicing", "VAT Refund", "Other"])];
 
 // Maps display tab label -> ftaStatus value stored in state after mapFtaTask()
 const TABS = [
