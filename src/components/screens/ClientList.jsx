@@ -474,27 +474,6 @@ export default function ClientList() {
 
   return (
     <div className="space-y-5">
-      {/* Page header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="page-kicker">Client Directory</div>
-          <h2 className="screen-title">Client List</h2>
-        </div>
-        {canManage && (
-          <div className="flex gap-2">
-            {canCreate && (
-              <Button variant="ghost" onClick={() => navigate("/clients/bulk-upload")}>
-                <Upload size={16} />
-                Import
-              </Button>
-            )}
-            <Button variant="ghost" onClick={exportCsv}>
-              <Download size={16} />
-              Export
-            </Button>
-          </div>
-        )}
-      </div>
 
       {/* Filter & review toolbar — mirrors TaskList design */}
       <Card>
@@ -548,10 +527,38 @@ export default function ClientList() {
               {/* Column customizer */}
               <ColumnCustomizer visibility={colVisibility} onChange={updateColVisibility} />
 
-              <Button variant="ghost" size="sm" onClick={refetchClients} disabled={clientsLoading}>
+              {/* Icon-only action buttons: Refresh, Import, Export */}
+              <button
+                type="button"
+                title="Refresh client list"
+                onClick={refetchClients}
+                disabled={clientsLoading}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-[#1e3a8a] disabled:opacity-50"
+              >
                 <RefreshCw size={15} className={clientsLoading ? "animate-spin" : ""} />
-                Refresh
-              </Button>
+              </button>
+
+              {canManage && canCreate && (
+                <button
+                  type="button"
+                  title="Import clients"
+                  onClick={() => navigate("/clients/bulk-upload")}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-[#1e3a8a]"
+                >
+                  <Upload size={15} />
+                </button>
+              )}
+              {canManage && (
+                <button
+                  type="button"
+                  title="Export clients to Excel"
+                  onClick={exportCsv}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-[#1e3a8a]"
+                >
+                  <Download size={15} />
+                </button>
+              )}
+
               {hasColumnFilters && (
                 <Button variant="ghost" size="sm" onClick={clearColumnFilters}>
                   <X size={15} />
@@ -691,19 +698,6 @@ export default function ClientList() {
 
       {/* Client table */}
       <Card className="overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 sm:px-5">
-          <div>
-            <div className="text-[14px] font-extrabold text-[#1e3a8a]">Client List</div>
-            <div className="mt-1 text-[12px] font-medium text-slate-500">
-              {clientsLoading
-                ? "Updating client list…"
-                : hasActiveFilters
-                  ? `Showing ${rows.length} of ${meta.total} matching clients.`
-                  : "Click a client name to open details."}
-            </div>
-          </div>
-          <div className="text-[12px] font-semibold text-slate-500">Click a name to open details</div>
-        </div>
         <Table>
           <thead>
             <tr>
