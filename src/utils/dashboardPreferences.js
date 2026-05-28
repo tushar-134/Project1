@@ -1,3 +1,5 @@
+import { sortOptionsWithOtherLast } from "./optionSort.js";
+
 export const DEFAULT_DASHBOARD_TILE_ORDER = [
   "VAT",
   "Corporate Tax",
@@ -18,7 +20,7 @@ function getPreferenceKey(user) {
 
 function normalizeAvailableNames(availableNames) {
   const names = Array.isArray(availableNames) && availableNames.length ? availableNames : DEFAULT_DASHBOARD_TILE_ORDER;
-  return [...new Set(names.filter(Boolean))];
+  return sortOptionsWithOtherLast([...new Set(names.filter(Boolean))]);
 }
 
 function sanitizeOrder(order, availableNames) {

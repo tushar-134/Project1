@@ -1,4 +1,4 @@
-import { Columns, Download, RefreshCw, Search, X } from "lucide-react";
+import { ChevronDown, Columns, Download, RefreshCw, Search, SlidersHorizontal, X } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -9,6 +9,7 @@ import { useClients } from "../../hooks/useClients";
 import { categoryService } from "../../services/categoryService";
 import { clientService } from "../../services/clientService";
 import { downloadBlob, mapCategory, mapClient } from "../../utils/adapterUtils";
+import { compareOptionsWithOtherLast } from "../../utils/optionSort";
 import { canManageTasks } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
@@ -45,6 +46,9 @@ const CATEGORY_LABELS = {
   EInv: "E-Invoicing",
   Refund: "VAT Refund",
 };
+const CATEGORY_VALUES_BY_LABEL = Object.fromEntries(
+  Object.entries(CATEGORY_LABELS).map(([value, label]) => [label.toLowerCase(), value])
+);
 const OPTION_ACRONYMS = new Map([
   ["ct", "CT"],
   ["einv", "EInv"],
@@ -77,6 +81,27 @@ function createEmptyColumnFilters() {
     scope: "",
     createdAt: "",
     updatedAt: "",
+  };
+}
+
+function normalizeStatusFilterValue(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (raw.toLowerCase() === "active") return "Active";
+  return FILTER_STATUSES.find((status) => status.toLowerCase() === raw.toLowerCase()) || raw;
+}
+
+function normalizeCategoryFilterValue(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return CATEGORY_VALUES_BY_LABEL[raw.toLowerCase()] || raw;
+}
+
+function createInitialColumnFilters(searchParams) {
+  return {
+    ...createEmptyColumnFilters(),
+    category: normalizeCategoryFilterValue(searchParams.get("category")),
+    status: normalizeStatusFilterValue(searchParams.get("status")),
   };
 }
 
@@ -114,7 +139,7 @@ function buildNormalizedOptions(values) {
     const key = normalizeOptionKey(label);
     if (!options.has(key)) options.set(key, { value: rawValue, label });
   });
-  return [...options.values()].sort((left, right) => left.label.localeCompare(right.label));
+  return [...options.values()].sort((left, right) => compareOptionsWithOtherLast(left, right, (option) => option.label));
 }
 
 function displayCategoryName(category) {
@@ -188,9 +213,10 @@ export default function TaskList() {
   const [scope, setScope] = useState(searchParams.get("scope") || "By Month");
   const [month, setMonth] = useState(initialMonth);
   const [drawerTaskId, setDrawerTaskId] = useState(null);
+  const [filtersOpen, setFiltersOpen] = useState(true);
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1 });
-  const [columnFilters, setColumnFilters] = useState(() => createEmptyColumnFilters());
+  const [columnFilters, setColumnFilters] = useState(() => createInitialColumnFilters(searchParams));
   const [colVisibility, setColVisibility] = useState(() => {
     const init = {};
     COLUMN_DEFS.forEach((c) => { init[c.key] = c.defaultOn; });
@@ -450,19 +476,6 @@ export default function TaskList() {
 
   return (
     <div className="space-y-5">
-      {/* ── Page header ── */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="page-kicker">Task Control</div>
-          <h2 className="screen-title">Task List</h2>
-        </div>
-        {canManage && (
-          <Button variant="ghost" onClick={exportCsv}>
-            <Download size={16} />
-            Export CSV
-          </Button>
-        )}
-      </div>
 
       {/* ── Filter card ── */}
       <Card>
@@ -500,14 +513,31 @@ export default function TaskList() {
 
             <ColumnCustomizer visibility={colVisibility} onChange={updateColVisibility} />
 
-            <Button variant="ghost" size="sm" onClick={refetchTasks} disabled={tasksLoading}>
+            <button
+              className="grid h-8 w-8 place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
+              onClick={refetchTasks}
+              disabled={tasksLoading}
+              aria-label="Refresh task list"
+              title="Refresh"
+            >
               <RefreshCw size={14} className={tasksLoading ? "animate-spin" : ""} />
-              Refresh
-            </Button>
+            </button>
+
+            {canManage && (
+              <button
+                className="grid h-8 w-8 place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-600 transition hover:bg-slate-50"
+                onClick={exportCsv}
+                aria-label="Export tasks as CSV"
+                title="Export CSV"
+              >
+                <Download size={14} />
+              </button>
+            )}
+
             {hasColumnFilters && (
               <Button variant="ghost" size="sm" onClick={clearColumnFilters}>
                 <X size={14} />
-                Clear columns
+                Clear
               </Button>
             )}
             {hasActiveFilters && (
@@ -518,9 +548,81 @@ export default function TaskList() {
           </div>
         </div>
 
-        {/* ── Column filters ── */}
-        <div className="px-5 py-4">
-          <div className="task-list-column-grid">
+        {/* ── Column filters accordion ── */}
+        <div>
+          {/* Accordion toggle */}
+          <button
+            type="button"
+            id="filter-accordion-toggle"
+            aria-expanded={filtersOpen}
+            aria-controls="filter-accordion-body"
+            onClick={() => setFiltersOpen((prev) => !prev)}
+            className={[
+              "group flex w-full items-center justify-between gap-3 border-y px-5 py-2.5 text-left transition-all duration-150",
+              hasColumnFilters
+                ? "border-blue-100 bg-blue-50/60 hover:bg-blue-50"
+                : "border-slate-100 bg-slate-50/80 hover:bg-slate-100/80",
+            ].join(" ")}
+          >
+            {/* Left: icon + label + active badge */}
+            <span className="flex items-center gap-2">
+              <span
+                className={[
+                  "flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors duration-150",
+                  hasColumnFilters
+                    ? "bg-[#1e3a8a] text-white shadow-sm shadow-blue-200"
+                    : "bg-white text-slate-400 ring-1 ring-slate-200 group-hover:text-slate-600",
+                ].join(" ")}
+              >
+                <SlidersHorizontal size={12} />
+              </span>
+              <span
+                className={[
+                  "text-[11px] font-extrabold uppercase tracking-widest",
+                  hasColumnFilters ? "text-[#1e3a8a]" : "text-slate-500",
+                ].join(" ")}
+              >
+                Filter Options
+              </span>
+              {hasColumnFilters && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-[#1e3a8a] px-2 py-0.5 text-[10px] font-extrabold text-white">
+                  {activeColumnFilters.length} active
+                </span>
+              )}
+            </span>
+
+            {/* Right: show/hide hint + chevron */}
+            <span className="flex items-center gap-1.5">
+              <span className={`text-[10px] font-semibold transition-colors duration-150 ${
+                hasColumnFilters ? "text-blue-400" : "text-slate-300 group-hover:text-slate-400"
+              }`}>
+                {filtersOpen ? "Hide" : "Show"}
+              </span>
+              <ChevronDown
+                size={14}
+                className={[
+                  "transition-all duration-200",
+                  filtersOpen ? "rotate-180" : "",
+                  hasColumnFilters ? "text-[#1e3a8a]" : "text-slate-400",
+                ].join(" ")}
+              />
+            </span>
+          </button>
+
+          {/* Accordion body */}
+          <div
+            id="filter-accordion-body"
+            role="region"
+            aria-labelledby="filter-accordion-toggle"
+            style={{
+              display: "grid",
+              gridTemplateRows: filtersOpen ? "1fr" : "0fr",
+              transition: "grid-template-rows 0.25s ease",
+            }}
+          >
+            <div style={{ overflow: "hidden" }}>
+              <div className="px-5 py-4">
+                <div className="task-list-column-grid">
             {/* Task ID */}
             <FilterField label="Task ID" htmlFor="task-filter-id">
               <div className="task-list-input-wrap">
@@ -694,16 +796,19 @@ export default function TaskList() {
             </FilterField>
           </div>
 
-          {/* Active filter tags */}
-          {hasColumnFilters && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {activeColumnFilters.map((item) => (
-                <span key={item} className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-700 ring-1 ring-blue-100">
-                  {item}
-                </span>
-              ))}
+                {/* Active filter tags */}
+                {hasColumnFilters && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {activeColumnFilters.map((item) => (
+                      <span key={item} className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-[11px] font-bold text-blue-700 ring-1 ring-blue-100">
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          )}
+          </div>
         </div>
       </Card>
 

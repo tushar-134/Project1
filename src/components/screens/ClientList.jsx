@@ -484,24 +484,37 @@ export default function ClientList() {
           aria-expanded={filtersOpen}
           aria-controls="filter-accordion-body"
           onClick={() => setFiltersOpen((v) => !v)}
-          className="w-full flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5 text-left transition-colors hover:bg-slate-50 rounded-xl"
+          className={[
+            "w-full flex flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-5 text-left select-none",
+            "border-b transition-all duration-200 rounded-t-xl",
+            hasColumnFilters
+              ? "bg-blue-50/70 border-blue-100 hover:bg-blue-50"
+              : "bg-slate-50 border-slate-200 hover:bg-slate-100",
+          ].join(" ")}
         >
-          {/* Left: icon + title + subtitle */}
+          {/* Left: icon badge + label + hint */}
           <div className="flex items-center gap-3 min-w-0">
-            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#dbe7ff] text-[#1e3a8a]">
-              <SlidersHorizontal size={15} />
+            <span className={[
+              "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg shadow-sm transition-all duration-200",
+              hasColumnFilters
+                ? "bg-[#1e3a8a] text-white"
+                : "bg-white text-[#1e3a8a] border border-slate-200",
+            ].join(" ")}>
+              <SlidersHorizontal size={16} />
             </span>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <span className="text-[14px] font-extrabold text-slate-900">Filters</span>
+                <span className="text-[11px] font-extrabold uppercase tracking-widest text-slate-500">
+                  Filter Options
+                </span>
                 {hasActiveFilters && (
-                  <span className="inline-flex rounded-full bg-[#1e3a8a] px-2 py-0.5 text-[10px] font-extrabold text-white">
-                    {activeFilterCount}
+                  <span className="inline-flex rounded-full bg-[#1e3a8a] px-2 py-0.5 text-[10px] font-extrabold text-white shadow-sm">
+                    {activeFilterCount} active
                   </span>
                 )}
               </div>
-              <p className="text-[11px] font-medium text-slate-400 truncate">
-                {filtersOpen ? "Click to collapse" : "Click to expand filters"}
+              <p className="mt-0.5 text-[11px] font-medium text-slate-400 truncate">
+                {filtersOpen ? "Click to collapse" : "Click to expand and filter clients"}
               </p>
             </div>
           </div>
@@ -514,16 +527,21 @@ export default function ClientList() {
               <InfoPill tone="green" label={`${meta.workingTasksTotal} active tasks`} />
             )}
             {clientsLoading && <InfoPill tone="amber" label="Refreshing" />}
-            {hasActiveFilters && <InfoPill tone="blue" label={`${activeFilterCount} active`} />}
+            {hasActiveFilters && <InfoPill tone="blue" label={`${activeFilterCount} filtered`} />}
           </div>
 
-          {/* Right: chevron */}
-          <ChevronDown
-            size={18}
-            className={`shrink-0 text-slate-400 transition-transform duration-300 ${
-              filtersOpen ? "rotate-180" : "rotate-0"
-            }`}
-          />
+          {/* Right: chevron enclosed in pill */}
+          <span className={[
+            "inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all duration-200",
+            hasColumnFilters
+              ? "bg-[#1e3a8a]/10 text-[#1e3a8a]"
+              : "bg-white text-slate-400 border border-slate-200",
+          ].join(" ")}>
+            <ChevronDown
+              size={15}
+              className={`transition-transform duration-300 ${filtersOpen ? "rotate-180" : "rotate-0"}`}
+            />
+          </span>
         </button>
 
         {/* ── Accordion body ── */}
