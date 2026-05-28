@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Columns, Download, Pencil, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Columns, Download, Pencil, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -359,6 +359,7 @@ export default function ClientList() {
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1, workingTasksTotal: 0 });
   const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
   const [drawerClientId, setDrawerClientId] = useState(null);
+  const [filtersOpen, setFiltersOpen] = useState(true);
 
   // Column visibility state: key → boolean. Undefined means "use defaultOn".
   const [colVisibility, setColVisibility] = useState(() => {
@@ -574,7 +575,74 @@ export default function ClientList() {
           </div>
         </div>
 
-        {/* Column filter grid — styled exactly like TaskList */}
+        {/* Column filter accordion — mirrors TaskList implementation */}
+        <button
+          type="button"
+          id="client-filter-accordion-toggle"
+          aria-expanded={filtersOpen}
+          aria-controls="client-filter-accordion-body"
+          onClick={() => setFiltersOpen((prev) => !prev)}
+          className={[
+            "group flex w-full items-center justify-between gap-3 border-y px-5 py-2.5 text-left transition-all duration-150",
+            hasColumnFilters
+              ? "border-blue-100 bg-blue-50/60 hover:bg-blue-50"
+              : "border-slate-100 bg-slate-50/80 hover:bg-slate-100/80",
+          ].join(" ")}
+        >
+          <span className="flex items-center gap-2">
+            <span
+              className={[
+                "flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors duration-150",
+                hasColumnFilters
+                  ? "bg-[#1e3a8a] text-white shadow-sm shadow-blue-200"
+                  : "bg-white text-slate-400 ring-1 ring-slate-200 group-hover:text-slate-600",
+              ].join(" ")}
+            >
+              <SlidersHorizontal size={12} />
+            </span>
+            <span
+              className={[
+                "text-[11px] font-extrabold uppercase tracking-widest",
+                hasColumnFilters ? "text-[#1e3a8a]" : "text-slate-500",
+              ].join(" ")}
+            >
+              Filter Options
+            </span>
+            {hasColumnFilters && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#1e3a8a] px-2 py-0.5 text-[10px] font-extrabold text-white">
+                {activeFilterCount} active
+              </span>
+            )}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className={`text-[10px] font-semibold transition-colors duration-150 ${
+              hasColumnFilters ? "text-blue-400" : "text-slate-300 group-hover:text-slate-400"
+            }`}>
+              {filtersOpen ? "Hide" : "Show"}
+            </span>
+            <ChevronDown
+              size={14}
+              className={[
+                "transition-all duration-200",
+                filtersOpen ? "rotate-180" : "",
+                hasColumnFilters ? "text-[#1e3a8a]" : "text-slate-400",
+              ].join(" ")}
+            />
+          </span>
+        </button>
+
+        {/* Accordion body */}
+        <div
+          id="client-filter-accordion-body"
+          role="region"
+          aria-labelledby="client-filter-accordion-toggle"
+          style={{
+            display: "grid",
+            gridTemplateRows: filtersOpen ? "1fr" : "0fr",
+            transition: "grid-template-rows 0.25s ease",
+          }}
+        >
+          <div style={{ overflow: "hidden" }}>
         <div className="px-4 py-4 sm:px-5">
           <div className="task-list-column-grid">
             <FilterField label="Client Name" htmlFor="client-filter-name">
@@ -694,6 +762,8 @@ export default function ClientList() {
             </div>
           )}
         </div>
+          </div>{/* /overflow:hidden */}
+        </div>{/* /accordion grid body */}
       </Card>
 
       {/* Client table */}
