@@ -20,9 +20,17 @@ const categoryLabels = {
   EInv: "E-Invoicing",
   Refund: "VAT Refund",
 };
+const categoryValuesByLabel = Object.fromEntries(
+  Object.entries(categoryLabels).map(([value, label]) => [label, value])
+);
 
 function displayCategoryName(category) {
   return categoryLabels[category?.name] || category?.name || "";
+}
+
+function getCategoryFilterValue(categories, displayName) {
+  const category = categories.find((item) => displayCategoryName(item) === displayName);
+  return category?.name || categoryValuesByLabel[displayName] || displayName;
 }
 
 function getTileMeta(name) {
@@ -87,7 +95,11 @@ export default function Dashboard() {
     return [name, metric?.active || 0, metric?.closed || 0, metric?.overdue || 0];
   });
   const openTasks = (category) => {
-    const params = new URLSearchParams({ category, month: selectedMonth });
+    const params = new URLSearchParams({
+      category: getCategoryFilterValue(state.categories, category),
+      status: "Active",
+      month: selectedMonth,
+    });
     navigate(`/tasks/list?${params.toString()}`);
   };
 

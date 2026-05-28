@@ -9,6 +9,7 @@ import { useClients } from "../../hooks/useClients";
 import { categoryService } from "../../services/categoryService";
 import { clientService } from "../../services/clientService";
 import { downloadBlob, mapCategory, mapClient } from "../../utils/adapterUtils";
+import { compareOptionsWithOtherLast } from "../../utils/optionSort";
 import { canManageTasks } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
@@ -45,6 +46,9 @@ const CATEGORY_LABELS = {
   EInv: "E-Invoicing",
   Refund: "VAT Refund",
 };
+const CATEGORY_VALUES_BY_LABEL = Object.fromEntries(
+  Object.entries(CATEGORY_LABELS).map(([value, label]) => [label.toLowerCase(), value])
+);
 const OPTION_ACRONYMS = new Map([
   ["ct", "CT"],
   ["einv", "EInv"],
@@ -77,6 +81,27 @@ function createEmptyColumnFilters() {
     scope: "",
     createdAt: "",
     updatedAt: "",
+  };
+}
+
+function normalizeStatusFilterValue(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (raw.toLowerCase() === "active") return "Active";
+  return FILTER_STATUSES.find((status) => status.toLowerCase() === raw.toLowerCase()) || raw;
+}
+
+function normalizeCategoryFilterValue(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  return CATEGORY_VALUES_BY_LABEL[raw.toLowerCase()] || raw;
+}
+
+function createInitialColumnFilters(searchParams) {
+  return {
+    ...createEmptyColumnFilters(),
+    category: normalizeCategoryFilterValue(searchParams.get("category")),
+    status: normalizeStatusFilterValue(searchParams.get("status")),
   };
 }
 
@@ -114,7 +139,7 @@ function buildNormalizedOptions(values) {
     const key = normalizeOptionKey(label);
     if (!options.has(key)) options.set(key, { value: rawValue, label });
   });
-  return [...options.values()].sort((left, right) => left.label.localeCompare(right.label));
+  return [...options.values()].sort((left, right) => compareOptionsWithOtherLast(left, right, (option) => option.label));
 }
 
 function displayCategoryName(category) {
@@ -190,7 +215,7 @@ export default function TaskList() {
   const [drawerTaskId, setDrawerTaskId] = useState(null);
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1 });
-  const [columnFilters, setColumnFilters] = useState(() => createEmptyColumnFilters());
+  const [columnFilters, setColumnFilters] = useState(() => createInitialColumnFilters(searchParams));
   const [colVisibility, setColVisibility] = useState(() => {
     const init = {};
     COLUMN_DEFS.forEach((c) => { init[c.key] = c.defaultOn; });
