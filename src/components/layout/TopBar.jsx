@@ -185,7 +185,7 @@ export default function TopBar({ title, onMenuClick }) {
         <button onClick={onMenuClick} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-700 hover:bg-slate-50 lg:hidden" aria-label="Open navigation">
           <Menu size={18} />
         </button>
-        <h1 className="min-w-0 truncate text-[16px] font-extrabold text-slate-900 sm:text-[18px]">{title}</h1>
+        <h1 className="min-w-0 truncate text-[20px] font-extrabold text-slate-900 sm:text-[22px]">{title}</h1>
       </div>
       <div ref={wrapRef} className="relative flex shrink-0 items-center gap-2 sm:gap-4">
         <div ref={expiryRef} className="relative">
