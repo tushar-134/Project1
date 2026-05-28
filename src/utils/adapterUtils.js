@@ -83,9 +83,11 @@ export function mapTask(task) {
     ftaStatus: task.ftaStatus,
     // Needed so TaskList can gate "Submitted to FTA" to FTA-tracked tasks only (BRD 5.4)
     isAwaitingFta: task.isAwaitingFta ?? false,
-    // Date audit fields — used in TaskList for Created Date & Last Modified Date columns
-    createdAt: task.createdAt ? task.createdAt.slice(0, 10) : null,
-    updatedAt: task.updatedAt ? task.updatedAt.slice(0, 10) : null,
+    // Date audit fields — full ISO strings are preserved so formatDateTime in
+    // TaskList.jsx can extract the exact server-side time. Slicing to date-only
+    // caused every time to display as 00:00 UTC (05:30 am local for IST/GST).
+    createdAt: task.createdAt || null,
+    updatedAt: task.updatedAt || null,
   };
 }
 
