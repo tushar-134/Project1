@@ -64,6 +64,8 @@ const actionMeta = {
   "Status Changed": { color: "#7c3aed", bg: "bg-purple-50", border: "border-purple-200", icon: "⟳" },
   "FTA Status Changed": { color: "#ea580c", bg: "bg-orange-50", border: "border-orange-200", icon: "◉" },
   "Generated Recurrence": { color: "#0891b2", bg: "bg-cyan-50", border: "border-cyan-200", icon: "↻" },
+  "Reassigned": { color: "#7c3aed", bg: "bg-purple-50", border: "border-purple-200", icon: "⇄" },
+  "Comment Added": { color: "#1e3a8a", bg: "bg-blue-50", border: "border-blue-200", icon: "💬" },
 };
 
 function getActionMeta(action) {
@@ -79,9 +81,10 @@ export default function TaskDetail() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [remarkText, setRemarkText] = useState("");
-  const [remarkSaving, setRemarkSaving] = useState(false);
-  const [remarkError, setRemarkError] = useState("");
+  const [remarkText, setRemarkText] = useState(""); // kept for any downstream refs — not rendered
+  const [commentText, setCommentText] = useState("");
+  const [commentSaving, setCommentSaving] = useState(false);
+  const [commentError, setCommentError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -97,7 +100,7 @@ export default function TaskDetail() {
           setTask(taskData);
           setLogs(logsData);
           setRemarkText(taskData?.remarks || "");
-          setRemarkError("");
+          setCommentError("");
         }
       } catch (err) {
         if (active) setError(err.response?.data?.message || "Failed to load task details");
@@ -138,20 +141,24 @@ export default function TaskDetail() {
   const overdue = daysOverdue(task.dueDate, task.status);
   const canEditRemarks = canManage || (currentUser?.role === "task_only" && String(task.assignedTo?._id) === String(currentUser?._id || currentUser?.id));
 
-  async function handleRemarkSave() {
-    if (remarkSaving) return;
-    setRemarkSaving(true);
-    setRemarkError(null);
+  async function handleRemarkSave() { /* kept for compatibility */ }
+
+  async function handleCommentSubmit(e) {
+    e?.preventDefault();
+    const trimmed = commentText.trim();
+    if (!trimmed || commentSaving) return;
+    setCommentSaving(true);
+    setCommentError("");
     try {
-      const updatedTask = await taskService.updateRemarks(task._id, remarkText);
-      setTask((current) => ({ ...current, remarks: updatedTask.remarks || "", updatedAt: updatedTask.updatedAt || current.updatedAt }));
-      setRemarkText(updatedTask.remarks || "");
+      const updatedTask = await taskService.addComment(task._id, trimmed);
+      setTask(updatedTask);
+      setCommentText("");
       const logsData = await taskService.getLogs(id);
       setLogs(logsData);
     } catch (err) {
-      setRemarkError(err.response?.data?.message || "Failed to update remark");
+      setCommentError(err.response?.data?.message || "Failed to post comment");
     } finally {
-      setRemarkSaving(false);
+      setCommentSaving(false);
     }
   }
 
@@ -321,34 +328,74 @@ export default function TaskDetail() {
           </div>
         )}
 
+        {/* Comments — replaces the old Remarks textarea */}
         <div className="task-detail-description">
-          <div className="task-detail-field-label mb-2">
-            <MessageSquare size={13} /> Remarks
+          <div className="task-detail-field-label mb-3">
+            <MessageSquare size={13} /> Comments
+            {task.comments?.length > 0 && (
+              <span className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#1e3a8a] px-1 text-[9px] font-extrabold text-white">
+                {task.comments.length}
+              </span>
+            )}
           </div>
-          {canEditRemarks ? (
-            <>
-              <textarea
-                id="task-detail-remark"
-                name="taskDetailRemark"
-                className="input min-h-28"
-                placeholder="Add context, blockers, or follow-up notes for this task."
-                value={remarkText}
-                onChange={(event) => setRemarkText(event.target.value)}
-                disabled={remarkSaving}
-              />
-              {remarkError && (
-                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">
-                  {remarkError}
+
+          {/* Thread */}
+          <div className="mb-3 space-y-3">
+            {!task.comments?.length && (
+              <p className="text-[13px] font-medium text-slate-400">No comments yet — add the first one below.</p>
+            )}
+            {(task.comments || []).map((c, idx) => {
+              const isMe = String(c.addedBy?._id || c.addedBy) === String(currentUser?._id || currentUser?.id);
+              const authorName = c.addedBy?.name || "Unknown";
+              return (
+                <div key={c._id || idx} className={`flex gap-3 ${isMe ? "flex-row-reverse" : ""}`}>
+                  <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-extrabold ${
+                    isMe ? "bg-[#1e3a8a] text-white" : "bg-slate-100 text-slate-600"
+                  }`}>
+                    {authorName.charAt(0).toUpperCase()}
+                  </div>
+                  <div className={`flex max-w-[75%] flex-col gap-1 ${isMe ? "items-end" : ""}`}>
+                    <div className={`rounded-2xl px-3.5 py-2.5 text-[13px] font-medium leading-relaxed ${
+                      isMe ? "bg-[#1e3a8a] text-white rounded-tr-sm" : "bg-slate-50 text-slate-800 rounded-tl-sm border border-slate-100"
+                    }`}>
+                      {c.text}
+                    </div>
+                    <div className={`flex items-center gap-1.5 text-[10px] font-medium text-slate-400 ${isMe ? "flex-row-reverse" : ""}`}>
+                      <span>{authorName}</span>
+                      <span>·</span>
+                      <span>{formatDateTime(c.createdAt)}</span>
+                    </div>
+                  </div>
                 </div>
+              );
+            })}
+          </div>
+
+          {/* Compose */}
+          {canEditRemarks && (
+            <form onSubmit={handleCommentSubmit}>
+              {commentError && (
+                <div className="mb-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">{commentError}</div>
               )}
-              <div className="mt-3 flex justify-end">
-                <Button size="sm" onClick={handleRemarkSave} disabled={remarkSaving}>
-                  {remarkSaving ? "Saving..." : "Save Remark"}
-                </Button>
+              <div className="flex gap-2">
+                <textarea
+                  rows={2}
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleCommentSubmit(); } }}
+                  placeholder="Add a comment… (Enter to send, Shift+Enter for new line)"
+                  className="input flex-1 resize-none text-[13px]"
+                  disabled={commentSaving}
+                />
+                <button
+                  type="submit"
+                  disabled={!commentText.trim() || commentSaving}
+                  className="self-end rounded-xl bg-[#1e3a8a] px-4 py-2 text-[12px] font-extrabold text-white hover:bg-[#1e40af] disabled:opacity-40 transition-colors"
+                >
+                  {commentSaving ? "…" : "Send"}
+                </button>
               </div>
-            </>
-          ) : (
-            <p className="text-[13px] leading-relaxed text-slate-700">{task.remarks || "No remark added"}</p>
+            </form>
           )}
         </div>
 

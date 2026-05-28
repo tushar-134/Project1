@@ -547,12 +547,12 @@ export default function TaskList() {
   }, [state.categories, state.tasks, columnFilters.category, taskCategoryNames]);
 
   const assigneeOptions = useMemo(
-    () => sortUniqueStrings(state.users?.length ? state.users.map((u) => u.name) : state.tasks.map((t) => t.assigned)),
-    [state.users, state.tasks]
+    () => sortUniqueStrings(state.tasks.map((t) => t.assigned).filter(Boolean)),
+    [state.tasks]
   );
   const clientSuggestions = useMemo(
-    () => sortUniqueStrings(state.clients?.length ? state.clients.map((c) => c.name || c.legalName) : state.tasks.map((t) => t.client)),
-    [state.clients, state.tasks]
+    () => sortUniqueStrings(state.tasks.map((t) => t.client).filter(Boolean)),
+    [state.tasks]
   );
   const rows = state.tasks;
 
