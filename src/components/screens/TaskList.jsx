@@ -1,4 +1,4 @@
-import { ChevronDown, Columns, Download, RefreshCw, Search, X } from "lucide-react";
+import { ChevronDown, Columns, Download, RefreshCw, Search, SlidersHorizontal, X } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -555,20 +555,56 @@ export default function TaskList() {
             aria-expanded={filtersOpen}
             aria-controls="filter-accordion-body"
             onClick={() => setFiltersOpen((prev) => !prev)}
-            className="flex w-full items-center justify-between gap-2 border-t border-slate-100 px-5 py-2.5 text-left text-[11px] font-extrabold uppercase tracking-widest text-slate-500 transition hover:bg-slate-50/70"
+            className={[
+              "group flex w-full items-center justify-between gap-3 border-y px-5 py-2.5 text-left transition-all duration-150",
+              hasColumnFilters
+                ? "border-blue-100 bg-blue-50/60 hover:bg-blue-50"
+                : "border-slate-100 bg-slate-50/80 hover:bg-slate-100/80",
+            ].join(" ")}
           >
+            {/* Left: icon + label + active badge */}
             <span className="flex items-center gap-2">
-              <span>Filter Options</span>
+              <span
+                className={[
+                  "flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors duration-150",
+                  hasColumnFilters
+                    ? "bg-[#1e3a8a] text-white shadow-sm shadow-blue-200"
+                    : "bg-white text-slate-400 ring-1 ring-slate-200 group-hover:text-slate-600",
+                ].join(" ")}
+              >
+                <SlidersHorizontal size={12} />
+              </span>
+              <span
+                className={[
+                  "text-[11px] font-extrabold uppercase tracking-widest",
+                  hasColumnFilters ? "text-[#1e3a8a]" : "text-slate-500",
+                ].join(" ")}
+              >
+                Filter Options
+              </span>
               {hasColumnFilters && (
-                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#1e3a8a] text-[9px] font-extrabold text-white">
-                  {activeColumnFilters.length}
+                <span className="inline-flex items-center gap-1 rounded-full bg-[#1e3a8a] px-2 py-0.5 text-[10px] font-extrabold text-white">
+                  {activeColumnFilters.length} active
                 </span>
               )}
             </span>
-            <ChevronDown
-              size={14}
-              className={`text-slate-400 transition-transform duration-200 ${filtersOpen ? "rotate-180" : ""}`}
-            />
+
+            {/* Right: show/hide hint + chevron */}
+            <span className="flex items-center gap-1.5">
+              <span className={`text-[10px] font-semibold transition-colors duration-150 ${
+                hasColumnFilters ? "text-blue-400" : "text-slate-300 group-hover:text-slate-400"
+              }`}>
+                {filtersOpen ? "Hide" : "Show"}
+              </span>
+              <ChevronDown
+                size={14}
+                className={[
+                  "transition-all duration-200",
+                  filtersOpen ? "rotate-180" : "",
+                  hasColumnFilters ? "text-[#1e3a8a]" : "text-slate-400",
+                ].join(" ")}
+              />
+            </span>
           </button>
 
           {/* Accordion body */}
