@@ -625,10 +625,6 @@ export default function AddClient() {
 
   async function handleTradeLicenceFile(licenceIndex, files) {
     const licence = licences[licenceIndex];
-    if (isEditMode && !licence?.persisted) {
-      toast.error("Save the new trade licence first, then upload its documents.");
-      return;
-    }
     const currentDocuments = licences[licenceIndex]?.documents || [];
     const { accepted: selected, skipped } = uniqueTradeLicenceFiles(files, currentDocuments);
     if (skipped) toast.error(skipped === 1 ? "This trade licence file is already added." : `${skipped} duplicate trade licence files were skipped.`);
