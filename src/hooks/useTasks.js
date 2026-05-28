@@ -11,10 +11,16 @@ const categoryToApi = {
 };
 
 function normalizeTaskParams(params = {}) {
+  // status may be a comma-separated multi-select string e.g. "WIP,Completed"
+  // Map each part individually through statusToApi, then rejoin.
+  const rawStatus = params.status || "";
+  const normalizedStatus = rawStatus
+    ? rawStatus.split(",").map((s) => statusToApi[s.trim()] || s.trim()).filter(Boolean).join(",")
+    : "";
   return {
     ...params,
     category: categoryToApi[params.category] || params.category,
-    status: statusToApi[params.status] || params.status,
+    status: normalizedStatus || undefined,
   };
 }
 
@@ -80,6 +86,14 @@ export function useTasks() {
     return task;
   }, [dispatch]);
 
+  const addComment = useCallback(async (id, text) => {
+    const task = await taskService.addComment(id, text);
+    const mapped = mapTask(task);
+    // Replace the task's comments array with the server's authoritative response
+    dispatch({ type: "UPDATE_TASK_COMMENTS", id, comments: mapped.comments });
+    return mapped;
+  }, [dispatch]);
+
   const exportTasks = useCallback((params) => taskService.export(normalizeTaskParams(params)), []);
 
   return useMemo(() => ({
@@ -92,8 +106,9 @@ export function useTasks() {
     updateAssignee,
     updateRemarks,
     updateFtaStatus,
+    addComment,
     uploadAttachment: taskService.uploadAttachment,
     deleteAttachment: taskService.deleteAttachment,
     exportTasks,
-  }), [exportTasks, fetchFtaTracker, fetchTasks, updateAssignee, updateFtaStatus, updateRemarks, updateStatus]);
+  }), [addComment, exportTasks, fetchFtaTracker, fetchTasks, updateAssignee, updateFtaStatus, updateRemarks, updateStatus]);
 }

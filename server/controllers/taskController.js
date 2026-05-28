@@ -359,7 +359,9 @@ async function taskQuery(req) {
       // "Active" chip = all non-completed statuses
       query.status = { $in: ["not_started", "wip", "submitted_to_fta"] };
     } else {
-      query.status = status;
+      // Support multi-select: comma-separated values from the frontend
+      const statusArr = String(status).split(",").map((s) => s.trim()).filter(Boolean);
+      query.status = statusArr.length === 1 ? statusArr[0] : { $in: statusArr };
     }
   }
   if (assignedTo) andClauses.push({ assignedTo });
@@ -430,6 +432,7 @@ const populateTask = [
   { path: "assignedTo", select: "name email role" },
   { path: "createdBy", select: "name" },
   { path: "attachments.uploadedBy", select: "name" },
+  { path: "comments.addedBy", select: "name" },
 ];
 
 exports.listTasks = async (req, res, next) => {
@@ -647,6 +650,39 @@ exports.updateAssignee = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
+
+exports.addComment = async (req, res, next) => {
+  try {
+    const { text } = req.body;
+    if (!text || !String(text).trim()) return res.status(400).json({ message: "Comment text is required" });
+
+    const task = await Task.findById(req.params.id);
+    if (!task) return res.status(404).json({ message: "Task not found" });
+
+    // task_only users can only comment on tasks assigned to them
+    if (req.user.role === "task_only" && String(task.assignedTo) !== String(req.user._id)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const newComment = { text: String(text).trim(), addedBy: req.user._id };
+
+    // Push the comment and stamp updatedAt using the server clock so this action
+    // correctly bumps the task to the top of the listTasks sort (updatedAt: -1).
+    const updated = await Task.findByIdAndUpdate(
+      task._id,
+      { $push: { comments: newComment }, $set: { updatedAt: new Date() } },
+      { new: true, runValidators: true }
+    ).populate(populateTask);
+
+    await auditLogger({
+      task: updated._id,
+      user: req.user._id,
+      action: "Comment Added",
+      notes: String(text).trim().slice(0, 100) + (String(text).trim().length > 100 ? "…" : ""),
+    });
+    res.json(updated);
+  } catch (error) { next(error); }
+};
 
 exports.updateRemarks = async (req, res, next) => {
   try {

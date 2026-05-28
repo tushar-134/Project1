@@ -10,6 +10,11 @@ const uploadedFileSchema = new mongoose.Schema({
   uploadedAt: { type: Date, default: Date.now },
 }, { _id: true });
 
+const commentSchema = new mongoose.Schema({
+  text: { type: String, required: true, trim: true },
+  addedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
+}, { timestamps: true, _id: true });
+
 // Task shape mirrors the original practice-management workflow, including recurring and FTA-specific fields.
 const taskSchema = new mongoose.Schema({
   taskId: { type: String, unique: true },
@@ -25,6 +30,7 @@ const taskSchema = new mongoose.Schema({
   periodQuarter: String, // e.g. "Jan-Mar", "Apr-Jun", "Jul-Sep", "Oct-Dec"
   description: String,
   remarks: String,
+  comments: { type: [commentSchema], default: [] },
   status: { type: String, enum: ["not_started", "wip", "completed", "submitted_to_fta"], default: "not_started" },
   isRecurring: { type: Boolean, default: false },
   recurringConfig: {

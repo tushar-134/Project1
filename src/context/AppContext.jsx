@@ -46,6 +46,8 @@ function reducer(state, action) {
       return { ...state, tasks: state.tasks.map((task) => task._id === action.id || task.id === action.id ? { ...task, assignedId: action.assignedTo, assigned: action.assigned } : task) };
     case "UPDATE_TASK_REMARKS":
       return { ...state, tasks: state.tasks.map((task) => task._id === action.id || task.id === action.id ? { ...task, remarks: action.remarks } : task) };
+    case "UPDATE_TASK_COMMENTS":
+      return { ...state, tasks: state.tasks.map((task) => task._id === action.id || task.id === action.id ? { ...task, comments: action.comments } : task) };
     case "UPDATE_FTA_STATUS":
       return { ...state, ftaItems: state.ftaItems.map((item) => item._id === action.id || item.id === action.id ? { ...item, ftaStatus: action.status, status: action.displayStatus || item.status } : item) };
     case "MARK_NOTIFICATION_READ":

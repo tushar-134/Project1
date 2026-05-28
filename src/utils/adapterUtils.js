@@ -88,6 +88,8 @@ export function mapTask(task) {
     // caused every time to display as 00:00 UTC (05:30 am local for IST/GST).
     createdAt: task.createdAt || null,
     updatedAt: task.updatedAt || null,
+    // Pass comments array through so TaskList can show comment history without extra fetches
+    comments: Array.isArray(task.comments) ? task.comments : [],
   };
 }
 
