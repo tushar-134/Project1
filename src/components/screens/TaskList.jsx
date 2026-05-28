@@ -429,6 +429,7 @@ export default function TaskList() {
                 onChange={(event) => {
                   const selected = state.users.find((user) => user._id === event.target.value || user.id === event.target.value);
                   updateAssignee(task.id, event.target.value || null, selected?.name || "Unassigned")
+                    .then(() => refetchTasks())
                     .catch(() => refetchTasks());
                 }}
               >
