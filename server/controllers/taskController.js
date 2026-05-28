@@ -604,25 +604,49 @@ exports.updateStatus = async (req, res, next) => {
 exports.updateAssignee = async (req, res, next) => {
   try {
     const { assignedTo } = req.body;
-    const task = await Task.findById(req.params.id);
+    const task = await Task.findById(req.params.id).populate("assignedTo", "name");
     if (!task) return res.status(404).json({ message: "Task not found" });
-    // Only admin/manager can reassign (task_only can't)
+
+    // Capture previous assignee name for the audit log before overwriting
+    const previousAssigneeName = task.assignedTo?.name || "Unassigned";
+
     const updateFields = { assignedTo: assignedTo || null };
-    // Explicitly set updatedAt via the server clock (same reason as updateStatus —
-    // findByIdAndUpdate bypasses Mongoose timestamps hooks).
+    // Explicitly set updatedAt via the server clock — findByIdAndUpdate bypasses
+    // Mongoose timestamps: true hooks, so we inject the timestamp directly.
     const updated = await Task.findByIdAndUpdate(
       task._id,
       { $set: { ...updateFields, updatedAt: new Date() } },
       { new: true, runValidators: true }
     ).populate(populateTask);
-    await auditLogger({ task: updated._id, user: req.user._id, action: "Updated", newStatus: updated.status });
-    // Notify the new assignee
+
+    // Resolve the new assignee's display name from the populated result
+    const newAssigneeName = updated.assignedTo?.name || "Unassigned";
+
+    // Build a descriptive audit note that matches the activity log UI style
+    let assignmentNote;
+    if (previousAssigneeName === "Unassigned" && newAssigneeName !== "Unassigned") {
+      assignmentNote = `Assigned to ${newAssigneeName}`;
+    } else if (previousAssigneeName !== "Unassigned" && newAssigneeName === "Unassigned") {
+      assignmentNote = `Unassigned (was ${previousAssigneeName})`;
+    } else {
+      assignmentNote = `Assigned to ${newAssigneeName} (was ${previousAssigneeName})`;
+    }
+
+    await auditLogger({
+      task: updated._id,
+      user: req.user._id,
+      action: "Reassigned",
+      notes: assignmentNote,
+    });
+
+    // Notify the new assignee if they are not the person making the change
     if (updated.assignedTo && String(updated.assignedTo._id || updated.assignedTo) !== String(req.user._id)) {
       await Notification.create({ recipient: updated.assignedTo._id || updated.assignedTo, title: "Task reassigned to you", message: `${updated.taskId} — ${updated.taskType} (${statusLabel(updated.status)})`, type: "task_update", relatedTask: updated._id });
     }
     res.json(updated);
   } catch (error) { next(error); }
 };
+
 
 exports.updateRemarks = async (req, res, next) => {
   try {
