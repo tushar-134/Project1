@@ -576,10 +576,15 @@ exports.updateStatus = async (req, res, next) => {
       updateFields.isAwaitingFta = false;
     }
 
-    // Use findByIdAndUpdate to guarantee all fields are persisted
+    // Use findByIdAndUpdate to guarantee all fields are persisted.
+    // Explicitly set updatedAt via the server clock because findByIdAndUpdate
+    // bypasses the Mongoose timestamps hook unless { timestamps: true } is passed
+    // as a query option — which some MongoDB drivers ignore on $set paths.
+    // Using new Date() here ensures the server (not the client browser) is the
+    // single source of truth for modification time.
     const updated = await Task.findByIdAndUpdate(
       task._id,
-      { $set: updateFields },
+      { $set: { ...updateFields, updatedAt: new Date() } },
       { new: true, runValidators: true }
     ).populate(populateTask);
 
@@ -603,9 +608,11 @@ exports.updateAssignee = async (req, res, next) => {
     if (!task) return res.status(404).json({ message: "Task not found" });
     // Only admin/manager can reassign (task_only can't)
     const updateFields = { assignedTo: assignedTo || null };
+    // Explicitly set updatedAt via the server clock (same reason as updateStatus —
+    // findByIdAndUpdate bypasses Mongoose timestamps hooks).
     const updated = await Task.findByIdAndUpdate(
       task._id,
-      { $set: updateFields },
+      { $set: { ...updateFields, updatedAt: new Date() } },
       { new: true, runValidators: true }
     ).populate(populateTask);
     await auditLogger({ task: updated._id, user: req.user._id, action: "Updated", newStatus: updated.status });
@@ -660,9 +667,10 @@ exports.updateFtaStatus = async (req, res, next) => {
       updateFields.isAwaitingFta = false;
     }
 
+    // Explicitly set updatedAt via the server clock.
     const updated = await Task.findByIdAndUpdate(
       task._id,
-      { $set: updateFields },
+      { $set: { ...updateFields, updatedAt: new Date() } },
       { new: true, runValidators: true }
     ).populate(populateTask);
 
