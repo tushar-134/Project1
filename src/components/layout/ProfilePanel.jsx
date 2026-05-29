@@ -65,7 +65,7 @@ export default function ProfilePanel({ open, initialTab = "profile", onClose }) 
   const navigate = useNavigate();
 
   useEffect(() => {
-    setActiveTab(initialTab);
+    setActiveTab(initialTab === "settings" ? "profile" : initialTab);
   }, [initialTab]);
 
   useEffect(() => {
@@ -206,30 +206,11 @@ export default function ProfilePanel({ open, initialTab = "profile", onClose }) 
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <div>
             <div className="text-[16px] font-extrabold text-slate-900">Profile</div>
-            <div className="text-[12px] font-semibold text-slate-500">Account overview and settings</div>
+            <div className="text-[12px] font-semibold text-slate-500">Account overview</div>
           </div>
           <button onClick={onClose} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50">
             <X size={16} />
           </button>
-        </div>
-
-        <div className="border-b border-slate-100 px-5 py-3">
-          <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1">
-            <button
-              type="button"
-              onClick={() => setActiveTab("profile")}
-              className={`rounded-lg px-3 py-2 text-[13px] font-bold transition ${activeTab === "profile" ? "bg-[#1e3a8a] text-white" : "text-slate-600 hover:bg-slate-50"}`}
-            >
-              Profile
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab("settings")}
-              className={`rounded-lg px-3 py-2 text-[13px] font-bold transition ${activeTab === "settings" ? "bg-[#1e3a8a] text-white" : "text-slate-600 hover:bg-slate-50"}`}
-            >
-              Settings
-            </button>
-          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-5 py-5">
