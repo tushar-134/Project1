@@ -317,7 +317,7 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
                   </div>
                   {/* Comment thread */}
                   {(() => {
-                    const comments = parseComments(task.remarks);
+                    const comments = parseComments(task.remarks).reverse();
                     return comments.length === 0 ? (
                       <p className="mb-3 text-[12px] text-slate-400 italic">No comments yet. Be the first to add one.</p>
                     ) : (
