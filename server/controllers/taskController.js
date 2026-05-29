@@ -358,6 +358,10 @@ async function taskQuery(req) {
     if (status === "Active") {
       // "Active" chip = all non-completed statuses
       query.status = { $in: ["not_started", "wip", "submitted_to_fta"] };
+    } else if (status.includes(",")) {
+      // Multi-select: comma-separated list from the frontend
+      const statusValues = status.split(",").map((s) => s.trim()).filter(Boolean);
+      query.status = { $in: statusValues };
     } else {
       query.status = status;
     }
