@@ -404,10 +404,6 @@ export default function Reports() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <div className="page-kicker">Insights</div>
-        <h2 className="screen-title">Reports</h2>
-      </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {tiles.map(([name, key, Icon]) => (
           <Card

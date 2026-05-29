@@ -386,12 +386,6 @@ export default function BulkUpload() {
 
   return (
     <div className="space-y-5">
-      {/* Header */}
-      <div>
-        <div className="page-kicker">Client Import</div>
-        <h2 className="screen-title">Bulk Upload</h2>
-      </div>
-
       <div className="grid gap-4 lg:grid-cols-[1fr_1.4fr]">
         {/* Instructions */}
         <Card className="p-4">
