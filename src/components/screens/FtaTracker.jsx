@@ -144,9 +144,9 @@ export default function FtaTracker() {
       )}
 
       {/* ── Filter accordion ── */}
-      <Card className="p-0 overflow-hidden">
+      <Card className="p-0">
         {/* Toolbar row: stats + clear actions */}
-        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-5 py-3.5">
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-5 py-3.5 rounded-t-xl">
           {/* Stats pills */}
           <div className="flex flex-wrap items-center gap-2">
             <InfoPill tone="navy" label={`${filtered.length} items`} />
