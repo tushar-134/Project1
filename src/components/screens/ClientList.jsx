@@ -643,7 +643,7 @@ export default function ClientList() {
             transition: "grid-template-rows 0.25s ease",
           }}
         >
-          <div style={{ overflow: "hidden" }}>
+          <div style={{ overflow: filtersOpen ? "visible" : "hidden" }}>
         <div className="px-4 py-4 sm:px-5">
           <div className="task-list-column-grid">
             <FilterField label="Client Name" htmlFor="client-filter-name">

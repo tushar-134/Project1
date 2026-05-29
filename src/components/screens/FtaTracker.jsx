@@ -253,7 +253,7 @@ export default function FtaTracker() {
             transition: "grid-template-rows 0.25s ease",
           }}
         >
-          <div style={{ overflow: "hidden" }}>
+          <div style={{ overflow: filtersOpen ? "visible" : "hidden" }}>
             <div className="px-5 py-4">
               <div className="task-list-column-grid">
                 {/* Client */}
