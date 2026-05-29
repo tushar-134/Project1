@@ -98,11 +98,7 @@ export default function Profile() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="page-kicker">Settings</div>
-          <h2 className="screen-title">My Profile</h2>
-        </div>
+      <div className="flex justify-end">
         <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
           <button
             type="button"

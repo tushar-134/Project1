@@ -52,11 +52,7 @@ export default function CustomFields() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div className="page-kicker">Data Extension</div>
-          <h2 className="screen-title">Custom Client Fields</h2>
-        </div>
+      <div className="flex justify-end">
         <Button onClick={openCreateModal}>
           <Plus size={16} /> New Field
         </Button>
