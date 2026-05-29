@@ -1143,13 +1143,6 @@ export default function AddClient() {
           )}
           {tab === 3 && (
             <div className="grid gap-3 md:grid-cols-2">
-              <Field label="Financial Year End" field="client-ct-fye">
-                <select className="input" value={form.fye} onChange={(e) => update("fye", e.target.value)}>
-                  {FINANCIAL_YEAR_OPTIONS.map((option) => (
-                    <option key={option} value={option}>{option}</option>
-                  ))}
-                </select>
-              </Field>
               <div className="space-y-2">
                 <label className="text-[14px] font-bold text-slate-700" htmlFor="client-vat-status">VAT Registration Status</label>
                 <div className="flex flex-wrap items-center gap-3">
@@ -1252,6 +1245,13 @@ export default function AddClient() {
                     </div>
                   </div>
                 )}
+                <Field label="Financial Year" field="client-ct-fye">
+                  <select className="input" value={form.fye} onChange={(e) => update("fye", e.target.value)}>
+                    {FINANCIAL_YEAR_OPTIONS.map((option) => (
+                      <option key={option} value={option}>{option}</option>
+                    ))}
+                  </select>
+                </Field>
               </div>
             </div>
           )}
@@ -1736,7 +1736,7 @@ function Basic({ form, update, countries, users, userSearch, setUserSearch, isUs
         <Field label="File No." field="client-file-no"><input className="input" value={form.fileNo} onChange={(e) => update("fileNo", e.target.value)} /></Field>
         <Field label="Legal Name*" field="client-legal-name"><input className="input" value={form.legalName} onChange={(e) => update("legalName", e.target.value)} /></Field>
         <Field label="Trade Name" field="client-trade-name"><input className="input" value={form.tradeName} onChange={(e) => update("tradeName", e.target.value)} /></Field>
-        <Field label="Financial Year End*" field="client-fye">
+        <Field label="Financial Year*" field="client-fye">
           <select className="input" value={form.fye} onChange={(e) => update("fye", e.target.value)}>
             {FINANCIAL_YEAR_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
           </select>
