@@ -1,6 +1,6 @@
-import { cloneElement, isValidElement, useEffect, useMemo, useRef, useState } from "react";
+import { cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import { Check, ChevronDown, Send, UploadCloud, X } from "lucide-react";
+import { Check, Send, UploadCloud } from "lucide-react";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
 import { useClients } from "../../hooks/useClients";
@@ -11,6 +11,7 @@ import { mapCategory } from "../../utils/adapterUtils";
 import { getFYOptions, getQuarters, getCurrentFYAndQuarter } from "../../utils/periodUtils";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
+import ClientComboBox from "../ui/ClientComboBox.jsx";
 import Toggle from "../ui/Toggle.jsx";
 
 export default function AddTask() {
@@ -508,112 +509,6 @@ export default function AddTask() {
 }
 function Step({ n, label, active }) { return <div className={`flex items-center gap-3 rounded-xl border p-3 ${active ? "border-[#1e3a8a] bg-white" : "border-[#e2e8f0] bg-white/60"}`}><div className={`grid h-7 w-7 place-items-center rounded-full text-[12px] font-black ${active ? "bg-[#1e3a8a] text-white" : "bg-slate-200 text-slate-500"}`}>{active ? <Check size={15} /> : n}</div><div className="font-extrabold">{label}</div></div>; }
 
-function ClientComboBox({ clients, value, onChange }) {
-  const [inputValue, setInputValue] = useState("");
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  const selected = clients.find((c) => (c._id || c.id) === value);
-
-  // Always filter by what the user has typed
-  const filtered = clients.filter((c) =>
-    !inputValue.trim() || c.name?.toLowerCase().includes(inputValue.toLowerCase())
-  );
-
-  // Sync input display: when closed and a client is selected, show its name
-  // When open (actively searching), keep user's typed query as-is
-  const displayValue = open ? inputValue : (selected?.name || inputValue);
-
-  useEffect(() => {
-    function onOutside(e) {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false);
-        // If user typed but didn't select, revert to empty or keep selected name
-        setInputValue(selected?.name || "");
-      }
-    }
-    document.addEventListener("mousedown", onOutside);
-    return () => document.removeEventListener("mousedown", onOutside);
-  }, [selected]);
-
-  function handleFocus() {
-    setInputValue(""); // clear so user can type a fresh search
-    setOpen(true);
-  }
-
-  function handleChange(e) {
-    setInputValue(e.target.value);
-    setOpen(true);
-  }
-
-  function handleSelect(client) {
-    onChange(client._id || client.id);
-    setInputValue(client.name); // immediately show selected name in the box
-    setOpen(false);
-  }
-
-  function handleClear(e) {
-    e.stopPropagation();
-    onChange("");
-    setInputValue("");
-    setOpen(false);
-  }
-
-  return (
-    <div ref={ref} className="relative">
-      <div className="relative flex items-center">
-        <input
-          id="taskClient"
-          name="taskClient"
-          className="input pr-14"
-          type="text"
-          autoComplete="off"
-          placeholder="Search client…"
-          value={displayValue}
-          onFocus={handleFocus}
-          onChange={handleChange}
-        />
-        <span className="pointer-events-none absolute right-2 flex items-center gap-1">
-          {value && (
-            <button
-              type="button"
-              className="pointer-events-auto text-slate-400 transition hover:text-slate-600"
-              onMouseDown={handleClear}
-              aria-label="Clear client"
-            >
-              <X size={13} />
-            </button>
-          )}
-          <ChevronDown
-            size={13}
-            className={`pointer-events-none text-slate-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
-          />
-        </span>
-      </div>
-      {open && (
-        <ul className="absolute top-full left-0 z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-[#e2e8f0] bg-white shadow-lg custom-scrollbar">
-          {filtered.length === 0 ? (
-            <li className="px-4 py-3 text-[12px] text-slate-400">No clients found</li>
-          ) : (
-            filtered.map((c) => (
-              <li
-                key={c._id || c.id}
-                onMouseDown={() => handleSelect(c)}
-                className={`cursor-pointer px-4 py-2.5 text-[13px] transition-colors hover:bg-blue-50 hover:text-[#1e3a8a] ${
-                  (c._id || c.id) === value
-                    ? "bg-blue-50/70 font-extrabold text-[#1e3a8a]"
-                    : "font-semibold text-slate-700"
-                }`}
-              >
-                {c.name}
-              </li>
-            ))
-          )}
-        </ul>
-      )}
-    </div>
-  );
-}
 function Field({ label, field, children }) {
   const control = isValidElement(children)
     ? cloneElement(children, {
