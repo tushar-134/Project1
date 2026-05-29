@@ -18,7 +18,7 @@ function InfoRow({ label, value }) {
   );
 }
 
-export default function Profile() {
+export default function Profile({ setSettingsHeaderAction }) {
   const { currentUser, setSessionUser } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialTab = searchParams.get("tab") === "settings" ? "settings" : "profile";
@@ -92,31 +92,35 @@ export default function Profile() {
     }
   }
 
+  useEffect(() => {
+    if (!setSettingsHeaderAction) return undefined;
+    setSettingsHeaderAction(
+      <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+        <button
+          type="button"
+          onClick={() => selectTab("profile")}
+          className={`rounded-lg px-3 py-2 text-[13px] font-bold transition ${activeTab === "profile" ? "bg-[#1e3a8a] text-white" : "text-slate-600 hover:bg-slate-50"}`}
+        >
+          Profile
+        </button>
+        <button
+          type="button"
+          onClick={() => selectTab("settings")}
+          className={`rounded-lg px-3 py-2 text-[13px] font-bold transition ${activeTab === "settings" ? "bg-[#1e3a8a] text-white" : "text-slate-600 hover:bg-slate-50"}`}
+        >
+          Settings
+        </button>
+      </div>
+    );
+    return () => setSettingsHeaderAction(null);
+  }, [setSettingsHeaderAction, activeTab]);
+
   if (loading) {
     return <div className="text-[14px] font-semibold text-slate-500">Loading profile...</div>;
   }
 
   return (
     <div className="space-y-5">
-      <div className="flex justify-end">
-        <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
-          <button
-            type="button"
-            onClick={() => selectTab("profile")}
-            className={`rounded-lg px-3 py-2 text-[13px] font-bold transition ${activeTab === "profile" ? "bg-[#1e3a8a] text-white" : "text-slate-600 hover:bg-slate-50"}`}
-          >
-            Profile
-          </button>
-          <button
-            type="button"
-            onClick={() => selectTab("settings")}
-            className={`rounded-lg px-3 py-2 text-[13px] font-bold transition ${activeTab === "settings" ? "bg-[#1e3a8a] text-white" : "text-slate-600 hover:bg-slate-50"}`}
-          >
-            Settings
-          </button>
-        </div>
-      </div>
-
       {activeTab === "profile" ? (
         <div className="grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)]">
           <Card className="p-5">

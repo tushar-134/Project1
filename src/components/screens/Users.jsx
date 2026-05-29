@@ -34,7 +34,7 @@ const ROLE_DETAILS = {
   },
 };
 
-export default function Users() {
+export default function Users({ setSettingsHeaderAction }) {
   const { state } = useApp();
   const { currentUser } = useAuth();
   const { fetchUsers, updateRole, createUser, updateUser, deleteUser, updateStatus } = useUsers();
@@ -219,19 +219,20 @@ export default function Users() {
     }
   }
 
-
+  useEffect(() => {
+    if (!setSettingsHeaderAction) return undefined;
+    setSettingsHeaderAction(canManageUsers ? (
+      <Button onClick={handleAddUser}>
+        <Plus size={16} />
+        Add User
+      </Button>
+    ) : null);
+    return () => setSettingsHeaderAction(null);
+  }, [setSettingsHeaderAction, canManageUsers]);
 
 
   return (
     <div className="space-y-5">
-      {canManageUsers && (
-        <div className="flex justify-end">
-          <Button onClick={handleAddUser}>
-            <Plus size={16} />
-            Add User
-          </Button>
-        </div>
-      )}
       <Card>
         <Table>
           <thead>

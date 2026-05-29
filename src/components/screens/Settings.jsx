@@ -64,6 +64,7 @@ export default function Settings() {
   const tabs = buildTabs(role);
   const [activeId, setActiveId] = useState(tabs[0]?.id ?? "");
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [headerAction, setHeaderAction] = useState(null);
 
   const activeTab = tabs.find((t) => t.id === activeId);
   const ActiveComponent = activeTab?.component ?? null;
@@ -143,21 +144,24 @@ export default function Settings() {
             <div className="border-b border-[#e2e8f0] px-6 py-5"
               style={{ background: "linear-gradient(135deg, rgba(30,58,138,.025), rgba(30,58,138,.065))" }}
             >
-              <div className="flex items-center gap-3">
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#1e3a8a] text-white shadow-md">
-                  <activeTab.icon size={20} />
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#1e3a8a] text-white shadow-md">
+                    <activeTab.icon size={20} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate text-[17px] font-black text-slate-900">{activeTab.label}</div>
+                    <div className="text-[12px] font-medium text-slate-500">{activeTab.description}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-[17px] font-black text-slate-900">{activeTab.label}</div>
-                  <div className="text-[12px] font-medium text-slate-500">{activeTab.description}</div>
-                </div>
+                {headerAction && <div className="shrink-0">{headerAction}</div>}
               </div>
             </div>
           )}
 
           {/* Screen content — rendered inside the panel */}
           <div className="p-6">
-            {ActiveComponent && <ActiveComponent />}
+            {ActiveComponent && <ActiveComponent setSettingsHeaderAction={setHeaderAction} />}
           </div>
         </div>
       </div>
