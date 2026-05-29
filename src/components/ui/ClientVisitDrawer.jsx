@@ -98,8 +98,13 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
 
   if (!visitId) return null;
 
+  const hasSavedAttendance = Boolean(
+    visit?.assignedUsers?.some((entry) => entry.checkInAt || entry.checkOutAt || String(entry.visitSummary || "").trim())
+  );
+  const canCancelVisit = canManage && visit && visit.status === "planned" && !hasSavedAttendance;
+
   async function handleCancelVisit() {
-    if (!canManage || !visit || visit.status === "cancelled" || statusSaving) return;
+    if (!canCancelVisit || statusSaving) return;
     setStatusSaving(true);
     try {
       const updated = await clientVisitService.updateStatus(visit._id, "cancelled");
@@ -157,9 +162,9 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
               </Button>
             )}
             {canManage && visit && (
-              <Button variant="danger" size="sm" onClick={handleCancelVisit} disabled={statusSaving || visit.status === "cancelled"}>
+              <Button variant="danger" size="sm" onClick={handleCancelVisit} disabled={statusSaving || !canCancelVisit}>
                 <XCircle size={15} />
-                {statusSaving ? "Cancelling..." : "Cancel"}
+                {statusSaving ? "Cancelling..." : "Cancelled"}
               </Button>
             )}
             <button

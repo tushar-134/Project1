@@ -674,6 +674,14 @@ exports.updateStatus = async (req, res, next) => {
     }
     const visit = await getVisitOr404(req, res);
     if (!visit) return;
+    if (req.body.status === "cancelled") {
+      const hasSavedAttendance = (visit.assignedUsers || []).some((entry) => (
+        entry.checkInAt || entry.checkOutAt || String(entry.visitSummary || "").trim()
+      ));
+      if (visit.status !== "planned" || hasSavedAttendance) {
+        return res.status(400).json({ message: "Saved visits cannot be cancelled." });
+      }
+    }
     visit.status = req.body.status;
     appendActivity(visit, req.user._id, "Status Changed", `Visit status changed to ${req.body.status}`);
     await visit.save();
