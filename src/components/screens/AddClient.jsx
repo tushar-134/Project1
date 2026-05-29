@@ -318,10 +318,10 @@ export default function AddClient() {
       };
       const primaryContact = client.contactPersons?.find((person) => person.isPrimary) || client.contactPersons?.[0] || {};
       const nextFye = normalizeFinancialYearEnd(client.financialYearEnd || client.ctDetails?.financialYearEnd || "");
-      const nextVatStatus = client.vatDetails?.status === "registered" || createdRegistrationTask?.taxType === "vat" ? "Registered" : "Not Registered";
+      const nextVatStatus = client.vatDetails?.status === "registered" ? "Registered" : "Not Registered";
       const nextVatRegistrationTask = createdRegistrationTask?.taxType === "vat" ? createdRegistrationTask.taskMongoId || "" : client.vatDetails?.registrationTask || "";
       const nextVatRegistrationTaskId = createdRegistrationTask?.taxType === "vat" ? createdRegistrationTask.taskId || "" : client.vatDetails?.registrationTaskId || "";
-      const nextCtStatus = client.ctDetails?.status === "registered" || createdRegistrationTask?.taxType === "ct" ? "Registered" : "Not Registered";
+      const nextCtStatus = client.ctDetails?.status === "registered" ? "Registered" : "Not Registered";
       const nextCtRegistrationTask = createdRegistrationTask?.taxType === "ct" ? createdRegistrationTask.taskMongoId || "" : client.ctDetails?.registrationTask || "";
       const nextCtRegistrationTaskId = createdRegistrationTask?.taxType === "ct" ? createdRegistrationTask.taskId || "" : client.ctDetails?.registrationTaskId || "";
       setForm({
@@ -360,7 +360,7 @@ export default function AddClient() {
           vatDetails: {
             ...(client.vatDetails || {}),
             trn: client.vatDetails?.trn || "",
-            status: nextVatStatus === "Registered" ? "registered" : "not_registered",
+            status: client.vatDetails?.status || "not_registered",
             registrationDate: client.vatDetails?.registrationDate?.slice?.(0, 10) || undefined,
             filingFrequency: client.vatDetails?.filingFrequency || normalizeVatFilingFrequency("", nextFye),
             registrationTask: nextVatRegistrationTask || undefined,
@@ -369,7 +369,7 @@ export default function AddClient() {
           ctDetails: {
             ...(client.ctDetails || {}),
             tin: client.ctDetails?.tin || "",
-            status: nextCtStatus === "Registered" ? "registered" : "not_registered",
+            status: client.ctDetails?.status || "not_registered",
             registrationDate: client.ctDetails?.registrationDate?.slice?.(0, 10) || undefined,
             financialYearEnd: client.ctDetails?.financialYearEnd || nextFye,
             registrationTask: nextCtRegistrationTask || undefined,
@@ -1180,19 +1180,19 @@ export default function AddClient() {
                     </select>
                   </Field>
                 </>
-              ) : (
+              ) : !form.vatRegistrationTaskId ? (
                 <div className="md:col-span-2 rounded-2xl border border-dashed border-[#cbd5e1] bg-slate-50 p-4">
                   <div className="text-sm font-bold text-slate-900">VAT registration task required</div>
                   <p className="mt-1 text-sm text-slate-600">
                     This client is marked as not registered for VAT. Create a VAT registration task first, then come back here and update the status to registered when the registration is complete.
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-3">
-                    <button type="button" className="text-sm font-bold text-[#1e3a8a] underline underline-offset-4" onClick={openVatRegistrationTask}>
+                    <button type="button" className="text-sm font-bold text-[#1e3a8a] underline underline-offset-4 cursor-pointer hover:text-[#1d4ed8] transition-colors" onClick={openVatRegistrationTask}>
                       Open VAT registration task
                     </button>
                   </div>
                 </div>
-              )}
+              ) : null}
               <div className="md:col-span-2 grid gap-3 md:grid-cols-2">
                 <div className="space-y-2">
                   <label className="text-[14px] font-bold text-slate-700" htmlFor="client-ct-status">CT Registration Status</label>
@@ -1228,26 +1228,28 @@ export default function AddClient() {
                       <input className="input" type="date" value={form.ctDate} onChange={(e) => update("ctDate", e.target.value)} />
                     </Field>
                   </>
-                ) : (
+                ) : !form.ctRegistrationTaskId ? (
                   <div className="md:col-span-2 rounded-2xl border border-dashed border-[#cbd5e1] bg-slate-50 p-4">
                     <div className="text-sm font-bold text-slate-900">CT registration task required</div>
                     <p className="mt-1 text-sm text-slate-600">
                       This client is marked as not registered for CT. Create a CT registration task first, then come back here and continue with the CT details after registration.
                     </p>
                     <div className="mt-3 flex flex-wrap items-center gap-3">
-                      <button type="button" className="text-sm font-bold text-[#1e3a8a] underline underline-offset-4" onClick={openCtRegistrationTask}>
+                      <button type="button" className="text-sm font-bold text-[#1e3a8a] underline underline-offset-4 cursor-pointer hover:text-[#1d4ed8] transition-colors" onClick={openCtRegistrationTask}>
                         Open CT registration task
                       </button>
                     </div>
                   </div>
+                ) : null}
+                {shouldShowCtRegistrationFields && (
+                  <Field label="Financial Year" field="client-ct-fye">
+                    <select className="input" value={form.fye} onChange={(e) => update("fye", e.target.value)}>
+                      {FINANCIAL_YEAR_OPTIONS.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </Field>
                 )}
-                <Field label="Financial Year" field="client-ct-fye">
-                  <select className="input" value={form.fye} onChange={(e) => update("fye", e.target.value)}>
-                    {FINANCIAL_YEAR_OPTIONS.map((option) => (
-                      <option key={option} value={option}>{option}</option>
-                    ))}
-                  </select>
-                </Field>
               </div>
             </div>
           )}
