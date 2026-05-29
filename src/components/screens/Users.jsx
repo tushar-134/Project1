@@ -380,10 +380,12 @@ export default function Users() {
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-4">
               <div className="text-[16px] font-extrabold">{editingUser ? "Edit User" : "Add User"}</div>
               <button
+                type="button"
                 onClick={closeModal}
                 disabled={saving}
-                aria-label="Close"
-                className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                aria-label="Close add user dialog"
+                title="Close"
               >
                 <X size={18} />
               </button>
