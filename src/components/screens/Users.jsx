@@ -224,18 +224,14 @@ export default function Users() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="page-kicker">Settings</div>
-          <h2 className="screen-title">User Management</h2>
-        </div>
-        {canManageUsers && (
+      {canManageUsers && (
+        <div className="flex justify-end">
           <Button onClick={handleAddUser}>
             <Plus size={16} />
             Add User
           </Button>
-        )}
-      </div>
+        </div>
+      )}
       <Card>
         <Table>
           <thead>

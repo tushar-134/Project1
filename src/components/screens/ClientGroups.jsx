@@ -99,13 +99,8 @@ export default function ClientGroups() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="page-kicker">Settings</div>
-          <h2 className="screen-title">Client Groups</h2>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex justify-end">
+        <div className="flex flex-wrap justify-end gap-2">
           <input
             id="new-group-name"
             name="newGroupName"
