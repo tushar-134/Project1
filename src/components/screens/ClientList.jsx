@@ -22,6 +22,7 @@ const COLUMN_DEFS = [
   { key: "client",    label: "Client",        defaultOn: true,  description: "Name, type & jurisdiction" },
   { key: "group",     label: "Group",         defaultOn: true,  description: "Client group membership" },
   { key: "compliance",label: "Compliance",    defaultOn: true,  description: "Licence & VAT TRN" },
+  { key: "licenceExpiry", label: "Licence Expiry", defaultOn: true, description: "Trade licence expiry date" },
   { key: "contact",   label: "Contact",       defaultOn: true,  description: "Primary contact details" },
   { key: "createdAt", label: "Created Date",  defaultOn: false, description: "Date the client was added" },
   { key: "createdBy", label: "Created By",    defaultOn: false, description: "Staff member who created the client" },
@@ -33,6 +34,7 @@ const EXPORT_KEY_MAP = {
   client:     ["fileNo", "name", "jurisdiction", "type"],
   group:      ["group"],
   compliance: ["licence", "vatTrn"],
+  licenceExpiry: ["licenceExpiry"],
   contact:    ["contact", "mobile", "email"],
   createdAt:  ["createdAt"],
   createdBy:  ["createdBy"],
@@ -45,6 +47,7 @@ const EMPTY_COLUMN_FILTERS = {
   type: "",
   group: "",
   compliance: "",
+  licenceExpiry: "",
   contact: "",
   createdAt: "",
   createdBy: "",
@@ -62,6 +65,7 @@ function buildActiveFilterSummary(columnFilters, query) {
   if (columnFilters.type) chips.push(`Type: ${columnFilters.type}`);
   if (columnFilters.group) chips.push(`Group: ${columnFilters.group}`);
   if (columnFilters.compliance) chips.push(`Compliance: ${columnFilters.compliance}`);
+  if (columnFilters.licenceExpiry) chips.push(`Licence Expiry: ${columnFilters.licenceExpiry}`);
   if (columnFilters.contact) chips.push(`Contact: ${columnFilters.contact}`);
   if (columnFilters.createdAt) chips.push(`Created: ${columnFilters.createdAt}`);
   if (columnFilters.createdBy) chips.push(`Created By: ${columnFilters.createdBy}`);
@@ -713,6 +717,16 @@ export default function ClientList() {
               </div>
             </FilterField>
 
+            <FilterField label="Licence Expiry" htmlFor="client-filter-licence-expiry">
+              <input
+                id="client-filter-licence-expiry"
+                className="input"
+                type="date"
+                value={columnFilters.licenceExpiry}
+                onChange={(e) => updateColumnFilter("licenceExpiry", e.target.value)}
+              />
+            </FilterField>
+
             <FilterField label="Contact" htmlFor="client-filter-contact">
               <div className="task-list-input-wrap">
                 <Search size={14} className="task-list-input-icon" aria-hidden="true" />
@@ -772,6 +786,7 @@ export default function ClientList() {
               {isVisible("client")     && <th>Client</th>}
               {isVisible("group")      && <th>Group</th>}
               {isVisible("compliance") && <th>Compliance</th>}
+              {isVisible("licenceExpiry") && <th>Licence Expiry</th>}
               {isVisible("contact")    && <th>Contact Details</th>}
               {isVisible("createdAt")  && <th>Created Date</th>}
               {isVisible("createdBy")  && <th>Created By</th>}
@@ -855,6 +870,11 @@ export default function ClientList() {
                       <div><span className="font-semibold text-slate-500">Licence:</span> {client.licence || "—"}</div>
                       <div><span className="font-semibold text-slate-500">VAT TRN:</span> {client.vatTrn || "—"}</div>
                     </div>
+                  </td>
+                )}
+                {isVisible("licenceExpiry") && (
+                  <td>
+                    <span className="text-[12px] font-semibold text-slate-700">{formatDate(client.licenceExpiry)}</span>
                   </td>
                 )}
                 {isVisible("contact") && (
