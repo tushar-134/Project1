@@ -379,7 +379,14 @@ export default function Users() {
           <Card className="flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col overflow-hidden p-0">
             <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-4">
               <div className="text-[16px] font-extrabold">{editingUser ? "Edit User" : "Add User"}</div>
-              <button onClick={closeModal} disabled={saving} className="text-slate-500 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">Close</button>
+              <button
+                onClick={closeModal}
+                disabled={saving}
+                aria-label="Close"
+                className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <X size={18} />
+              </button>
             </div>
             <div className="grid gap-3 overflow-y-auto px-4 py-4 custom-scrollbar">
               <Field label="Name" field="user-form-name"><input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>

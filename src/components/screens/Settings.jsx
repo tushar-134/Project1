@@ -1,4 +1,4 @@
-import { Boxes, Folders, Settings2, Users, LayoutGrid } from "lucide-react";
+import { Boxes, Folders, Settings2, Users, LayoutGrid, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { canManageCategories, canManageGroups, canViewUsers } from "../../utils/permissions.js";
@@ -63,6 +63,7 @@ export default function Settings() {
   const role = currentUser?.role;
   const tabs = buildTabs(role);
   const [activeId, setActiveId] = useState(tabs[0]?.id ?? "");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const activeTab = tabs.find((t) => t.id === activeId);
   const ActiveComponent = activeTab?.component ?? null;
@@ -90,46 +91,62 @@ export default function Settings() {
       {/* ── Main layout: vertical sidebar tabs + content panel ── */}
       <div className="flex gap-5 min-h-[600px]">
 
-        {/* Sidebar tab list */}
-        <div className="w-[220px] min-w-[220px] shrink-0 space-y-1">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = tab.id === activeId;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveId(tab.id)}
-                className={`
-                  group w-full rounded-xl px-4 py-3 text-left transition-all
-                  ${isActive
-                    ? "bg-[#1e3a8a] text-white shadow-lg shadow-blue-900/20"
-                    : "bg-white text-slate-700 border border-[#e2e8f0] hover:border-blue-200 hover:bg-blue-50/60"}
-                `}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition-colors
-                      ${isActive ? "bg-white/15 text-white" : "bg-slate-100 text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-700"}`}
-                  >
-                    <Icon size={16} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className={`truncate text-[13px] font-extrabold leading-tight ${isActive ? "text-white" : "text-slate-800"}`}>
-                      {tab.label}
+        {/* Collapsible sidebar tab list */}
+        <div className={`relative shrink-0 transition-all duration-300 ${sidebarOpen ? "w-[220px]" : "w-12"}`}>
+          {/* Toggle button */}
+          <button
+            type="button"
+            aria-label={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+            onClick={() => setSidebarOpen((o) => !o)}
+            className="absolute -right-3 top-3 z-10 grid h-6 w-6 place-items-center rounded-full border border-[#e2e8f0] bg-white text-slate-500 shadow-sm transition hover:border-blue-300 hover:text-blue-600"
+          >
+            {sidebarOpen ? <ChevronLeft size={13} /> : <ChevronRight size={13} />}
+          </button>
+
+          <div className="space-y-1 overflow-hidden">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = tab.id === activeId;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  title={!sidebarOpen ? tab.label : undefined}
+                  onClick={() => setActiveId(tab.id)}
+                  className={`
+                    group w-full rounded-xl text-left transition-all
+                    ${sidebarOpen ? "px-4 py-3" : "px-2 py-3 flex justify-center"}
+                    ${isActive
+                      ? "bg-[#1e3a8a] text-white shadow-lg shadow-blue-900/20"
+                      : "bg-white text-slate-700 border border-[#e2e8f0] hover:border-blue-200 hover:bg-blue-50/60"}
+                  `}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition-colors
+                        ${isActive ? "bg-white/15 text-white" : "bg-slate-100 text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-700"}`}
+                    >
+                      <Icon size={16} />
                     </div>
-                    <div className={`mt-0.5 truncate text-[10px] font-semibold uppercase tracking-wider ${isActive ? "text-white/65" : "text-slate-400"}`}>
-                      {tab.category}
-                    </div>
+                    {sidebarOpen && (
+                      <div className="min-w-0">
+                        <div className={`truncate text-[13px] font-extrabold leading-tight ${isActive ? "text-white" : "text-slate-800"}`}>
+                          {tab.label}
+                        </div>
+                        <div className={`mt-0.5 truncate text-[10px] font-semibold uppercase tracking-wider ${isActive ? "text-white/65" : "text-slate-400"}`}>
+                          {tab.category}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              </button>
-            );
-          })}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Content panel */}
-        <div className="min-w-0 flex-1 rounded-2xl border border-[#e2e8f0] bg-white shadow-sm">
+        <div className="min-w-0 flex-1 overflow-x-auto rounded-2xl border border-[#e2e8f0] bg-white shadow-sm">
           {/* Panel header */}
           {activeTab && (
             <div className="border-b border-[#e2e8f0] px-6 py-5"
