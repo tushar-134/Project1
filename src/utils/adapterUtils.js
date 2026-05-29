@@ -49,6 +49,7 @@ export function mapClient(client) {
     jurisdiction: jurisdictionLabels[client.jurisdiction] || client.jurisdiction,
     group: client.group?.name || "",
     licence: client.tradeLicences?.[0]?.licenceNumber || "",
+    licenceExpiry: client.tradeLicences?.[0]?.expiryDate ? client.tradeLicences[0].expiryDate.slice(0, 10) : "",
     vatTrn: client.vatDetails?.trn || "",
     contact: client.contactPersons?.find((p) => p.isPrimary)?.fullName || client.contactPersons?.[0]?.fullName || "",
     mobile: client.contactPersons?.[0]?.mobile ? `${client.contactPersons[0].mobile.countryCode || ""} ${client.contactPersons[0].mobile.number || ""}` : "",

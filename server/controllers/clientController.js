@@ -72,7 +72,7 @@ function buildClientSearchClause(value) {
 }
 
 async function buildClientListQuery(req) {
-  const { search, jurisdiction, type, group, assignedUser, client, compliance, contact, createdAt, createdBy } = req.query;
+  const { search, jurisdiction, type, group, assignedUser, client, compliance, contact, createdAt, createdBy, licenceExpiry } = req.query;
   const query = { isActive: true };
   const andClauses = [];
 
@@ -140,6 +140,10 @@ async function buildClientListQuery(req) {
   if (createdBy) {
     const matchedUserIds = await User.find({ name: buildPattern(createdBy) }).distinct("_id");
     andClauses.push({ createdBy: { $in: matchedUserIds } });
+  }
+  if (licenceExpiry) {
+    const pattern = buildPattern(licenceExpiry);
+    andClauses.push({ "tradeLicences.expiryDate": pattern });
   }
   if (andClauses.length) query.$and = andClauses;
   return query;
