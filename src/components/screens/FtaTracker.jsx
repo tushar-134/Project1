@@ -130,13 +130,6 @@ export default function FtaTracker() {
 
   return (
     <div className="space-y-5">
-      <div className="flex justify-end">
-        <Button variant="ghost" onClick={refresh} disabled={loading}>
-          <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
-          Refresh
-        </Button>
-      </div>
-
       {/* Task-only info banner */}
       {isTaskOnly && (
         <div className="flex items-center gap-2.5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-[13px] text-blue-800">
@@ -168,6 +161,16 @@ export default function FtaTracker() {
 
           {/* Actions */}
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={refresh}
+              disabled={loading}
+              className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-blue-200 hover:bg-blue-50 hover:text-[#1e3a8a] disabled:cursor-not-allowed disabled:opacity-60"
+              aria-label="Refresh FTA tracker"
+              title="Refresh"
+            >
+              <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
+            </button>
             {hasFilters && (
               <Button variant="ghost" size="sm" onClick={clearFilters}>
                 <X size={14} />
