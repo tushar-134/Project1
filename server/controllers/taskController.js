@@ -15,6 +15,13 @@ const STATUS_LABEL = {
   submitted_to_fta: "Submitted to FTA",
   completed: "Completed",
 };
+// Reverse map: UI label → DB enum value
+const LABEL_TO_STATUS = {
+  "Not Yet Started": "not_started",
+  "WIP": "wip",
+  "Submitted to FTA": "submitted_to_fta",
+  "Completed": "completed",
+};
 const FTA_STATUS_LABEL = {
   in_review: "In Review",
   additional_query: "Additional Query",
@@ -356,14 +363,14 @@ async function taskQuery(req) {
   if (category && category !== "All") query.category = category;
   if (status && status !== "All") {
     if (status === "Active") {
-      // "Active" chip = all non-completed statuses
       query.status = { $in: ["not_started", "wip", "submitted_to_fta"] };
-    } else if (status.includes(",")) {
-      // Multi-select: comma-separated list from the frontend
-      const statusValues = status.split(",").map((s) => s.trim()).filter(Boolean);
-      query.status = { $in: statusValues };
     } else {
-      query.status = status;
+      // Split comma-joined string and map human-readable labels → DB enum values
+      const statusValues = status.split(",").map((s) => {
+        const trimmed = s.trim();
+        return LABEL_TO_STATUS[trimmed] || trimmed;
+      }).filter(Boolean);
+      query.status = { $in: statusValues };
     }
   }
   if (assignedTo) andClauses.push({ assignedTo });
