@@ -79,15 +79,6 @@ export default function Settings() {
 
   return (
     <div className="space-y-6">
-      {/* ── Page header ── */}
-      <div>
-        <div className="page-kicker">Administration</div>
-        <h1 className="screen-title">Settings</h1>
-        <p className="mt-1 text-[13px] text-slate-500">
-          Manage users, data fields, and organisational preferences from one place.
-        </p>
-      </div>
-
       {/* ── Main layout: vertical sidebar tabs + content panel ── */}
       <div className="flex gap-5 min-h-[600px]">
 

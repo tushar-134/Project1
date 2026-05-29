@@ -1055,10 +1055,6 @@ export default function AddClient() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <div className="page-kicker">Client Master</div>
-        <h2 className="screen-title">{isEditMode ? "Edit Client" : "Add Client"}</h2>
-      </div>
       <Card>
         <div className="flex overflow-x-auto rounded-t-xl border-b border-[#e2e8f0] bg-slate-50 p-2">{tabs.map((t, i) => <button key={t} onClick={() => setTab(i)} className={`mr-1 whitespace-nowrap rounded-lg px-3 py-2 text-[12px] font-extrabold ${tab === i ? "bg-[#1e3a8a] text-white" : "text-slate-600 hover:bg-white"}`}>{t}</button>)}</div>
         <div className="p-4">

@@ -119,11 +119,7 @@ export default function Contacts() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="page-kicker">Contacts</div>
-          <h2 className="screen-title">Contact Directory</h2>
-        </div>
+      <div className="flex justify-end">
         <Button onClick={() => setModalOpen(true)}>
           <UserRoundPlus size={16} />
           Add Contact

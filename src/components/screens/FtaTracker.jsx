@@ -130,17 +130,7 @@ export default function FtaTracker() {
 
   return (
     <div className="space-y-5">
-      {/* ── Page header (single title) ── */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="page-kicker">FTA Response Queue</div>
-          <h2 className="screen-title">FTA Tracker</h2>
-          <p className="mt-1 text-[13px] text-slate-500">
-            Dedicated module for managing submissions that require FTA to review
-            and respond. Triggered when any task status is set to &apos;Submitted
-            to FTA&apos;.
-          </p>
-        </div>
+      <div className="flex justify-end">
         <Button variant="ghost" onClick={refresh} disabled={loading}>
           <RefreshCw size={15} className={loading ? "animate-spin" : ""} />
           Refresh
