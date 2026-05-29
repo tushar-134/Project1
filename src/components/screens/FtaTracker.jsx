@@ -18,6 +18,7 @@ import { sortOptionsWithOtherLast } from "../../utils/optionSort";
 import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
+import ClientComboBox from "../ui/ClientComboBox.jsx";
 import Table from "../ui/Table.jsx";
 
 const CATEGORY_FILTERS = sortOptionsWithOtherLast([
@@ -257,17 +258,14 @@ export default function FtaTracker() {
               <div className="task-list-column-grid">
                 {/* Client */}
                 <FilterField label="Client" htmlFor="fta-filter-client">
-                  <div className="task-list-input-wrap">
-                    <Search size={14} className="task-list-input-icon" aria-hidden="true" />
-                    <input
-                      id="fta-filter-client"
-                      className="input"
-                      type="search"
-                      placeholder="Search client"
-                      value={filters.client}
-                      onChange={(e) => updateFilter("client", e.target.value)}
-                    />
-                  </div>
+                  <ClientComboBox
+                    clients={state.clients}
+                    value={filters.client}
+                    onChange={(val) => updateFilter("client", val)}
+                    useNameAsValue={true}
+                    inputId="fta-filter-client"
+                    placeholder="Search client"
+                  />
                 </FilterField>
 
                 {/* Category */}

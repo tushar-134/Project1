@@ -3,11 +3,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { useApp } from "../../context/AppContext.jsx";
 import { clientVisitService } from "../../services/clientVisitService.js";
 import { downloadBlob } from "../../utils/adapterUtils.js";
 import { canManageClientVisits } from "../../utils/permissions.js";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
+import ClientComboBox from "../ui/ClientComboBox.jsx";
 import ClientVisitDrawer from "../ui/ClientVisitDrawer.jsx";
 import StatusPill from "../ui/StatusPill.jsx";
 import Table from "../ui/Table.jsx";
@@ -47,6 +49,7 @@ function sortParam(sort) {
 export default function ClientVisits() {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
+  const { state } = useApp();
   const canManage = canManageClientVisits(currentUser?.role);
   const [filters, setFilters] = useState({
     status: "all",
@@ -156,15 +159,14 @@ export default function ClientVisits() {
           </FilterField>
 
           <FilterField label="Client Name">
-            <div className="flex h-9 items-center gap-2 rounded-lg border border-[#e2e8f0] bg-white px-3 text-[13px] transition focus-within:ring-2 focus-within:[--tw-ring-color:rgb(30_58_138_/_0.16)] focus-within:border-[#1e3a8a]">
-              <Search className="shrink-0 text-slate-400" size={16} />
-              <input
-                className="min-w-0 flex-1 border-0 bg-transparent p-0 text-[13px] text-slate-900 outline-none placeholder:text-slate-400"
-                value={filters.clientName}
-                onChange={(event) => updateFilter("clientName", event.target.value)}
-                placeholder="Search client..."
-              />
-            </div>
+            <ClientComboBox
+              clients={state.clients}
+              value={filters.clientName}
+              onChange={(val) => updateFilter("clientName", val)}
+              useNameAsValue={true}
+              inputId="visits-filter-client"
+              placeholder="Search client..."
+            />
           </FilterField>
 
           <FilterField label="From Date">

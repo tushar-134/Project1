@@ -14,6 +14,7 @@ import { canManageTasks } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
+import ClientComboBox from "../ui/ClientComboBox.jsx";
 import Table from "../ui/Table.jsx";
 import TaskDrawer from "../ui/TaskDrawer.jsx";
 
@@ -766,23 +767,14 @@ export default function TaskList() {
 
             {/* Client */}
             <FilterField label="Client" htmlFor="task-filter-client">
-              <div className="task-list-input-wrap">
-                <Search size={14} className="task-list-input-icon" aria-hidden="true" />
-                <input
-                  id="task-filter-client"
-                  className="input"
-                  type="search"
-                  list="task-client-suggestions"
-                  placeholder="Search client"
-                  value={columnFilters.client}
-                  onChange={(event) => updateColumnFilter("client", event.target.value)}
-                />
-              </div>
-              <datalist id="task-client-suggestions">
-                {clientSuggestions.map((client) => (
-                  <option key={client.value} value={client.value} />
-                ))}
-              </datalist>
+              <ClientComboBox
+                clients={state.clients}
+                value={columnFilters.client}
+                onChange={(val) => updateColumnFilter("client", val)}
+                useNameAsValue={true}
+                inputId="task-filter-client"
+                placeholder="Search client"
+              />
             </FilterField>
 
             {/* Category */}

@@ -9,6 +9,7 @@ import { canCreateClients, canManageClients } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
+import ClientComboBox from "../ui/ClientComboBox.jsx";
 import ClientDrawer from "../ui/ClientDrawer.jsx";
 import Table from "../ui/Table.jsx";
 
@@ -646,17 +647,14 @@ export default function ClientList() {
         <div className="px-4 py-4 sm:px-5">
           <div className="task-list-column-grid">
             <FilterField label="Client Name" htmlFor="client-filter-name">
-              <div className="task-list-input-wrap">
-                <Search size={14} className="task-list-input-icon" aria-hidden="true" />
-                <input
-                  id="client-filter-name"
-                  className="input"
-                  type="search"
-                  placeholder="Search client"
-                  value={columnFilters.client}
-                  onChange={(e) => updateColumnFilter("client", e.target.value)}
-                />
-              </div>
+              <ClientComboBox
+                clients={state.clients}
+                value={columnFilters.client}
+                onChange={(val) => updateColumnFilter("client", val)}
+                useNameAsValue={true}
+                inputId="client-filter-name"
+                placeholder="Search client"
+              />
             </FilterField>
 
             <FilterField label="Jurisdiction" htmlFor="client-filter-jurisdiction">

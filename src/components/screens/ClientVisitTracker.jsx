@@ -10,6 +10,7 @@ import { ROLE_LABELS } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
+import ClientComboBox from "../ui/ClientComboBox.jsx";
 import Table from "../ui/Table.jsx";
 
 const blankForm = () => ({
@@ -421,18 +422,13 @@ export default function ClientVisitTracker() {
 
             <div className="grid gap-3 md:grid-cols-2">
               <Field label="Client*" field="visit-client">
-                <select
-                  className="input"
+                <ClientComboBox
+                  clients={state.clients}
                   value={form.clientId}
-                  onChange={(e) => setForm((current) => ({ ...current, clientId: e.target.value }))}
-                >
-                  <option value="">Select client</option>
-                  {state.clients.map((client) => (
-                    <option key={client._id || client.id} value={client._id || client.id}>
-                      {client.legalName || client.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(id) => setForm((current) => ({ ...current, clientId: id }))}
+                  inputId="visit-client"
+                  placeholder="Search client…"
+                />
               </Field>
               <Field label="Visit Date*" field="visit-date">
                 <input
