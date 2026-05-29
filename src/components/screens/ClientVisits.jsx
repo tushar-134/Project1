@@ -1,5 +1,5 @@
-import { Download, Plus, Search, SquarePen } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ChevronDown, Download, Plus, Search, SquarePen } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -55,7 +55,7 @@ export default function ClientVisits() {
     fromDate: "",
     toDate: "",
   });
-  const [exportFormat, setExportFormat] = useState("xlsx");
+  const [exportOpen, setExportOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [visits, setVisits] = useState([]);
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1 });
@@ -63,6 +63,7 @@ export default function ClientVisits() {
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState({ key: "visitDate", direction: "desc" });
   const [drawerVisitId, setDrawerVisitId] = useState(null);
+  const exportRef = useRef(null);
 
   const params = useMemo(() => ({
     page,
@@ -96,6 +97,16 @@ export default function ClientVisits() {
     };
   }, [params]);
 
+  useEffect(() => {
+    function closeExportMenu(event) {
+      if (exportRef.current && !exportRef.current.contains(event.target)) {
+        setExportOpen(false);
+      }
+    }
+    document.addEventListener("pointerdown", closeExportMenu);
+    return () => document.removeEventListener("pointerdown", closeExportMenu);
+  }, []);
+
   function updateFilter(key, value) {
     setPage(1);
     setFilters((current) => ({ ...current, [key]: value }));
@@ -107,10 +118,11 @@ export default function ClientVisits() {
       : { key, direction: "asc" });
   }
 
-  async function exportVisits() {
+  async function exportVisits(format) {
     try {
-      const blob = await clientVisitService.export({ ...params, format: exportFormat });
-      downloadBlob(blob, exportFormat === "pdf" ? "client-visits.pdf" : "client-visits.xlsx");
+      setExportOpen(false);
+      const blob = await clientVisitService.export({ ...params, format });
+      downloadBlob(blob, format === "pdf" ? "client-visits.pdf" : "client-visits.xlsx");
     } catch {
       toast.error("Unable to export client visits.");
     }
@@ -122,33 +134,8 @@ export default function ClientVisits() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="page-kicker">Field Operations</div>
-          <h1 className="screen-title">Client Visits</h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            className="input min-w-[110px]"
-            value={exportFormat}
-            onChange={(event) => setExportFormat(event.target.value)}
-          >
-            <option value="xlsx">Excel</option>
-            <option value="pdf">PDF</option>
-          </select>
-          <Button variant="ghost" onClick={exportVisits}>
-            <Download size={16} />
-            Export
-          </Button>
-          <Button onClick={() => navigate("/client-visits/new")}>
-            <Plus size={16} />
-            New Visit
-          </Button>
-        </div>
-      </div>
-
       <Card className="p-5">
-        <div className="grid gap-3 lg:grid-cols-5">
+        <div className="grid items-end gap-3 xl:grid-cols-[1fr_1fr_1.25fr_1fr_1fr_auto]">
           <FilterField label="Status">
             <select className="input" value={filters.status} onChange={(event) => updateFilter("status", event.target.value)}>
               {statusOptions.map((option) => (
@@ -187,6 +174,38 @@ export default function ClientVisits() {
           <FilterField label="To Date">
             <input className="input" type="date" value={filters.toDate} onChange={(event) => updateFilter("toDate", event.target.value)} />
           </FilterField>
+
+          <div className="flex shrink-0 items-center gap-2 xl:justify-end">
+            <div ref={exportRef} className="relative">
+              <Button variant="ghost" onClick={() => setExportOpen((open) => !open)}>
+                <Download size={16} />
+                Export
+                <ChevronDown size={14} className={`transition ${exportOpen ? "rotate-180" : ""}`} />
+              </Button>
+              {exportOpen && (
+                <div className="absolute right-0 top-full z-30 mt-2 w-40 rounded-xl border border-[#e2e8f0] bg-white p-1 shadow-xl shadow-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => exportVisits("xlsx")}
+                    className="flex w-full items-center rounded-lg px-3 py-2 text-left text-[13px] font-bold text-slate-700 hover:bg-slate-50"
+                  >
+                    Excel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => exportVisits("pdf")}
+                    className="flex w-full items-center rounded-lg px-3 py-2 text-left text-[13px] font-bold text-slate-700 hover:bg-slate-50"
+                  >
+                    PDF
+                  </button>
+                </div>
+              )}
+            </div>
+            <Button onClick={() => navigate("/client-visits/new")}>
+              <Plus size={16} />
+              New Visit
+            </Button>
+          </div>
         </div>
       </Card>
 
@@ -282,9 +301,9 @@ export default function ClientVisits() {
   );
 }
 
-function FilterField({ label, children }) {
+function FilterField({ label, children, className = "" }) {
   return (
-    <label className="space-y-2">
+    <label className={`space-y-2 ${className}`}>
       <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">{label}</span>
       {children}
     </label>
