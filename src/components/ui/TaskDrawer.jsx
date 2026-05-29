@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { taskService } from "../../services/taskService.js";
-import { ftaStatusFromApi, statusFromApi, statusToApi } from "../../utils/adapterUtils.js";
+import { ftaStatusFromApi, statusFromApi } from "../../utils/adapterUtils.js";
 import Badge from "./Badge.jsx";
 import Button from "./Button.jsx";
 import Card from "./Card.jsx";
@@ -46,7 +46,6 @@ function getActionMeta(action) {
   return actionMeta[action] || { color: "#64748b", bg: "bg-slate-50", border: "border-slate-200", icon: "." };
 }
 
-const STATUS_OPTIONS = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed"];
 
 export default function TaskDrawer({ taskId, canManage, onClose }) {
   const navigate = useNavigate();
@@ -55,9 +54,7 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [statusSaving, setStatusSaving] = useState(false);
-  const [statusError, setStatusError] = useState("");
-  const [remarkText, setRemarkText] = useState("");
+  const [commentInput, setCommentInput] = useState("");
   const [remarkSaving, setRemarkSaving] = useState(false);
   const [remarkError, setRemarkError] = useState("");
 
@@ -72,7 +69,7 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
       if (active) {
         setTask(taskData);
         setLogs(logsData);
-        setRemarkText(taskData?.remarks || "");
+        setCommentInput("");
         setRemarkError("");
       }
     } catch (err) {
@@ -114,42 +111,41 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
   const displayStatus = statusFromApi[task?.status] || task?.status;
   const displayCategory = categoryLabels[task?.category] || task?.category;
   const overdue = task ? daysOverdue(task.dueDate, task.status) : 0;
-  const canChangeStatus = Boolean(
-    task && (
+  const canEditRemarks = Boolean(
+    task &&
+    (
       canManage ||
       (currentUser?.role === "task_only" && String(task.assignedTo?._id) === String(currentUser?._id || currentUser?.id))
     )
   );
-  const canEditRemarks = canChangeStatus;
 
-  async function handleStatusChange(nextLabel) {
-    if (!task || statusSaving || nextLabel === displayStatus) return;
-    setStatusSaving(true);
-    setStatusError("");
-    const previousTask = task;
-    setTask({ ...task, status: statusToApi[nextLabel] || nextLabel });
+  // Parse remarks as JSON array of {text, author, at}; fall back to legacy string
+  function parseComments(rawRemarks) {
+    if (!rawRemarks) return [];
     try {
-      await taskService.updateStatus(task._id, statusToApi[nextLabel] || nextLabel);
-      await loadTask(true);
-    } catch (err) {
-      setTask(previousTask);
-      setStatusError(err.response?.data?.message || "Failed to update task status");
-    } finally {
-      setStatusSaving(false);
-    }
+      const parsed = JSON.parse(rawRemarks);
+      if (Array.isArray(parsed)) return parsed;
+    } catch { /* not JSON */ }
+    return [{ text: rawRemarks, author: "—", at: null }];
   }
 
-  async function handleRemarkSave() {
-    if (!task || remarkSaving) return;
+  async function handleCommentPost() {
+    const text = commentInput.trim();
+    if (!text || remarkSaving) return;
     setRemarkSaving(true);
     setRemarkError("");
     try {
-      const updatedTask = await taskService.updateRemarks(task._id, remarkText);
+      const existing = parseComments(task.remarks);
+      const next = [
+        ...existing,
+        { text, author: currentUser?.name || "You", at: new Date().toISOString() },
+      ];
+      const updatedTask = await taskService.updateRemarks(task._id, JSON.stringify(next));
       setTask((current) => current ? { ...current, remarks: updatedTask.remarks || "", updatedAt: updatedTask.updatedAt || current.updatedAt } : current);
-      setRemarkText(updatedTask.remarks || "");
+      setCommentInput("");
       await loadTask(true);
     } catch (err) {
-      setRemarkError(err.response?.data?.message || "Failed to update remark");
+      setRemarkError(err.response?.data?.message || "Failed to post comment");
     } finally {
       setRemarkSaving(false);
     }
@@ -240,36 +236,8 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
                       <div className="text-[16px] font-extrabold text-slate-900">{task.taskType}</div>
                     </div>
                   </div>
-                  {canChangeStatus ? (
-                    <div className="flex min-w-[220px] flex-col items-end gap-1">
-                      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400" htmlFor="task-drawer-status">
-                        Status
-                      </label>
-                      <select
-                        id="task-drawer-status"
-                        name="taskDrawerStatus"
-                        className="input h-9 min-w-[220px]"
-                        value={displayStatus || ""}
-                        onChange={(event) => handleStatusChange(event.target.value)}
-                        disabled={statusSaving}
-                      >
-                        {STATUS_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ) : (
-                    <StatusPill status={displayStatus} />
-                  )}
+                  <StatusPill status={displayStatus} />
                 </div>
-
-                {statusError && (
-                  <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">
-                    {statusError}
-                  </div>
-                )}
 
                 <div className="task-detail-grid">
                   <div className="task-detail-field">
@@ -344,33 +312,64 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
                 )}
 
                 <div className="task-detail-description">
-                  <div className="mb-2 task-detail-field-label">
-                    <MessageSquare size={13} /> Remarks
+                  <div className="mb-3 task-detail-field-label">
+                    <MessageSquare size={13} /> Comments
                   </div>
-                  {canEditRemarks ? (
+                  {/* Comment thread */}
+                  {(() => {
+                    const comments = parseComments(task.remarks);
+                    return comments.length === 0 ? (
+                      <p className="mb-3 text-[12px] text-slate-400 italic">No comments yet. Be the first to add one.</p>
+                    ) : (
+                      <div className="mb-3 space-y-3">
+                        {comments.map((comment, idx) => (
+                          <div key={idx} className="flex items-start gap-2.5">
+                            <div className="flex-shrink-0 h-7 w-7 rounded-full bg-[#1e3a8a] flex items-center justify-center text-[10px] font-extrabold text-white">
+                              {String(comment.author || "?").charAt(0).toUpperCase()}
+                            </div>
+                            <div className="flex-1 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2">
+                              <div className="flex items-center justify-between gap-2 mb-1">
+                                <span className="text-[11px] font-extrabold text-slate-700">{comment.author || "—"}</span>
+                                {comment.at && (
+                                  <span className="text-[10px] text-slate-400">
+                                    {new Date(comment.at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                                    {" at "}
+                                    {new Date(comment.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[13px] leading-relaxed text-slate-700 whitespace-pre-wrap">{comment.text}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                  {canEditRemarks && (
                     <>
                       <textarea
                         id="task-drawer-remark"
                         name="taskDrawerRemark"
-                        className="input min-h-28"
-                        placeholder="Add context, blockers, or follow-up notes for this task."
-                        value={remarkText}
-                        onChange={(event) => setRemarkText(event.target.value)}
+                        className="input min-h-20"
+                        placeholder="Write a comment…"
+                        value={commentInput}
+                        onChange={(event) => setCommentInput(event.target.value)}
                         disabled={remarkSaving}
+                        onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleCommentPost(); }}
                       />
                       {remarkError && (
-                        <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">
+                        <div className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">
                           {remarkError}
                         </div>
                       )}
-                      <div className="mt-3 flex justify-end">
-                        <Button size="sm" onClick={handleRemarkSave} disabled={remarkSaving}>
-                          {remarkSaving ? "Saving..." : "Save Remark"}
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <span className="text-[10px] text-slate-400">Ctrl+Enter to post</span>
+                        <Button size="sm" onClick={handleCommentPost} disabled={remarkSaving || !commentInput.trim()}>
+                          <MessageSquare size={13} />
+                          {remarkSaving ? "Posting..." : "Post Comment"}
                         </Button>
                       </div>
                     </>
-                  ) : (
-                    <p className="text-[13px] leading-relaxed text-slate-700">{task.remarks || "No remark added"}</p>
                   )}
                 </div>
 
@@ -400,10 +399,6 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
                   <span className="text-slate-300">.</span>
                   <span>Updated {formatDateTime(task.updatedAt)}</span>
                 </div>
-
-                {canChangeStatus && statusSaving && (
-                  <div className="text-[12px] font-semibold text-slate-500">Updating status...</div>
-                )}
               </Card>
 
               <div>

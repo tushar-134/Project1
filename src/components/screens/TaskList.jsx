@@ -387,7 +387,7 @@ export default function TaskList() {
 
   const serverFilters = useMemo(() => ({
     category: deferredColumnFilters.category || undefined,
-    status: deferredColumnFilters.status?.length === 1 ? deferredColumnFilters.status[0] : undefined,
+    status: deferredColumnFilters.status?.length > 0 ? deferredColumnFilters.status.join(",") : undefined,
     month: scope === "By Month" ? month : undefined,
     overdue: scope === "Overdue" ? "true" : undefined,
     taskId: deferredColumnFilters.taskId || undefined,
@@ -746,7 +746,7 @@ export default function TaskList() {
               transition: "grid-template-rows 0.25s ease",
             }}
           >
-            <div style={{ overflow: "hidden" }}>
+            <div style={{ overflow: filtersOpen ? "visible" : "hidden" }}>
               <div className="px-5 py-4">
                 <div className="task-list-column-grid">
             {/* Task ID */}
