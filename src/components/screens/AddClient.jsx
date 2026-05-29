@@ -548,7 +548,7 @@ export default function AddClient() {
     id: attachment._id,
     name: attachment.name,
     size: attachment.size,
-    type: attachment.fileType,
+    type: attachment.name?.split(".").pop()?.toLowerCase() || attachment.fileType,
     description: attachment.description || "",
     uploadedOn: attachment.uploadedAt?.slice?.(0, 10) || new Date().toISOString().slice(0, 10),
     uploadedBy: attachment.uploadedBy?.name || "You",
@@ -689,6 +689,10 @@ export default function AddClient() {
     const selected = Array.from(files || []);
     if (!selected.length) return;
     const attachmentNote = String(description || "").trim();
+    if (!attachmentNote) {
+      toast.error("Attachment description is required before uploading.");
+      return;
+    }
     if (!isEditMode) {
       setAttachments((current) => [
         ...current,
@@ -696,7 +700,7 @@ export default function AddClient() {
           id: `${file.name}-${file.lastModified}-${file.size}`,
           name: file.name,
           size: formatFileSize(file.size),
-          type: file.type || file.name.split(".").pop()?.toUpperCase() || "File",
+          type: file.name?.split(".").pop()?.toLowerCase() || "file",
           description: attachmentNote,
           uploadedOn: "Pending save",
           uploadedBy: "You",
