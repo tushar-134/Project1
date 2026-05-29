@@ -98,15 +98,6 @@ function parseFinancialYearStartMonth(value) {
   return monthIndex >= 0 ? monthIndex : 0;
 }
 
-function toOrdinal(value) {
-  const remainder10 = value % 10;
-  const remainder100 = value % 100;
-  if (remainder10 === 1 && remainder100 !== 11) return `${value}st`;
-  if (remainder10 === 2 && remainder100 !== 12) return `${value}nd`;
-  if (remainder10 === 3 && remainder100 !== 13) return `${value}rd`;
-  return `${value}th`;
-}
-
 function getVatFilingFrequencyOptions(financialYearEnd) {
   const startMonth = parseFinancialYearStartMonth(financialYearEnd);
   return Array.from({ length: 12 }, (_, index) => {
@@ -115,7 +106,7 @@ function getVatFilingFrequencyOptions(financialYearEnd) {
     const value = `${MONTH_NAMES[rangeStart]}-${MONTH_NAMES[rangeEnd]}`;
     return {
       value,
-      label: `${toOrdinal(index + 1)} (${value})`,
+      label: value,
     };
   });
 }
