@@ -115,7 +115,7 @@ function getVatFilingFrequencyOptions(financialYearEnd) {
     const value = `${MONTH_NAMES[rangeStart]}-${MONTH_NAMES[rangeEnd]}`;
     return {
       value,
-      label: `${toOrdinal(index + 1)} Quarter (${value})`,
+      label: `${toOrdinal(index + 1)} (${value})`,
     };
   });
 }

@@ -256,11 +256,11 @@ export default function TaskDetail() {
             </div>
           )}
 
-          {/* Quarter */}
+          {/* Period Quarter */}
           {task.periodQuarter && (
             <div className="task-detail-field">
               <div className="task-detail-field-label">
-                <Clock size={13} /> Quarter
+                <Clock size={13} /> Period
               </div>
               <div className="task-detail-field-value">{task.periodQuarter}</div>
             </div>

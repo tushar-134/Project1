@@ -382,13 +382,13 @@ export default function AddTask() {
                     ))}
                   </select>
                 </Field>
-                <Field label="Quarter" field="taskPeriodQuarter">
+                <Field label="Period" field="taskPeriodQuarter">
                   <select
                     className="input"
                     value={details.periodQuarter}
                     onChange={(e) => setDetails({ ...details, periodQuarter: e.target.value })}
                   >
-                    <option value="">Select Quarter</option>
+                    <option value="">Select Period</option>
                     {quarterOptions.map((q) => (
                       <option key={q.value} value={q.value}>{q.value}</option>
                     ))}
