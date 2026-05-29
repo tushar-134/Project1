@@ -1,7 +1,8 @@
-import { Download, Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Download, Plus, UserPlus, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
+import { clientService } from "../../services/clientService";
 import { groupService } from "../../services/groupService";
 import { downloadBlob } from "../../utils/adapterUtils";
 import Button from "../ui/Button.jsx";
@@ -18,6 +19,10 @@ export default function ClientGroups({ setSettingsHeaderAction }) {
   const [viewOpen, setViewOpen] = useState(false);
   const [selectedExportGroupId, setSelectedExportGroupId] = useState("");
   const [selectedExportClientId, setSelectedExportClientId] = useState("");
+  const [allClients, setAllClients] = useState([]);
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [groupClientBusy, setGroupClientBusy] = useState(false);
+  const listItems = (response) => Array.isArray(response) ? response : response?.items || [];
   const load = () => groupService.list().then((groups) => dispatch({
     type: "SET_RESOURCE",
     resource: "groups",
@@ -35,6 +40,15 @@ export default function ClientGroups({ setSettingsHeaderAction }) {
   const exportClientOptions = selectedExportGroup
     ? selectedExportGroup.clients || []
     : state.groups.flatMap((group) => group.clients || []);
+  const assignedClientIds = useMemo(
+    () => new Set((viewingGroup?.clients || []).map((client) => String(client._id))),
+    [viewingGroup],
+  );
+  const availableClients = useMemo(() => {
+    return allClients
+      .filter((client) => !assignedClientIds.has(String(client._id)))
+      .sort((a, b) => String(a.legalName || "").localeCompare(String(b.legalName || "")));
+  }, [allClients, assignedClientIds]);
   const safeFilename = (value, fallback) =>
     String(value || fallback)
       .trim()
@@ -72,6 +86,7 @@ export default function ClientGroups({ setSettingsHeaderAction }) {
   function closeView() {
     setViewingGroup(null);
     setViewOpen(false);
+    setShowClientDropdown(false);
   }
   function handleEdit(group) {
     setEditingGroup(group);
@@ -81,6 +96,54 @@ export default function ClientGroups({ setSettingsHeaderAction }) {
   function handleView(group) {
     setViewingGroup(group);
     setViewOpen(true);
+    setShowClientDropdown(false);
+    if (!allClients.length) loadClients();
+  }
+  async function loadClients() {
+    try {
+      const response = await clientService.list({ page: 1, limit: 500 });
+      setAllClients(listItems(response));
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Unable to load clients.");
+    }
+  }
+  async function syncViewingGroup(groupId) {
+    const groups = await groupService.list();
+    const mappedGroups = groups.map((g) => ({
+      ...g,
+      id: g._id,
+      clients: g.clients || [],
+      clientNames: g.clients?.map((c) => c.legalName) || [],
+    }));
+    dispatch({ type: "SET_RESOURCE", resource: "groups", payload: mappedGroups });
+    setViewingGroup(mappedGroups.find((group) => group._id === groupId) || null);
+  }
+  async function addClientToGroup(clientId) {
+    if (!viewingGroup?._id) return;
+    try {
+      setGroupClientBusy(true);
+      await groupService.updateClients(viewingGroup._id, { add: [clientId] });
+      await syncViewingGroup(viewingGroup._id);
+      setShowClientDropdown(false);
+      toast.success("Client added to group.");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Unable to add client.");
+    } finally {
+      setGroupClientBusy(false);
+    }
+  }
+  async function removeClientFromGroup(clientId) {
+    if (!viewingGroup?._id) return;
+    try {
+      setGroupClientBusy(true);
+      await groupService.updateClients(viewingGroup._id, { remove: [clientId] });
+      await syncViewingGroup(viewingGroup._id);
+      toast.success("Client removed from group.");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Unable to remove client.");
+    } finally {
+      setGroupClientBusy(false);
+    }
   }
   async function saveGroup() {
     if (!editName.trim() || !editingGroup) {
@@ -205,16 +268,6 @@ export default function ClientGroups({ setSettingsHeaderAction }) {
                 <td>
                   <Button size="sm" variant="ghost" onClick={() => handleEdit(g)}>
                     Edit
-                  </Button>{" "}
-                  <Button
-                    size="sm"
-                    variant="danger"
-                    onClick={async () => {
-                      await groupService.remove(g._id);
-                      load();
-                    }}
-                  >
-                    Ungroup
                   </Button>
                 </td>
               </tr>
@@ -257,8 +310,13 @@ export default function ClientGroups({ setSettingsHeaderAction }) {
           <Card className="w-full max-w-lg p-4">
             <div className="mb-4 flex items-center justify-between">
               <div className="text-[16px] font-extrabold">{viewingGroup.name}</div>
-              <button onClick={closeView} className="text-slate-500 hover:text-slate-700">
-                Close
+              <button
+                type="button"
+                onClick={closeView}
+                aria-label="Close group details"
+                className="grid h-9 w-9 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+              >
+                <X size={18} />
               </button>
             </div>
 
@@ -266,14 +324,16 @@ export default function ClientGroups({ setSettingsHeaderAction }) {
               <div className="text-sm font-semibold text-slate-600">
                 {(viewingGroup.clients || []).length} client(s)
               </div>
-              <Button
-                variant="ghost"
-                onClick={() => exportThisGroupClientsExcel(viewingGroup._id, viewingGroup.name)}
-                disabled={!(viewingGroup.clients || []).length}
-              >
-                <Download size={16} />
-                Export This Group (Client-wise)
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => exportThisGroupClientsExcel(viewingGroup._id, viewingGroup.name)}
+                  disabled={!(viewingGroup.clients || []).length}
+                >
+                  <Download size={16} />
+                  Export This Group (Client-wise)
+                </Button>
+              </div>
             </div>
 
             <div className="mt-3 space-y-2">
@@ -290,7 +350,20 @@ export default function ClientGroups({ setSettingsHeaderAction }) {
                       {(viewingGroup.clients || []).map((c) => (
                         <tr key={c._id}>
                           <td className="font-semibold">{c.legalName}</td>
-                          <td className="text-slate-600">{c.fileNo || "-"}</td>
+                          <td className="text-slate-600">
+                            <div className="flex items-center justify-between gap-3">
+                              <span>{c.fileNo || "-"}</span>
+                              <button
+                                type="button"
+                                disabled={groupClientBusy}
+                                onClick={() => removeClientFromGroup(c._id)}
+                                aria-label={`Remove ${c.legalName} from group`}
+                                className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <X size={15} />
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -303,10 +376,48 @@ export default function ClientGroups({ setSettingsHeaderAction }) {
               )}
             </div>
 
-            <div className="mt-4 flex justify-end">
-              <Button variant="ghost" onClick={closeView}>
-                Close
-              </Button>
+            <div className="mt-4 space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="ghost"
+                  disabled={groupClientBusy}
+                  onClick={() => {
+                    setShowClientDropdown(true);
+                    if (!allClients.length) loadClients();
+                  }}
+                >
+                  <UserPlus size={16} />
+                  Add Client
+                </Button>
+              </div>
+
+              {showClientDropdown && (
+                <div className="max-h-56 overflow-auto rounded-2xl border border-slate-200 bg-slate-50/70 p-2">
+                  {availableClients.length ? (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {availableClients.map((client) => (
+                        <button
+                          key={client._id}
+                          type="button"
+                          disabled={groupClientBusy}
+                          onClick={() => addClientToGroup(client._id)}
+                          className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white px-3 py-2 text-left transition hover:border-blue-200 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-extrabold text-slate-800">{client.legalName}</span>
+                            <span className="block truncate text-xs font-semibold text-slate-500">{client.fileNo || "No file no."}</span>
+                          </span>
+                          <Plus size={16} className="shrink-0 text-blue-600" />
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl bg-white p-3 text-sm font-semibold text-slate-500">
+                      No clients available to add
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </Card>
         </div>

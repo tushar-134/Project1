@@ -645,6 +645,9 @@ export default function ClientList() {
             display: "grid",
             gridTemplateRows: filtersOpen ? "1fr" : "0fr",
             transition: "grid-template-rows 0.25s ease",
+            overflow: filtersOpen ? "visible" : "hidden",
+            position: "relative",
+            zIndex: 20,
           }}
         >
           <div style={{ overflow: filtersOpen ? "visible" : "hidden" }}>

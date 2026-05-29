@@ -233,6 +233,26 @@ export default function Users({ setSettingsHeaderAction }) {
 
   return (
     <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="page-kicker">Settings</div>
+          <h2 className="screen-title">User Management</h2>
+        </div>
+        {canManageUsers && (
+          <Button onClick={handleAddUser}>
+            <Plus size={16} />
+            Add User
+          </Button>
+        )}
+      </div>
+      <Card className="p-4">
+        <div className="mb-2 text-[14px] font-extrabold">Role permissions</div>
+        <div className="grid gap-3 md:grid-cols-3">
+          <Role title="Task Only" summary={ROLE_DETAILS["Task Only"].summary} text={ROLE_DETAILS["Task Only"].text} />
+          <Role title="Manager" summary={ROLE_DETAILS.Manager.summary} text={ROLE_DETAILS.Manager.text} />
+          <Role title="Admin" summary={ROLE_DETAILS.Admin.summary} text={ROLE_DETAILS.Admin.text} />
+        </div>
+      </Card>
       <Card>
         <Table>
           <thead>
@@ -288,7 +308,7 @@ export default function Users({ setSettingsHeaderAction }) {
                           {activeTooltip === u._id && (
                             <div 
                               ref={tooltipRef}
-                              className="absolute left-0 bottom-full z-[100] mb-2 w-64 rounded-2xl border border-slate-100 bg-white p-3 shadow-xl shadow-slate-200/50 animate-in fade-in slide-in-from-bottom-2 duration-200"
+                              className="absolute right-0 top-full z-[100] mt-2 w-64 rounded-2xl border border-slate-100 bg-white p-3 shadow-xl shadow-slate-200/50 animate-in fade-in slide-in-from-top-2 duration-200"
                             >
                               <div className="mb-2 flex items-center justify-between border-b border-slate-50 pb-2">
                                 <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">Other Assignments</span>
@@ -311,7 +331,7 @@ export default function Users({ setSettingsHeaderAction }) {
                                   ))}
                                 </div>
                               </div>
-                              <div className="absolute -bottom-1 left-4 h-2 w-2 rotate-45 border-b border-r border-slate-100 bg-white"></div>
+                              <div className="absolute -top-1 right-4 h-2 w-2 rotate-45 border-l border-t border-slate-100 bg-white"></div>
                             </div>
                           )}
                         </div>
@@ -362,14 +382,6 @@ export default function Users({ setSettingsHeaderAction }) {
             ))}
           </tbody>
         </Table>
-      </Card>
-      <Card className="p-4">
-        <div className="mb-2 text-[14px] font-extrabold">Role permissions</div>
-        <div className="grid gap-3 md:grid-cols-3">
-          <Role title="Task Only" summary={ROLE_DETAILS["Task Only"].summary} text={ROLE_DETAILS["Task Only"].text} />
-          <Role title="Manager" summary={ROLE_DETAILS.Manager.summary} text={ROLE_DETAILS.Manager.text} />
-          <Role title="Admin" summary={ROLE_DETAILS.Admin.summary} text={ROLE_DETAILS.Admin.text} />
-        </div>
       </Card>
       {modalOpen && (
         <div className="fixed inset-0 z-40 grid place-items-center bg-slate-900/35 p-4">
