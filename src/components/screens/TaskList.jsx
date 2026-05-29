@@ -75,7 +75,7 @@ function createEmptyColumnFilters() {
     type: "",
     dueDate: "",
     assigned: "",
-    status: "",
+    status: [],
     remarks: "",
     recurring: "",
     scope: "",
@@ -85,10 +85,11 @@ function createEmptyColumnFilters() {
 }
 
 function normalizeStatusFilterValue(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  if (raw.toLowerCase() === "active") return "Active";
-  return FILTER_STATUSES.find((status) => status.toLowerCase() === raw.toLowerCase()) || raw;
+  if (!value) return [];
+  const raw = String(value).trim();
+  if (!raw) return [];
+  const found = FILTER_STATUSES.find((s) => s.toLowerCase() === raw.toLowerCase());
+  return found ? [found] : [];
 }
 
 function normalizeCategoryFilterValue(value) {
@@ -173,7 +174,7 @@ function buildActiveColumnFilterSummary(filters) {
     filters.type ? `Task Type: ${filters.type}` : null,
     filters.dueDate ? `Due Date: ${filters.dueDate}` : null,
     filters.assigned ? `Assigned: ${filters.assigned}` : null,
-    filters.status ? `Status: ${filters.status}` : null,
+    filters.status?.length ? `Status: ${filters.status.join(", ")}` : null,
     filters.remarks ? `Remark: ${filters.remarks}` : null,
     filters.recurring ? `Recurring: ${filters.recurring === "recurring" ? "Recurring" : "One-time"}` : null,
     filters.scope ? `Scope: ${filters.scope}` : null,
@@ -203,6 +204,98 @@ function StatusPill({ status }) {
   );
 }
 
+const SELECTABLE_STATUSES = FILTER_STATUSES.filter((s) => s !== "All");
+
+function StatusMultiSelect({ selected, onChange, open, setOpen, dropdownRef }) {
+  // Close on outside click
+  useEffect(() => {
+    function handleOutside(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleOutside);
+    return () => document.removeEventListener("mousedown", handleOutside);
+  }, [dropdownRef, setOpen]);
+
+  function toggle(status) {
+    const next = selected.includes(status)
+      ? selected.filter((s) => s !== status)
+      : [...selected, status];
+    onChange(next);
+  }
+
+  const label = selected.length === 0
+    ? "All statuses"
+    : selected.length === 1
+      ? selected[0]
+      : `${selected.length} statuses`;
+
+  return (
+    <div ref={dropdownRef} className="relative">
+      <button
+        id="task-filter-status"
+        type="button"
+        className="input flex items-center justify-between gap-2 text-left"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span className={selected.length === 0 ? "text-slate-400" : "text-slate-800 font-semibold"}>
+          {label}
+        </span>
+        <ChevronDown size={13} className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <ul
+          role="listbox"
+          aria-multiselectable="true"
+          className="absolute top-full left-0 z-50 mt-1 w-48 overflow-hidden rounded-xl border border-[#e2e8f0] bg-white shadow-lg"
+        >
+          {SELECTABLE_STATUSES.map((status) => {
+            const checked = selected.includes(status);
+            const { bg, text } = STATUS_PILL[status] || { bg: "bg-slate-100", text: "text-slate-600" };
+            return (
+              <li
+                key={status}
+                role="option"
+                aria-selected={checked}
+                onMouseDown={(e) => { e.preventDefault(); toggle(status); }}
+                className={`flex cursor-pointer items-center gap-2.5 px-3 py-2.5 text-[12px] font-semibold transition-colors hover:bg-slate-50 ${
+                  checked ? "bg-blue-50/60" : ""
+                }`}
+              >
+                <span
+                  className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border-2 transition-colors ${
+                    checked
+                      ? "border-[#1e3a8a] bg-[#1e3a8a]"
+                      : "border-slate-300 bg-white"
+                  }`}
+                >
+                  {checked && (
+                    <svg viewBox="0 0 10 8" fill="none" width="8" height="8">
+                      <path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </span>
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-extrabold ${bg} ${text}`}>{status}</span>
+              </li>
+            );
+          })}
+          {selected.length > 0 && (
+            <li
+              onMouseDown={(e) => { e.preventDefault(); onChange([]); }}
+              className="flex cursor-pointer items-center gap-2 border-t border-slate-100 px-3 py-2 text-[12px] font-semibold text-slate-400 transition-colors hover:text-[#dc2626]"
+            >
+              <X size={12} /> Clear selection
+            </li>
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export default function TaskList() {
   const { state, dispatch } = useApp();
   const { currentUser } = useAuth();
@@ -220,6 +313,8 @@ export default function TaskList() {
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1 });
   const [columnFilters, setColumnFilters] = useState(() => createInitialColumnFilters(searchParams));
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const statusDropdownRef = useRef(null);
   const [colVisibility, setColVisibility] = useState(() => {
     // Restore from localStorage so column choices persist across refreshes
     // and navigation. Fall back to COLUMN_DEFS defaults if nothing is saved.
@@ -292,7 +387,7 @@ export default function TaskList() {
 
   const serverFilters = useMemo(() => ({
     category: deferredColumnFilters.category || undefined,
-    status: deferredColumnFilters.status || undefined,
+    status: deferredColumnFilters.status?.length === 1 ? deferredColumnFilters.status[0] : undefined,
     month: scope === "By Month" ? month : undefined,
     overdue: scope === "Overdue" ? "true" : undefined,
     taskId: deferredColumnFilters.taskId || undefined,
@@ -746,19 +841,15 @@ export default function TaskList() {
               </select>
             </FilterField>
 
-            {/* Status — now includes Active option */}
+            {/* Status — multi-select checkbox dropdown */}
             <FilterField label="Status" htmlFor="task-filter-status">
-              <select
-                id="task-filter-status"
-                className="input"
-                value={columnFilters.status}
-                onChange={(event) => updateColumnFilter("status", event.target.value)}
-              >
-                <option value="">All statuses</option>
-                {FILTER_STATUSES.filter((s) => s !== "All").map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
-              </select>
+              <StatusMultiSelect
+                selected={columnFilters.status}
+                onChange={(val) => updateColumnFilter("status", val)}
+                open={statusDropdownOpen}
+                setOpen={setStatusDropdownOpen}
+                dropdownRef={statusDropdownRef}
+              />
             </FilterField>
 
             {/* Remark */}

@@ -79,7 +79,7 @@ export default function TaskDetail() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [remarkText, setRemarkText] = useState("");
+  const [commentInput, setCommentInput] = useState("");
   const [remarkSaving, setRemarkSaving] = useState(false);
   const [remarkError, setRemarkError] = useState("");
 
@@ -96,7 +96,7 @@ export default function TaskDetail() {
         if (active) {
           setTask(taskData);
           setLogs(logsData);
-          setRemarkText(taskData?.remarks || "");
+          setCommentInput("");
           setRemarkError("");
         }
       } catch (err) {
@@ -138,18 +138,35 @@ export default function TaskDetail() {
   const overdue = daysOverdue(task.dueDate, task.status);
   const canEditRemarks = canManage || (currentUser?.role === "task_only" && String(task.assignedTo?._id) === String(currentUser?._id || currentUser?.id));
 
-  async function handleRemarkSave() {
-    if (remarkSaving) return;
+  // Parse remarks as JSON array of {text, author, at} objects; fall back to legacy string
+  function parseComments(rawRemarks) {
+    if (!rawRemarks) return [];
+    try {
+      const parsed = JSON.parse(rawRemarks);
+      if (Array.isArray(parsed)) return parsed;
+    } catch { /* not JSON */ }
+    // Legacy plain string — surface as a single unnamed comment
+    return [{ text: rawRemarks, author: "—", at: null }];
+  }
+
+  async function handleCommentPost() {
+    const text = commentInput.trim();
+    if (!text || remarkSaving) return;
     setRemarkSaving(true);
     setRemarkError(null);
     try {
-      const updatedTask = await taskService.updateRemarks(task._id, remarkText);
+      const existing = parseComments(task.remarks);
+      const next = [
+        ...existing,
+        { text, author: currentUser?.name || "You", at: new Date().toISOString() },
+      ];
+      const updatedTask = await taskService.updateRemarks(task._id, JSON.stringify(next));
       setTask((current) => ({ ...current, remarks: updatedTask.remarks || "", updatedAt: updatedTask.updatedAt || current.updatedAt }));
-      setRemarkText(updatedTask.remarks || "");
+      setCommentInput("");
       const logsData = await taskService.getLogs(id);
       setLogs(logsData);
     } catch (err) {
-      setRemarkError(err.response?.data?.message || "Failed to update remark");
+      setRemarkError(err.response?.data?.message || "Failed to post comment");
     } finally {
       setRemarkSaving(false);
     }
@@ -322,33 +339,67 @@ export default function TaskDetail() {
         )}
 
         <div className="task-detail-description">
-          <div className="task-detail-field-label mb-2">
-            <MessageSquare size={13} /> Remarks
+          <div className="task-detail-field-label mb-3">
+            <MessageSquare size={13} /> Comments
           </div>
-          {canEditRemarks ? (
+
+          {/* Comment thread */}
+          {(() => {
+            const comments = parseComments(task.remarks);
+            return comments.length === 0 ? (
+              <p className="mb-3 text-[12px] text-slate-400 italic">No comments yet. Be the first to add one.</p>
+            ) : (
+              <div className="mb-3 space-y-3">
+                {comments.map((comment, idx) => (
+                  <div key={idx} className="flex items-start gap-2.5">
+                    <div className="flex-shrink-0 h-7 w-7 rounded-full bg-[#1e3a8a] flex items-center justify-center text-[10px] font-extrabold text-white">
+                      {String(comment.author || "?").charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="text-[11px] font-extrabold text-slate-700">{comment.author || "—"}</span>
+                        {comment.at && (
+                          <span className="text-[10px] text-slate-400">
+                            {new Date(comment.at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                            {" at "}
+                            {new Date(comment.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[13px] leading-relaxed text-slate-700 whitespace-pre-wrap">{comment.text}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* Post new comment */}
+          {canEditRemarks && (
             <>
               <textarea
                 id="task-detail-remark"
                 name="taskDetailRemark"
-                className="input min-h-28"
-                placeholder="Add context, blockers, or follow-up notes for this task."
-                value={remarkText}
-                onChange={(event) => setRemarkText(event.target.value)}
+                className="input min-h-20"
+                placeholder="Write a comment…"
+                value={commentInput}
+                onChange={(event) => setCommentInput(event.target.value)}
                 disabled={remarkSaving}
+                onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleCommentPost(); }}
               />
               {remarkError && (
-                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">
+                <div className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">
                   {remarkError}
                 </div>
               )}
-              <div className="mt-3 flex justify-end">
-                <Button size="sm" onClick={handleRemarkSave} disabled={remarkSaving}>
-                  {remarkSaving ? "Saving..." : "Save Remark"}
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <span className="text-[10px] text-slate-400">Ctrl+Enter to post</span>
+                <Button size="sm" onClick={handleCommentPost} disabled={remarkSaving || !commentInput.trim()}>
+                  <MessageSquare size={13} />
+                  {remarkSaving ? "Posting..." : "Post Comment"}
                 </Button>
               </div>
             </>
-          ) : (
-            <p className="text-[13px] leading-relaxed text-slate-700">{task.remarks || "No remark added"}</p>
           )}
         </div>
 
