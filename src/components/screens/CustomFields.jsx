@@ -7,7 +7,7 @@ import Card from "../ui/Card.jsx";
 import CustomFieldModal from "../ui/CustomFieldModal.jsx";
 import { toast } from "react-hot-toast";
 
-export default function CustomFields() {
+export default function CustomFields({ setSettingsHeaderAction }) {
   const { state, dispatch } = useApp();
   const [modal, setModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -50,14 +50,18 @@ export default function CustomFields() {
 
   const fields = state.customFields || [];
 
+  useEffect(() => {
+    if (!setSettingsHeaderAction) return undefined;
+    setSettingsHeaderAction(
+      <Button onClick={openCreateModal}>
+        <Plus size={16} /> New Field
+      </Button>
+    );
+    return () => setSettingsHeaderAction(null);
+  }, [setSettingsHeaderAction]);
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <Button onClick={openCreateModal}>
-          <Plus size={16} /> New Field
-        </Button>
-      </div>
-
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {fields.map((f) => (
           <Card key={f._id} className="group relative overflow-hidden border-slate-200 transition-all hover:border-blue-300 hover:shadow-md">

@@ -8,7 +8,7 @@ import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import Table from "../ui/Table.jsx";
 
-export default function ClientGroups() {
+export default function ClientGroups({ setSettingsHeaderAction }) {
   const { state, dispatch } = useApp();
   const [name, setName] = useState("");
   const [editingGroup, setEditingGroup] = useState(null);
@@ -97,33 +97,37 @@ export default function ClientGroups() {
     }
   }
 
+  useEffect(() => {
+    if (!setSettingsHeaderAction) return undefined;
+    setSettingsHeaderAction(
+      <div className="flex flex-wrap justify-end gap-2">
+        <input
+          id="new-group-name"
+          name="newGroupName"
+          className="input w-56"
+          placeholder="New group name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <Button
+          onClick={async () => {
+            if (name) {
+              await groupService.create({ name });
+              setName("");
+              load();
+            }
+          }}
+        >
+          <Plus size={16} />
+          Create Group
+        </Button>
+      </div>
+    );
+    return () => setSettingsHeaderAction(null);
+  }, [setSettingsHeaderAction, name]);
+
   return (
     <div className="space-y-5">
-      <div className="flex justify-end">
-        <div className="flex flex-wrap justify-end gap-2">
-          <input
-            id="new-group-name"
-            name="newGroupName"
-            className="input w-56"
-            placeholder="New group name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <Button
-            onClick={async () => {
-              if (name) {
-                await groupService.create({ name });
-                setName("");
-                load();
-              }
-            }}
-          >
-            <Plus size={16} />
-            Create Group
-          </Button>
-        </div>
-      </div>
-
       <Card className="p-4">
         <div className="grid gap-3 md:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_auto_auto] md:items-end">
           <label htmlFor="export-group">
