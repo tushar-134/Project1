@@ -1,6 +1,6 @@
-import { cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
+import { cloneElement, isValidElement, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
-import { Check, Send, UploadCloud } from "lucide-react";
+import { Check, ChevronDown, Send, UploadCloud, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
 import { useClients } from "../../hooks/useClients";
@@ -343,7 +343,13 @@ export default function AddTask() {
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            <Field label="Client*" field="taskClient"><select className="input" value={details.client} onChange={(e) => setDetails({ ...details, client: e.target.value })}><option value="">Select client</option>{state.clients.map((c) => <option key={c.id} value={c._id}>{c.name}</option>)}</select></Field>
+            <Field label="Client*" field="taskClient">
+              <ClientComboBox
+                clients={state.clients}
+                value={details.client}
+                onChange={(id) => setDetails({ ...details, client: id })}
+              />
+            </Field>
             <Field label="Assign To" field="taskAssignedTo"><select className="input" value={details.assigned} onChange={(e) => setDetails({ ...details, assigned: e.target.value })}><option value="">Unassigned</option>{state.users.map((u) => <option key={u.id} value={u._id}>{u.name}</option>)}</select></Field>
             <Field label="Due Date*" field="taskDueDate"><input className="input" type="date" value={details.dueDate} onChange={(e) => handleRecurrenceChange({ dueDate: e.target.value })} /></Field>
             <Field label="Description / Notes" field="taskDescription"><textarea className="input textarea" value={details.description} onChange={(e) => setDetails({ ...details, description: e.target.value })} /></Field>
@@ -502,6 +508,97 @@ export default function AddTask() {
   );
 }
 function Step({ n, label, active }) { return <div className={`flex items-center gap-3 rounded-xl border p-3 ${active ? "border-[#1e3a8a] bg-white" : "border-[#e2e8f0] bg-white/60"}`}><div className={`grid h-7 w-7 place-items-center rounded-full text-[12px] font-black ${active ? "bg-[#1e3a8a] text-white" : "bg-slate-200 text-slate-500"}`}>{active ? <Check size={15} /> : n}</div><div className="font-extrabold">{label}</div></div>; }
+
+function ClientComboBox({ clients, value, onChange }) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  const selected = clients.find((c) => (c._id || c.id) === value);
+
+  const filtered = clients.filter((c) =>
+    !query || c.name?.toLowerCase().includes(query.toLowerCase())
+  );
+
+  useEffect(() => {
+    function onOutside(e) {
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false);
+        setQuery("");
+      }
+    }
+    document.addEventListener("mousedown", onOutside);
+    return () => document.removeEventListener("mousedown", onOutside);
+  }, []);
+
+  function handleSelect(client) {
+    onChange(client._id || client.id);
+    setQuery("");
+    setOpen(false);
+  }
+
+  function handleClear(e) {
+    e.stopPropagation();
+    onChange("");
+    setQuery("");
+    setOpen(false);
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <div className="relative flex items-center">
+        <input
+          id="taskClient"
+          name="taskClient"
+          className="input pr-14"
+          type="text"
+          autoComplete="off"
+          placeholder="Search client…"
+          value={open ? query : (selected?.name || "")}
+          onFocus={() => { setOpen(true); setQuery(""); }}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+        <span className="pointer-events-none absolute right-2 flex items-center gap-1">
+          {value && (
+            <button
+              type="button"
+              className="pointer-events-auto text-slate-400 transition hover:text-slate-600"
+              onMouseDown={handleClear}
+              aria-label="Clear client"
+            >
+              <X size={13} />
+            </button>
+          )}
+          <ChevronDown
+            size={13}
+            className={`pointer-events-none text-slate-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+          />
+        </span>
+      </div>
+      {open && (
+        <ul className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-[#e2e8f0] bg-white shadow-lg custom-scrollbar">
+          {filtered.length === 0 ? (
+            <li className="px-4 py-3 text-[12px] text-slate-400">No clients found</li>
+          ) : (
+            filtered.map((c) => (
+              <li
+                key={c._id || c.id}
+                onMouseDown={() => handleSelect(c)}
+                className={`cursor-pointer px-4 py-2.5 text-[13px] transition-colors hover:bg-blue-50 hover:text-[#1e3a8a] ${
+                  (c._id || c.id) === value
+                    ? "bg-blue-50/70 font-extrabold text-[#1e3a8a]"
+                    : "font-semibold text-slate-700"
+                }`}
+              >
+                {c.name}
+              </li>
+            ))
+          )}
+        </ul>
+      )}
+    </div>
+  );
+}
 function Field({ label, field, children }) {
   const control = isValidElement(children)
     ? cloneElement(children, {
