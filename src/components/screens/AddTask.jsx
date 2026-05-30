@@ -501,7 +501,15 @@ export default function AddTask() {
               <div className={`smooth-panel overflow-hidden ${fta ? "max-h-20 opacity-100" : "max-h-0 opacity-0"}`}><div className="mt-3 rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-[12px] font-semibold text-yellow-800">This task will be routed to FTA Tracker when submitted.</div></div>
             </>
           )}
-          <div className="mt-5 flex gap-2"><Button variant="ghost" onClick={() => setStep(2)}>Back</Button><Button onClick={submit} disabled={submitting}><Send size={16} />{submitting ? (isEditMode ? "Saving..." : "Submitting...") : (isEditMode ? "Save Task" : "Submit Task")}</Button></div>
+          <div className="mt-5 flex gap-2"><Button variant="ghost" onClick={() => {
+            if (returnToClient?.clientId) {
+              navigate(`/clients/edit/${returnToClient.clientId}`, {
+                state: { activeTab: Number(returnToClient.activeTab) || 3 },
+              });
+              return;
+            }
+            setStep(2);
+          }}>Back</Button><Button onClick={submit} disabled={submitting}><Send size={16} />{submitting ? (isEditMode ? "Saving..." : "Submitting...") : (isEditMode ? "Save Task" : "Submit Task")}</Button></div>
         </Card>
       )}
     </div>

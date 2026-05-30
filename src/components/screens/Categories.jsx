@@ -10,7 +10,7 @@ import Toggle from "../ui/Toggle.jsx";
 // Default state for the Task Type modal — all visibility toggles start off for new task types.
 const EMPTY_TASK_TYPE = { name: "", showPeriod: false, showRecurring: false, showAwaitingFta: false };
 
-export default function Categories() {
+export default function Categories({ setSettingsHeaderAction }) {
   const { state, dispatch } = useApp();
   const [modal, setModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -103,12 +103,19 @@ export default function Categories() {
     load();
   }
 
+  useEffect(() => {
+    if (!setSettingsHeaderAction) return undefined;
+    setSettingsHeaderAction(
+      <Button onClick={openCreateModal}>
+        <Plus size={16} />
+        New Category
+      </Button>
+    );
+    return () => setSettingsHeaderAction(null);
+  }, [setSettingsHeaderAction]);
+
   return (
     <div className="space-y-5">
-      <div className="flex justify-end">
-        <Button onClick={openCreateModal}><Plus size={16} />New Category</Button>
-      </div>
-
       <div className="grid gap-4 lg:grid-cols-2">
         {state.categories.filter((category) => category.id !== "refund").map((category) => {
           const taskTypes = category.rawTaskTypes?.length

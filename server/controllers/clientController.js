@@ -778,7 +778,7 @@ exports.exportClients = async (req, res, next) => {
       const otherFields    = activeCustomFields.filter((f) => f.type !== "currency");
 
       // Column order: Base → Currency → Contacts → Other Custom Fields
-      const baseHeaders        = ["File No", "Legal Name", "Jurisdiction", "Type", "Group", "Licence No", "Licence Expiry", "VAT TRN", "Created Date", "Created By"];
+      const baseHeaders        = ["File No", "Legal Name", "Jurisdiction", "Type", "Group", "Assigned To", "Licence No", "Licence Expiry", "VAT TRN", "Created Date", "Created By"];
       const currencyHeaders    = currencyFields.map((f) => f.label);
       const contactHeaders     = Array.from({ length: maxContacts }, (_, i) => `Contact ${i + 1}`);
       const otherCustomHeaders = otherFields.map((f) => f.label);
@@ -792,6 +792,7 @@ exports.exportClients = async (req, res, next) => {
         row["Jurisdiction"]   = jurisLabel(c);
         row["Type"]           = typeLabel(c);
         row["Group"]          = c.group?.name || "";
+        row["Assigned To"]    = c.assignedUser?.name || "";
         row["Licence No"]     = c.tradeLicences?.[0]?.licenceNumber || "";
         row["Licence Expiry"] = formatDate(c.tradeLicences?.[0]?.expiryDate) || "";
         row["VAT TRN"]        = c.vatDetails?.trn || "";
@@ -826,7 +827,7 @@ exports.exportClients = async (req, res, next) => {
       });
     } else {
       // ── Visible / Selected Columns mode ────────────────────────────────────
-      const BASE_COLUMNS = ["fileNo", "name", "jurisdiction", "type", "group", "licence", "licenceExpiry", "vatTrn", "contact", "mobile", "email", "createdAt", "createdBy"];
+      const BASE_COLUMNS = ["fileNo", "name", "jurisdiction", "type", "group", "assignedUser", "licence", "licenceExpiry", "vatTrn", "contact", "mobile", "email", "createdAt", "createdBy"];
       const ALL_COLUMNS  = BASE_COLUMNS;
       const requestedColumns = req.query.columns
         ? String(req.query.columns).split(",").map((c) => c.trim()).filter(Boolean)
@@ -845,6 +846,7 @@ exports.exportClients = async (req, res, next) => {
         jurisdiction:  "Jurisdiction",
         type:          "Type",
         group:         "Group",
+        assignedUser:  "Assigned To",
         licence:       "Licence No",
         licenceExpiry: "Licence Expiry",
         vatTrn:        "VAT TRN",
@@ -861,6 +863,7 @@ exports.exportClients = async (req, res, next) => {
           case "jurisdiction":  return jurisLabel(c);
           case "type":          return typeLabel(c);
           case "group":         return c.group?.name || "";
+          case "assignedUser":  return c.assignedUser?.name || "";
           case "licence":       return c.tradeLicences?.[0]?.licenceNumber || "";
           case "licenceExpiry": return formatDate(c.tradeLicences?.[0]?.expiryDate) || "";
           case "vatTrn":        return c.vatDetails?.trn || "";

@@ -241,9 +241,9 @@ export default function Dashboard() {
       </div>
 
       <div className="grid gap-3 md:grid-cols-3">
-        <Stat icon={<FileText size={18} />} label="Total Clients" value={stats.totalClients || 0} color="text-[#1e3a8a]" />
-        <Stat icon={<Clock size={18} />} label="Pending Tasks" value={stats.pendingTasks || 0} color="text-[#eab308]" />
-        <Stat icon={<AlertTriangle size={18} />} label="Overdue" value={stats.overdueTasks || 0} color="text-[#dc2626]" />
+        <Stat icon={<FileText size={18} />} label="Total Clients" value={stats.totalClients || 0} color="text-[#1e3a8a]" onClick={() => navigate("/clients/list")} />
+        <Stat icon={<Clock size={18} />} label="Pending Tasks" value={stats.pendingTasks || 0} color="text-[#eab308]" onClick={() => navigate(`/tasks/list?status=Active&month=${selectedMonth}`)} />
+        <Stat icon={<AlertTriangle size={18} />} label="Overdue" value={stats.overdueTasks || 0} color="text-[#dc2626]" onClick={() => navigate(`/tasks/list?status=Active&overdue=true&month=${selectedMonth}`)} />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -325,6 +325,19 @@ export default function Dashboard() {
   );
 }
 
-function Stat({ icon, label, value, color }) {
-  return <Card className="flex items-center gap-3 p-4"><div className={`grid h-10 w-10 place-items-center rounded-xl bg-slate-50 ${color}`}>{icon}</div><div><div className="text-[11px] font-extrabold uppercase text-slate-500">{label}</div><div className="text-[24px] font-black">{value}</div></div></Card>;
+function Stat({ icon, label, value, color, onClick }) {
+  return (
+    <Card
+      className={`flex items-center gap-3 p-4 transition ${
+        onClick ? "cursor-pointer hover:-translate-y-0.5 hover:shadow-md" : ""
+      }`}
+      onClick={onClick}
+    >
+      <div className={`grid h-10 w-10 place-items-center rounded-xl bg-slate-50 ${color}`}>{icon}</div>
+      <div>
+        <div className="text-[11px] font-extrabold uppercase text-slate-500">{label}</div>
+        <div className="text-[24px] font-black">{value}</div>
+      </div>
+    </Card>
+  );
 }

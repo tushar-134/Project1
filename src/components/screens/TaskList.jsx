@@ -315,7 +315,7 @@ export default function TaskList() {
 
   const BASE_EXPORT_FIELDS = COLUMN_DEFS.map((c) => ({ key: c.key, label: c.label }));
 
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1 });
   const [columnFilters, setColumnFilters] = useState(() => createInitialColumnFilters(searchParams));
@@ -767,6 +767,9 @@ export default function TaskList() {
               display: "grid",
               gridTemplateRows: filtersOpen ? "1fr" : "0fr",
               transition: "grid-template-rows 0.25s ease",
+              overflow: filtersOpen ? "visible" : "hidden",
+              position: "relative",
+              zIndex: 20,
             }}
           >
             <div style={{ overflow: filtersOpen ? "visible" : "hidden" }}>

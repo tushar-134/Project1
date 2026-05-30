@@ -14,6 +14,7 @@ const contactSchema = new mongoose.Schema({
   type: { type: String, default: "Government Authority" },
   address: { type: String, trim: true },
   location: { type: String, trim: true },
+  emirates: { type: String, trim: true },
   city: { type: String, trim: true },
   isPrimary: { type: Boolean, default: false },
   isActive: { type: Boolean, default: true },

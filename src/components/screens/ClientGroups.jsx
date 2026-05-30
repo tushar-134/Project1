@@ -1,14 +1,15 @@
-import { Download, Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Download, Plus, Search, UserPlus, X } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
+import { clientService } from "../../services/clientService";
 import { groupService } from "../../services/groupService";
 import { downloadBlob } from "../../utils/adapterUtils";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import Table from "../ui/Table.jsx";
 
-export default function ClientGroups() {
+export default function ClientGroups({ setSettingsHeaderAction }) {
   const { state, dispatch } = useApp();
   const [name, setName] = useState("");
   const [editingGroup, setEditingGroup] = useState(null);
@@ -18,6 +19,11 @@ export default function ClientGroups() {
   const [viewOpen, setViewOpen] = useState(false);
   const [selectedExportGroupId, setSelectedExportGroupId] = useState("");
   const [selectedExportClientId, setSelectedExportClientId] = useState("");
+  const [allClients, setAllClients] = useState([]);
+  const [clientSearch, setClientSearch] = useState("");
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [groupClientBusy, setGroupClientBusy] = useState(false);
+  const listItems = (response) => Array.isArray(response) ? response : response?.items || response?.clients || [];
   const load = () => groupService.list().then((groups) => dispatch({
     type: "SET_RESOURCE",
     resource: "groups",
@@ -35,6 +41,24 @@ export default function ClientGroups() {
   const exportClientOptions = selectedExportGroup
     ? selectedExportGroup.clients || []
     : state.groups.flatMap((group) => group.clients || []);
+  const assignedClientIds = useMemo(
+    () => new Set((viewingGroup?.clients || []).map((client) => String(client._id))),
+    [viewingGroup],
+  );
+  const availableClients = useMemo(() => {
+    return allClients
+      .filter((client) => !assignedClientIds.has(String(client._id)))
+      .sort((a, b) => String(a.legalName || "").localeCompare(String(b.legalName || "")));
+  }, [allClients, assignedClientIds]);
+  const filteredClients = useMemo(() => {
+    const query = clientSearch.trim().toLowerCase();
+    if (!query) return availableClients;
+    return availableClients.filter((client) =>
+      [client.legalName, client.fileNo, client.tradeName]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query)),
+    );
+  }, [availableClients, clientSearch]);
   const safeFilename = (value, fallback) =>
     String(value || fallback)
       .trim()
@@ -72,6 +96,8 @@ export default function ClientGroups() {
   function closeView() {
     setViewingGroup(null);
     setViewOpen(false);
+    setClientSearch("");
+    setShowClientDropdown(false);
   }
   function handleEdit(group) {
     setEditingGroup(group);
@@ -81,6 +107,56 @@ export default function ClientGroups() {
   function handleView(group) {
     setViewingGroup(group);
     setViewOpen(true);
+    setClientSearch("");
+    setShowClientDropdown(false);
+    if (!allClients.length) loadClients();
+  }
+  async function loadClients() {
+    try {
+      const response = await clientService.list({ page: 1, limit: 500 });
+      setAllClients(listItems(response));
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Unable to load clients.");
+    }
+  }
+  async function syncViewingGroup(groupId) {
+    const groups = await groupService.list();
+    const mappedGroups = groups.map((g) => ({
+      ...g,
+      id: g._id,
+      clients: g.clients || [],
+      clientNames: g.clients?.map((c) => c.legalName) || [],
+    }));
+    dispatch({ type: "SET_RESOURCE", resource: "groups", payload: mappedGroups });
+    setViewingGroup(mappedGroups.find((group) => group._id === groupId) || null);
+  }
+  async function addClientToGroup(clientId) {
+    if (!viewingGroup?._id) return;
+    try {
+      setGroupClientBusy(true);
+      await groupService.updateClients(viewingGroup._id, { add: [clientId] });
+      await syncViewingGroup(viewingGroup._id);
+      setShowClientDropdown(false);
+      setClientSearch("");
+      toast.success("Client added to group.");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Unable to add client.");
+    } finally {
+      setGroupClientBusy(false);
+    }
+  }
+  async function removeClientFromGroup(clientId) {
+    if (!viewingGroup?._id) return;
+    try {
+      setGroupClientBusy(true);
+      await groupService.updateClients(viewingGroup._id, { remove: [clientId] });
+      await syncViewingGroup(viewingGroup._id);
+      toast.success("Client removed from group.");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Unable to remove client.");
+    } finally {
+      setGroupClientBusy(false);
+    }
   }
   async function saveGroup() {
     if (!editName.trim() || !editingGroup) {
@@ -97,33 +173,37 @@ export default function ClientGroups() {
     }
   }
 
+  useEffect(() => {
+    if (!setSettingsHeaderAction) return undefined;
+    setSettingsHeaderAction(
+      <div className="flex flex-wrap justify-end gap-2">
+        <input
+          id="new-group-name"
+          name="newGroupName"
+          className="input w-56"
+          placeholder="New group name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
+        <Button
+          onClick={async () => {
+            if (name) {
+              await groupService.create({ name });
+              setName("");
+              load();
+            }
+          }}
+        >
+          <Plus size={16} />
+          Create Group
+        </Button>
+      </div>
+    );
+    return () => setSettingsHeaderAction(null);
+  }, [setSettingsHeaderAction, name]);
+
   return (
     <div className="space-y-5">
-      <div className="flex justify-end">
-        <div className="flex flex-wrap justify-end gap-2">
-          <input
-            id="new-group-name"
-            name="newGroupName"
-            className="input w-56"
-            placeholder="New group name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <Button
-            onClick={async () => {
-              if (name) {
-                await groupService.create({ name });
-                setName("");
-                load();
-              }
-            }}
-          >
-            <Plus size={16} />
-            Create Group
-          </Button>
-        </div>
-      </div>
-
       <Card className="p-4">
         <div className="grid gap-3 md:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_auto_auto] md:items-end">
           <label htmlFor="export-group">
@@ -201,16 +281,6 @@ export default function ClientGroups() {
                 <td>
                   <Button size="sm" variant="ghost" onClick={() => handleEdit(g)}>
                     Edit
-                  </Button>{" "}
-                  <Button
-                    size="sm"
-                    variant="danger"
-                    onClick={async () => {
-                      await groupService.remove(g._id);
-                      load();
-                    }}
-                  >
-                    Ungroup
                   </Button>
                 </td>
               </tr>
@@ -253,8 +323,13 @@ export default function ClientGroups() {
           <Card className="w-full max-w-lg p-4">
             <div className="mb-4 flex items-center justify-between">
               <div className="text-[16px] font-extrabold">{viewingGroup.name}</div>
-              <button onClick={closeView} className="text-slate-500 hover:text-slate-700">
-                Close
+              <button
+                type="button"
+                onClick={closeView}
+                aria-label="Close group details"
+                className="grid h-9 w-9 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+              >
+                <X size={18} />
               </button>
             </div>
 
@@ -262,14 +337,16 @@ export default function ClientGroups() {
               <div className="text-sm font-semibold text-slate-600">
                 {(viewingGroup.clients || []).length} client(s)
               </div>
-              <Button
-                variant="ghost"
-                onClick={() => exportThisGroupClientsExcel(viewingGroup._id, viewingGroup.name)}
-                disabled={!(viewingGroup.clients || []).length}
-              >
-                <Download size={16} />
-                Export This Group (Client-wise)
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => exportThisGroupClientsExcel(viewingGroup._id, viewingGroup.name)}
+                  disabled={!(viewingGroup.clients || []).length}
+                >
+                  <Download size={16} />
+                  Export This Group (Client-wise)
+                </Button>
+              </div>
             </div>
 
             <div className="mt-3 space-y-2">
@@ -286,7 +363,20 @@ export default function ClientGroups() {
                       {(viewingGroup.clients || []).map((c) => (
                         <tr key={c._id}>
                           <td className="font-semibold">{c.legalName}</td>
-                          <td className="text-slate-600">{c.fileNo || "-"}</td>
+                          <td className="text-slate-600">
+                            <div className="flex items-center justify-between gap-3">
+                              <span>{c.fileNo || "-"}</span>
+                              <button
+                                type="button"
+                                disabled={groupClientBusy}
+                                onClick={() => removeClientFromGroup(c._id)}
+                                aria-label={`Remove ${c.legalName} from group`}
+                                className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <X size={15} />
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -299,10 +389,61 @@ export default function ClientGroups() {
               )}
             </div>
 
-            <div className="mt-4 flex justify-end">
-              <Button variant="ghost" onClick={closeView}>
-                Close
-              </Button>
+            <div className="mt-4 space-y-3">
+              <div className="relative inline-flex">
+                <Button
+                  variant="ghost"
+                  disabled={groupClientBusy}
+                  onClick={() => {
+                    setShowClientDropdown((open) => !open);
+                    if (!allClients.length) loadClients();
+                  }}
+                >
+                  <UserPlus size={16} />
+                  Add Client
+                </Button>
+
+                {showClientDropdown && (
+                  <div className="absolute left-0 top-full z-50 mt-2 w-[min(26rem,calc(100vw-3rem))] rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl shadow-slate-900/10">
+                    <div className="relative">
+                      <Search size={15} className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        className="h-10 w-full rounded-lg border border-slate-200 bg-white py-2 pl-12 pr-3 text-[13px] outline-none transition placeholder:text-slate-400 focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/15"
+                        placeholder="Search existing clients..."
+                        value={clientSearch}
+                        onChange={(event) => setClientSearch(event.target.value)}
+                        autoFocus
+                      />
+                    </div>
+
+                    <div className="mt-3 max-h-32 overflow-auto pr-1">
+                      {filteredClients.length ? (
+                        <div className="space-y-2">
+                          {filteredClients.map((client) => (
+                            <button
+                              key={client._id}
+                              type="button"
+                              disabled={groupClientBusy}
+                              onClick={() => addClientToGroup(client._id)}
+                              className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2 text-left transition hover:border-blue-200 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-extrabold text-slate-800">{client.legalName}</span>
+                                <span className="block truncate text-xs font-semibold text-slate-500">{client.fileNo || "No file no."}</span>
+                              </span>
+                              <Plus size={16} className="shrink-0 text-blue-600" />
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-xl bg-slate-50 p-3 text-sm font-semibold text-slate-500">
+                          {availableClients.length ? "No clients match your search" : "No clients available to add"}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </Card>
         </div>
