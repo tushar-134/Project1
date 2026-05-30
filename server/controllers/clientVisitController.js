@@ -578,7 +578,9 @@ exports.updateVisit = async (req, res, next) => {
     visit.visitTime = String(visitTime || "").trim();
     visit.visitType = VISIT_TYPES.includes(visitType) ? visitType : "Requirement Gathering";
     visit.location = String(location || "").trim();
-    visit.remarks = String(remarks || "").trim();
+    if (remarks !== undefined) {
+      visit.remarks = String(remarks).trim();
+    }
 
     const previousAssignedByUser = new Map(
       (visit.assignedUsers || []).map((entry) => [String(entry.user?._id || entry.user), entry])
@@ -726,6 +728,27 @@ exports.updateStatus = async (req, res, next) => {
     }
     visit.status = req.body.status;
     appendActivity(visit, req.user._id, "Status Changed", `Visit status changed to ${req.body.status}`);
+    await visit.save();
+    res.json(serializeVisit(await visit.populate(populateVisit)));
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.updateRemarks = async (req, res, next) => {
+  try {
+    const visit = await getVisitOr404(req, res);
+    if (!visit) return;
+    
+    // In visits, "task_only" can post comments on visits assigned to them, 
+    // managers/admins can post comments on any visit.
+    const isAssigned = (visit.assignedUsers || []).some(entry => String(entry.user?._id || entry.user) === String(req.user._id));
+    if (!canManageVisit(req) && !isAssigned) {
+      return res.status(403).json({ message: "You don't have permission to comment on this visit." });
+    }
+
+    visit.remarks = req.body.remarks || "";
+    appendActivity(visit, req.user._id, "Remarks Updated", "Added a comment to visit");
     await visit.save();
     res.json(serializeVisit(await visit.populate(populateVisit)));
   } catch (error) {
