@@ -1,5 +1,5 @@
 import { Outlet, useLocation } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Sidebar, { navItems } from "./Sidebar.jsx";
 import TopBar from "./TopBar.jsx";
 
@@ -7,10 +7,6 @@ export default function Layout() {
   const { pathname } = useLocation();
   const [navOpen, setNavOpen] = useState(false);
   const title = navItems.flatMap((s) => s.links).find((link) => link.to === pathname)?.label || "Dashboard";
-
-  useEffect(() => {
-    setNavOpen(false);
-  }, [pathname]);
 
   return (
     <div className="h-dvh overflow-hidden bg-[#f1f5f9]">

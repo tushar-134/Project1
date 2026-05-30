@@ -98,7 +98,6 @@ export default function Sidebar({ open = false, onClose = () => {} }) {
                   key={to}
                   to={to}
                   end={to === "/contacts"}
-                  onClick={onClose}
                   className={({ isActive }) =>
                     `flex h-9 items-center gap-3 rounded-xl px-3 text-[12.5px] font-semibold transition-all duration-150 ${
                       isActive
