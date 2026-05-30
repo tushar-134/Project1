@@ -303,11 +303,11 @@ export default function ClientVisits() {
                   </button>
                 </td>
                 <td>
-                  {visit.clientType === "existing" && visit.client ? (
+                  {visit.client?._id ? (
                     <button
                       type="button"
-                      className="font-black text-left text-[#1e3a8a] hover:underline hover:text-blue-700 transition-colors"
-                      onClick={() => setDrawerClientId(visit.client)}
+                      className="font-black text-[#1e3a8a] hover:underline text-left"
+                      onClick={() => setDrawerClientId(visit.client._id)}
                     >
                       {visit.clientName}
                     </button>

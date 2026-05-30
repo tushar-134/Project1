@@ -194,6 +194,11 @@ export default function AddTask() {
     if (!selected.length) return;
     const note = String(description || "").trim();
 
+    if (!note) {
+      toast.error("Attachment description is required before uploading.");
+      return;
+    }
+
     if (!id) {
       setAttachments((current) => [
         ...current,
@@ -543,15 +548,24 @@ function AttachmentUploadZone({ description, onDescriptionChange, onFiles, isUpl
       <div className="text-[15px] font-extrabold text-slate-800">{isUploading ? "Uploading..." : "Upload attachments"}</div>
       <div className="mt-1 text-[12px] font-semibold text-slate-500">Choose one or more files. You can open selected files immediately.</div>
       <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-        <Field label="Attachment Description" field="task-attachment-description">
+        <Field label="Attachment Description*" field="task-attachment-description">
           <input
             className="input"
             value={description}
-            placeholder="Optional attachment note"
+            placeholder="What is this attachment for?"
             onChange={(event) => onDescriptionChange(event.target.value)}
           />
         </Field>
-        <label htmlFor={inputId} className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#1e3a8a] px-4 text-[14px] font-bold text-white transition hover:bg-[#1d4ed8]">
+        <label 
+          htmlFor={description.trim() ? inputId : undefined}
+          onClick={(e) => {
+            if (!description.trim()) {
+              e.preventDefault();
+              toast.error("Please enter an attachment description first.");
+            }
+          }}
+          className={`inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl px-4 text-[14px] font-bold text-white transition ${!description.trim() || isUploading ? "bg-slate-300 pointer-events-none" : "bg-[#1e3a8a] hover:bg-[#1d4ed8]"}`}
+        >
           <UploadCloud size={16} />
           {isUploading ? "Uploading..." : "Upload files"}
         </label>

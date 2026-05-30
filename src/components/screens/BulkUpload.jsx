@@ -17,15 +17,33 @@ const templateRows = [
     jurisdiction: "mainland",
     licenceNumber: "TL-1001",
     vatTrn: "100200300400500",
-    contactName: "Aisha Khan",
-    contactEmail: "aisha@example.com",
-    contactCountryCode: "+971",
-    contactMobile: "501234567",
+    contact_name_1: "Aisha Khan",
+    contact_email_1: "aisha@example.com",
+    contact_country_code_1: "+971",
+    contact_mobile_1: "501234567",
+    contact_name_2: "John Smith",
+    contact_email_2: "john@example.com",
+    contact_name_3: "",
+    contact_email_3: "",
+    contact_name_4: "",
+    contact_email_4: "",
+    contact_name_5: "",
+    contact_email_5: "",
+    contact_name_6: "",
+    contact_email_6: "",
+    contact_name_7: "",
+    contact_email_7: "",
+    contact_name_8: "",
+    contact_email_8: "",
+    contact_name_9: "",
+    contact_email_9: "",
+    contact_name_10: "",
+    contact_email_10: "",
     assignedUserEmailId: "sara@filingbuddy.ae",
   },
 ];
 
-const PREVIEW_COLUMNS = ["serial", "legalName", "tradeName", "clientType", "licenceNumber", "contactName", "contactEmail"];
+const PREVIEW_COLUMNS = ["serial", "legalName", "tradeName", "clientType", "licenceNumber", "contact_name_1", "contact_email_1"];
 
 export default function BulkUpload() {
   const [fileName, setFileName] = useState("");
@@ -379,7 +397,7 @@ export default function BulkUpload() {
 
   const instructions = [
     "Download the sample template and extract the ZIP.",
-    "Fill mandatory columns: legalName, contactName, contactEmail, contactMobile.",
+    "Fill mandatory columns: legalName and licenceNumber.",
     "Place trade licence, passport & emirate ID scans in their respective folders (licenses/, passports/, emirate_ids/), all named as serial.ext (e.g. 1.pdf).",
     "Select the entire folder below and review results.",
   ];
