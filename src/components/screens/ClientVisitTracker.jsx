@@ -11,7 +11,7 @@ import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
-import ClientDrawer from "../ui/ClientDrawer.jsx";
+import ClientVisitHistoryDrawer from "../ui/ClientVisitHistoryDrawer.jsx";
 import Table from "../ui/Table.jsx";
 
 const blankForm = () => ({
@@ -93,7 +93,7 @@ export default function ClientVisitTracker() {
   const [savingRow, setSavingRow] = useState({});
   const [selectedVisitorByVisit, setSelectedVisitorByVisit] = useState({});
   const [timeDrafts, setTimeDrafts] = useState({});
-  const [drawerClientId, setDrawerClientId] = useState(null);
+  const [historyClient, setHistoryClient] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -339,7 +339,7 @@ export default function ClientVisitTracker() {
                       <button
                         type="button"
                         className="font-extrabold text-[#1e3a8a] hover:underline text-left"
-                        onClick={() => setDrawerClientId(visit.client._id)}
+                        onClick={() => setHistoryClient({ id: visit.client._id, name: visit.client?.legalName })}
                       >
                         {visit.client?.legalName}
                       </button>
@@ -514,9 +514,10 @@ export default function ClientVisitTracker() {
         </div>
       )}
 
-      <ClientDrawer
-        clientId={drawerClientId}
-        onClose={() => setDrawerClientId(null)}
+      <ClientVisitHistoryDrawer
+        clientId={historyClient?.id}
+        clientName={historyClient?.name}
+        onClose={() => setHistoryClient(null)}
       />
     </div>
   );
