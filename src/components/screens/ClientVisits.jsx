@@ -294,7 +294,7 @@ export default function ClientVisits() {
               <SortableHeader label="Visit ID" onClick={() => toggleSort("visitId")} />
               <SortableHeader label="Client" onClick={() => toggleSort("client")} />
               <SortableHeader label="Schedule" onClick={() => toggleSort("visitDate")} />
-              <SortableHeader label="Type" onClick={() => toggleSort("type")} />
+              <SortableHeader label="Visit Type" onClick={() => toggleSort("type")} />
               <th>Visited By</th>
               <SortableHeader label="Status" onClick={() => toggleSort("status")} />
               <th>Actions</th>
