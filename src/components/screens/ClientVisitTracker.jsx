@@ -11,6 +11,7 @@ import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
+import ClientDrawer from "../ui/ClientDrawer.jsx";
 import Table from "../ui/Table.jsx";
 
 const blankForm = () => ({
@@ -92,6 +93,7 @@ export default function ClientVisitTracker() {
   const [savingRow, setSavingRow] = useState({});
   const [selectedVisitorByVisit, setSelectedVisitorByVisit] = useState({});
   const [timeDrafts, setTimeDrafts] = useState({});
+  const [drawerClientId, setDrawerClientId] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -333,7 +335,17 @@ export default function ClientVisitTracker() {
               return (
                 <tr key={visit._id}>
                   <td>
-                    <div className="font-extrabold text-slate-900">{visit.client?.legalName || "Unknown Client"}</div>
+                    {visit.client?._id ? (
+                      <button
+                        type="button"
+                        className="font-extrabold text-[#1e3a8a] hover:underline text-left"
+                        onClick={() => setDrawerClientId(visit.client._id)}
+                      >
+                        {visit.client?.legalName}
+                      </button>
+                    ) : (
+                      <div className="font-extrabold text-slate-900">{visit.client?.legalName || "Unknown Client"}</div>
+                    )}
                     <div className="text-[11px] font-semibold text-slate-500">{visit.client?.fileNo || "-"}</div>
                   </td>
                   <td>{formatVisitDate(visit.visitDate)}</td>
@@ -501,6 +513,11 @@ export default function ClientVisitTracker() {
           </Card>
         </div>
       )}
+
+      <ClientDrawer
+        clientId={drawerClientId}
+        onClose={() => setDrawerClientId(null)}
+      />
     </div>
   );
 }
