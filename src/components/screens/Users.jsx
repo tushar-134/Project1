@@ -233,18 +233,7 @@ export default function Users({ setSettingsHeaderAction }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <div className="page-kicker">Settings</div>
-          <h2 className="screen-title">User Management</h2>
-        </div>
-        {canManageUsers && (
-          <Button onClick={handleAddUser}>
-            <Plus size={16} />
-            Add User
-          </Button>
-        )}
-      </div>
+
       <Card className="p-4">
         <div className="mb-2 text-[14px] font-extrabold">Role permissions</div>
         <div className="grid gap-3 md:grid-cols-3">
