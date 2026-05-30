@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronLeft, ChevronRight, Columns, Download, Pencil, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Columns, Download, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -12,6 +12,7 @@ import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
 import ClientDrawer from "../ui/ClientDrawer.jsx";
+import ExportModal from "../ui/ExportModal.jsx";
 import Table from "../ui/Table.jsx";
 
 // ─── Column definitions ────────────────────────────────────────────────────
@@ -22,7 +23,8 @@ import Table from "../ui/Table.jsx";
 const COLUMN_DEFS = [
   { key: "client",    label: "Client",        defaultOn: true,  description: "Name, type & jurisdiction" },
   { key: "group",     label: "Group",         defaultOn: true,  description: "Client group membership" },
-  { key: "compliance",label: "Compliance",    defaultOn: true,  description: "Licence & VAT TRN" },
+  { key: "assignedTo", label: "Assigned To",  defaultOn: true,  description: "Assigned staff member" },
+  { key: "compliance",label: "Compliance",    defaultOn: true,  description: "VAT TRN" },
   { key: "licenceExpiry", label: "Licence Expiry", defaultOn: true, description: "Trade licence expiry date" },
   { key: "contact",   label: "Contact",       defaultOn: true,  description: "Primary contact details" },
   { key: "createdAt", label: "Created Date",  defaultOn: false, description: "Date the client was added" },
@@ -34,7 +36,8 @@ const COLUMN_DEFS = [
 const EXPORT_KEY_MAP = {
   client:     ["fileNo", "name", "jurisdiction", "type"],
   group:      ["group"],
-  compliance: ["licence", "vatTrn"],
+  assignedTo: ["assignedUser"],
+  compliance: ["vatTrn"],
   licenceExpiry: ["licenceExpiry"],
   contact:    ["contact", "mobile", "email"],
   createdAt:  ["createdAt"],
@@ -367,10 +370,7 @@ export default function ClientList() {
   const [drawerClientId, setDrawerClientId] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  // "pick" = option chooser | "select" = field-picker checklist
-  const [exportMode, setExportMode] = useState("pick");
   const [customFieldsForExport, setCustomFieldsForExport] = useState([]);
-  // selectedExportFields: Set of column keys chosen in the field-picker
   const BASE_EXPORT_FIELDS = [
     { key: "fileNo",        label: "File No" },
     { key: "name",          label: "Legal Name" },
@@ -384,9 +384,6 @@ export default function ClientList() {
     { key: "createdAt",     label: "Created Date" },
     { key: "createdBy",     label: "Created By" },
   ];
-  const [selectedExportFields, setSelectedExportFields] = useState(
-    () => new Set(BASE_EXPORT_FIELDS.map((f) => f.key))
-  );
 
   // Column visibility state: key → boolean. Undefined means "use defaultOn".
   const [colVisibility, setColVisibility] = useState(() => {
@@ -494,7 +491,6 @@ export default function ClientList() {
   });
 
   const openExportModal = async () => {
-    setExportMode("pick");
     setIsExportModalOpen(true);
     // Fetch custom fields so they appear in the field picker
     try {
@@ -768,7 +764,7 @@ export default function ClientList() {
                   id="client-filter-compliance"
                   className="input"
                   type="search"
-                  placeholder="TRN or licence no."
+                  placeholder="VAT TRN"
                   value={columnFilters.compliance}
                   onChange={(e) => updateColumnFilter("compliance", e.target.value)}
                 />
@@ -843,6 +839,7 @@ export default function ClientList() {
             <tr>
               {isVisible("client")     && <th>Client</th>}
               {isVisible("group")      && <th>Group</th>}
+              {isVisible("assignedTo") && <th>Assigned To</th>}
               {isVisible("compliance") && <th>Compliance</th>}
               {isVisible("licenceExpiry") && <th>Licence Expiry</th>}
               {isVisible("contact")    && <th>Contact Details</th>}
@@ -922,10 +919,16 @@ export default function ClientList() {
                 {isVisible("group") && (
                   <td>{client.group ? <span className="rounded-full bg-purple-50 px-2 py-1 text-[11px] font-extrabold text-[#7c3aed]">{client.group}</span> : "—"}</td>
                 )}
+                {isVisible("assignedTo") && (
+                  <td>
+                    {client.assignedToName
+                      ? <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-700">{client.assignedToName}</span>
+                      : <span className="text-[12px] text-slate-400">—</span>}
+                  </td>
+                )}
                 {isVisible("compliance") && (
                   <td>
                     <div className="space-y-1">
-                      <div><span className="font-semibold text-slate-500">Licence:</span> {client.licence || "—"}</div>
                       <div><span className="font-semibold text-slate-500">VAT TRN:</span> {client.vatTrn || "—"}</div>
                     </div>
                   </td>
@@ -959,9 +962,6 @@ export default function ClientList() {
                 {canManage && (
                   <td>
                     <div className="flex gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => navigate(`/clients/edit/${client.id}`)}>
-                        <Pencil size={14} />
-                      </Button>
                       {currentUser?.role === "admin" && (
                         <Button
                           size="sm"
@@ -1008,193 +1008,17 @@ export default function ClientList() {
       </Card>
 
       {drawerClientId && <ClientDrawer clientId={drawerClientId} onClose={() => setDrawerClientId(null)} />}
-
-      {/* ── Export Modal ─────────────────────────────────────────────────── */}
-      {isExportModalOpen && (
-        <div
-          className="fixed inset-0 z-[70] grid place-items-center bg-slate-900/40 p-4 backdrop-blur-sm"
-          onClick={() => { setIsExportModalOpen(false); setExportMode("pick"); }}
-        >
-          <div
-            className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-4">
-              <div className="flex items-center gap-2">
-                {exportMode === "select" && (
-                  <button
-                    onClick={() => setExportMode("pick")}
-                    className="mr-1 grid h-7 w-7 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-                  >
-                    <ChevronLeft size={16} />
-                  </button>
-                )}
-                <div className="grid h-7 w-7 place-items-center rounded-lg bg-[#1e3a8a] text-white">
-                  <Download size={14} />
-                </div>
-                <div>
-                  <div className="text-sm font-extrabold text-slate-900">
-                    {exportMode === "select" ? "Choose Fields to Export" : "Export Clients"}
-                  </div>
-                  <div className="text-[11px] font-medium text-slate-500">
-                    {exportMode === "select" ? "Check the fields you want in the Excel file" : "Choose what to include in the Excel file"}
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={() => { setIsExportModalOpen(false); setExportMode("pick"); }}
-                className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-200 hover:text-slate-600"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* ── Option picker view ── */}
-            {exportMode === "pick" && (
-              <>
-                <div className="space-y-3 p-5">
-                  {/* Export Visible */}
-                  <button
-                    type="button"
-                    onClick={exportVisible}
-                    className="group w-full rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-[#1e3a8a] hover:bg-blue-50/50 hover:shadow-md"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="grid h-9 w-9 flex-none place-items-center rounded-lg bg-slate-100 text-slate-600 transition group-hover:bg-[#1e3a8a] group-hover:text-white">
-                        <Columns size={16} />
-                      </div>
-                      <div>
-                        <div className="text-[13px] font-extrabold text-slate-900">Export Visible Columns</div>
-                        <div className="mt-0.5 text-[11px] font-medium text-slate-500">
-                          Downloads only the columns currently shown in the table
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-
-                  {/* Export All */}
-                  <button
-                    type="button"
-                    onClick={exportAll}
-                    className="group w-full rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-emerald-500 hover:bg-emerald-50/50 hover:shadow-md"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="grid h-9 w-9 flex-none place-items-center rounded-lg bg-emerald-50 text-emerald-600 transition group-hover:bg-emerald-500 group-hover:text-white">
-                        <Download size={16} />
-                      </div>
-                      <div>
-                        <div className="text-[13px] font-extrabold text-slate-900">Export All Fields</div>
-                        <div className="mt-0.5 text-[11px] font-medium text-slate-500">
-                          Full export — all contacts, custom fields &amp; currency values
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-1.5 pl-12">
-                      {["All contacts", "Currency amounts", "Custom fields", "All core data"].map((tag) => (
-                        <span key={tag} className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </button>
-
-                  {/* Export Selected */}
-                  <button
-                    type="button"
-                    onClick={() => setExportMode("select")}
-                    className="group w-full rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-violet-500 hover:bg-violet-50/50 hover:shadow-md"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="grid h-9 w-9 flex-none place-items-center rounded-lg bg-violet-50 text-violet-600 transition group-hover:bg-violet-500 group-hover:text-white">
-                        <SlidersHorizontal size={16} />
-                      </div>
-                      <div>
-                        <div className="text-[13px] font-extrabold text-slate-900">Export Selected Fields</div>
-                        <div className="mt-0.5 text-[11px] font-medium text-slate-500">
-                          Pick exactly which fields to include
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                </div>
-                <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-3">
-                  <p className="text-[11px] font-medium text-slate-400">
-                    Export respects your current search and filter settings.
-                  </p>
-                </div>
-              </>
-            )}
-
-            {/* ── Field picker / checklist view ── */}
-            {exportMode === "select" && (
-              <>
-                <div className="max-h-[360px] overflow-y-auto px-4 py-3 space-y-4">
-                  {/* Base fields */}
-                  <div>
-                    <div className="mb-1.5 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Core Fields</div>
-                    <div className="space-y-1">
-                      {BASE_EXPORT_FIELDS.map((f) => (
-                        <label
-                          key={f.key}
-                          className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 transition hover:bg-slate-50"
-                        >
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 rounded border-slate-300 accent-[#1e3a8a]"
-                            checked={selectedExportFields.has(f.key)}
-                            onChange={() => toggleExportField(f.key)}
-                          />
-                          <span className="text-[12px] font-semibold text-slate-700">{f.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Custom fields */}
-                  {customFieldsForExport.length > 0 && (
-                    <div>
-                      <div className="mb-1.5 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">Custom Fields</div>
-                      <div className="space-y-1">
-                        {customFieldsForExport.map((f) => (
-                          <label
-                            key={f.key}
-                            className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-1.5 transition hover:bg-slate-50"
-                          >
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4 rounded border-slate-300 accent-[#1e3a8a]"
-                              checked={selectedExportFields.has(f.key)}
-                              onChange={() => toggleExportField(f.key)}
-                            />
-                            <span className="flex-1 text-[12px] font-semibold text-slate-700">{f.label}</span>
-                            <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-400 capitalize">{f.type}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/50 px-5 py-3">
-                  <span className="text-[11px] font-medium text-slate-400">
-                    {selectedExportFields.size} field{selectedExportFields.size !== 1 ? "s" : ""} selected
-                  </span>
-                  <button
-                    type="button"
-                    disabled={selectedExportFields.size === 0}
-                    onClick={exportSelected}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#1e3a8a] px-4 py-2 text-[12px] font-extrabold text-white shadow-sm transition hover:bg-[#1e40af] disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <Download size={13} />
-                    Download
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        title="Export Clients"
+        entityName="clients"
+        baseFields={BASE_EXPORT_FIELDS}
+        customFields={customFieldsForExport}
+        onExportVisible={exportVisible}
+        onExportAll={exportAll}
+        onExportSelected={exportSelected}
+      />
     </div>
   );
 }

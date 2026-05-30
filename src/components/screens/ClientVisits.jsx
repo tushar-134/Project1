@@ -12,6 +12,7 @@ import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
 import ClientDrawer from "../ui/ClientDrawer.jsx";
 import ClientVisitDrawer from "../ui/ClientVisitDrawer.jsx";
+import ExportModal from "../ui/ExportModal.jsx";
 import StatusPill from "../ui/StatusPill.jsx";
 import Table from "../ui/Table.jsx";
 
@@ -60,6 +61,7 @@ export default function ClientVisits() {
     toDate: "",
   });
   const [exportOpen, setExportOpen] = useState(false);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [visits, setVisits] = useState([]);
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1 });
@@ -69,6 +71,23 @@ export default function ClientVisits() {
   const [drawerVisitId, setDrawerVisitId] = useState(null);
   const [drawerClientId, setDrawerClientId] = useState(null);
   const exportRef = useRef(null);
+
+  const BASE_EXPORT_FIELDS = [
+    { key: "visitId", label: "Visit ID" },
+    { key: "clientName", label: "Client Name" },
+    { key: "clientType", label: "Client Type" },
+    { key: "visitDate", label: "Visit Date" },
+    { key: "visitTime", label: "Visit Time" },
+    { key: "visitType", label: "Visit Type" },
+    { key: "location", label: "Location" },
+    { key: "status", label: "Status" },
+    { key: "assignedUsers", label: "Assigned Users" },
+    { key: "teamLead", label: "Team Lead" },
+    { key: "checkInStatus", label: "Check-In Status" },
+    { key: "checkOutStatus", label: "Check-Out Status" },
+    { key: "createdBy", label: "Created By" },
+    { key: "remarks", label: "Remarks" },
+  ];
 
   const params = useMemo(() => ({
     page,
@@ -140,6 +159,26 @@ export default function ClientVisits() {
       toast.error("Unable to export client visits.");
     }
   }
+
+  const exportAll = async () => {
+    try {
+      setIsExportModalOpen(false);
+      const blob = await clientVisitService.export({ ...params, format: "xlsx", mode: "all" });
+      downloadBlob(blob, "client-visits-all.xlsx");
+    } catch {
+      toast.error("Unable to export client visits.");
+    }
+  };
+
+  const exportSelected = async (selectedKeys) => {
+    try {
+      setIsExportModalOpen(false);
+      const blob = await clientVisitService.export({ ...params, format: "xlsx", columns: selectedKeys.join(",") || undefined });
+      downloadBlob(blob, "client-visits-selected.xlsx");
+    } catch {
+      toast.error("Unable to export client visits.");
+    }
+  };
 
   function handleVisitUpdated(updatedVisit) {
     setVisits((current) => current.map((visit) => (visit._id === updatedVisit._id ? updatedVisit : visit)));
@@ -215,7 +254,7 @@ export default function ClientVisits() {
                 <div className="absolute right-0 top-full z-30 mt-2 w-40 rounded-xl border border-[#e2e8f0] bg-white p-1 shadow-xl shadow-slate-200">
                   <button
                     type="button"
-                    onClick={() => exportVisits("xlsx")}
+                    onClick={() => { setExportOpen(false); setIsExportModalOpen(true); }}
                     className="flex w-full items-center rounded-lg px-3 py-2 text-left text-[13px] font-bold text-slate-700 hover:bg-slate-50"
                   >
                     Excel
@@ -340,6 +379,16 @@ export default function ClientVisits() {
       <ClientDrawer
         clientId={drawerClientId}
         onClose={() => setDrawerClientId(null)}
+      />
+
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        title="Export Client Visits"
+        entityName="visits"
+        baseFields={BASE_EXPORT_FIELDS}
+        onExportAll={exportAll}
+        onExportSelected={exportSelected}
       />
     </div>
   );

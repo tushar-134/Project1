@@ -333,23 +333,58 @@ async function buildFilteredVisits(req, { exportMode = false } = {}) {
   return items.map(serializeVisit);
 }
 
-function exportRows(visits = []) {
-  return visits.map((visit) => ({
-    "Visit ID": visit.visitId || "",
-    Client: visit.clientName || "",
-    "Client Type": visit.clientType || "",
-    Date: visit.visitDate ? new Date(visit.visitDate).toISOString().slice(0, 10) : "",
-    Time: visit.visitTime || "",
-    Type: visit.visitType || "",
-    Location: visit.clientLocation || visit.location || "",
-    Status: visit.status || "",
-    "Assigned Users": (visit.assignedUsers || []).map((entry) => entry.user?.name || "").filter(Boolean).join(", "),
-    "Team Lead": visit.teamLead?.name || "",
-    "Check-In Status": visit.checkInStatus || "",
-    "Check-Out Status": visit.checkOutStatus || "",
-    "Created By": visit.createdBy?.name || "",
-    Remarks: visit.remarks || "",
-  }));
+function exportRows(visits = [], requestedColumns = []) {
+  const HEADER_MAP = {
+    visitId: "Visit ID",
+    clientName: "Client Name",
+    clientType: "Client Type",
+    visitDate: "Visit Date",
+    visitTime: "Visit Time",
+    visitType: "Visit Type",
+    location: "Location",
+    status: "Status",
+    assignedUsers: "Assigned Users",
+    teamLead: "Team Lead",
+    checkInStatus: "Check-In Status",
+    checkOutStatus: "Check-Out Status",
+    createdBy: "Created By",
+    remarks: "Remarks",
+  };
+
+  const getBaseCell = (visit, col) => {
+    switch (col) {
+      case "visitId": return visit.visitId || "";
+      case "clientName": return visit.clientName || "";
+      case "clientType": return visit.clientType || "";
+      case "visitDate": return visit.visitDate ? new Date(visit.visitDate).toISOString().slice(0, 10) : "";
+      case "visitTime": return visit.visitTime || "";
+      case "visitType": return visit.visitType || "";
+      case "location": return visit.clientLocation || visit.location || "";
+      case "status": return visit.status || "";
+      case "assignedUsers": return (visit.assignedUsers || []).map((entry) => entry.user?.name || "").filter(Boolean).join(", ");
+      case "teamLead": return visit.teamLead?.name || "";
+      case "checkInStatus": return visit.checkInStatus || "";
+      case "checkOutStatus": return visit.checkOutStatus || "";
+      case "createdBy": return visit.createdBy?.name || "";
+      case "remarks": return visit.remarks || "";
+      default: return "";
+    }
+  };
+
+  const orderedHeaders = requestedColumns.map(k => HEADER_MAP[k]).filter(Boolean);
+
+  const rows = visits.map((visit) => {
+    const row = {};
+    requestedColumns.forEach((col) => {
+      const header = HEADER_MAP[col];
+      if (header) {
+        row[header] = getBaseCell(visit, col);
+      }
+    });
+    return row;
+  });
+
+  return { rows, orderedHeaders };
 }
 
 exports.listVisits = async (req, res, next) => {
@@ -697,12 +732,27 @@ exports.updateStatus = async (req, res, next) => {
 exports.exportVisits = async (req, res, next) => {
   try {
     const format = String(req.query.format || "xlsx").toLowerCase();
+    const isExportAll = req.query.mode === "all";
     const visits = await buildFilteredVisits(req, { exportMode: true });
-    const rows = exportRows(visits);
+
+    const ALL_COLUMNS = [
+      "visitId", "clientName", "clientType", "visitDate", "visitTime",
+      "visitType", "location", "status", "assignedUsers", "teamLead",
+      "checkInStatus", "checkOutStatus", "createdBy", "remarks"
+    ];
+    
+    const requestedColumns = isExportAll
+      ? ALL_COLUMNS
+      : (req.query.columns ? String(req.query.columns).split(",").map(c => c.trim()).filter(Boolean) : ALL_COLUMNS);
+
+    const { rows, orderedHeaders } = exportRows(visits, requestedColumns);
 
     if (format === "pdf") {
-      const lines = rows.flatMap((row, index) => ([
-        `${index + 1}. ${row["Visit ID"]} | ${row.Client} | ${row.Date} ${row.Time} | ${row.Type} | ${row.Status}`,
+      // Basic PDF logic fallback, usually PDF doesn't use dynamic columns easily with simple text building
+      // We will supply all rows here
+      const allRowsData = exportRows(visits, ALL_COLUMNS).rows;
+      const lines = allRowsData.flatMap((row, index) => ([
+        `${index + 1}. ${row["Visit ID"]} | ${row["Client Name"]} | ${row["Visit Date"]} ${row["Visit Time"]} | ${row["Visit Type"]} | ${row["Status"]}`,
         `   Team: ${row["Assigned Users"] || "-"} | Location: ${row.Location || "-"}`,
       ]));
       const pdf = buildSimplePdf("Client Visits Report", lines);
@@ -714,7 +764,7 @@ exports.exportVisits = async (req, res, next) => {
     }
 
     const workbook = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const worksheet = XLSX.utils.json_to_sheet(rows, { header: orderedHeaders });
     XLSX.utils.book_append_sheet(workbook, worksheet, "Client Visits");
     const buffer = XLSX.write(workbook, { bookType: "xlsx", type: "buffer" });
     res

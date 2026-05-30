@@ -15,6 +15,7 @@ import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
+import ExportModal from "../ui/ExportModal.jsx";
 import Table from "../ui/Table.jsx";
 import TaskDrawer from "../ui/TaskDrawer.jsx";
 
@@ -310,6 +311,10 @@ export default function TaskList() {
   const [scope, setScope] = useState(searchParams.get("scope") || "By Month");
   const [month, setMonth] = useState(initialMonth);
   const [drawerTaskId, setDrawerTaskId] = useState(null);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+
+  const BASE_EXPORT_FIELDS = COLUMN_DEFS.map((c) => ({ key: c.key, label: c.label }));
+
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1 });
@@ -477,8 +482,25 @@ export default function TaskList() {
     setColumnFilters(createEmptyColumnFilters());
   };
 
-  const exportCsv = async () =>
-    downloadBlob(await exportTasks(serverFilters), "tasks.csv");
+  const exportVisible = async () => {
+    const serverCols = Object.keys(colVisibility).filter((k) => colVisibility[k]);
+    const params = { ...serverFilters, columns: serverCols.join(",") || undefined };
+    setIsExportModalOpen(false);
+    downloadBlob(await exportTasks(params), "tasks.xlsx");
+  };
+
+  const exportAll = async () => {
+    const params = { ...serverFilters, mode: "all" };
+    setIsExportModalOpen(false);
+    downloadBlob(await exportTasks(params), "tasks_full_export.xlsx");
+  };
+
+  const exportSelected = async (selectedKeys) => {
+    const cols = selectedKeys.join(",");
+    const params = { ...serverFilters, columns: cols || undefined };
+    setIsExportModalOpen(false);
+    downloadBlob(await exportTasks(params), "tasks_selected.xlsx");
+  };
 
   const renderTaskRow = (task) => {
     const canEditTask =
@@ -653,9 +675,9 @@ export default function TaskList() {
             {canManage && (
               <button
                 className="grid h-8 w-8 place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-600 transition hover:bg-slate-50"
-                onClick={exportCsv}
-                aria-label="Export tasks as CSV"
-                title="Export CSV"
+                onClick={() => setIsExportModalOpen(true)}
+                aria-label="Export tasks to Excel"
+                title="Export Excel"
               >
                 <Download size={14} />
               </button>
@@ -981,6 +1003,17 @@ export default function TaskList() {
       {canManage && drawerTaskId && (
         <TaskDrawer taskId={drawerTaskId} canManage={canManage} onClose={() => setDrawerTaskId(null)} />
       )}
+
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        title="Export Tasks"
+        entityName="tasks"
+        baseFields={BASE_EXPORT_FIELDS}
+        onExportVisible={exportVisible}
+        onExportAll={exportAll}
+        onExportSelected={exportSelected}
+      />
     </div>
   );
 }
