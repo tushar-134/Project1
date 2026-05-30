@@ -59,17 +59,6 @@ export default function Settings() {
           <span className={`settings-bar ${sidebarOpen ? "sbar-bot-open" : ""}`} />
         </button>
 
-        {activeTab && (
-          <div className="flex items-center gap-2.5">
-            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#1e3a8a] text-white shadow-md shadow-blue-900/20">
-              <activeTab.icon size={16} />
-            </div>
-            <div>
-              <div className="text-[14px] font-extrabold leading-tight text-slate-900">{activeTab.label}</div>
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{activeTab.category}</div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ── Inline layout: collapsible left nav + content ── */}
