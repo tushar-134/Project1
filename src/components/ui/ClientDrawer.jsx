@@ -192,9 +192,11 @@ export default function ClientDrawer({ clientId, onClose }) {
                 ) : (
                   <div className="space-y-6">
                     {contactPersons.map((contact, idx) => (
-                      <div key={idx} className={idx > 0 ? "pt-4 border-t border-slate-100" : ""}>
-                        <div className="mb-3 flex items-center gap-2">
-                          <div className="text-[14px] font-bold text-slate-800">{contact.fullName || `Contact ${idx + 1}`}</div>
+                      <div key={idx} className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+                        <div className="mb-3 flex items-center gap-2 border-b border-slate-200/60 pb-3">
+                          <div className="text-[14px] font-extrabold text-slate-800">
+                            Contact {idx + 1} {contact.fullName ? `— ${contact.fullName}` : ""}
+                          </div>
                           {contact.isPrimary && (
                             <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-extrabold text-blue-600">Primary</span>
                           )}
@@ -239,8 +241,8 @@ export default function ClientDrawer({ clientId, onClose }) {
                 ) : (
                   <div className="space-y-6">
                     {tradeLicences.map((licence, idx) => (
-                      <div key={idx} className={idx > 0 ? "pt-4 border-t border-slate-100" : ""}>
-                        <div className="mb-3 text-[14px] font-bold text-slate-800">Licence {idx + 1}</div>
+                      <div key={idx} className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+                        <div className="mb-3 border-b border-slate-200/60 pb-3 text-[14px] font-extrabold text-slate-800">Licence {idx + 1}</div>
                         <div className="grid gap-4 md:grid-cols-2">
                           <DetailRow label="Licence Number" value={licence.licenceNumber} />
                           <DetailRow label="Issuing Authority" value={licence.issuingAuthority} />
@@ -285,8 +287,8 @@ export default function ClientDrawer({ clientId, onClose }) {
                   </div>
                   <div className="space-y-6">
                     {portals.map((portal, idx) => (
-                      <div key={idx} className={idx > 0 ? "pt-4 border-t border-slate-100" : ""}>
-                        <div className="mb-3 text-[14px] font-bold text-slate-800">{portal.portalName || `Portal ${idx + 1}`}</div>
+                      <div key={idx} className="rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+                        <div className="mb-3 border-b border-slate-200/60 pb-3 text-[14px] font-extrabold text-slate-800">{portal.portalName || `Portal ${idx + 1}`}</div>
                         <div className="grid gap-4 md:grid-cols-2">
                           <DetailRow label="Portal URL" value={portal.portalUrl} />
                           <DetailRow label="Username" value={portal.username} />
