@@ -623,16 +623,7 @@ function normalizeBulkJurisdiction(raw) {
 function validateBulkRow(row) {
   const errors = [];
   if (!String(row.legalName || "").trim()) errors.push("legalName is required.");
-  const clientType = String(row.clientType || "legal").trim().toLowerCase();
-  if (!["legal", "natural"].includes(clientType)) errors.push("clientType must be 'legal' or 'natural'.");
-  const trn = String(row.vatTrn || row.trn || "").trim();
-  if (trn && !/^1\d{14}$/.test(trn)) errors.push("VAT TRN must be a 15-digit number starting with 1.");
-  if (!String(row.contactName || "").trim()) errors.push("contactName is required.");
-  const email = String(row.contactEmail || "").trim();
-  if (!email) errors.push("contactEmail is required.");
-  else if (!EMAIL_PATTERN.test(email)) errors.push("contactEmail is invalid.");
-  if (!String(row.contactMobile || "").trim()) errors.push("contactMobile is required.");
-  else if (!/^\d+$/.test(String(row.contactMobile).trim())) errors.push("contactMobile must contain only digits.");
+  if (!String(row.licenceNumber || "").trim()) errors.push("licenceNumber is required.");
   return errors;
 }
 
@@ -646,7 +637,44 @@ async function resolveAssignedUser(emailId) {
 function buildClientPayload(row, userId) {
   const trn = String(row.vatTrn || row.trn || "").trim();
   const licence = String(row.licenceNumber || "").trim();
-  const contactCountryCode = String(row.contactCountryCode || "+971").trim();
+  
+  const contactPersons = [];
+  
+  // Contact 1: has country code and mobile number too
+  const c1Name = String(row.contact_name_1 || "").trim();
+  const c1Email = String(row.contact_email_1 || "").trim();
+  const c1Country = String(row.contact_country_code_1 || "+971").trim();
+  const c1Mobile = String(row.contact_mobile_1 || "").trim();
+  
+  if (c1Name || c1Email || c1Mobile) {
+    contactPersons.push({
+      fullName: c1Name,
+      email: c1Email,
+      mobile: {
+        countryCode: c1Country,
+        number: c1Mobile,
+      },
+      isPrimary: false,
+    });
+  }
+  
+  // Contacts 2..10: only name and email
+  for (let n = 2; n <= 10; n++) {
+    const cName = String(row[`contact_name_${n}`] || "").trim();
+    const cEmail = String(row[`contact_email_${n}`] || "").trim();
+    if (cName || cEmail) {
+      contactPersons.push({
+        fullName: cName,
+        email: cEmail,
+        isPrimary: false,
+      });
+    }
+  }
+
+  if (contactPersons.length > 0) {
+    contactPersons[0].isPrimary = true;
+  }
+
   return {
     clientType: String(row.clientType || "legal").trim().toLowerCase(),
     legalName: String(row.legalName || "").trim(),
@@ -654,15 +682,7 @@ function buildClientPayload(row, userId) {
     jurisdiction: normalizeBulkJurisdiction(row.jurisdiction),
     vatDetails: trn ? { trn } : undefined,
     tradeLicences: licence ? [{ licenceNumber: licence }] : [],
-    contactPersons: [{
-      fullName: String(row.contactName || "").trim(),
-      email: String(row.contactEmail || "").trim(),
-      mobile: {
-        countryCode: contactCountryCode,
-        number: String(row.contactMobile || "").trim(),
-      },
-      isPrimary: true,
-    }],
+    contactPersons,
     createdBy: userId,
   };
 }
@@ -674,11 +694,13 @@ exports.bulkUpload = async (req, res, next) => {
     const rows = Array.isArray(req.body.rows) ? req.body.rows : req.body;
     const results = [];
     let added = 0, failed = 0;
+    const seenLicences = new Set();
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const serial = row.serial || i + 1;
       const legalName = String(row.legalName || row.name || "").trim();
+      const licence = String(row.licenceNumber || "").trim();
 
       try {
         // Validate row fields
@@ -689,16 +711,31 @@ exports.bulkUpload = async (req, res, next) => {
           continue;
         }
 
-        const trn = String(row.vatTrn || row.trn || "").trim();
-        const licence = String(row.licenceNumber || "").trim();
+        // Check for duplicate licence numbers within this batch
+        if (seenLicences.has(licence.toLowerCase())) {
+          results.push({
+            serial,
+            status: "error",
+            legalName,
+            error: `A duplicate licence number "${licence}" is present in this upload batch.`
+          });
+          failed++;
+          continue;
+        }
+        seenLicences.add(licence.toLowerCase());
 
-        // Duplicate check
-        const exists = await findDuplicateClient({
-          vatDetails: { trn },
-          tradeLicences: licence ? [{ licenceNumber: licence }] : [],
+        // Check against existing clients in database
+        const exists = await Client.findOne({
+          isActive: true,
+          "tradeLicences.licenceNumber": licence,
         });
         if (exists) {
-          results.push({ serial, status: "error", legalName, error: duplicateMessage(exists, { vatDetails: { trn }, tradeLicences: licence ? [{ licenceNumber: licence }] : [] }) });
+          results.push({
+            serial,
+            status: "error",
+            legalName,
+            error: `A client with trade licence "${licence}" already exists.`
+          });
           failed++;
           continue;
         }
