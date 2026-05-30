@@ -11,6 +11,7 @@ import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
 import ClientVisitDrawer from "../ui/ClientVisitDrawer.jsx";
+import ClientVisitHistoryDrawer from "../ui/ClientVisitHistoryDrawer.jsx";
 import ExportModal from "../ui/ExportModal.jsx";
 import StatusPill from "../ui/StatusPill.jsx";
 import Table from "../ui/Table.jsx";
@@ -69,6 +70,7 @@ export default function ClientVisits() {
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState({ key: "visitDate", direction: "desc" });
   const [drawerVisitId, setDrawerVisitId] = useState(null);
+  const [historyClient, setHistoryClient] = useState(null); // { id, name }
   const exportRef = useRef(null);
 
   const BASE_EXPORT_FIELDS = [
@@ -316,7 +318,7 @@ export default function ClientVisits() {
                     <button
                       type="button"
                       className="font-black text-[#1e3a8a] hover:underline text-left"
-                      onClick={() => setDrawerVisitId(visit._id)}
+                      onClick={() => setHistoryClient({ id: visit.client._id, name: visit.clientName })}
                     >
                       {visit.clientName}
                     </button>
@@ -383,6 +385,16 @@ export default function ClientVisits() {
         canManage={canManage}
         onClose={() => setDrawerVisitId(null)}
         onVisitUpdated={handleVisitUpdated}
+      />
+
+      <ClientVisitHistoryDrawer
+        clientId={historyClient?.id}
+        clientName={historyClient?.name}
+        onClose={() => setHistoryClient(null)}
+        onVisitClick={(visitId) => {
+          setHistoryClient(null);
+          setDrawerVisitId(visitId);
+        }}
       />
 
       <ExportModal
