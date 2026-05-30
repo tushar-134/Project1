@@ -765,11 +765,24 @@ exports.exportClients = async (req, res, next) => {
         ? Math.max(...clients.map((c) => c.contactPersons?.length || 0))
         : 0;
 
-      // Build ordered header list: base → custom fields → contacts (contacts last)
-      const baseHeaders       = ["File No", "Legal Name", "Jurisdiction", "Type", "Group", "Licence No", "VAT TRN", "Created Date", "Created By"];
-      const customFieldHeaders = customFieldDefs.map((f) => f.label);
-      const contactHeaders    = Array.from({ length: maxContacts }, (_, i) => `Contact ${i + 1}`);
-      orderedHeaders = [...baseHeaders, ...customFieldHeaders, ...contactHeaders];
+      // Only include custom fields that have at least one non-empty value across all clients
+      const activeCustomFields = customFieldDefs.filter((f) =>
+        clients.some((c) => {
+          const raw = c.customFields?.get ? c.customFields.get(f.key) : (c.customFields?.[f.key] || "");
+          return raw && String(raw).trim() !== "";
+        })
+      );
+
+      // Split into currency (shown first, before contacts) and everything else (shown after contacts)
+      const currencyFields = activeCustomFields.filter((f) => f.type === "currency");
+      const otherFields    = activeCustomFields.filter((f) => f.type !== "currency");
+
+      // Column order: Base → Currency → Contacts → Other Custom Fields
+      const baseHeaders        = ["File No", "Legal Name", "Jurisdiction", "Type", "Group", "Licence No", "VAT TRN", "Created Date", "Created By"];
+      const currencyHeaders    = currencyFields.map((f) => f.label);
+      const contactHeaders     = Array.from({ length: maxContacts }, (_, i) => `Contact ${i + 1}`);
+      const otherCustomHeaders = otherFields.map((f) => f.label);
+      orderedHeaders = [...baseHeaders, ...currencyHeaders, ...contactHeaders, ...otherCustomHeaders];
 
       rows = clients.map((c) => {
         const row = {};
@@ -783,10 +796,10 @@ exports.exportClients = async (req, res, next) => {
         row["VAT TRN"]      = c.vatDetails?.trn || "";
         row["Created Date"] = formatDate(c.createdAt);
         row["Created By"]   = c.createdBy?.name || "";
-        // Custom fields (before contacts)
-        customFieldDefs.forEach((f) => {
+        // Currency custom fields (right after base, before contacts)
+        currencyFields.forEach((f) => {
           const raw = c.customFields?.get ? c.customFields.get(f.key) : (c.customFields?.[f.key] || "");
-          row[f.label] = f.type === "currency" ? formatCurrencyValue(raw) : (raw || "");
+          row[f.label] = formatCurrencyValue(raw);
         });
         // Contacts: one cell per contact, all details joined with newlines
         for (let i = 0; i < maxContacts; i++) {
@@ -803,6 +816,11 @@ exports.exportClients = async (req, res, next) => {
             row[`Contact ${i + 1}`] = "";
           }
         }
+        // Other custom fields (after contacts, at the very end)
+        otherFields.forEach((f) => {
+          const raw = c.customFields?.get ? c.customFields.get(f.key) : (c.customFields?.[f.key] || "");
+          row[f.label] = raw || "";
+        });
         return row;
       });
     } else {
