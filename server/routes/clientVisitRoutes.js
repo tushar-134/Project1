@@ -93,4 +93,11 @@ router.patch(
   ctrl.updateStatus
 );
 
+router.patch(
+  "/:id/remarks",
+  canAccess,
+  body("remarks").notEmpty().withMessage("Remarks string is required."),
+  ctrl.updateRemarks
+);
+
 module.exports = router;

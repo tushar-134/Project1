@@ -1,7 +1,8 @@
-import { AlertTriangle, Calendar, Clock3, ExternalLink, MapPin, NotebookPen, Pencil, Save, User, UsersRound, X, XCircle } from "lucide-react";
+import { AlertTriangle, Calendar, Clock3, ExternalLink, MapPin, MessageSquare, NotebookPen, Pencil, Save, User, UsersRound, X, XCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { clientVisitService } from "../../services/clientVisitService.js";
+import { useAuth } from "../../context/AuthContext.jsx";
 import Button from "./Button.jsx";
 import Card from "./Card.jsx";
 import StatusPill from "./StatusPill.jsx";
@@ -52,13 +53,21 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
   const [attendanceSaving, setAttendanceSaving] = useState(false);
   const [attendanceEditing, setAttendanceEditing] = useState(true);
   const [attendanceForm, setAttendanceForm] = useState({ checkInTime: "", checkOutTime: "", visitSummary: "" });
+  const { currentUser } = useAuth();
+  const [commentInput, setCommentInput] = useState("");
+  const [remarkSaving, setRemarkSaving] = useState(false);
+  const [remarkError, setRemarkError] = useState("");
 
   const loadVisit = useCallback(async (active = true) => {
     setLoading(true);
     setError("");
     try {
       const data = await clientVisitService.get(visitId);
-      if (active) setVisit(data);
+      if (active) {
+        setVisit(data);
+        setCommentInput("");
+        setRemarkError("");
+      }
     } catch (err) {
       if (active) setError(err.response?.data?.message || "Failed to load visit details.");
     } finally {
@@ -130,6 +139,36 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
       setError(err.response?.data?.message || "Unable to save visit timing.");
     } finally {
       setAttendanceSaving(false);
+    }
+  }
+
+  function parseComments(rawRemarks) {
+    if (!rawRemarks) return [];
+    try {
+      const parsed = JSON.parse(rawRemarks);
+      if (Array.isArray(parsed)) return parsed;
+    } catch { /* not JSON */ }
+    return [{ text: rawRemarks, author: "—", at: null }];
+  }
+
+  async function handleCommentPost() {
+    const text = commentInput.trim();
+    if (!text || remarkSaving) return;
+    setRemarkSaving(true);
+    setRemarkError("");
+    try {
+      const existing = parseComments(visit.remarks);
+      const next = [
+        ...existing,
+        { text, author: currentUser?.name || "You", at: new Date().toISOString() },
+      ];
+      const updatedVisit = await clientVisitService.updateRemarks(visit._id, JSON.stringify(next));
+      setVisit((current) => current ? { ...current, remarks: updatedVisit.remarks || "", activityLogs: updatedVisit.activityLogs || current.activityLogs } : current);
+      setCommentInput("");
+    } catch (err) {
+      setRemarkError(err.response?.data?.message || "Failed to post comment");
+    } finally {
+      setRemarkSaving(false);
     }
   }
 
@@ -224,7 +263,6 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
                   <Detail label="Visit Type" icon={<NotebookPen size={13} />}>{visit.visitType || "-"}</Detail>
                   <Detail label="Created By" icon={<User size={13} />}>{visit.createdBy?.name || "-"}</Detail>
                   <Detail label="Client Type" icon={<UsersRound size={13} />}>{titleStatus(visit.clientType)}</Detail>
-                  <Detail label="Remarks" icon={<NotebookPen size={13} />}>{visit.remarks || "-"}</Detail>
                 </div>
               </Card>
 
@@ -308,6 +346,70 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
                   ))}
                 </div>
               </Card>
+
+              <div className="rounded-2xl border border-[#e2e8f0] bg-white p-5">
+                <div className="mb-4 flex items-center gap-2 text-[16px] font-black text-slate-900">
+                  <MessageSquare size={18} />
+                  Comments
+                </div>
+
+                {/* Comment thread */}
+                {(() => {
+                  const comments = parseComments(visit.remarks);
+                  return comments.length === 0 ? (
+                    <p className="mb-4 text-[13px] text-slate-400 italic">No comments yet. Be the first to add one.</p>
+                  ) : (
+                    <div className="mb-5 space-y-4">
+                      {comments.map((comment, idx) => (
+                        <div key={idx} className="flex items-start gap-3">
+                          <div className="flex-shrink-0 h-8 w-8 rounded-full bg-[#1e3a8a] flex items-center justify-center text-[12px] font-extrabold text-white">
+                            {String(comment.author || "?").charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 rounded-2xl bg-[#f8fbff] border border-[#e2e8f0] px-4 py-3">
+                            <div className="flex items-center justify-between gap-2 mb-1.5">
+                              <span className="text-[12px] font-extrabold text-slate-700">{comment.author || "—"}</span>
+                              {comment.at && (
+                                <span className="text-[11px] font-semibold text-slate-400">
+                                  {new Date(comment.at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                                  {" at "}
+                                  {new Date(comment.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[14px] leading-relaxed text-slate-700 whitespace-pre-wrap">{comment.text}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+
+                {/* Post new comment */}
+                {canManage || (visit.assignedUsers || []).some((entry) => String(entry.user?._id || entry.user) === String(currentUser?._id || currentUser?.id)) ? (
+                  <div className="border-t border-[#e2e8f0] pt-4 mt-2">
+                    <textarea
+                      className="input min-h-[90px] py-3 text-[14px]"
+                      placeholder="Write a comment…"
+                      value={commentInput}
+                      onChange={(event) => setCommentInput(event.target.value)}
+                      disabled={remarkSaving}
+                      onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleCommentPost(); }}
+                    />
+                    {remarkError && (
+                      <div className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-semibold text-red-700">
+                        {remarkError}
+                      </div>
+                    )}
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <span className="text-[12px] font-semibold text-slate-400">Ctrl+Enter or ⌘+Enter to post</span>
+                      <Button size="sm" onClick={handleCommentPost} disabled={remarkSaving || !commentInput.trim()}>
+                        <MessageSquare size={14} />
+                        {remarkSaving ? "Posting..." : "Post Comment"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </div>
           )}
         </div>
