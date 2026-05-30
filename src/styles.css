@@ -80,6 +80,46 @@ button { touch-action: manipulation; }
   transform: translateY(-7px) rotate(-45deg);
 }
 
+/* ── Settings Page Hamburger ── */
+.settings-hamburger-btn {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: #1e3a8a;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+  box-shadow: 0 2px 8px rgba(30,58,138,0.25);
+}
+.settings-hamburger-btn:hover {
+  background: #1d3580;
+  box-shadow: 0 4px 16px rgba(30,58,138,0.38);
+  transform: scale(1.05);
+}
+.settings-hamburger-btn:active {
+  transform: scale(0.96);
+}
+.settings-bar {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: #ffffff;
+  transition: transform 0.28s cubic-bezier(.4,0,.2,1), opacity 0.2s ease, width 0.2s ease;
+  transform-origin: center;
+}
+.sbar-top-open { transform: translateY(7px) rotate(45deg); }
+.sbar-mid-open { opacity: 0; width: 0; }
+.sbar-bot-open { transform: translateY(-7px) rotate(-45deg); }
+
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 5px;
 }
