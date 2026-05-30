@@ -10,7 +10,6 @@ import { canManageClientVisits } from "../../utils/permissions.js";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
-import ClientDrawer from "../ui/ClientDrawer.jsx";
 import ClientVisitDrawer from "../ui/ClientVisitDrawer.jsx";
 import ExportModal from "../ui/ExportModal.jsx";
 import StatusPill from "../ui/StatusPill.jsx";
@@ -70,7 +69,6 @@ export default function ClientVisits() {
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState({ key: "visitDate", direction: "desc" });
   const [drawerVisitId, setDrawerVisitId] = useState(null);
-  const [drawerClientId, setDrawerClientId] = useState(null);
   const exportRef = useRef(null);
 
   const BASE_EXPORT_FIELDS = [
@@ -318,7 +316,7 @@ export default function ClientVisits() {
                     <button
                       type="button"
                       className="font-black text-[#1e3a8a] hover:underline text-left"
-                      onClick={() => setDrawerClientId(visit.client._id)}
+                      onClick={() => setDrawerVisitId(visit._id)}
                     >
                       {visit.clientName}
                     </button>
@@ -385,11 +383,6 @@ export default function ClientVisits() {
         canManage={canManage}
         onClose={() => setDrawerVisitId(null)}
         onVisitUpdated={handleVisitUpdated}
-      />
-
-      <ClientDrawer
-        clientId={drawerClientId}
-        onClose={() => setDrawerClientId(null)}
       />
 
       <ExportModal
