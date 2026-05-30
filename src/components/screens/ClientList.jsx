@@ -380,9 +380,7 @@ export default function ClientList() {
     { key: "licence",       label: "Licence No" },
     { key: "licenceExpiry", label: "Licence Expiry" },
     { key: "vatTrn",        label: "VAT TRN" },
-    { key: "contact",       label: "Contact Name" },
-    { key: "mobile",        label: "Mobile No" },
-    { key: "email",         label: "Email" },
+    { key: "contact",       label: "Contact Details" },
     { key: "createdAt",     label: "Created Date" },
     { key: "createdBy",     label: "Created By" },
   ];
