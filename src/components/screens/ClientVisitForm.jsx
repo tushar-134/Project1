@@ -11,6 +11,7 @@ import { DIAL_CODE_OPTIONS } from "../../utils/dialCodeOptions.js";
 import { getPhoneNumberSpec, normalizeDialCode, normalizePhoneNumber } from "../../utils/phoneUtils.js";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
+import ClientComboBox from "../ui/ClientComboBox.jsx";
 import UserAvatar from "../ui/UserAvatar.jsx";
 
 const visitTypes = ["Requirement Gathering", "Verification", "Onboarding Discussion", "Follow Up", "Collection", "Meeting"];
@@ -325,16 +326,12 @@ export default function ClientVisitForm() {
             {form.clientType === "existing" ? (
               <>
                 <Field label="Select Client *">
-                  <div>
-                    <select className="input" value={form.clientId} onChange={(event) => updateField("clientId", event.target.value)}>
-                      <option value="">Select Client</option>
-                      {clientOptions.map((client) => (
-                        <option key={client._id || client.id} value={client._id || client.id}>
-                          {client.legalName || client.name} {client.fileNo ? `(${client.fileNo})` : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <ClientComboBox
+                    clients={clientOptions}
+                    value={form.clientId}
+                    onChange={(id) => updateField("clientId", id)}
+                    placeholder="Search client…"
+                  />
                 </Field>
               </>
             ) : (
