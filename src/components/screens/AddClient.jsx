@@ -1492,9 +1492,9 @@ export default function AddClient() {
                             setCustomFieldValues({ ...customFieldValues, [f.key]: `${code}:${amount}` });
                           };
                           return (
-                            <div className="flex gap-2">
+                            <div className="flex flex-col gap-2 xl:flex-row">
                               <select
-                                className="input w-52 flex-none"
+                                className="input w-full xl:w-2/5 flex-none"
                                 value={selectedCode}
                                 onChange={(e) => handleCurrencyChange(e.target.value, amountVal)}
                               >
