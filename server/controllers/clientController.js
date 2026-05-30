@@ -6,6 +6,7 @@ const Contact = require("../models/Contact");
 const ClientGroup = require("../models/ClientGroup");
 const Notification = require("../models/Notification");
 const ActivityLog = require("../models/ActivityLog");
+const CustomField = require("../models/CustomField");
 const { nextClientFileNo } = require("../utils/autoId");
 const { normalizeDialCode, normalizePhoneNumber } = require("../utils/phoneUtils");
 const { buildUploadedFileUrl, normalizeStoredUploadUrl } = require("../utils/uploadUrl");
@@ -730,28 +731,7 @@ exports.exportClients = async (req, res, next) => {
       .populate("createdBy", "name");
 
     const XLSX = require("xlsx");
-
-    // columns param: comma-separated list of server column keys the user has visible.
-    const ALL_COLUMNS = ["fileNo", "name", "jurisdiction", "type", "group", "licence", "vatTrn", "contact", "mobile", "email", "createdAt", "createdBy"];
-    const requestedColumns = req.query.columns
-      ? String(req.query.columns).split(",").map((c) => c.trim()).filter(Boolean)
-      : ALL_COLUMNS;
-    const activeColumns = ALL_COLUMNS.filter((c) => requestedColumns.includes(c));
-
-    const HEADER_MAP = {
-      fileNo:      "File No",
-      name:        "Name",
-      jurisdiction:"Jurisdiction",
-      type:        "Type",
-      group:       "Group",
-      licence:     "Licence No",
-      vatTrn:      "VAT TRN",
-      contact:     "Contact Name",
-      mobile:      "Mobile No",
-      email:       "Email",
-      createdAt:   "Created Date",
-      createdBy:   "Created By",
-    };
+    const isExportAll = req.query.mode === "all";
 
     const typeLabel  = (c) => (c.clientType === "natural" ? "Natural Person" : "Legal Person");
     const jurisLabel = (c) => {
@@ -764,39 +744,105 @@ exports.exportClients = async (req, res, next) => {
       if (Number.isNaN(date.getTime())) return "";
       return `${String(date.getDate()).padStart(2, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${date.getFullYear()}`;
     };
-
-    const getCell = (c, col) => {
-      switch (col) {
-        case "fileNo":       return c.fileNo || "";
-        case "name":        return c.legalName || "";
-        case "jurisdiction":return jurisLabel(c);
-        case "type":        return typeLabel(c);
-        case "group":       return c.group?.name || "";
-        case "licence":     return c.tradeLicences?.[0]?.licenceNumber || "";
-        case "vatTrn":      return c.vatDetails?.trn || "";
-        case "contact":     return c.contactPersons?.find((p) => p.isPrimary)?.fullName || c.contactPersons?.[0]?.fullName || "";
-        case "mobile":      return c.contactPersons?.[0]?.mobile ? `${c.contactPersons[0].mobile.countryCode || ""} ${c.contactPersons[0].mobile.number || ""}`.trim() : "";
-        case "email":       return c.contactPersons?.[0]?.email || "";
-        case "createdAt":   return formatDate(c.createdAt);
-        case "createdBy":   return c.createdBy?.name || "";
-        default:            return "";
-      }
+    const formatCurrencyValue = (val) => {
+      if (!val) return "";
+      const colonIdx = val.indexOf(":");
+      if (colonIdx === -1) return val;
+      const code = val.slice(0, colonIdx);
+      const amount = val.slice(colonIdx + 1);
+      return amount ? `${code} ${amount}` : "";
     };
 
-    // Build array of row objects for xlsx
-    const headers = activeColumns.reduce((acc, col) => { acc[col] = HEADER_MAP[col]; return acc; }, {});
-    const rows = clients.map((c) => {
-      const row = {};
-      activeColumns.forEach((col) => { row[HEADER_MAP[col]] = getCell(c, col); });
-      return row;
-    });
+    let rows;
+    let orderedHeaders;
 
-    const worksheet = XLSX.utils.json_to_sheet(rows, { header: activeColumns.map((col) => HEADER_MAP[col]) });
+    if (isExportAll) {
+      // ── Export All mode: expand contacts + custom fields ──────────────────
+      const MAX_CONTACTS = 10;
+      const customFieldDefs = await CustomField.find({ isActive: true }).lean();
+
+      // Build ordered header list
+      const baseHeaders = ["File No", "Legal Name", "Jurisdiction", "Type", "Group", "Licence No", "VAT TRN", "Created Date", "Created By"];
+      const contactHeaders = [];
+      for (let i = 1; i <= MAX_CONTACTS; i++) {
+        contactHeaders.push(`Contact ${i} Name`, `Contact ${i} Mobile`, `Contact ${i} Email`, `Contact ${i} Role`);
+      }
+      const customFieldHeaders = customFieldDefs.map((f) => f.label);
+      orderedHeaders = [...baseHeaders, ...contactHeaders, ...customFieldHeaders];
+
+      rows = clients.map((c) => {
+        const row = {};
+        // Base columns
+        row["File No"]       = c.fileNo || "";
+        row["Legal Name"]    = c.legalName || "";
+        row["Jurisdiction"]  = jurisLabel(c);
+        row["Type"]          = typeLabel(c);
+        row["Group"]         = c.group?.name || "";
+        row["Licence No"]    = c.tradeLicences?.[0]?.licenceNumber || "";
+        row["VAT TRN"]       = c.vatDetails?.trn || "";
+        row["Created Date"]  = formatDate(c.createdAt);
+        row["Created By"]    = c.createdBy?.name || "";
+        // Flattened contacts (up to MAX_CONTACTS)
+        for (let i = 0; i < MAX_CONTACTS; i++) {
+          const p = c.contactPersons?.[i];
+          const n = i + 1;
+          row[`Contact ${n} Name`]   = p?.fullName || "";
+          row[`Contact ${n} Mobile`] = p?.mobile ? `${p.mobile.countryCode || ""} ${p.mobile.number || ""}`.trim() : "";
+          row[`Contact ${n} Email`]  = p?.email || "";
+          row[`Contact ${n} Role`]   = p?.role || "";
+        }
+        // Custom fields
+        customFieldDefs.forEach((f) => {
+          const raw = c.customFields?.get ? c.customFields.get(f.key) : (c.customFields?.[f.key] || "");
+          row[f.label] = f.type === "currency" ? formatCurrencyValue(raw) : (raw || "");
+        });
+        return row;
+      });
+    } else {
+      // ── Visible Columns mode (original behaviour) ─────────────────────────
+      const ALL_COLUMNS = ["fileNo", "name", "jurisdiction", "type", "group", "licence", "vatTrn", "contact", "mobile", "email", "createdAt", "createdBy"];
+      const requestedColumns = req.query.columns
+        ? String(req.query.columns).split(",").map((c) => c.trim()).filter(Boolean)
+        : ALL_COLUMNS;
+      const activeColumns = ALL_COLUMNS.filter((c) => requestedColumns.includes(c));
+      const HEADER_MAP = {
+        fileNo: "File No", name: "Name", jurisdiction: "Jurisdiction", type: "Type",
+        group: "Group", licence: "Licence No", vatTrn: "VAT TRN",
+        contact: "Contact Name", mobile: "Mobile No", email: "Email",
+        createdAt: "Created Date", createdBy: "Created By",
+      };
+      const getCell = (c, col) => {
+        switch (col) {
+          case "fileNo":       return c.fileNo || "";
+          case "name":        return c.legalName || "";
+          case "jurisdiction":return jurisLabel(c);
+          case "type":        return typeLabel(c);
+          case "group":       return c.group?.name || "";
+          case "licence":     return c.tradeLicences?.[0]?.licenceNumber || "";
+          case "vatTrn":      return c.vatDetails?.trn || "";
+          case "contact":     return c.contactPersons?.find((p) => p.isPrimary)?.fullName || c.contactPersons?.[0]?.fullName || "";
+          case "mobile":      return c.contactPersons?.[0]?.mobile ? `${c.contactPersons[0].mobile.countryCode || ""} ${c.contactPersons[0].mobile.number || ""}`.trim() : "";
+          case "email":       return c.contactPersons?.[0]?.email || "";
+          case "createdAt":   return formatDate(c.createdAt);
+          case "createdBy":   return c.createdBy?.name || "";
+          default:            return "";
+        }
+      };
+      orderedHeaders = activeColumns.map((col) => HEADER_MAP[col]);
+      rows = clients.map((c) => {
+        const row = {};
+        activeColumns.forEach((col) => { row[HEADER_MAP[col]] = getCell(c, col); });
+        return row;
+      });
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(rows, { header: orderedHeaders });
     const workbook  = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Clients");
     const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
 
-    res.setHeader("Content-Disposition", 'attachment; filename="clients.xlsx"')
+    const filename = isExportAll ? "clients_full_export.xlsx" : "clients.xlsx";
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`)
        .setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
        .send(buffer);
   } catch (error) { next(error); }
