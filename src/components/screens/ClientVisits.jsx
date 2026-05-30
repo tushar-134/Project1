@@ -56,6 +56,7 @@ export default function ClientVisits() {
   const [filters, setFilters] = useState({
     status: "all",
     visitType: "all",
+    clientType: "all",
     clientName: "",
     fromDate: "",
     toDate: "",
@@ -94,6 +95,7 @@ export default function ClientVisits() {
     limit: 10,
     status: filters.status,
     visitType: filters.visitType,
+    clientType: filters.clientType,
     clientName: filters.clientName,
     fromDate: filters.fromDate,
     toDate: filters.toDate,
@@ -211,7 +213,7 @@ export default function ClientVisits() {
       </div>
 
       <Card className="p-5">
-        <div className="grid items-end gap-3 xl:grid-cols-[1fr_1.25fr_1fr_1fr_auto]">
+        <div className="grid items-end gap-3 xl:grid-cols-[1fr_1fr_1.25fr_1fr_1fr_auto]">
 
           <FilterField label="Visit Type">
             <select className="input" value={filters.visitType} onChange={(event) => updateFilter("visitType", event.target.value)}>
@@ -221,6 +223,14 @@ export default function ClientVisits() {
               {visitTypes
                 .filter((option) => !visitTypeOptions.includes(option))
                 .map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </FilterField>
+
+          <FilterField label="Client Type">
+            <select className="input" value={filters.clientType} onChange={(event) => updateFilter("clientType", event.target.value)}>
+              <option value="all">All Clients</option>
+              <option value="existing">Existing Client</option>
+              <option value="new">New Client</option>
             </select>
           </FilterField>
 

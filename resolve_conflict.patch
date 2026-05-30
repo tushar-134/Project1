@@ -1,14 +1,20 @@
---- src/components/screens/TaskList.jsx
-+++ src/components/screens/TaskList.jsx
-@@ -313,11 +313,7 @@
-   const [drawerTaskId, setDrawerTaskId] = useState(null);
+--- src/components/screens/ClientVisits.jsx
++++ src/components/screens/ClientVisits.jsx
+@@ -303,15 +303,6 @@
+                 </td>
+                 <td>
 -<<<<<<< HEAD
-   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
- 
-   const BASE_EXPORT_FIELDS = COLUMN_DEFS.map((c) => ({ key: c.key, label: c.label }));
- 
--  const [filtersOpen, setFiltersOpen] = useState(true);
+-                  {visit.clientType === "existing" && visit.client ? (
+-                    <button
+-                      type="button"
+-                      className="font-black text-left text-[#1e3a8a] hover:underline hover:text-blue-700 transition-colors"
+-                      onClick={() => setDrawerClientId(visit.client)}
 -=======
-   const [filtersOpen, setFiltersOpen] = useState(false);
+                   {visit.client?._id ? (
+                     <button
+                       type="button"
+                       className="font-black text-[#1e3a8a] hover:underline text-left"
+                       onClick={() => setDrawerClientId(visit.client._id)}
 ->>>>>>> origin/main
-   const [page, setPage] = useState(1);
+                     >
+                       {visit.clientName}
