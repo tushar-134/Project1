@@ -43,22 +43,37 @@ export default function Settings() {
   return (
     <div className="space-y-4">
 
-      {/* ── Top bar: hamburger + breadcrumb ── */}
-      <div className="flex items-center gap-3">
-        {/* Animated hamburger — scoped to this page */}
-        <button
-          type="button"
-          aria-label={sidebarOpen ? "Close settings menu" : "Open settings menu"}
-          aria-expanded={sidebarOpen}
-          onClick={() => setSidebarOpen((o) => !o)}
-          className="settings-hamburger-btn"
-          title={sidebarOpen ? "Close menu" : "Open menu"}
-        >
-          <span className={`settings-bar ${sidebarOpen ? "sbar-top-open" : ""}`} />
-          <span className={`settings-bar ${sidebarOpen ? "sbar-mid-open" : ""}`} />
-          <span className={`settings-bar ${sidebarOpen ? "sbar-bot-open" : ""}`} />
-        </button>
+      {/* ── Top bar: hamburger + header ── */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-4">
+          {/* Animated hamburger — scoped to this page */}
+          <button
+            type="button"
+            aria-label={sidebarOpen ? "Close settings menu" : "Open settings menu"}
+            aria-expanded={sidebarOpen}
+            onClick={() => setSidebarOpen((o) => !o)}
+            className="settings-hamburger-btn shrink-0"
+            title={sidebarOpen ? "Close menu" : "Open menu"}
+          >
+            <span className={`settings-bar ${sidebarOpen ? "sbar-top-open" : ""}`} />
+            <span className={`settings-bar ${sidebarOpen ? "sbar-mid-open" : ""}`} />
+            <span className={`settings-bar ${sidebarOpen ? "sbar-bot-open" : ""}`} />
+          </button>
 
+          {activeTab && (
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#1e3a8a] text-white shadow-md">
+                <activeTab.icon size={20} />
+              </div>
+              <div className="min-w-0">
+                <div className="truncate text-[17px] font-black text-slate-900">{activeTab.label}</div>
+                <div className="text-[12px] font-medium text-slate-500">{activeTab.description}</div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {headerAction && <div className="shrink-0">{headerAction}</div>}
       </div>
 
       {/* ── Inline layout: collapsible left nav + content ── */}
@@ -128,25 +143,7 @@ export default function Settings() {
 
         {/* Content panel */}
         <div className="min-w-0 flex-1 overflow-x-auto rounded-2xl border border-[#e2e8f0] bg-white shadow-sm">
-          {activeTab && (
-            <div
-              className="border-b border-[#e2e8f0] px-6 py-5"
-              style={{ background: "linear-gradient(135deg, rgba(30,58,138,.025), rgba(30,58,138,.065))" }}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#1e3a8a] text-white shadow-md">
-                    <activeTab.icon size={20} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="truncate text-[17px] font-black text-slate-900">{activeTab.label}</div>
-                    <div className="text-[12px] font-medium text-slate-500">{activeTab.description}</div>
-                  </div>
-                </div>
-                {headerAction && <div className="shrink-0">{headerAction}</div>}
-              </div>
-            </div>
-          )}
+
           <div className="p-6">
             {ActiveComponent && <ActiveComponent setSettingsHeaderAction={setHeaderAction} />}
           </div>
