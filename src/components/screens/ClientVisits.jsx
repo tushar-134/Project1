@@ -10,7 +10,6 @@ import { canManageClientVisits } from "../../utils/permissions.js";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
-import ClientDrawer from "../ui/ClientDrawer.jsx";
 import ClientVisitDrawer from "../ui/ClientVisitDrawer.jsx";
 import ExportModal from "../ui/ExportModal.jsx";
 import StatusPill from "../ui/StatusPill.jsx";
@@ -70,7 +69,6 @@ export default function ClientVisits() {
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState({ key: "visitDate", direction: "desc" });
   const [drawerVisitId, setDrawerVisitId] = useState(null);
-  const [drawerClientId, setDrawerClientId] = useState(null);
   const exportRef = useRef(null);
 
   const BASE_EXPORT_FIELDS = [
@@ -215,13 +213,6 @@ export default function ClientVisits() {
       <Card className="p-5">
         <div className="grid items-end gap-3 xl:grid-cols-[1fr_1fr_1.25fr_1fr_1fr_auto]">
 
-          <FilterField label="Client Type">
-            <select className="input" value={filters.clientType} onChange={(event) => updateFilter("clientType", event.target.value)}>
-              <option value="all">All</option>
-              <option value="existing">Existing</option>
-              <option value="new">New</option>
-            </select>
-          </FilterField>
 
           <FilterField label="Visit Type">
             <select className="input" value={filters.visitType} onChange={(event) => updateFilter("visitType", event.target.value)}>
@@ -231,6 +222,14 @@ export default function ClientVisits() {
               {visitTypes
                 .filter((option) => !visitTypeOptions.includes(option))
                 .map((option) => <option key={option} value={option}>{option}</option>)}
+            </select>
+          </FilterField>
+
+          <FilterField label="Client Type">
+            <select className="input" value={filters.clientType} onChange={(event) => updateFilter("clientType", event.target.value)}>
+              <option value="all">All Clients</option>
+              <option value="existing">Existing Client</option>
+              <option value="new">New Client</option>
             </select>
           </FilterField>
 
@@ -317,7 +316,7 @@ export default function ClientVisits() {
                     <button
                       type="button"
                       className="font-black text-[#1e3a8a] hover:underline text-left"
-                      onClick={() => setDrawerClientId(visit.client._id)}
+                      onClick={() => setDrawerVisitId(visit._id)}
                     >
                       {visit.clientName}
                     </button>
@@ -384,11 +383,6 @@ export default function ClientVisits() {
         canManage={canManage}
         onClose={() => setDrawerVisitId(null)}
         onVisitUpdated={handleVisitUpdated}
-      />
-
-      <ClientDrawer
-        clientId={drawerClientId}
-        onClose={() => setDrawerClientId(null)}
       />
 
       <ExportModal
