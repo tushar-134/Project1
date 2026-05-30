@@ -32,8 +32,7 @@ function blankForm(currentUser) {
       location: "",
     },
     visitDate: todayValue(),
-    visitHourMinute: "10:00",
-    visitMeridiem: "AM",
+    visitTime24: "10:00",
     visitType: "Requirement Gathering",
     location: "",
     remarks: "",
@@ -42,13 +41,24 @@ function blankForm(currentUser) {
 }
 
 function parseVisitTime(value) {
-  const match = String(value || "").trim().match(/^(\d{1,2}:\d{2})\s?(AM|PM)$/i);
-  if (!match) return { visitHourMinute: "10:00", visitMeridiem: "AM" };
-  return { visitHourMinute: match[1], visitMeridiem: match[2].toUpperCase() };
+  const match = String(value || "").trim().match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/i);
+  if (!match) return "10:00";
+  let hour = parseInt(match[1], 10);
+  const min = match[2];
+  const meridiem = match[3].toUpperCase();
+  if (meridiem === "PM" && hour < 12) hour += 12;
+  if (meridiem === "AM" && hour === 12) hour = 0;
+  return `${String(hour).padStart(2, "0")}:${min}`;
 }
 
-function joinVisitTime(hourMinute, meridiem) {
-  return `${hourMinute} ${meridiem}`;
+function joinVisitTime(time24) {
+  if (!time24) return "10:00 AM";
+  const [h, m] = time24.split(":");
+  let hour = parseInt(h, 10);
+  const meridiem = hour >= 12 ? "PM" : "AM";
+  if (hour > 12) hour -= 12;
+  if (hour === 0) hour = 12;
+  return `${hour}:${m} ${meridiem}`;
 }
 
 function firstClientLocation(client) {
@@ -93,7 +103,6 @@ export default function ClientVisitForm() {
     clientVisitService.get(id)
       .then((visit) => {
         if (!active) return;
-        const { visitHourMinute, visitMeridiem } = parseVisitTime(visit.visitTime);
         setForm({
           clientType: visit.clientType || "existing",
           clientId: visit.client?._id || "",
@@ -105,8 +114,7 @@ export default function ClientVisitForm() {
             location: visit.newClient?.location || "",
           },
           visitDate: visit.visitDate ? visit.visitDate.slice(0, 10) : todayValue(),
-          visitHourMinute,
-          visitMeridiem,
+          visitTime24: parseVisitTime(visit.visitTime),
           visitType: visit.visitType || "Requirement Gathering",
           location: visit.location || "",
           remarks: visit.remarks || "",
@@ -209,8 +217,8 @@ export default function ClientVisitForm() {
       toast.error("Visit Date is required.");
       return;
     }
-    if (!/^\d{1,2}:\d{2}$/.test(form.visitHourMinute)) {
-      toast.error("Visit Time must look like 10:00.");
+    if (!form.visitTime24) {
+      toast.error("Visit Time is required.");
       return;
     }
     if (!form.assignedUsers.length) {
@@ -227,7 +235,7 @@ export default function ClientVisitForm() {
         mobileNumber: normalizePhoneNumber(form.newClient.mobileNumber),
       } : undefined,
       visitDate: form.visitDate,
-      visitTime: joinVisitTime(form.visitHourMinute, form.visitMeridiem),
+      visitTime: joinVisitTime(form.visitTime24),
       visitType: form.visitType,
       location: form.location,
       remarks: form.remarks,
@@ -364,7 +372,7 @@ export default function ClientVisitForm() {
               </div>
             )}
 
-            <div className="grid gap-4 md:grid-cols-[1fr_1fr_110px]">
+            <div className="grid gap-4 md:grid-cols-2">
               <Field label="Visit Date *">
                 <div className="relative">
                   <input className="input pr-10" type="date" min={todayValue()} value={form.visitDate} onChange={(event) => updateField("visitDate", event.target.value)} />
@@ -372,16 +380,7 @@ export default function ClientVisitForm() {
                 </div>
               </Field>
               <Field label="Visit Time *">
-                <div className="relative">
-                  <input className="input pr-10" value={form.visitHourMinute} onChange={(event) => updateField("visitHourMinute", event.target.value)} placeholder="10:00" />
-                  <Clock3 className="pointer-events-none absolute right-4 top-3 text-slate-400" size={16} />
-                </div>
-              </Field>
-              <Field label="AM / PM">
-                <select className="input" value={form.visitMeridiem} onChange={(event) => updateField("visitMeridiem", event.target.value)}>
-                  <option value="AM">AM</option>
-                  <option value="PM">PM</option>
-                </select>
+                <input type="time" className="input" value={form.visitTime24} onChange={(event) => updateField("visitTime24", event.target.value)} />
               </Field>
             </div>
 
