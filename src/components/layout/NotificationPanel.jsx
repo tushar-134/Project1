@@ -16,13 +16,9 @@ const TYPE_META = {
 // ─── Decide where a notification should navigate to ──────────────────────────
 function getNavTarget(notification) {
   const { type, relatedTask, relatedClient } = notification;
-  if (type === "fta_query") return "/tasks/fta-tracker";
-  if ((type === "task_due" || type === "task_overdue" || type === "task_update") && relatedTask)
-    return `/tasks/${relatedTask}`;
-  if (type === "client_added" && relatedClient)
-    return `/clients/list`;
-  // Fallback — send to task list or dashboard
-  if (relatedTask) return `/tasks/${relatedTask}`;
+  if (type === "fta_query" && !relatedTask) return "/tasks/fta-tracker";
+  if (relatedTask) return `/tasks/list?drawer=${relatedTask}`;
+  if (type === "client_added" && relatedClient) return `/clients/list`;
   return "/dashboard";
 }
 
