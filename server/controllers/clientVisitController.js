@@ -327,7 +327,7 @@ async function buildFilteredVisits(req, { exportMode = false } = {}) {
       total,
       page: pageNumber,
       pages: Math.max(1, Math.ceil(total / pageSize)),
-      filters: { status, visitType, clientName, userName, fromDate, toDate },
+      filters: { status, visitType, clientType, clientName, userName, fromDate, toDate },
       visitTypes: VISIT_TYPES,
     };
   }

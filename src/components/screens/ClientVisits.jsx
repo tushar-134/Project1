@@ -215,6 +215,7 @@ export default function ClientVisits() {
       <Card className="p-5">
         <div className="grid items-end gap-3 xl:grid-cols-[1fr_1fr_1.25fr_1fr_1fr_auto]">
 
+
           <FilterField label="Visit Type">
             <select className="input" value={filters.visitType} onChange={(event) => updateFilter("visitType", event.target.value)}>
               {visitTypeOptions.map((option) => (
