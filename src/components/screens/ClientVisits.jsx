@@ -1,4 +1,4 @@
-import { ChevronDown, Download, Plus, Search, SquarePen } from "lucide-react";
+import { Briefcase, ChevronDown, Download, Plus, Search, SquarePen } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -13,7 +13,6 @@ import ClientComboBox from "../ui/ClientComboBox.jsx";
 import ClientVisitDrawer from "../ui/ClientVisitDrawer.jsx";
 import StatusPill from "../ui/StatusPill.jsx";
 import Table from "../ui/Table.jsx";
-import UserAvatar from "../ui/UserAvatar.jsx";
 
 const statusOptions = [
   { value: "all", label: "All Statuses" },
@@ -219,7 +218,7 @@ export default function ClientVisits() {
               <SortableHeader label="Client" onClick={() => toggleSort("client")} />
               <SortableHeader label="Schedule" onClick={() => toggleSort("visitDate")} />
               <SortableHeader label="Type" onClick={() => toggleSort("type")} />
-              <th>Team</th>
+              <th>Visited By</th>
               <SortableHeader label="Status" onClick={() => toggleSort("status")} />
               <th>Actions</th>
             </tr>
@@ -323,25 +322,81 @@ function SortableHeader({ label, onClick }) {
 }
 
 function TeamPreview({ entries = [] }) {
-  const visible = entries.slice(0, 3);
-  const remaining = entries.length - visible.length;
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef(null);
+  const users = entries
+    .filter((entry) => entry.checkInAt || entry.checkOutAt || String(entry.visitSummary || "").trim())
+    .map((entry) => entry.user)
+    .filter(Boolean);
+  const firstUser = users[0];
+  const remainingUsers = users.slice(1);
+
+  useEffect(() => {
+    function closeMenu(event) {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("pointerdown", closeMenu);
+    return () => document.removeEventListener("pointerdown", closeMenu);
+  }, []);
+
+  if (!firstUser) {
+    return <span className="text-[12px] italic text-slate-400">Not visited</span>;
+  }
+
   return (
-    <div className="flex items-center">
-      <div className="flex -space-x-2">
-        {visible.map((entry) => (
-          <UserAvatar
-            key={entry._id}
-            user={entry.user}
-            size="sm"
-            className="h-8 w-8 border-2 border-white bg-[#e2ecff] p-0 text-[11px]"
-          />
-        ))}
-        {remaining > 0 && (
-          <div className="grid h-8 w-8 place-items-center rounded-full border-2 border-white bg-[#e2ecff] text-[11px] font-black text-[#1e3a8a]">
-            +{remaining}
-          </div>
-        )}
+    <div className="flex items-center gap-1.5">
+      <div className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-50 text-blue-600">
+        <Briefcase size={12} />
       </div>
+      <span className="max-w-[120px] truncate text-[13px] font-bold text-slate-700">
+        {firstUser.name || firstUser.email || "User"}
+      </span>
+
+      {remainingUsers.length > 0 && (
+        <div ref={menuRef} className="relative">
+          <button
+            type="button"
+            className={`flex h-5 items-center rounded-full border px-1.5 text-[10px] font-black transition-all ${
+              open
+                ? "border-blue-600 bg-blue-600 text-white shadow-sm shadow-blue-200"
+                : "border-slate-200 bg-slate-100 text-slate-500 hover:border-slate-300 hover:bg-slate-200"
+            }`}
+            onClick={(event) => {
+              event.stopPropagation();
+              setOpen((current) => !current);
+            }}
+          >
+            +{remainingUsers.length}
+          </button>
+
+          {open && (
+            <div className="absolute left-0 top-full z-[100] mt-2 w-56 rounded-2xl border border-slate-100 bg-white p-3 shadow-xl shadow-slate-200/70">
+              <div className="mb-2 flex items-center justify-between border-b border-slate-50 pb-2">
+                <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">Other Users</span>
+                <span className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-black text-blue-600">{remainingUsers.length} More</span>
+              </div>
+              <div className="max-h-40 overflow-y-auto pr-1">
+                <div className="grid gap-1.5">
+                  {remainingUsers.map((user, index) => (
+                    <div key={user._id || user.id || user.email || index} className="flex items-center gap-2 rounded-xl border border-slate-50 bg-slate-50/30 p-2 transition-colors hover:border-blue-100 hover:bg-blue-50/30">
+                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-slate-100 bg-white text-[10px] font-black text-slate-400 shadow-sm">
+                        {(user.name || user.email || "U").charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-[11px] font-extrabold text-slate-700">{user.name || "Unnamed user"}</div>
+                        {user.email && <div className="truncate text-[9px] font-bold text-slate-400">{user.email}</div>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="absolute -top-1 left-4 h-2 w-2 rotate-45 border-l border-t border-slate-100 bg-white"></div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
