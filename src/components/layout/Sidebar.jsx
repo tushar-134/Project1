@@ -30,15 +30,15 @@ export const navItems = [
   ]},
 ];
 
-export default function Sidebar({ open = false, onClose = () => {}, mobile = false }) {
+export default function Sidebar({ open = false, onClose = () => {} }) {
   const { currentUser } = useAuth();
   const { state } = useApp();
   const { fetchFtaTracker } = useTasks();
   const role = currentUser?.role;
   // Sidebar badges are driven from live task state so they stay accurate after status changes.
   useEffect(() => {
-    if ((!mobile || open) && canViewFtaTracker(role)) fetchFtaTracker().catch(() => {});
-  }, [mobile, open, role]);
+    if (open && canViewFtaTracker(role)) fetchFtaTracker().catch(() => {});
+  }, [open, role]);
   const ftaCount = state.ftaItems.filter((task) => task.ftaStatus !== "approved" && task.status !== "Approved").length;
   const visibleNavItems = navItems
     .map((group) => ({
@@ -66,11 +66,9 @@ export default function Sidebar({ open = false, onClose = () => {}, mobile = fal
       }),
     }))
     .filter((group) => group.links.length);
-  const asideClass = mobile
-    ? `side-scroll fixed left-0 top-0 z-50 flex h-dvh w-[260px] max-w-[82vw] flex-col overflow-y-auto bg-[#1e3a8a] text-white shadow-2xl transition-transform duration-200 ${open ? "translate-x-0" : "-translate-x-full"}`
-    : "side-scroll fixed left-0 top-0 z-30 hidden h-screen w-[220px] min-w-[220px] flex-col overflow-y-auto bg-[#1e3a8a] text-white lg:flex";
+  const asideClass = `side-scroll fixed left-0 top-0 z-50 flex h-dvh w-[260px] max-w-[82vw] flex-col overflow-y-auto bg-[#1e3a8a] text-white shadow-2xl transition-transform duration-200 lg:w-[220px] lg:max-w-none ${open ? "translate-x-0" : "-translate-x-full"}`;
   return (
-    <aside className={asideClass} aria-hidden={mobile && !open}>
+    <aside className={asideClass} aria-hidden={!open}>
       <div className="border-b border-white/10 p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -80,7 +78,7 @@ export default function Sidebar({ open = false, onClose = () => {}, mobile = fal
               <div className="text-[10px] font-semibold text-white/65">Accounting LLC</div>
             </div>
           </div>
-          {mobile && <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg text-white/75 hover:bg-white/10 hover:text-white" aria-label="Close navigation"><X size={17} /></button>}
+          <button onClick={onClose} className="grid h-8 w-8 place-items-center rounded-lg text-white/75 hover:bg-white/10 hover:text-white" aria-label="Close navigation"><X size={17} /></button>
         </div>
       </div>
       <nav className="flex-1 px-3 py-4">
@@ -93,7 +91,7 @@ export default function Sidebar({ open = false, onClose = () => {}, mobile = fal
                   key={to}
                   to={to}
                   end={to === "/contacts"}
-                  onClick={mobile ? onClose : undefined}
+                  onClick={onClose}
                   className={({ isActive }) => `flex h-9 items-center gap-2.5 rounded-lg px-3 text-[12px] font-bold transition ${isActive ? "bg-white/18 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.14)]" : "text-white/76 hover:bg-white/10 hover:text-white"}`}
                 >
                   <Icon size={16} />

@@ -17,7 +17,7 @@ const LEADER_KEY = "project1:topbar-poll-leader";
 const LEADER_TTL_MS = 75_000;
 const LEADER_HEARTBEAT_MS = 15_000;
 
-export default function TopBar({ title, onMenuClick }) {
+export default function TopBar({ title, navOpen = false, onMenuClick }) {
   const [open, setOpen] = useState(false);
   const [expiryOpen, setExpiryOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -182,7 +182,12 @@ export default function TopBar({ title, onMenuClick }) {
   return (
     <header className="relative flex min-h-[52px] shrink-0 items-center justify-between gap-3 border-b border-[#e2e8f0] bg-white px-3 py-2 sm:px-4 lg:px-6">
       <div className="flex min-w-0 items-center gap-2">
-        <button onClick={onMenuClick} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-700 hover:bg-slate-50 lg:hidden" aria-label="Open navigation">
+        <button
+          onClick={onMenuClick}
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-700 hover:bg-slate-50"
+          aria-label={navOpen ? "Close navigation" : "Open navigation"}
+          aria-expanded={navOpen}
+        >
           <Menu size={18} />
         </button>
         <h1 className="min-w-0 truncate text-[20px] font-extrabold text-slate-900 sm:text-[22px]">{title}</h1>
