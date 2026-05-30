@@ -515,19 +515,11 @@ export default function ClientList() {
     downloadBlob(await exportClients(params), "clients_full_export.xlsx");
   };
 
-  const exportSelected = async () => {
-    const cols = [...selectedExportFields].join(",");
+  const exportSelected = async (selectedKeys) => {
+    const cols = selectedKeys.join(",");
     const params = { ...buildExportParams(), columns: cols || undefined };
     setIsExportModalOpen(false);
     downloadBlob(await exportClients(params), "clients_selected.xlsx");
-  };
-
-  const toggleExportField = (key) => {
-    setSelectedExportFields((prev) => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
   };
 
   return (
