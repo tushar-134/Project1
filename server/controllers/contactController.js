@@ -25,6 +25,7 @@ exports.listContacts = async (req, res, next) => {
         { "mobile.number": new RegExp(search, "i") },
         { address: new RegExp(search, "i") },
         { location: new RegExp(search, "i") },
+        { emirates: new RegExp(search, "i") },
         { city: new RegExp(search, "i") },
       ];
     }
@@ -43,6 +44,7 @@ exports.createContact = async (req, res, next) => {
       fullName: String(req.body.contactPersonName || "").trim(),
       address: String(req.body.address || "").trim(),
       location: String(req.body.location || "").trim(),
+      emirates: String(req.body.emirates || "").trim(),
       designation: String(req.body.designation || "").trim(),
       email: String(req.body.email || "").trim().toLowerCase(),
       mobile: {
@@ -62,7 +64,7 @@ exports.updateContact = async (req, res, next) => {
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
     const contact = await Contact.findById(req.params.id);
     if (!contact || !contact.isActive) return res.status(404).json({ message: "Contact not found" });
-    const ALLOWED = ["authorityName", "contactPersonName", "designation", "email", "address", "location", "city"];
+    const ALLOWED = ["authorityName", "contactPersonName", "designation", "email", "address", "location", "emirates", "city"];
     ALLOWED.forEach((key) => {
       if (key in req.body) contact[key] = typeof req.body[key] === "string" ? req.body[key].trim() : req.body[key];
     });

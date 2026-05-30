@@ -17,6 +17,7 @@ const blankContact = {
   mobile: "",
   email: "",
   address: "",
+  emirates: "",
   location: "",
 };
 
@@ -28,11 +29,12 @@ const bulkTemplateRows = [
     mobile: "501234567",
     email: "aisha@example.com",
     address: "Dubai, United Arab Emirates",
+    emirates: "Dubai",
     location: "Dubai",
   },
 ];
 
-const bulkColumns = ["authorityName", "contactPersonName", "countryCode", "mobile", "email", "address", "location"];
+const bulkColumns = ["authorityName", "contactPersonName", "countryCode", "mobile", "email", "address", "emirates", "location"];
 const bulkColumnLabels = {
   authorityName: "Authority Name",
   contactPersonName: "Contact Person",
@@ -40,6 +42,7 @@ const bulkColumnLabels = {
   mobile: "Mobile",
   email: "Email",
   address: "Address",
+  emirates: "Emirates",
   location: "Location",
 };
 
@@ -58,6 +61,7 @@ function toContactRows(contacts) {
     mobile: [contact.mobile?.countryCode, contact.mobile?.number].filter(Boolean).join(" ").trim(),
     email: contact.email || "",
     address: contact.address || "-",
+    emirates: contact.emirates || "-",
     location: contact.location || contact.city || contact.client?.registeredAddress?.emirate || "-",
   }));
 }
@@ -79,6 +83,7 @@ function normalizeBulkRow(row, index) {
     mobile: normalizePhoneNumber(getRowValue(row, ["mobile", "Mobile", "Mobile Number", "Phone", "Phone Number"])),
     email: getRowValue(row, ["email", "Email"]),
     address: getRowValue(row, ["address", "Address"]),
+    emirates: getRowValue(row, ["emirates", "Emirates", "Emirate"]),
     location: getRowValue(row, ["location", "Location", "City", "city"]),
   };
 }
@@ -125,7 +130,7 @@ export default function Contacts() {
     const term = query.trim().toLowerCase();
     if (!term) return contactList;
     return contactList.filter((contact) =>
-      [contact.authorityName, contact.contactPersonName, contact.mobile, contact.email, contact.address, contact.location].some((value) =>
+      [contact.authorityName, contact.contactPersonName, contact.mobile, contact.email, contact.address, contact.emirates, contact.location].some((value) =>
         String(value || "").toLowerCase().includes(term)
       )
     );
@@ -206,6 +211,7 @@ export default function Contacts() {
             number: row.mobile,
           },
           address: row.address,
+          emirates: row.emirates,
           location: row.location,
         });
         added += 1;
@@ -244,6 +250,7 @@ export default function Contacts() {
           number: digits,
         },
         address: form.address.trim(),
+        emirates: form.emirates.trim(),
         location: form.location.trim(),
       });
       await loadContacts();
@@ -301,6 +308,7 @@ export default function Contacts() {
               <th>Mobile Number</th>
               <th>Email</th>
               <th>Address</th>
+              <th>Emirates</th>
               <th>Location</th>
             </tr>
           </thead>
@@ -319,12 +327,13 @@ export default function Contacts() {
                 <td><span className="inline-flex items-center gap-1"><Phone size={13} />{contact.mobile || "-"}</span></td>
                 <td><span className="inline-flex items-center gap-1"><Mail size={13} />{contact.email || "-"}</span></td>
                 <td><span className="inline-flex items-start gap-1"><MapPinned size={13} className="mt-0.5 shrink-0" />{contact.address}</span></td>
+                <td>{contact.emirates}</td>
                 <td><span className="inline-flex items-center gap-1"><MapPin size={13} />{contact.location}</span></td>
               </tr>
             ))}
             {contacts.length === 0 && (
               <tr>
-                <td colSpan="6" className="py-8 text-center text-[13px] font-semibold text-slate-500">No stored authority contacts found yet.</td>
+                <td colSpan="7" className="py-8 text-center text-[13px] font-semibold text-slate-500">No stored authority contacts found yet.</td>
               </tr>
             )}
           </tbody>
@@ -363,6 +372,14 @@ export default function Contacts() {
                 </div>
               </Field>
               <Field label="Email" field="contact-email"><input className="input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
+              <Field label="Emirates" field="contact-emirates">
+                <select className="input" value={form.emirates} onChange={(e) => setForm({ ...form, emirates: e.target.value })}>
+                  <option value="">Select Emirates</option>
+                  {["Abu Dhabi","Dubai","Sharjah","Ajman","Umm Al Quwain","Ras Al Khaimah","Fujairah"].map((e) => (
+                    <option key={e} value={e}>{e}</option>
+                  ))}
+                </select>
+              </Field>
               <Field label="Location" field="contact-location"><input className="input" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></Field>
               <div className="md:col-span-2">
                 <Field label="Address" field="contact-address"><textarea className="input min-h-[96px] py-2" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} /></Field>
@@ -414,7 +431,7 @@ export default function Contacts() {
               </div>
 
               <div className="rounded-xl border border-[#e2e8f0] bg-slate-50 p-3 text-[12px] font-semibold text-slate-600">
-                Required columns: Authority Name, Contact Person, Country Code, Mobile. Optional: Email, Address, Location.
+                Required columns: Authority Name, Contact Person, Country Code, Mobile. Optional: Email, Address, Emirates, Location.
               </div>
 
               {bulkFileName && (
@@ -434,6 +451,7 @@ export default function Contacts() {
                         <th>Contact Person</th>
                         <th>Mobile</th>
                         <th>Email</th>
+                        <th>Emirates</th>
                         <th>Location</th>
                         <th>Status</th>
                       </tr>
@@ -446,6 +464,7 @@ export default function Contacts() {
                           <td>{row.contactPersonName || "-"}</td>
                           <td>{[row.countryCode, row.mobile].filter(Boolean).join(" ") || "-"}</td>
                           <td>{row.email || "-"}</td>
+                          <td>{row.emirates || "-"}</td>
                           <td>{row.location || "-"}</td>
                           <td>
                             {row.status === "success" ? (
