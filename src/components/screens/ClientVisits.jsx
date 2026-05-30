@@ -50,6 +50,7 @@ export default function ClientVisits() {
   const { currentUser } = useAuth();
   const { state } = useApp();
   const canManage = canManageClientVisits(currentUser?.role);
+  const [activeTab, setActiveTab] = useState("all");
   const [filters, setFilters] = useState({
     status: "all",
     visitType: "all",
@@ -114,6 +115,14 @@ export default function ClientVisits() {
     setFilters((current) => ({ ...current, [key]: value }));
   }
 
+  function handleTabChange(tab) {
+    setActiveTab(tab);
+    setPage(1);
+    if (tab === "all") setFilters((current) => ({ ...current, status: "all" }));
+    if (tab === "scheduled") setFilters((current) => ({ ...current, status: "planned" }));
+    if (tab === "past") setFilters((current) => ({ ...current, status: "completed,cancelled" }));
+  }
+
   function toggleSort(key) {
     setSort((current) => current.key === key
       ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
@@ -136,15 +145,32 @@ export default function ClientVisits() {
 
   return (
     <div className="space-y-5">
+      <div className="flex items-center gap-6 border-b border-slate-200">
+        <button
+          type="button"
+          onClick={() => handleTabChange("all")}
+          className={`pb-3 text-[14px] font-extrabold transition-colors ${activeTab === "all" ? "border-b-2 border-blue-600 text-blue-600" : "border-b-2 border-transparent text-slate-500 hover:text-slate-700"}`}
+        >
+          All Visits
+        </button>
+        <button
+          type="button"
+          onClick={() => handleTabChange("scheduled")}
+          className={`pb-3 text-[14px] font-extrabold transition-colors ${activeTab === "scheduled" ? "border-b-2 border-blue-600 text-blue-600" : "border-b-2 border-transparent text-slate-500 hover:text-slate-700"}`}
+        >
+          Scheduled Visits
+        </button>
+        <button
+          type="button"
+          onClick={() => handleTabChange("past")}
+          className={`pb-3 text-[14px] font-extrabold transition-colors ${activeTab === "past" ? "border-b-2 border-blue-600 text-blue-600" : "border-b-2 border-transparent text-slate-500 hover:text-slate-700"}`}
+        >
+          Past Visits
+        </button>
+      </div>
+
       <Card className="p-5">
-        <div className="grid items-end gap-3 xl:grid-cols-[1fr_1fr_1.25fr_1fr_1fr_auto]">
-          <FilterField label="Status">
-            <select className="input" value={filters.status} onChange={(event) => updateFilter("status", event.target.value)}>
-              {statusOptions.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </FilterField>
+        <div className="grid items-end gap-3 xl:grid-cols-[1fr_1.25fr_1fr_1fr_auto]">
 
           <FilterField label="Visit Type">
             <select className="input" value={filters.visitType} onChange={(event) => updateFilter("visitType", event.target.value)}>

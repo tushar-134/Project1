@@ -255,7 +255,10 @@ async function buildFilteredVisits(req, { exportMode = false } = {}) {
   if (to) to.setHours(23, 59, 59, 999);
 
   let items = hydrated.filter((visit) => {
-    if (status && status !== "all" && visit.status !== status) return false;
+    if (status && status !== "all") {
+      const statusArray = status.split(",");
+      if (!statusArray.includes(visit.status)) return false;
+    }
     if (visitType && visitType !== "all" && visit.visitType !== visitType) return false;
     if (term) {
       const haystack = [visitClientName(visit), visit.client?.fileNo, visit.location]
