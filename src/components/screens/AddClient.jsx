@@ -1489,36 +1489,30 @@ export default function AddClient() {
                           const colonIdx = raw.indexOf(":");
                           const selectedCode = colonIdx !== -1 ? raw.slice(0, colonIdx) : (raw ? "USD" : "AED");
                           const amountVal = colonIdx !== -1 ? raw.slice(colonIdx + 1) : "";
-                          const selectedCurrency = CURRENCIES.find(c => c.code === selectedCode) || CURRENCIES[0];
                           const handleCurrencyChange = (code, amount) => {
                             setCustomFieldValues({ ...customFieldValues, [f.key]: `${code}:${amount}` });
                           };
                           return (
-                            <div className="flex flex-col gap-2 xl:flex-row">
+                            <div className="flex w-full overflow-hidden rounded-lg shadow-sm ring-1 ring-slate-200 focus-within:ring-2 focus-within:ring-blue-500 bg-white transition-shadow">
                               <select
-                                className="input w-full xl:w-2/5 flex-none"
+                                className="flex-none border-0 bg-slate-50 py-2 pl-3 pr-7 text-xs font-bold text-slate-700 outline-none focus:ring-0 cursor-pointer appearance-auto"
                                 value={selectedCode}
                                 onChange={(e) => handleCurrencyChange(e.target.value, amountVal)}
                               >
                                 {CURRENCIES.map(c => (
-                                  <option key={c.code} value={c.code}>{c.label}</option>
+                                  <option key={c.code} value={c.code}>{c.code}</option>
                                 ))}
                               </select>
-                              <div className="relative flex-1">
-                                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm font-bold text-slate-500 select-none">
-                                  {selectedCurrency.symbol}
-                                </span>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  className="input w-full"
-                                  style={{ paddingLeft: `${selectedCurrency.symbol.length > 1 ? 3.5 : 2.25}rem` }}
-                                  value={amountVal}
-                                  placeholder="0.00"
-                                  onChange={(e) => handleCurrencyChange(selectedCode, e.target.value)}
-                                />
-                              </div>
+                              <div className="w-px bg-slate-200 flex-none" />
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                className="block w-full min-w-0 border-0 py-2 px-3 text-sm font-medium text-slate-900 outline-none focus:ring-0 bg-transparent placeholder:text-slate-400"
+                                value={amountVal}
+                                placeholder="0.00"
+                                onChange={(e) => handleCurrencyChange(selectedCode, e.target.value)}
+                              />
                             </div>
                           );
                         })() : (
