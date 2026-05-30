@@ -365,6 +365,7 @@ export default function ClientList() {
   const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
   const [drawerClientId, setDrawerClientId] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(true);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   // Column visibility state: key → boolean. Undefined means "use defaultOn".
   const [colVisibility, setColVisibility] = useState(() => {
@@ -459,23 +460,31 @@ export default function ClientList() {
   }, []);
 
   // Build the `columns` param for the Excel export — only server-mappable keys that are visible
-  const exportCsv = async () => {
+  const buildExportParams = () => ({
+    search: deferredQuery.trim() || undefined,
+    client: deferredColumnFilters.client.trim() || undefined,
+    jurisdiction: deferredColumnFilters.jurisdiction || undefined,
+    type: deferredColumnFilters.type || undefined,
+    group: deferredColumnFilters.group.trim() || undefined,
+    compliance: deferredColumnFilters.compliance.trim() || undefined,
+    contact: deferredColumnFilters.contact.trim() || undefined,
+    createdAt: deferredColumnFilters.createdAt || undefined,
+    createdBy: deferredColumnFilters.createdBy.trim() || undefined,
+  });
+
+  const exportVisible = async () => {
     const serverCols = visibleColumns
       .flatMap((c) => EXPORT_KEY_MAP[c.key] || [])
       .filter(Boolean);
-    const params = {
-      search: deferredQuery.trim() || undefined,
-      client: deferredColumnFilters.client.trim() || undefined,
-      jurisdiction: deferredColumnFilters.jurisdiction || undefined,
-      type: deferredColumnFilters.type || undefined,
-      group: deferredColumnFilters.group.trim() || undefined,
-      compliance: deferredColumnFilters.compliance.trim() || undefined,
-      contact: deferredColumnFilters.contact.trim() || undefined,
-      createdAt: deferredColumnFilters.createdAt || undefined,
-      createdBy: deferredColumnFilters.createdBy.trim() || undefined,
-      columns: serverCols.join(",") || undefined,
-    };
+    const params = { ...buildExportParams(), columns: serverCols.join(",") || undefined };
+    setIsExportModalOpen(false);
     downloadBlob(await exportClients(params), "clients.xlsx");
+  };
+
+  const exportAll = async () => {
+    const params = { ...buildExportParams(), mode: "all" };
+    setIsExportModalOpen(false);
+    downloadBlob(await exportClients(params), "clients_full_export.xlsx");
   };
 
   return (
@@ -558,7 +567,7 @@ export default function ClientList() {
                 <button
                   type="button"
                   title="Export clients to Excel"
-                  onClick={exportCsv}
+                  onClick={() => setIsExportModalOpen(true)}
                   className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-[#1e3a8a]"
                 >
                   <Download size={15} />
@@ -953,6 +962,92 @@ export default function ClientList() {
       </Card>
 
       {drawerClientId && <ClientDrawer clientId={drawerClientId} onClose={() => setDrawerClientId(null)} />}
+
+      {/* ── Export Modal ─────────────────────────────────────────────────── */}
+      {isExportModalOpen && (
+        <div
+          className="fixed inset-0 z-[70] grid place-items-center bg-slate-900/40 p-4 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setIsExportModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/50 px-5 py-4">
+              <div className="flex items-center gap-2">
+                <div className="grid h-7 w-7 place-items-center rounded-lg bg-[#1e3a8a] text-white">
+                  <Download size={14} />
+                </div>
+                <div>
+                  <div className="text-sm font-extrabold text-slate-900">Export Clients</div>
+                  <div className="text-[11px] font-medium text-slate-500">Choose what to include in the Excel file</div>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsExportModalOpen(false)}
+                className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-200 hover:text-slate-600"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Options */}
+            <div className="space-y-3 p-5">
+              {/* Export Visible */}
+              <button
+                type="button"
+                onClick={exportVisible}
+                className="group w-full rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-[#1e3a8a] hover:bg-blue-50/50 hover:shadow-md"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="grid h-9 w-9 flex-none place-items-center rounded-lg bg-slate-100 text-slate-600 transition group-hover:bg-[#1e3a8a] group-hover:text-white">
+                    <Columns size={16} />
+                  </div>
+                  <div>
+                    <div className="text-[13px] font-extrabold text-slate-900">Export Visible Columns</div>
+                    <div className="mt-0.5 text-[11px] font-medium text-slate-500">
+                      Downloads only the columns currently shown in the table
+                    </div>
+                  </div>
+                </div>
+              </button>
+
+              {/* Export All */}
+              <button
+                type="button"
+                onClick={exportAll}
+                className="group w-full rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-emerald-500 hover:bg-emerald-50/50 hover:shadow-md"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="grid h-9 w-9 flex-none place-items-center rounded-lg bg-emerald-50 text-emerald-600 transition group-hover:bg-emerald-500 group-hover:text-white">
+                    <Download size={16} />
+                  </div>
+                  <div>
+                    <div className="text-[13px] font-extrabold text-slate-900">Export All Fields</div>
+                    <div className="mt-0.5 text-[11px] font-medium text-slate-500">
+                      Full export — all contacts (up to 10), custom fields &amp; currency values
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1.5 pl-12">
+                  {["All contacts flattened", "Currency amounts", "Custom fields", "All core data"].map((tag) => (
+                    <span key={tag} className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-100">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </button>
+            </div>
+
+            <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-3">
+              <p className="text-[11px] font-medium text-slate-400">
+                Export respects your current search and filter settings.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
