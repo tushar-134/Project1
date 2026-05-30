@@ -118,6 +118,7 @@ export default function CustomFieldModal({ isOpen, onClose, onSave, editingId = 
                 <option value="number">Number</option>
                 <option value="date">Date</option>
                 <option value="select">Dropdown Select</option>
+                <option value="currency">Currency Amount</option>
               </select>
             </Field>
 

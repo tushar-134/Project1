@@ -1460,7 +1460,66 @@ export default function AddClient() {
                             value={customFieldValues[f.key] || ""}
                             onChange={(e) => setCustomFieldValues({ ...customFieldValues, [f.key]: e.target.value })}
                           />
-                        ) : (
+                        ) : f.type === "currency" ? (() => {
+                          const CURRENCIES = [
+                            { code: "AED", symbol: "د.إ", label: "AED - د.إ (UAE Dirham)" },
+                            { code: "USD", symbol: "$",   label: "USD - $ (US Dollar)" },
+                            { code: "EUR", symbol: "€",   label: "EUR - € (Euro)" },
+                            { code: "GBP", symbol: "£",   label: "GBP - £ (British Pound)" },
+                            { code: "INR", symbol: "₹",   label: "INR - ₹ (Indian Rupee)" },
+                            { code: "SAR", symbol: "﷼",   label: "SAR - ﷼ (Saudi Riyal)" },
+                            { code: "QAR", symbol: "﷼",   label: "QAR - ﷼ (Qatari Riyal)" },
+                            { code: "KWD", symbol: "د.ك", label: "KWD - د.ك (Kuwaiti Dinar)" },
+                            { code: "BHD", symbol: ".د.ب",label: "BHD - .د.ب (Bahraini Dinar)" },
+                            { code: "OMR", symbol: "﷼",   label: "OMR - ﷼ (Omani Rial)" },
+                            { code: "JPY", symbol: "¥",   label: "JPY - ¥ (Japanese Yen)" },
+                            { code: "CNY", symbol: "¥",   label: "CNY - ¥ (Chinese Yuan)" },
+                            { code: "CHF", symbol: "Fr",  label: "CHF - Fr (Swiss Franc)" },
+                            { code: "CAD", symbol: "C$",  label: "CAD - C$ (Canadian Dollar)" },
+                            { code: "AUD", symbol: "A$",  label: "AUD - A$ (Australian Dollar)" },
+                            { code: "SGD", symbol: "S$",  label: "SGD - S$ (Singapore Dollar)" },
+                            { code: "HKD", symbol: "HK$", label: "HKD - HK$ (Hong Kong Dollar)" },
+                            { code: "PKR", symbol: "₨",   label: "PKR - ₨ (Pakistani Rupee)" },
+                            { code: "BDT", symbol: "৳",   label: "BDT - ৳ (Bangladeshi Taka)" },
+                            { code: "ZAR", symbol: "R",   label: "ZAR - R (South African Rand)" },
+                          ];
+                          const raw = customFieldValues[f.key] || "";
+                          const colonIdx = raw.indexOf(":");
+                          const selectedCode = colonIdx !== -1 ? raw.slice(0, colonIdx) : (raw ? "USD" : "AED");
+                          const amountVal = colonIdx !== -1 ? raw.slice(colonIdx + 1) : "";
+                          const selectedCurrency = CURRENCIES.find(c => c.code === selectedCode) || CURRENCIES[0];
+                          const handleCurrencyChange = (code, amount) => {
+                            setCustomFieldValues({ ...customFieldValues, [f.key]: `${code}:${amount}` });
+                          };
+                          return (
+                            <div className="flex gap-2">
+                              <select
+                                className="input w-52 flex-none"
+                                value={selectedCode}
+                                onChange={(e) => handleCurrencyChange(e.target.value, amountVal)}
+                              >
+                                {CURRENCIES.map(c => (
+                                  <option key={c.code} value={c.code}>{c.label}</option>
+                                ))}
+                              </select>
+                              <div className="relative flex-1">
+                                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm font-bold text-slate-500 select-none">
+                                  {selectedCurrency.symbol}
+                                </span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  className="input w-full"
+                                  style={{ paddingLeft: `${selectedCurrency.symbol.length > 1 ? 3.5 : 2.25}rem` }}
+                                  value={amountVal}
+                                  placeholder="0.00"
+                                  onChange={(e) => handleCurrencyChange(selectedCode, e.target.value)}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })() : (
                           <input
                             type="text"
                             className="input"
