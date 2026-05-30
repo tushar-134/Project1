@@ -8,7 +8,7 @@ import Card from "../ui/Card.jsx";
 import Toggle from "../ui/Toggle.jsx";
 
 // Default state for the Task Type modal — all visibility toggles start off for new task types.
-const EMPTY_TASK_TYPE = { name: "", showPeriod: false, showRecurring: false, showAwaitingFta: false };
+const EMPTY_TASK_TYPE = { name: "", showPeriod: false, showRecurring: false };
 
 export default function Categories({ setSettingsHeaderAction }) {
   const { state, dispatch } = useApp();
@@ -74,7 +74,6 @@ export default function Categories({ setSettingsHeaderAction }) {
       name: type.name || "",
       showPeriod: type.showPeriod ?? true,   // existing task types: respect saved value (DB defaults true)
       showRecurring: type.showRecurring ?? true,
-      showAwaitingFta: type.showAwaitingFta ?? true,
     });
     setTtModal(true);
   }
@@ -148,11 +147,10 @@ export default function Categories({ setSettingsHeaderAction }) {
                             {[
                               { key: "showPeriod", label: "P" },
                               { key: "showRecurring", label: "R" },
-                              { key: "showAwaitingFta", label: "F" },
                             ].map(({ key, label }) => (
                               <span
                                 key={key}
-                                title={`${key === "showPeriod" ? "Period" : key === "showRecurring" ? "Recurring" : "Awaiting FTA"}: ${type[key] !== false ? "Visible" : "Hidden"}`}
+                                title={`${key === "showPeriod" ? "Period" : "Recurring"}: ${type[key] !== false ? "Visible" : "Hidden"}`}
                                 className={`rounded px-1.5 py-0.5 text-[9px] font-black leading-none ${
                                   type[key] !== false
                                     ? "bg-blue-100 text-blue-700"
@@ -255,7 +253,6 @@ export default function Categories({ setSettingsHeaderAction }) {
               {[
                 { key: "showPeriod", label: "Period", description: "The task period field (e.g. Q1 2026)" },
                 { key: "showRecurring", label: "Recurring Task", description: "Recurring task toggle and schedule settings" },
-                { key: "showAwaitingFta", label: "Awaiting FTA Response", description: "FTA response toggle for regulatory submissions" },
               ].map(({ key, label, description }) => (
                 <div key={key} className="flex items-center justify-between rounded-lg border border-[#e2e8f0] px-3 py-2.5">
                   <div>

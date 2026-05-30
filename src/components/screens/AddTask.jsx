@@ -32,7 +32,7 @@ export default function AddTask() {
   const category = state.categories.find((cat) => cat.id === categoryId);
   const [type, setType] = useState(prefillTask?.type || "VAT Return");
   const [recurring, setRecurring] = useState(false);
-  const [fta, setFta] = useState(false);
+
   const [savedStatus, setSavedStatus] = useState("not_started");
   const [submitting, setSubmitting] = useState(false);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
@@ -62,7 +62,7 @@ export default function AddTask() {
   }, [category, type]);
   const showPeriod = selectedRawType ? (selectedRawType.showPeriod !== false) : true;
   const showRecurring = selectedRawType ? (selectedRawType.showRecurring !== false) : true;
-  const showAwaitingFta = selectedRawType ? (selectedRawType.showAwaitingFta !== false) : true;
+
 
   // Derive FY + Quarter options from the selected client's financialYearEnd.
   const selectedClient = useMemo(
@@ -114,7 +114,7 @@ export default function AddTask() {
       setCategoryName(task.category || "VAT");
       setType(task.taskType || task.type || "");
       setRecurring(Boolean(task.isRecurring ?? task.recurring));
-      setFta(Boolean(task.isAwaitingFta));
+
       // Handle both mapped shape (apiStatus) and raw API shape (status enum)
       setSavedStatus(task.apiStatus || task.status || "not_started");
       setDetails({
@@ -260,7 +260,6 @@ export default function AddTask() {
       }
       // Resolve effective values — reset hidden fields so they don't accidentally persist.
       const effectiveRecurring = showRecurring ? recurring : false;
-      const effectiveFta = showAwaitingFta ? fta : false;
       const payload = {
         category: resolvedCategory.name,
         taskType: type,
@@ -280,10 +279,8 @@ export default function AddTask() {
           nextDueDate: details.nextDue,
           endDate: details.endDate || undefined
         } : undefined,
-        isAwaitingFta: effectiveFta,
-        // In edit mode, preserve the current status — don't override it just because FTA toggle is on.
-        // In create mode, auto-set to submitted_to_fta if FTA toggle is on, else not_started.
-        status: isEditMode ? savedStatus : (effectiveFta ? "submitted_to_fta" : "not_started"),
+        isAwaitingFta: false,
+        status: isEditMode ? savedStatus : "not_started",
       };
       let savedTask;
       if (isEditMode) {
@@ -500,12 +497,7 @@ export default function AddTask() {
               </div>
             </>
           )}
-          {showAwaitingFta && (
-            <>
-              <ToggleRow label="Awaiting FTA Response" checked={fta} onChange={setFta} />
-              <div className={`smooth-panel overflow-hidden ${fta ? "max-h-20 opacity-100" : "max-h-0 opacity-0"}`}><div className="mt-3 rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-[12px] font-semibold text-yellow-800">This task will be routed to FTA Tracker when submitted.</div></div>
-            </>
-          )}
+
           <div className="mt-5 flex gap-2"><Button variant="ghost" onClick={() => {
             if (returnToClient?.clientId) {
               navigate(`/clients/edit/${returnToClient.clientId}`, {
