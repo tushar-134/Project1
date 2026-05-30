@@ -237,6 +237,7 @@ async function buildFilteredVisits(req, { exportMode = false } = {}) {
     status,
     visitType,
     clientType,
+    clientId,
     clientName,
     userName,
     fromDate,
@@ -262,6 +263,7 @@ async function buildFilteredVisits(req, { exportMode = false } = {}) {
     }
     if (visitType && visitType !== "all" && visit.visitType !== visitType) return false;
     if (clientType && clientType !== "all" && visit.clientType !== clientType) return false;
+    if (clientId && String(visit.client?._id || visit.client || "") !== String(clientId)) return false;
     if (term) {
       const haystack = [visitClientName(visit), visit.client?.fileNo, visit.location]
         .filter(Boolean)
