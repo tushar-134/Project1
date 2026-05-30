@@ -1233,6 +1233,13 @@ export default function AddClient() {
                 </div>
                 {shouldShowCtRegistrationFields ? (
                   <>
+                    <Field label="Financial Year" field="client-ct-fye">
+                      <select className="input" value={form.fye} onChange={(e) => update("fye", e.target.value)}>
+                        {FINANCIAL_YEAR_OPTIONS.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </Field>
                     <Field label="CT Registration Number (TIN)" field="client-ct-tin">
                       <input className="input" value={form.ctTin} onChange={(e) => update("ctTin", e.target.value)} />
                     </Field>
@@ -1253,15 +1260,6 @@ export default function AddClient() {
                     </div>
                   </div>
                 ) : null}
-                {shouldShowCtRegistrationFields && (
-                  <Field label="Financial Year" field="client-ct-fye">
-                    <select className="input" value={form.fye} onChange={(e) => update("fye", e.target.value)}>
-                      {FINANCIAL_YEAR_OPTIONS.map((option) => (
-                        <option key={option} value={option}>{option}</option>
-                      ))}
-                    </select>
-                  </Field>
-                )}
               </div>
             </div>
           )}
