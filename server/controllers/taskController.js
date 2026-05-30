@@ -7,6 +7,7 @@ const ActivityLog = require("../models/ActivityLog");
 const auditLogger = require("../utils/auditLogger");
 const { nextTaskId } = require("../utils/autoId");
 const { buildUploadedFileUrl } = require("../utils/uploadUrl");
+const xlsx = require("xlsx");
 
 // Human-readable status labels for notification messages
 const STATUS_LABEL = {
@@ -777,11 +778,74 @@ exports.getTaskLogs = async (req, res, next) => {
 exports.exportTasks = async (req, res, next) => {
   try {
     const tasks = await Task.find(await taskQuery(req)).populate(populateTask);
-    const csv = ["Task ID,Client,Category,Task Type,Due Date,Assigned,Status"].concat(tasks.map((t) => [t.taskId, t.client?.legalName || "", t.category, t.taskType, t.dueDate?.toISOString().slice(0, 10), t.assignedTo?.name || "", t.status].map((v) => `"${String(v).replaceAll('"', '""')}"`).join(","))).join("\n");
-    // Bug #2 Fix: res.attachment() was removed in Express 5; use setHeader instead.
-    res.setHeader("Content-Disposition", 'attachment; filename="tasks.csv"')
-      .setHeader("Content-Type", "text/csv")
-      .send(csv);
+
+    const formatDate = (dateStr) => {
+      if (!dateStr) return "";
+      const date = new Date(dateStr);
+      if (Number.isNaN(date.getTime())) return "";
+      return `${String(date.getDate()).padStart(2, "0")}-${String(date.getMonth() + 1).padStart(2, "0")}-${date.getFullYear()}`;
+    };
+
+    const isExportAll = req.query.mode === "all";
+
+    const BASE_COLUMNS = ["taskId", "client", "category", "type", "dueDate", "assigned", "status", "recurring", "createdAt", "updatedAt"];
+    const ALL_COLUMNS = BASE_COLUMNS;
+    const requestedColumns = isExportAll 
+      ? ALL_COLUMNS 
+      : (req.query.columns ? String(req.query.columns).split(",").map(c => c.trim()).filter(Boolean) : ALL_COLUMNS);
+
+    const activeBaseColumns = requestedColumns.filter(k => BASE_COLUMNS.includes(k));
+
+    const HEADER_MAP = {
+      taskId: "Task ID",
+      client: "Client",
+      category: "Category",
+      type: "Task Type",
+      dueDate: "Due Date",
+      assigned: "Assigned",
+      status: "Status",
+      recurring: "Recurring",
+      createdAt: "Created Date",
+      updatedAt: "Last Modified",
+    };
+
+    const orderedHeaders = activeBaseColumns.map(k => HEADER_MAP[k]).filter(Boolean);
+
+    const getBaseCell = (t, col) => {
+      switch (col) {
+        case "taskId": return t.taskId || "";
+        case "client": return t.client?.legalName || "";
+        case "category": return t.category || "";
+        case "type": return t.taskType || "";
+        case "dueDate": return formatDate(t.dueDate);
+        case "assigned": return t.assignedTo?.name || "Unassigned";
+        case "status": return statusLabel(t.status) || "";
+        case "recurring": return t.isRecurring ? "Recurring" : "One-time";
+        case "createdAt": return formatDate(t.createdAt);
+        case "updatedAt": return formatDate(t.updatedAt);
+        default: return "";
+      }
+    };
+
+    const rows = tasks.map((t) => {
+      const row = {};
+      activeBaseColumns.forEach((col) => {
+        const header = HEADER_MAP[col];
+        if (header) {
+          row[header] = getBaseCell(t, col);
+        }
+      });
+      return row;
+    });
+
+    const wb = xlsx.utils.book_new();
+    const ws = xlsx.utils.json_to_sheet(rows, { header: orderedHeaders });
+    xlsx.utils.book_append_sheet(wb, ws, "Tasks");
+    const buffer = xlsx.write(wb, { type: "buffer", bookType: "xlsx" });
+
+    res.setHeader("Content-Disposition", 'attachment; filename="tasks.xlsx"');
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    return res.send(buffer);
   } catch (error) { next(error); }
 };
 
