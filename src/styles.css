@@ -31,6 +31,55 @@ button { touch-action: manipulation; }
 .app-scroll::-webkit-scrollbar-thumb, .side-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
 .side-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,.28); }
 
+/* ── Animated Hamburger Button ── */
+.hamburger-btn {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: #1e3a8a;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+  box-shadow: 0 2px 8px rgba(30,58,138,0.25);
+}
+.hamburger-btn:hover {
+  background: #1d3580;
+  box-shadow: 0 4px 16px rgba(30,58,138,0.38);
+  transform: scale(1.05);
+}
+.hamburger-btn:active {
+  transform: scale(0.96);
+}
+.hamburger-bar {
+  display: block;
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: #ffffff;
+  transition: transform 0.28s cubic-bezier(.4,0,.2,1), opacity 0.2s ease, width 0.2s ease;
+  transform-origin: center;
+}
+/* Open state: top bar rotates +45deg */
+.bar-top-open {
+  transform: translateY(7px) rotate(45deg);
+}
+/* Open state: middle bar fades out */
+.bar-mid-open {
+  opacity: 0;
+  width: 0;
+}
+/* Open state: bottom bar rotates -45deg */
+.bar-bot-open {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 5px;
 }
