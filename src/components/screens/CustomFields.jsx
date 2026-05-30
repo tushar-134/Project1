@@ -73,7 +73,9 @@ export default function CustomFields({ setSettingsHeaderAction }) {
                   </div>
                   <div>
                     <div className="text-[13px] font-extrabold text-slate-900">{f.label}</div>
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{f.type}</div>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                      {{ text: "Short Text", number: "Number", date: "Date", select: "Dropdown Select", currency: "Currency Amount" }[f.type] || f.type}
+                    </div>
                   </div>
                 </div>
                 <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
