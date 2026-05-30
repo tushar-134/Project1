@@ -298,56 +298,16 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
                     />
                   </label>
                 </div>
-                <label className="mt-3 block">
-                  <span className="field-label">Visit Remark</span>
-                  <textarea
-                    className="input min-h-[110px] py-3"
-                    value={attendanceForm.visitSummary}
-                    onChange={(event) => setAttendanceForm((current) => ({ ...current, visitSummary: event.target.value }))}
-                    disabled={!attendanceEditing || attendanceSaving || visit.status === "cancelled"}
-                    placeholder="Add visit notes or outcome..."
-                  />
-                </label>
-                <div className="mt-3 flex justify-end">
+                <div className="mt-4 flex justify-end">
                   <Button onClick={handleAttendanceSave} disabled={!attendanceEditing || attendanceSaving || visit.status === "cancelled"}>
                     <Save size={15} />
-                    {attendanceSaving ? "Saving..." : "Save"}
+                    {attendanceSaving ? "Saving..." : "Save Timing"}
                   </Button>
                 </div>
               </Card>
 
-              <Card className="p-5">
-                <div className="mb-3 text-[16px] font-black text-slate-900">Assigned Users</div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {(visit.assignedUsers || []).map((entry) => (
-                    <div key={entry._id} className="flex items-center gap-3 rounded-2xl border border-[#e2e8f0] bg-white p-4">
-                      <UserAvatar user={entry.user} size="sm" />
-                      <div className="min-w-0">
-                        <div className="truncate font-black text-slate-900">{entry.user?.name || "Unknown User"}</div>
-                        <div className="truncate text-[12px] font-semibold text-slate-500">{entry.user?.role || entry.user?.email || "-"}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-
-              <Card className="p-5">
-                <div className="mb-3 text-[16px] font-black text-slate-900">Activity Timeline</div>
-                <div className="space-y-3">
-                  {(visit.activityLogs || []).map((entry) => (
-                    <div key={entry._id} className="rounded-2xl border border-[#e2e8f0] bg-white p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="font-black text-slate-900">{entry.action}</div>
-                        <div className="text-[11px] font-semibold text-slate-500">{formatDateTime(entry.createdAt)}</div>
-                      </div>
-                      <div className="mt-1 text-[12px] font-semibold text-slate-500">{entry.user?.name || "-"}</div>
-                      {entry.message && <div className="mt-2 text-[13px] font-medium text-slate-600">{entry.message}</div>}
-                    </div>
-                  ))}
-                </div>
-              </Card>
-
-              <div className="rounded-2xl border border-[#e2e8f0] bg-white p-5">
+              {/* Comments Section moved here */}
+              <div className="rounded-2xl border border-[#e2e8f0] bg-white p-5 shadow-sm">
                 <div className="mb-4 flex items-center gap-2 text-[16px] font-black text-slate-900">
                   <MessageSquare size={18} />
                   Comments
@@ -359,7 +319,7 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
                   return comments.length === 0 ? (
                     <p className="mb-4 text-[13px] text-slate-400 italic">No comments yet. Be the first to add one.</p>
                   ) : (
-                    <div className="mb-5 space-y-4">
+                    <div className="mb-5 space-y-4 max-h-[280px] overflow-y-auto pr-2 custom-scrollbar">
                       {comments.map((comment, idx) => (
                         <div key={idx} className="flex items-start gap-3">
                           <div className="flex-shrink-0 h-8 w-8 rounded-full bg-[#1e3a8a] flex items-center justify-center text-[12px] font-extrabold text-white">
@@ -410,6 +370,38 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
                   </div>
                 ) : null}
               </div>
+
+              <Card className="p-5">
+                <div className="mb-3 text-[16px] font-black text-slate-900">Assigned Users</div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {(visit.assignedUsers || []).map((entry) => (
+                    <div key={entry._id} className="flex items-center gap-3 rounded-2xl border border-[#e2e8f0] bg-white p-4">
+                      <UserAvatar user={entry.user} size="sm" />
+                      <div className="min-w-0">
+                        <div className="truncate font-black text-slate-900">{entry.user?.name || "Unknown User"}</div>
+                        <div className="truncate text-[12px] font-semibold text-slate-500">{entry.user?.role || entry.user?.email || "-"}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              <Card className="p-5">
+                <div className="mb-3 text-[16px] font-black text-slate-900">Activity Timeline</div>
+                <div className="space-y-3">
+                  {(visit.activityLogs || []).map((entry) => (
+                    <div key={entry._id} className="rounded-2xl border border-[#e2e8f0] bg-white p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="font-black text-slate-900">{entry.action}</div>
+                        <div className="text-[11px] font-semibold text-slate-500">{formatDateTime(entry.createdAt)}</div>
+                      </div>
+                      <div className="mt-1 text-[12px] font-semibold text-slate-500">{entry.user?.name || "-"}</div>
+                      {entry.message && <div className="mt-2 text-[13px] font-medium text-slate-600">{entry.message}</div>}
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
             </div>
           )}
         </div>
