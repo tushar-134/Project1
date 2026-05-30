@@ -1,4 +1,4 @@
-import { Download, Plus, UserPlus, X } from "lucide-react";
+import { Download, Plus, Search, UserPlus, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
@@ -20,9 +20,10 @@ export default function ClientGroups({ setSettingsHeaderAction }) {
   const [selectedExportGroupId, setSelectedExportGroupId] = useState("");
   const [selectedExportClientId, setSelectedExportClientId] = useState("");
   const [allClients, setAllClients] = useState([]);
+  const [clientSearch, setClientSearch] = useState("");
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [groupClientBusy, setGroupClientBusy] = useState(false);
-  const listItems = (response) => Array.isArray(response) ? response : response?.items || [];
+  const listItems = (response) => Array.isArray(response) ? response : response?.items || response?.clients || [];
   const load = () => groupService.list().then((groups) => dispatch({
     type: "SET_RESOURCE",
     resource: "groups",
@@ -49,6 +50,15 @@ export default function ClientGroups({ setSettingsHeaderAction }) {
       .filter((client) => !assignedClientIds.has(String(client._id)))
       .sort((a, b) => String(a.legalName || "").localeCompare(String(b.legalName || "")));
   }, [allClients, assignedClientIds]);
+  const filteredClients = useMemo(() => {
+    const query = clientSearch.trim().toLowerCase();
+    if (!query) return availableClients;
+    return availableClients.filter((client) =>
+      [client.legalName, client.fileNo, client.tradeName]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query)),
+    );
+  }, [availableClients, clientSearch]);
   const safeFilename = (value, fallback) =>
     String(value || fallback)
       .trim()
@@ -86,6 +96,7 @@ export default function ClientGroups({ setSettingsHeaderAction }) {
   function closeView() {
     setViewingGroup(null);
     setViewOpen(false);
+    setClientSearch("");
     setShowClientDropdown(false);
   }
   function handleEdit(group) {
@@ -96,6 +107,7 @@ export default function ClientGroups({ setSettingsHeaderAction }) {
   function handleView(group) {
     setViewingGroup(group);
     setViewOpen(true);
+    setClientSearch("");
     setShowClientDropdown(false);
     if (!allClients.length) loadClients();
   }
@@ -125,6 +137,7 @@ export default function ClientGroups({ setSettingsHeaderAction }) {
       await groupService.updateClients(viewingGroup._id, { add: [clientId] });
       await syncViewingGroup(viewingGroup._id);
       setShowClientDropdown(false);
+      setClientSearch("");
       toast.success("Client added to group.");
     } catch (error) {
       toast.error(error?.response?.data?.message || "Unable to add client.");
@@ -377,47 +390,60 @@ export default function ClientGroups({ setSettingsHeaderAction }) {
             </div>
 
             <div className="mt-4 space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="relative inline-flex">
                 <Button
                   variant="ghost"
                   disabled={groupClientBusy}
                   onClick={() => {
-                    setShowClientDropdown(true);
+                    setShowClientDropdown((open) => !open);
                     if (!allClients.length) loadClients();
                   }}
                 >
                   <UserPlus size={16} />
                   Add Client
                 </Button>
-              </div>
 
-              {showClientDropdown && (
-                <div className="max-h-56 overflow-auto rounded-2xl border border-slate-200 bg-slate-50/70 p-2">
-                  {availableClients.length ? (
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {availableClients.map((client) => (
-                        <button
-                          key={client._id}
-                          type="button"
-                          disabled={groupClientBusy}
-                          onClick={() => addClientToGroup(client._id)}
-                          className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white px-3 py-2 text-left transition hover:border-blue-200 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          <span className="min-w-0">
-                            <span className="block truncate text-sm font-extrabold text-slate-800">{client.legalName}</span>
-                            <span className="block truncate text-xs font-semibold text-slate-500">{client.fileNo || "No file no."}</span>
-                          </span>
-                          <Plus size={16} className="shrink-0 text-blue-600" />
-                        </button>
-                      ))}
+                {showClientDropdown && (
+                  <div className="absolute left-0 top-full z-50 mt-2 w-[min(26rem,calc(100vw-3rem))] rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl shadow-slate-900/10">
+                    <div className="relative">
+                      <Search size={15} className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        className="h-10 w-full rounded-lg border border-slate-200 bg-white py-2 pl-12 pr-3 text-[13px] outline-none transition placeholder:text-slate-400 focus:border-[#1e3a8a] focus:ring-2 focus:ring-[#1e3a8a]/15"
+                        placeholder="Search existing clients..."
+                        value={clientSearch}
+                        onChange={(event) => setClientSearch(event.target.value)}
+                        autoFocus
+                      />
                     </div>
-                  ) : (
-                    <div className="rounded-xl bg-white p-3 text-sm font-semibold text-slate-500">
-                      No clients available to add
+
+                    <div className="mt-3 max-h-32 overflow-auto pr-1">
+                      {filteredClients.length ? (
+                        <div className="space-y-2">
+                          {filteredClients.map((client) => (
+                            <button
+                              key={client._id}
+                              type="button"
+                              disabled={groupClientBusy}
+                              onClick={() => addClientToGroup(client._id)}
+                              className="flex w-full items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50/70 px-3 py-2 text-left transition hover:border-blue-200 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              <span className="min-w-0">
+                                <span className="block truncate text-sm font-extrabold text-slate-800">{client.legalName}</span>
+                                <span className="block truncate text-xs font-semibold text-slate-500">{client.fileNo || "No file no."}</span>
+                              </span>
+                              <Plus size={16} className="shrink-0 text-blue-600" />
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="rounded-xl bg-slate-50 p-3 text-sm font-semibold text-slate-500">
+                          {availableClients.length ? "No clients match your search" : "No clients available to add"}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
             </div>
           </Card>
         </div>
