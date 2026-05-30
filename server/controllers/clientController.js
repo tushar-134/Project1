@@ -778,7 +778,7 @@ exports.exportClients = async (req, res, next) => {
       const otherFields    = activeCustomFields.filter((f) => f.type !== "currency");
 
       // Column order: Base → Currency → Contacts → Other Custom Fields
-      const baseHeaders        = ["File No", "Legal Name", "Jurisdiction", "Type", "Group", "Licence No", "VAT TRN", "Created Date", "Created By"];
+      const baseHeaders        = ["File No", "Legal Name", "Jurisdiction", "Type", "Group", "Licence No", "Licence Expiry", "VAT TRN", "Created Date", "Created By"];
       const currencyHeaders    = currencyFields.map((f) => f.label);
       const contactHeaders     = Array.from({ length: maxContacts }, (_, i) => `Contact ${i + 1}`);
       const otherCustomHeaders = otherFields.map((f) => f.label);
@@ -787,15 +787,16 @@ exports.exportClients = async (req, res, next) => {
       rows = clients.map((c) => {
         const row = {};
         // Base columns
-        row["File No"]      = c.fileNo || "";
-        row["Legal Name"]   = c.legalName || "";
-        row["Jurisdiction"] = jurisLabel(c);
-        row["Type"]         = typeLabel(c);
-        row["Group"]        = c.group?.name || "";
-        row["Licence No"]   = c.tradeLicences?.[0]?.licenceNumber || "";
-        row["VAT TRN"]      = c.vatDetails?.trn || "";
-        row["Created Date"] = formatDate(c.createdAt);
-        row["Created By"]   = c.createdBy?.name || "";
+        row["File No"]        = c.fileNo || "";
+        row["Legal Name"]     = c.legalName || "";
+        row["Jurisdiction"]   = jurisLabel(c);
+        row["Type"]           = typeLabel(c);
+        row["Group"]          = c.group?.name || "";
+        row["Licence No"]     = c.tradeLicences?.[0]?.licenceNumber || "";
+        row["Licence Expiry"] = formatDate(c.tradeLicences?.[0]?.expiryDate) || "";
+        row["VAT TRN"]        = c.vatDetails?.trn || "";
+        row["Created Date"]   = formatDate(c.createdAt);
+        row["Created By"]     = c.createdBy?.name || "";
         // Currency custom fields (right after base, before contacts)
         currencyFields.forEach((f) => {
           const raw = c.customFields?.get ? c.customFields.get(f.key) : (c.customFields?.[f.key] || "");
@@ -824,39 +825,66 @@ exports.exportClients = async (req, res, next) => {
         return row;
       });
     } else {
-      // ── Visible Columns mode (original behaviour) ─────────────────────────
-      const ALL_COLUMNS = ["fileNo", "name", "jurisdiction", "type", "group", "licence", "vatTrn", "contact", "mobile", "email", "createdAt", "createdBy"];
+      // ── Visible / Selected Columns mode ────────────────────────────────────
+      const BASE_COLUMNS = ["fileNo", "name", "jurisdiction", "type", "group", "licence", "licenceExpiry", "vatTrn", "contact", "mobile", "email", "createdAt", "createdBy"];
+      const ALL_COLUMNS  = BASE_COLUMNS;
       const requestedColumns = req.query.columns
         ? String(req.query.columns).split(",").map((c) => c.trim()).filter(Boolean)
         : ALL_COLUMNS;
-      const activeColumns = ALL_COLUMNS.filter((c) => requestedColumns.includes(c));
+
+      // Separate known base columns from custom field keys
+      const activeBaseColumns   = requestedColumns.filter((k) => BASE_COLUMNS.includes(k));
+      const activeCustomKeys    = requestedColumns.filter((k) => !BASE_COLUMNS.includes(k));
+      const customFieldDefsAll  = activeCustomKeys.length > 0
+        ? await CustomField.find({ key: { $in: activeCustomKeys }, isActive: true }).lean()
+        : [];
+
       const HEADER_MAP = {
-        fileNo: "File No", name: "Name", jurisdiction: "Jurisdiction", type: "Type",
-        group: "Group", licence: "Licence No", vatTrn: "VAT TRN",
-        contact: "Contact Name", mobile: "Mobile No", email: "Email",
-        createdAt: "Created Date", createdBy: "Created By",
+        fileNo:        "File No",
+        name:          "Legal Name",
+        jurisdiction:  "Jurisdiction",
+        type:          "Type",
+        group:         "Group",
+        licence:       "Licence No",
+        licenceExpiry: "Licence Expiry",
+        vatTrn:        "VAT TRN",
+        contact:       "Contact Name",
+        mobile:        "Mobile No",
+        email:         "Email",
+        createdAt:     "Created Date",
+        createdBy:     "Created By",
       };
-      const getCell = (c, col) => {
+      const getBaseCell = (c, col) => {
         switch (col) {
-          case "fileNo":       return c.fileNo || "";
-          case "name":        return c.legalName || "";
-          case "jurisdiction":return jurisLabel(c);
-          case "type":        return typeLabel(c);
-          case "group":       return c.group?.name || "";
-          case "licence":     return c.tradeLicences?.[0]?.licenceNumber || "";
-          case "vatTrn":      return c.vatDetails?.trn || "";
-          case "contact":     return c.contactPersons?.find((p) => p.isPrimary)?.fullName || c.contactPersons?.[0]?.fullName || "";
-          case "mobile":      return c.contactPersons?.[0]?.mobile ? `${c.contactPersons[0].mobile.countryCode || ""} ${c.contactPersons[0].mobile.number || ""}`.trim() : "";
-          case "email":       return c.contactPersons?.[0]?.email || "";
-          case "createdAt":   return formatDate(c.createdAt);
-          case "createdBy":   return c.createdBy?.name || "";
-          default:            return "";
+          case "fileNo":        return c.fileNo || "";
+          case "name":          return c.legalName || "";
+          case "jurisdiction":  return jurisLabel(c);
+          case "type":          return typeLabel(c);
+          case "group":         return c.group?.name || "";
+          case "licence":       return c.tradeLicences?.[0]?.licenceNumber || "";
+          case "licenceExpiry": return formatDate(c.tradeLicences?.[0]?.expiryDate) || "";
+          case "vatTrn":        return c.vatDetails?.trn || "";
+          case "contact":       return c.contactPersons?.find((p) => p.isPrimary)?.fullName || c.contactPersons?.[0]?.fullName || "";
+          case "mobile":        return c.contactPersons?.[0]?.mobile ? `${c.contactPersons[0].mobile.countryCode || ""} ${c.contactPersons[0].mobile.number || ""}`.trim() : "";
+          case "email":         return c.contactPersons?.[0]?.email || "";
+          case "createdAt":     return formatDate(c.createdAt);
+          case "createdBy":     return c.createdBy?.name || "";
+          default:              return "";
         }
       };
-      orderedHeaders = activeColumns.map((col) => HEADER_MAP[col]);
+
+      // Build ordered headers: base cols first, then selected custom fields
+      const baseColHeaders   = activeBaseColumns.map((col) => HEADER_MAP[col]);
+      const customColHeaders = customFieldDefsAll.map((f) => f.label);
+      orderedHeaders = [...baseColHeaders, ...customColHeaders];
+
       rows = clients.map((c) => {
         const row = {};
-        activeColumns.forEach((col) => { row[HEADER_MAP[col]] = getCell(c, col); });
+        activeBaseColumns.forEach((col) => { row[HEADER_MAP[col]] = getBaseCell(c, col); });
+        customFieldDefsAll.forEach((f) => {
+          const raw = c.customFields?.get ? c.customFields.get(f.key) : (c.customFields?.[f.key] || "");
+          row[f.label] = f.type === "currency" ? formatCurrencyValue(raw) : (raw || "");
+        });
         return row;
       });
     }
