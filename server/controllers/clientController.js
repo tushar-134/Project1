@@ -864,9 +864,15 @@ exports.exportClients = async (req, res, next) => {
           case "licence":       return c.tradeLicences?.[0]?.licenceNumber || "";
           case "licenceExpiry": return formatDate(c.tradeLicences?.[0]?.expiryDate) || "";
           case "vatTrn":        return c.vatDetails?.trn || "";
-          case "contact":       return c.contactPersons?.find((p) => p.isPrimary)?.fullName || c.contactPersons?.[0]?.fullName || "";
-          case "mobile":        return c.contactPersons?.[0]?.mobile ? `${c.contactPersons[0].mobile.countryCode || ""} ${c.contactPersons[0].mobile.number || ""}`.trim() : "";
-          case "email":         return c.contactPersons?.[0]?.email || "";
+          case "contact":
+            return c.contactPersons?.map((p) => p.fullName).filter(Boolean).join("\n") || "";
+          case "mobile":
+            return c.contactPersons
+              ?.map((p) => p.mobile ? `${p.mobile.countryCode || ""} ${p.mobile.number || ""}`.trim() : "")
+              .filter(Boolean)
+              .join("\n") || "";
+          case "email":
+            return c.contactPersons?.map((p) => p.email).filter(Boolean).join("\n") || "";
           case "createdAt":     return formatDate(c.createdAt);
           case "createdBy":     return c.createdBy?.name || "";
           default:              return "";
