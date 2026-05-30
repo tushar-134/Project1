@@ -757,45 +757,52 @@ exports.exportClients = async (req, res, next) => {
     let orderedHeaders;
 
     if (isExportAll) {
-      // ── Export All mode: expand contacts + custom fields ──────────────────
-      const MAX_CONTACTS = 10;
+      // ── Export All mode: dynamic contacts + custom fields ─────────────────
       const customFieldDefs = await CustomField.find({ isActive: true }).lean();
 
-      // Build ordered header list
-      const baseHeaders = ["File No", "Legal Name", "Jurisdiction", "Type", "Group", "Licence No", "VAT TRN", "Created Date", "Created By"];
-      const contactHeaders = [];
-      for (let i = 1; i <= MAX_CONTACTS; i++) {
-        contactHeaders.push(`Contact ${i} Name`, `Contact ${i} Mobile`, `Contact ${i} Email`, `Contact ${i} Role`);
-      }
+      // Calculate the actual max contacts across all clients — no ghost columns
+      const maxContacts = clients.length > 0
+        ? Math.max(...clients.map((c) => c.contactPersons?.length || 0))
+        : 0;
+
+      // Build ordered header list: base → custom fields → contacts (contacts last)
+      const baseHeaders       = ["File No", "Legal Name", "Jurisdiction", "Type", "Group", "Licence No", "VAT TRN", "Created Date", "Created By"];
       const customFieldHeaders = customFieldDefs.map((f) => f.label);
-      orderedHeaders = [...baseHeaders, ...contactHeaders, ...customFieldHeaders];
+      const contactHeaders    = Array.from({ length: maxContacts }, (_, i) => `Contact ${i + 1}`);
+      orderedHeaders = [...baseHeaders, ...customFieldHeaders, ...contactHeaders];
 
       rows = clients.map((c) => {
         const row = {};
         // Base columns
-        row["File No"]       = c.fileNo || "";
-        row["Legal Name"]    = c.legalName || "";
-        row["Jurisdiction"]  = jurisLabel(c);
-        row["Type"]          = typeLabel(c);
-        row["Group"]         = c.group?.name || "";
-        row["Licence No"]    = c.tradeLicences?.[0]?.licenceNumber || "";
-        row["VAT TRN"]       = c.vatDetails?.trn || "";
-        row["Created Date"]  = formatDate(c.createdAt);
-        row["Created By"]    = c.createdBy?.name || "";
-        // Flattened contacts (up to MAX_CONTACTS)
-        for (let i = 0; i < MAX_CONTACTS; i++) {
-          const p = c.contactPersons?.[i];
-          const n = i + 1;
-          row[`Contact ${n} Name`]   = p?.fullName || "";
-          row[`Contact ${n} Mobile`] = p?.mobile ? `${p.mobile.countryCode || ""} ${p.mobile.number || ""}`.trim() : "";
-          row[`Contact ${n} Email`]  = p?.email || "";
-          row[`Contact ${n} Role`]   = p?.role || "";
-        }
-        // Custom fields
+        row["File No"]      = c.fileNo || "";
+        row["Legal Name"]   = c.legalName || "";
+        row["Jurisdiction"] = jurisLabel(c);
+        row["Type"]         = typeLabel(c);
+        row["Group"]        = c.group?.name || "";
+        row["Licence No"]   = c.tradeLicences?.[0]?.licenceNumber || "";
+        row["VAT TRN"]      = c.vatDetails?.trn || "";
+        row["Created Date"] = formatDate(c.createdAt);
+        row["Created By"]   = c.createdBy?.name || "";
+        // Custom fields (before contacts)
         customFieldDefs.forEach((f) => {
           const raw = c.customFields?.get ? c.customFields.get(f.key) : (c.customFields?.[f.key] || "");
           row[f.label] = f.type === "currency" ? formatCurrencyValue(raw) : (raw || "");
         });
+        // Contacts: one cell per contact, all details joined with newlines
+        for (let i = 0; i < maxContacts; i++) {
+          const p = c.contactPersons?.[i];
+          if (p) {
+            const mobile = p.mobile ? `${p.mobile.countryCode || ""} ${p.mobile.number || ""}`.trim() : "";
+            const parts = [];
+            if (p.fullName) parts.push(`Name: ${p.fullName}`);
+            if (mobile)     parts.push(`Mobile: ${mobile}`);
+            if (p.email)    parts.push(`Email: ${p.email}`);
+            if (p.role)     parts.push(`Role: ${p.role}`);
+            row[`Contact ${i + 1}`] = parts.join("\n");
+          } else {
+            row[`Contact ${i + 1}`] = "";
+          }
+        }
         return row;
       });
     } else {
