@@ -48,6 +48,7 @@ export function mapClient(client) {
     type: client.clientType === "natural" ? "Natural Person" : "Legal Person",
     jurisdiction: jurisdictionLabels[client.jurisdiction] || client.jurisdiction,
     group: client.group?.name || "",
+    assignedToName: client.assignedUser?.name || "",
     licence: client.tradeLicences?.[0]?.licenceNumber || "",
     licenceExpiry: client.tradeLicences?.[0]?.expiryDate ? client.tradeLicences[0].expiryDate.slice(0, 10) : "",
     vatTrn: client.vatDetails?.trn || "",

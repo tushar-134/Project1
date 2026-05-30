@@ -233,7 +233,6 @@ export default function Users({ setSettingsHeaderAction }) {
 
   return (
     <div className="space-y-5">
-
       <Card className="p-4">
         <div className="mb-2 text-[14px] font-extrabold">Role permissions</div>
         <div className="grid gap-3 md:grid-cols-3">

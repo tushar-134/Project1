@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronLeft, ChevronRight, Columns, Download, Pencil, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Columns, Download, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -22,7 +22,8 @@ import Table from "../ui/Table.jsx";
 const COLUMN_DEFS = [
   { key: "client",    label: "Client",        defaultOn: true,  description: "Name, type & jurisdiction" },
   { key: "group",     label: "Group",         defaultOn: true,  description: "Client group membership" },
-  { key: "compliance",label: "Compliance",    defaultOn: true,  description: "Licence & VAT TRN" },
+  { key: "assignedTo", label: "Assigned To",  defaultOn: true,  description: "Assigned staff member" },
+  { key: "compliance",label: "Compliance",    defaultOn: true,  description: "VAT TRN" },
   { key: "licenceExpiry", label: "Licence Expiry", defaultOn: true, description: "Trade licence expiry date" },
   { key: "contact",   label: "Contact",       defaultOn: true,  description: "Primary contact details" },
   { key: "createdAt", label: "Created Date",  defaultOn: false, description: "Date the client was added" },
@@ -34,7 +35,8 @@ const COLUMN_DEFS = [
 const EXPORT_KEY_MAP = {
   client:     ["fileNo", "name", "jurisdiction", "type"],
   group:      ["group"],
-  compliance: ["licence", "vatTrn"],
+  assignedTo: ["assignedUser"],
+  compliance: ["vatTrn"],
   licenceExpiry: ["licenceExpiry"],
   contact:    ["contact", "mobile", "email"],
   createdAt:  ["createdAt"],
@@ -768,7 +770,7 @@ export default function ClientList() {
                   id="client-filter-compliance"
                   className="input"
                   type="search"
-                  placeholder="TRN or licence no."
+                  placeholder="VAT TRN"
                   value={columnFilters.compliance}
                   onChange={(e) => updateColumnFilter("compliance", e.target.value)}
                 />
@@ -843,6 +845,7 @@ export default function ClientList() {
             <tr>
               {isVisible("client")     && <th>Client</th>}
               {isVisible("group")      && <th>Group</th>}
+              {isVisible("assignedTo") && <th>Assigned To</th>}
               {isVisible("compliance") && <th>Compliance</th>}
               {isVisible("licenceExpiry") && <th>Licence Expiry</th>}
               {isVisible("contact")    && <th>Contact Details</th>}
@@ -922,10 +925,16 @@ export default function ClientList() {
                 {isVisible("group") && (
                   <td>{client.group ? <span className="rounded-full bg-purple-50 px-2 py-1 text-[11px] font-extrabold text-[#7c3aed]">{client.group}</span> : "—"}</td>
                 )}
+                {isVisible("assignedTo") && (
+                  <td>
+                    {client.assignedToName
+                      ? <span className="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-700">{client.assignedToName}</span>
+                      : <span className="text-[12px] text-slate-400">—</span>}
+                  </td>
+                )}
                 {isVisible("compliance") && (
                   <td>
                     <div className="space-y-1">
-                      <div><span className="font-semibold text-slate-500">Licence:</span> {client.licence || "—"}</div>
                       <div><span className="font-semibold text-slate-500">VAT TRN:</span> {client.vatTrn || "—"}</div>
                     </div>
                   </td>
@@ -959,9 +968,6 @@ export default function ClientList() {
                 {canManage && (
                   <td>
                     <div className="flex gap-1">
-                      <Button size="sm" variant="ghost" onClick={() => navigate(`/clients/edit/${client.id}`)}>
-                        <Pencil size={14} />
-                      </Button>
                       {currentUser?.role === "admin" && (
                         <Button
                           size="sm"
