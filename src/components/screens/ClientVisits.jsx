@@ -10,6 +10,7 @@ import { canManageClientVisits } from "../../utils/permissions.js";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
+import ClientDrawer from "../ui/ClientDrawer.jsx";
 import ClientVisitDrawer from "../ui/ClientVisitDrawer.jsx";
 import ExportModal from "../ui/ExportModal.jsx";
 import StatusPill from "../ui/StatusPill.jsx";
@@ -68,6 +69,7 @@ export default function ClientVisits() {
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState({ key: "visitDate", direction: "desc" });
   const [drawerVisitId, setDrawerVisitId] = useState(null);
+  const [drawerClientId, setDrawerClientId] = useState(null);
   const exportRef = useRef(null);
 
   const BASE_EXPORT_FIELDS = [
@@ -301,7 +303,17 @@ export default function ClientVisits() {
                   </button>
                 </td>
                 <td>
-                  <div className="font-black text-slate-900">{visit.clientName}</div>
+                  {visit.clientType === "existing" && visit.client ? (
+                    <button
+                      type="button"
+                      className="font-black text-left text-[#1e3a8a] hover:underline hover:text-blue-700 transition-colors"
+                      onClick={() => setDrawerClientId(visit.client)}
+                    >
+                      {visit.clientName}
+                    </button>
+                  ) : (
+                    <div className="font-black text-slate-900">{visit.clientName}</div>
+                  )}
                   <div className="mt-1 text-[12px] font-semibold text-slate-500">{visit.clientLocation || "-"}</div>
                 </td>
                 <td>
@@ -362,6 +374,11 @@ export default function ClientVisits() {
         canManage={canManage}
         onClose={() => setDrawerVisitId(null)}
         onVisitUpdated={handleVisitUpdated}
+      />
+
+      <ClientDrawer
+        clientId={drawerClientId}
+        onClose={() => setDrawerClientId(null)}
       />
 
       <ExportModal
