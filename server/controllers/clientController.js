@@ -879,14 +879,42 @@ exports.exportClients = async (req, res, next) => {
         }
       };
 
-      // Build ordered headers: base cols first, then selected custom fields
-      const baseColHeaders   = activeBaseColumns.map((col) => HEADER_MAP[col]);
+      const CONTACT_KEYS = new Set(["contact", "mobile", "email"]);
+      const wantsContacts = activeBaseColumns.some((k) => CONTACT_KEYS.has(k));
+      // Non-contact base columns — these map 1-to-1 to a header
+      const nonContactBaseColumns = activeBaseColumns.filter((k) => !CONTACT_KEYS.has(k));
+
+      // Dynamic contact columns (only if any contact key was requested)
+      const maxContacts = wantsContacts && clients.length > 0
+        ? Math.max(...clients.map((c) => c.contactPersons?.length || 0))
+        : 0;
+      const contactHeaders = Array.from({ length: maxContacts }, (_, i) => `Contact ${i + 1}`);
+
+      // Build ordered headers: non-contact base → Contact N → custom fields
+      const baseColHeaders   = nonContactBaseColumns.map((col) => HEADER_MAP[col]);
       const customColHeaders = customFieldDefsAll.map((f) => f.label);
-      orderedHeaders = [...baseColHeaders, ...customColHeaders];
+      orderedHeaders = [...baseColHeaders, ...contactHeaders, ...customColHeaders];
 
       rows = clients.map((c) => {
         const row = {};
-        activeBaseColumns.forEach((col) => { row[HEADER_MAP[col]] = getBaseCell(c, col); });
+        // Non-contact base columns
+        nonContactBaseColumns.forEach((col) => { row[HEADER_MAP[col]] = getBaseCell(c, col); });
+        // Contact N columns — one cell per contact, all details with newlines
+        for (let i = 0; i < maxContacts; i++) {
+          const p = c.contactPersons?.[i];
+          if (p) {
+            const mobile = p.mobile ? `${p.mobile.countryCode || ""} ${p.mobile.number || ""}`.trim() : "";
+            const parts = [];
+            if (p.fullName) parts.push(`Name: ${p.fullName}`);
+            if (mobile)     parts.push(`Mobile: ${mobile}`);
+            if (p.email)    parts.push(`Email: ${p.email}`);
+            if (p.role)     parts.push(`Role: ${p.role}`);
+            row[`Contact ${i + 1}`] = parts.join("\n");
+          } else {
+            row[`Contact ${i + 1}`] = "";
+          }
+        }
+        // Custom fields
         customFieldDefsAll.forEach((f) => {
           const raw = c.customFields?.get ? c.customFields.get(f.key) : (c.customFields?.[f.key] || "");
           row[f.label] = f.type === "currency" ? formatCurrencyValue(raw) : (raw || "");
