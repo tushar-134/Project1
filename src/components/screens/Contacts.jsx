@@ -345,7 +345,7 @@ export default function Contacts() {
           <Card className="w-full max-w-2xl p-4">
             <div className="mb-4 flex items-center justify-between">
               <div className="text-[16px] font-extrabold">Add Authority Contact</div>
-              <button onClick={closeModal} disabled={saving} className="text-slate-500 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">Close</button>
+              <button onClick={closeModal} disabled={saving} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Close" title="Close"><X size={18} /></button>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <Field label="Name / Authority Name*" field="contact-authority-name"><input className="input" value={form.authorityName} onChange={(e) => setForm({ ...form, authorityName: e.target.value })} /></Field>
