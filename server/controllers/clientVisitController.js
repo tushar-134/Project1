@@ -236,6 +236,7 @@ async function buildFilteredVisits(req, { exportMode = false } = {}) {
   const {
     status,
     visitType,
+    clientType,
     clientName,
     userName,
     fromDate,
@@ -260,6 +261,7 @@ async function buildFilteredVisits(req, { exportMode = false } = {}) {
       if (!statusArray.includes(visit.status)) return false;
     }
     if (visitType && visitType !== "all" && visit.visitType !== visitType) return false;
+    if (clientType && clientType !== "all" && visit.clientType !== clientType) return false;
     if (term) {
       const haystack = [visitClientName(visit), visit.client?.fileNo, visit.location]
         .filter(Boolean)
@@ -325,7 +327,7 @@ async function buildFilteredVisits(req, { exportMode = false } = {}) {
       total,
       page: pageNumber,
       pages: Math.max(1, Math.ceil(total / pageSize)),
-      filters: { status, visitType, clientName, userName, fromDate, toDate },
+      filters: { status, visitType, clientType, clientName, userName, fromDate, toDate },
       visitTypes: VISIT_TYPES,
     };
   }
