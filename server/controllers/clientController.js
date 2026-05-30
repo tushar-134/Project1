@@ -728,6 +728,7 @@ exports.exportClients = async (req, res, next) => {
   try {
     const clients = await Client.find(await buildClientListQuery(req))
       .populate("group", "name")
+      .populate("assignedUser", "name")
       .populate("createdBy", "name");
 
     const XLSX = require("xlsx");
