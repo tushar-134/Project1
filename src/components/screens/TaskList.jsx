@@ -310,7 +310,7 @@ export default function TaskList() {
   const [scope, setScope] = useState(searchParams.get("scope") || "By Month");
   const [month, setMonth] = useState(initialMonth);
   const [drawerTaskId, setDrawerTaskId] = useState(null);
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1 });
   const [columnFilters, setColumnFilters] = useState(() => createInitialColumnFilters(searchParams));

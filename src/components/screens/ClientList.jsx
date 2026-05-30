@@ -364,7 +364,7 @@ export default function ClientList() {
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1, workingTasksTotal: 0 });
   const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
   const [drawerClientId, setDrawerClientId] = useState(null);
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   // Column visibility state: key → boolean. Undefined means "use defaultOn".

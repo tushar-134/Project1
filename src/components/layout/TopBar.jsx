@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, Bell, ChevronDown, LogOut, UserCircle2 } from "lucide-react";
 import NotificationPanel from "./NotificationPanel.jsx";
 import ProfilePanel from "./ProfilePanel.jsx";
@@ -182,7 +182,7 @@ export default function TopBar({ title, navOpen = false, onMenuClick }) {
   return (
     <header className="relative flex min-h-[56px] shrink-0 items-center justify-between gap-3 border-b border-[#e2e8f0] bg-white px-3 py-2 shadow-sm sm:px-4 lg:px-6">
       <div className="flex min-w-0 items-center gap-3">
-        {/* Animated hamburger -> X */}
+        {/* Hamburger — always 3 bars; sidebar has its own close (X) button */}
         <button
           onClick={onMenuClick}
           className="hamburger-btn"
@@ -190,9 +190,9 @@ export default function TopBar({ title, navOpen = false, onMenuClick }) {
           aria-expanded={navOpen}
           title={navOpen ? "Close menu" : "Open menu"}
         >
-          <span className={`hamburger-bar ${navOpen ? "bar-top-open" : ""}`} />
-          <span className={`hamburger-bar ${navOpen ? "bar-mid-open" : ""}`} />
-          <span className={`hamburger-bar ${navOpen ? "bar-bot-open" : ""}`} />
+          <span className="hamburger-bar" />
+          <span className="hamburger-bar" />
+          <span className="hamburger-bar" />
         </button>
         <h1 className="min-w-0 truncate text-[20px] font-extrabold text-slate-900 sm:text-[22px]">{title}</h1>
       </div>

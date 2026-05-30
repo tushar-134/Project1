@@ -85,7 +85,7 @@ export default function FtaTracker() {
 
   const [activeTab, setActiveTab] = useState("in_review");
   const [filters, setFilters] = useState(createEmptyFilters());
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
   function refresh() {
