@@ -377,6 +377,7 @@ export default function ClientList() {
     { key: "jurisdiction",  label: "Jurisdiction" },
     { key: "type",          label: "Type" },
     { key: "group",         label: "Group" },
+    { key: "assignedUser",  label: "Assigned To" },
     { key: "licence",       label: "Licence No" },
     { key: "licenceExpiry", label: "Licence Expiry" },
     { key: "vatTrn",        label: "VAT TRN" },

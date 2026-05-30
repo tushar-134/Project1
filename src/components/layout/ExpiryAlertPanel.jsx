@@ -40,7 +40,7 @@ export default function ExpiryAlertPanel({ open, onClose, onOpenClient, payload,
   function openClient(item) {
     if (!item.clientId) return;
     onClose?.();
-    onOpenClient?.(item.clientId);
+    onOpenClient?.(item.clientId, item);
   }
 
   return (

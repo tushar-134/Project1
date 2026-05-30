@@ -1,0 +1,14 @@
+--- src/components/screens/TaskList.jsx
++++ src/components/screens/TaskList.jsx
+@@ -313,11 +313,7 @@
+   const [drawerTaskId, setDrawerTaskId] = useState(null);
+-<<<<<<< HEAD
+   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+ 
+   const BASE_EXPORT_FIELDS = COLUMN_DEFS.map((c) => ({ key: c.key, label: c.label }));
+ 
+-  const [filtersOpen, setFiltersOpen] = useState(true);
+-=======
+   const [filtersOpen, setFiltersOpen] = useState(false);
+->>>>>>> origin/main
+   const [page, setPage] = useState(1);
