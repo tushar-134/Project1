@@ -865,14 +865,14 @@ exports.exportClients = async (req, res, next) => {
           case "licenceExpiry": return formatDate(c.tradeLicences?.[0]?.expiryDate) || "";
           case "vatTrn":        return c.vatDetails?.trn || "";
           case "contact":
-            return c.contactPersons?.map((p) => p.fullName).filter(Boolean).join("\n") || "";
+            return c.contactPersons?.map((p) => p.fullName).filter(Boolean).join(" | ") || "";
           case "mobile":
             return c.contactPersons
               ?.map((p) => p.mobile ? `${p.mobile.countryCode || ""} ${p.mobile.number || ""}`.trim() : "")
               .filter(Boolean)
-              .join("\n") || "";
+              .join(" | ") || "";
           case "email":
-            return c.contactPersons?.map((p) => p.email).filter(Boolean).join("\n") || "";
+            return c.contactPersons?.map((p) => p.email).filter(Boolean).join(" | ") || "";
           case "createdAt":     return formatDate(c.createdAt);
           case "createdBy":     return c.createdBy?.name || "";
           default:              return "";
