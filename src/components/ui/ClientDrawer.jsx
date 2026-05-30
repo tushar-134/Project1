@@ -200,7 +200,7 @@ export default function ClientDrawer({ clientId, onClose }) {
                           )}
                         </div>
                         <div className="grid gap-4 md:grid-cols-2">
-                          <DetailRow label="Official Contact" value={contact.fullName} />
+                          {contact.fullName && <DetailRow label="Official Contact" value={contact.fullName} />}
                           <DetailRow label="Designation" value={contact.designation} />
                           <DetailRow label="Email" value={contact.email} />
                           <DetailRow label="Phone No" value={[contact.mobile?.countryCode, contact.mobile?.number].filter(Boolean).join(" ")} />
