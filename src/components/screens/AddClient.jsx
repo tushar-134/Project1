@@ -99,11 +99,13 @@ function parseFinancialYearStartMonth(value) {
 }
 
 function getVatFilingFrequencyOptions(financialYearEnd) {
-  const startMonth = parseFinancialYearStartMonth(financialYearEnd);
-  return Array.from({ length: 12 }, (_, index) => {
-    const rangeStart = (startMonth + index) % 12;
-    const rangeEnd = (rangeStart + 2) % 12;
-    const value = `${MONTH_NAMES[rangeStart]}-${MONTH_NAMES[rangeEnd]}`;
+  return MONTH_NAMES.map((_, startMonth) => {
+    const quarters = Array.from({ length: 4 }, (_, quarterIndex) => {
+      const rangeStart = (startMonth + quarterIndex * 3) % 12;
+      const rangeEnd = (rangeStart + 2) % 12;
+      return `${MONTH_NAMES[rangeStart]}-${MONTH_NAMES[rangeEnd]}`;
+    });
+    const value = quarters.join(" || ");
     return {
       value,
       label: value,
@@ -113,13 +115,19 @@ function getVatFilingFrequencyOptions(financialYearEnd) {
 
 function normalizeVatFilingFrequency(value, financialYearEnd) {
   const options = getVatFilingFrequencyOptions(financialYearEnd);
-  if (!value) return options[0]?.value || "Jan-Mar";
+  if (!value) return options[0]?.value || "Jan-Mar || Apr-Jun || Jul-Sep || Oct-Dec";
 
   const normalizedValue = String(value).trim().toLowerCase().replace(/\s+/g, "");
   const matchingOption = options.find((option) => option.value.toLowerCase().replace(/\s+/g, "") === normalizedValue);
   if (matchingOption) return matchingOption.value;
 
-  return options[0]?.value || "Jan-Mar";
+  const matchingLegacyRange = options.find((option) => {
+    const firstRange = option.value.split("||")[0]?.trim() || "";
+    return firstRange.toLowerCase().replace(/\s+/g, "") === normalizedValue;
+  });
+  if (matchingLegacyRange) return matchingLegacyRange.value;
+
+  return options[0]?.value || "Jan-Mar || Apr-Jun || Jul-Sep || Oct-Dec";
 }
 
 export default function AddClient() {
