@@ -1,5 +1,5 @@
 import { Building2, Clock, ExternalLink, FileText, Mail, MapPin, Phone, User, UserCheck, X, Globe, SlidersHorizontal, ShieldCheck, BadgeCheck } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { clientService } from "../../services/clientService.js";
@@ -66,22 +66,57 @@ function collectAttachmentGroups(client) {
   return groups;
 }
 
-function DetailRow({ label, value }) {
+function normalizeDateKey(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+}
+
+function findExpiryFocusKey(client, focus) {
+  if (!client || !focus?.type || !focus?.expiryDate) return "";
+  const targetDate = normalizeDateKey(focus.expiryDate);
+  const targetHolder = String(focus.holderName || "").trim().toLowerCase();
+  if (!targetDate) return "";
+
+  if (focus.type === "licence") {
+    const index = (client.tradeLicences || []).findIndex((licence) => {
+      const holder = String(licence.licenceNumber || licence.issuingAuthority || "").trim().toLowerCase();
+      return normalizeDateKey(licence.expiryDate) === targetDate && (!targetHolder || holder === targetHolder);
+    });
+    return index >= 0 ? `licence-${index}` : "";
+  }
+
+  if (focus.type === "emirates_id" || focus.type === "passport") {
+    const index = (client.contactPersons || []).findIndex((contact) => {
+      const expiryDate = focus.type === "emirates_id" ? contact.emiratesId?.expiryDate : contact.passport?.expiryDate;
+      const holder = String(contact.fullName || "").trim().toLowerCase();
+      return normalizeDateKey(expiryDate) === targetDate && (!targetHolder || holder === targetHolder);
+    });
+    return index >= 0 ? `${focus.type}-${index}` : "";
+  }
+
+  return "";
+}
+
+function DetailRow({ label, value, className = "", rowRef }) {
   return (
-    <div>
+    <div ref={rowRef} className={`rounded-lg border border-transparent transition-colors duration-300 ${className}`}>
       <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</div>
       <div className="mt-1 text-[13px] font-semibold text-slate-800">{value || "-"}</div>
     </div>
   );
 }
 
-export default function ClientDrawer({ clientId, onClose }) {
+export default function ClientDrawer({ clientId, onClose, expiryFocus = null }) {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const canManage = canManageClients(currentUser?.role);
   const [client, setClient] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const expiryRefs = useRef({});
+  const [highlightedExpiryKey, setHighlightedExpiryKey] = useState("");
 
   const loadClient = useCallback(async (active = true) => {
     setLoading(true);
@@ -119,6 +154,28 @@ export default function ClientDrawer({ clientId, onClose }) {
     };
   }, [clientId, loadClient]);
 
+  const expiryFocusKey = useMemo(() => findExpiryFocusKey(client, expiryFocus), [client, expiryFocus]);
+
+  const setExpiryRef = useCallback((key) => (node) => {
+    if (node) expiryRefs.current[key] = node;
+    else delete expiryRefs.current[key];
+  }, []);
+
+  useEffect(() => {
+    if (loading || !expiryFocusKey) return undefined;
+    const frameId = window.requestAnimationFrame(() => {
+      const node = expiryRefs.current[expiryFocusKey];
+      if (!node) return;
+      node.scrollIntoView({ behavior: "smooth", block: "center" });
+      setHighlightedExpiryKey(expiryFocusKey);
+    });
+    const timeoutId = window.setTimeout(() => setHighlightedExpiryKey(""), 3500);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.clearTimeout(timeoutId);
+    };
+  }, [expiryFocusKey, loading]);
+
   if (!clientId) return null;
 
   const contactPersons = client?.contactPersons || [];
@@ -126,6 +183,7 @@ export default function ClientDrawer({ clientId, onClose }) {
   const portals = client?.portalLogins || [];
   const customFields = client?.customFields || {};
   const attachmentGroups = collectAttachmentGroups(client);
+  const expiryHighlightClass = "border-orange-300 bg-orange-50 px-3 py-2 shadow-[0_0_0_3px_rgba(251,146,60,0.18)]";
 
   return (
     <>
@@ -209,9 +267,19 @@ export default function ClientDrawer({ clientId, onClose }) {
                           <DetailRow label="WhatsApp" value={contact.whatsapp} />
                           <DetailRow label="Alternate Email" value={contact.alternateEmail} />
                           <DetailRow label="Emirates ID" value={contact.emiratesId?.number} />
-                          <DetailRow label="EID Expiry" value={formatDate(contact.emiratesId?.expiryDate)} />
+                          <DetailRow
+                            label="EID Expiry"
+                            value={formatDate(contact.emiratesId?.expiryDate)}
+                            rowRef={setExpiryRef(`emirates_id-${idx}`)}
+                            className={highlightedExpiryKey === `emirates_id-${idx}` ? expiryHighlightClass : ""}
+                          />
                           <DetailRow label="Passport No" value={contact.passport?.number} />
-                          <DetailRow label="Passport Expiry" value={formatDate(contact.passport?.expiryDate)} />
+                          <DetailRow
+                            label="Passport Expiry"
+                            value={formatDate(contact.passport?.expiryDate)}
+                            rowRef={setExpiryRef(`passport-${idx}`)}
+                            className={highlightedExpiryKey === `passport-${idx}` ? expiryHighlightClass : ""}
+                          />
                         </div>
                       </div>
                     ))}
@@ -248,7 +316,12 @@ export default function ClientDrawer({ clientId, onClose }) {
                           <DetailRow label="Issuing Authority" value={licence.issuingAuthority} />
                           <DetailRow label="Licence Type" value={licence.licenceType} />
                           <DetailRow label="Issue Date" value={formatDate(licence.issueDate)} />
-                          <DetailRow label="Expiry Date" value={formatDate(licence.expiryDate)} />
+                          <DetailRow
+                            label="Expiry Date"
+                            value={formatDate(licence.expiryDate)}
+                            rowRef={setExpiryRef(`licence-${idx}`)}
+                            className={highlightedExpiryKey === `licence-${idx}` ? expiryHighlightClass : ""}
+                          />
                           <DetailRow label="Official Email" value={licence.officialEmail} />
                         </div>
                       </div>

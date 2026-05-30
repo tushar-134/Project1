@@ -24,6 +24,7 @@ export default function TopBar({ title, navOpen = false, onMenuClick }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileTab, setProfileTab] = useState("profile");
   const [drawerClientId, setDrawerClientId] = useState(null);
+  const [drawerExpiryFocus, setDrawerExpiryFocus] = useState(null);
   const wrapRef = useRef(null);
   const expiryRef = useRef(null);
   const menuRef = useRef(null);
@@ -213,7 +214,10 @@ export default function TopBar({ title, navOpen = false, onMenuClick }) {
           <ExpiryAlertPanel
             open={expiryOpen}
             onClose={() => setExpiryOpen(false)}
-            onOpenClient={(clientId) => setDrawerClientId(clientId)}
+            onOpenClient={(clientId, item) => {
+              setDrawerExpiryFocus(item);
+              setDrawerClientId(clientId);
+            }}
             payload={expiryPayload}
             loading={expiryLoading}
             error={expiryError}
@@ -269,7 +273,16 @@ export default function TopBar({ title, navOpen = false, onMenuClick }) {
         <NotificationPanel open={open} onClose={() => setOpen(false)} />
       </div>
       <ProfilePanel open={profileOpen} initialTab={profileTab} onClose={() => setProfileOpen(false)} />
-      {drawerClientId && <ClientDrawer clientId={drawerClientId} onClose={() => setDrawerClientId(null)} />}
+      {drawerClientId && (
+        <ClientDrawer
+          clientId={drawerClientId}
+          expiryFocus={drawerExpiryFocus}
+          onClose={() => {
+            setDrawerClientId(null);
+            setDrawerExpiryFocus(null);
+          }}
+        />
+      )}
     </header>
   );
 }
