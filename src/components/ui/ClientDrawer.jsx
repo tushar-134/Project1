@@ -256,26 +256,24 @@ export default function ClientDrawer({ clientId, onClose }) {
 
               <Card className="p-5">
                 <div className="mb-4 flex items-center gap-2 text-[16px] font-extrabold text-slate-900">
-                  <ShieldCheck size={16} /> VAT & Corporate Tax
+                  <ShieldCheck size={16} /> VAT Details
                 </div>
-                <div className="grid gap-6 md:grid-cols-2">
-                  <div>
-                    <div className="mb-3 text-[13px] font-bold text-slate-800">VAT Details</div>
-                    <div className="grid gap-4">
-                      <DetailRow label="TRN" value={client.vatDetails?.trn} />
-                      <DetailRow label="Status" value={client.vatDetails?.status} />
-                      <DetailRow label="Registration Date" value={formatDate(client.vatDetails?.registrationDate)} />
-                      <DetailRow label="Filing Frequency" value={client.vatDetails?.filingFrequency} />
-                    </div>
-                  </div>
-                  <div>
-                    <div className="mb-3 text-[13px] font-bold text-slate-800">Corporate Tax Details</div>
-                    <div className="grid gap-4">
-                      <DetailRow label="TIN" value={client.ctDetails?.tin} />
-                      <DetailRow label="Status" value={client.ctDetails?.status} />
-                      <DetailRow label="Registration Date" value={formatDate(client.ctDetails?.registrationDate)} />
-                    </div>
-                  </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <DetailRow label="TRN" value={client.vatDetails?.trn} />
+                  <DetailRow label="Status" value={client.vatDetails?.status} />
+                  <DetailRow label="Registration Date" value={formatDate(client.vatDetails?.registrationDate)} />
+                  <DetailRow label="Filing Frequency" value={client.vatDetails?.filingFrequency} />
+                </div>
+              </Card>
+
+              <Card className="p-5">
+                <div className="mb-4 flex items-center gap-2 text-[16px] font-extrabold text-slate-900">
+                  <ShieldCheck size={16} /> Corporate Tax Details
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <DetailRow label="TIN" value={client.ctDetails?.tin} />
+                  <DetailRow label="Status" value={client.ctDetails?.status} />
+                  <DetailRow label="Registration Date" value={formatDate(client.ctDetails?.registrationDate)} />
                 </div>
               </Card>
 
