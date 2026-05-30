@@ -238,9 +238,13 @@ export default function ClientVisitForm() {
       visitTime: joinVisitTime(form.visitTime24),
       visitType: form.visitType,
       location: form.location,
-      remarks: form.remarks,
       assignedUsers: form.assignedUsers.map((user) => ({ user })),
     };
+
+    // Include remarks only for a new visit
+    if (!isEditMode) {
+      payload.remarks = form.remarks;
+    }
 
     setSaving(true);
     try {
@@ -394,10 +398,6 @@ export default function ClientVisitForm() {
                 <input className="input" value={form.location} onChange={(event) => updateField("location", event.target.value)} placeholder="Physical address or location name" />
               </Field>
             </div>
-
-            <Field label="Remarks / Notes" className="flex flex-1 flex-col">
-              <textarea className="input h-full min-h-[140px] py-3" value={form.remarks} onChange={(event) => updateField("remarks", event.target.value)} />
-            </Field>
           </div>
         </Card>
 
