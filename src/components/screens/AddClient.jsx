@@ -245,11 +245,15 @@ export default function AddClient() {
   const [form, setForm] = useState({
     clientType: "", fileNo: "", legalName: "", tradeName: "", fye: "Jan - Dec", jurisdiction: "Mainland", assigned: "",
     country: "United Arab Emirates", emirate: "Dubai", street: "", poBox: "", postalCode: "", differentAddress: false, correspondence: "",
-    vatTrn: "", vatStatus: "Registered", vatDate: "", vatFreq: "Jan-Mar", vatRegistrationTask: "", vatRegistrationTaskId: "", ctTin: "", ctStatus: "Not Registered", ctDate: "", ctRegistrationTask: "", ctRegistrationTaskId: "", group: "", newGroup: "",
+    vatTrn: "", vatStatus: "Registered", vatDate: "", vatDeregDate: "", vatFreq: "Jan-Mar", vatRegistrationTask: "", vatRegistrationTaskId: "", ctTin: "", ctStatus: "Not Registered", ctDate: "", ctDeregDate: "", ctRegistrationTask: "", ctRegistrationTaskId: "", group: "", newGroup: "",
   });
   const vatFilingFrequencyOptions = useMemo(() => getVatFilingFrequencyOptions(form.fye), [form.fye]);
   const shouldShowVatRegistrationFields = form.vatStatus !== "Not Registered";
   const shouldShowCtRegistrationFields = form.ctStatus !== "Not Registered";
+  const isVatDeregistered = form.vatStatus === "Deregistered";
+  const isCtDeregistered = form.ctStatus === "Deregistered";
+  const [vatHistory, setVatHistory] = useState([]);
+  const [ctHistory, setCtHistory] = useState([]);
   const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
 
   const [contacts, setContacts] = useState([{
@@ -418,10 +422,12 @@ export default function AddClient() {
       };
       const primaryContact = client.contactPersons?.find((person) => person.isPrimary) || client.contactPersons?.[0] || {};
       const nextFye = normalizeFinancialYearEnd(client.financialYearEnd || client.ctDetails?.financialYearEnd || "");
-      const nextVatStatus = client.vatDetails?.status === "registered" ? "Registered" : "Not Registered";
+      const apiVatStatus = client.vatDetails?.status || "not_registered";
+      const nextVatStatus = apiVatStatus === "registered" ? "Registered" : apiVatStatus === "deregistered" ? "Deregistered" : "Not Registered";
       const nextVatRegistrationTask = createdRegistrationTask?.taxType === "vat" ? createdRegistrationTask.taskMongoId || "" : client.vatDetails?.registrationTask || "";
       const nextVatRegistrationTaskId = createdRegistrationTask?.taxType === "vat" ? createdRegistrationTask.taskId || "" : client.vatDetails?.registrationTaskId || "";
-      const nextCtStatus = client.ctDetails?.status === "registered" ? "Registered" : "Not Registered";
+      const apiCtStatus = client.ctDetails?.status || "not_registered";
+      const nextCtStatus = apiCtStatus === "registered" ? "Registered" : apiCtStatus === "deregistered" ? "Deregistered" : "Not Registered";
       const nextCtRegistrationTask = createdRegistrationTask?.taxType === "ct" ? createdRegistrationTask.taskMongoId || "" : client.ctDetails?.registrationTask || "";
       const nextCtRegistrationTaskId = createdRegistrationTask?.taxType === "ct" ? createdRegistrationTask.taskId || "" : client.ctDetails?.registrationTaskId || "";
       setForm({
@@ -442,17 +448,21 @@ export default function AddClient() {
         vatTrn: client.vatDetails?.trn || "",
         vatStatus: nextVatStatus,
         vatDate: client.vatDetails?.registrationDate?.slice?.(0, 10) || "",
+        vatDeregDate: client.vatDetails?.deregistrationDate?.slice?.(0, 10) || "",
         vatFreq: normalizeVatFilingFrequency(client.vatDetails?.filingFrequency, nextFye),
         vatRegistrationTask: nextVatRegistrationTask,
         vatRegistrationTaskId: nextVatRegistrationTaskId,
         ctTin: client.ctDetails?.tin || "",
         ctStatus: nextCtStatus,
         ctDate: client.ctDetails?.registrationDate?.slice?.(0, 10) || "",
+        ctDeregDate: client.ctDetails?.deregistrationDate?.slice?.(0, 10) || "",
         ctRegistrationTask: nextCtRegistrationTask,
         ctRegistrationTaskId: nextCtRegistrationTaskId,
         group: client.group?._id || client.group || "",
         newGroup: "",
       });
+      setVatHistory(client.vatDetails?.history || []);
+      setCtHistory(client.ctDetails?.history || []);
       const createdTaskKey = createdRegistrationTask?.taskMongoId ? `${id}:${createdRegistrationTask.taxType}:${createdRegistrationTask.taskMongoId}` : "";
       if (createdTaskKey && handledCreatedRegistrationTaskRef.current !== createdTaskKey) {
         handledCreatedRegistrationTaskRef.current = createdTaskKey;
@@ -905,6 +915,23 @@ export default function AddClient() {
         toast.error("VAT TRN must be a 15-digit number starting with 1.");
         return false;
       }
+      if (vatStatus === "Registered" && !form.vatDate) {
+        toast.error("VAT Registration Date is required when VAT status is Registered.");
+        return false;
+      }
+      if (vatStatus === "Deregistered" && !form.vatDeregDate) {
+        toast.error("De-Registration Date is required when VAT status is Deregistered.");
+        return false;
+      }
+      const ctStatus = String(form.ctStatus || "").trim();
+      if (ctStatus === "Registered" && !form.ctDate) {
+        toast.error("CT Registration Date is required when CT status is Registered.");
+        return false;
+      }
+      if (ctStatus === "Deregistered" && !form.ctDeregDate) {
+        toast.error("De-Registration Date is required when CT status is Deregistered.");
+        return false;
+      }
     }
     const shouldValidateContacts = !continueToNext || tab >= 2;
     const shouldValidateTradeLicences = !continueToNext || tab >= 1;
@@ -1007,16 +1034,18 @@ export default function AddClient() {
       if (includeVatCt) {
         payload.vatDetails = {
           trn: shouldShowVatRegistrationFields ? form.vatTrn : "",
-          status: form.vatStatus === "Registered" ? "registered" : "not_registered",
+          status: form.vatStatus === "Registered" ? "registered" : form.vatStatus === "Deregistered" ? "deregistered" : "not_registered",
           registrationDate: shouldShowVatRegistrationFields ? form.vatDate : undefined,
+          deregistrationDate: form.vatStatus === "Deregistered" ? form.vatDeregDate || undefined : undefined,
           filingFrequency: shouldShowVatRegistrationFields ? normalizeVatFilingFrequency(form.vatFreq, form.fye) : undefined,
           registrationTask: form.vatRegistrationTask || undefined,
           registrationTaskId: form.vatRegistrationTaskId || undefined,
         };
         payload.ctDetails = {
           tin: shouldShowCtRegistrationFields ? form.ctTin : "",
-          status: form.ctStatus === "Registered" ? "registered" : "not_registered",
+          status: form.ctStatus === "Registered" ? "registered" : form.ctStatus === "Deregistered" ? "deregistered" : "not_registered",
           registrationDate: shouldShowCtRegistrationFields ? form.ctDate : undefined,
+          deregistrationDate: form.ctStatus === "Deregistered" ? form.ctDeregDate || undefined : undefined,
           financialYearEnd: form.fye,
           registrationTask: form.ctRegistrationTask || undefined,
           registrationTaskId: form.ctRegistrationTaskId || undefined,
@@ -1243,14 +1272,33 @@ export default function AddClient() {
           )}
           {tab === 3 && (
             <div className="grid gap-3 md:grid-cols-2">
+              {isVatDeregistered && (
+                <div className="md:col-span-2 rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-semibold text-amber-800 flex items-center gap-2">
+                  <span className="flex h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" />
+                  This client's VAT registration has been deregistered.
+                </div>
+              )}
               <div className="space-y-2">
                 <label className="text-[14px] font-bold text-slate-700" htmlFor="client-vat-status">VAT Registration Status</label>
                 <div className="flex flex-wrap items-center gap-3">
-                  <select id="client-vat-status" className="input min-w-[240px] flex-1" value={form.vatStatus} onChange={(e) => update("vatStatus", e.target.value)}>
+                  <select
+                    id="client-vat-status"
+                    className="input min-w-[240px] flex-1"
+                    value={form.vatStatus}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setForm((f) => ({
+                        ...f,
+                        vatStatus: val,
+                        ...(val !== "Registered" ? { vatRegistrationTask: "", vatRegistrationTaskId: "" } : {})
+                      }));
+                    }}
+                  >
                     <option>Registered</option>
                     <option>Not Registered</option>
+                    <option>Deregistered</option>
                   </select>
-                  {form.vatRegistrationTaskId && (
+                  {form.vatRegistrationTaskId && form.vatStatus !== "Registered" && (
                     <button
                       type="button"
                       className="rounded-full border border-[#bfdbfe] bg-white px-3 py-2 text-xs font-extrabold text-[#1e3a8a] transition hover:bg-blue-50"
@@ -1268,7 +1316,40 @@ export default function AddClient() {
                   )}
                 </div>
               </div>
-              {shouldShowVatRegistrationFields ? (
+              {isVatDeregistered ? (
+                <>
+                  <Field label="VAT TRN" field="client-vat-trn">
+                    <input className="input bg-slate-100 text-slate-500 cursor-not-allowed" inputMode="numeric" maxLength={15} placeholder="15 digits starting with 1" value={form.vatTrn} readOnly={true} />
+                  </Field>
+                  <Field label="VAT Registration Date" field="client-vat-date">
+                    <input className="input bg-slate-100 text-slate-500 cursor-not-allowed" type="date" value={form.vatDate} readOnly={true} />
+                  </Field>
+                  <Field label="VAT Filing Frequency" field="client-vat-frequency">
+                    <select className="input bg-slate-100 text-slate-500 cursor-not-allowed" value={form.vatFreq} disabled={true}>
+                      {vatFilingFrequencyOptions.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="VAT De-Registration Date" field="client-vat-dereg-date">
+                    <input className="input" type="date" value={form.vatDeregDate} onChange={(e) => update("vatDeregDate", e.target.value)} />
+                  </Field>
+
+                  {!form.vatRegistrationTaskId ? (
+                    <div className="md:col-span-2 rounded-2xl border border-dashed border-[#cbd5e1] bg-slate-50 p-4">
+                      <div className="text-sm font-bold text-slate-900">VAT registration task required</div>
+                      <p className="mt-1 text-sm text-slate-600">
+                        This client's VAT registration is deregistered. Create a VAT registration task to start the process of re-registering them.
+                      </p>
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <button type="button" className="text-sm font-bold text-[#1e3a8a] underline underline-offset-4 cursor-pointer hover:text-[#1d4ed8] transition-colors" onClick={openVatRegistrationTask}>
+                          Create VAT registration task
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </>
+              ) : shouldShowVatRegistrationFields ? (
                 <>
                   <Field label="VAT TRN" field="client-vat-trn">
                     <input className="input" inputMode="numeric" maxLength={15} placeholder="15 digits starting with 1" value={form.vatTrn} onChange={(e) => update("vatTrn", String(e.target.value || "").replace(/\D+/g, "").slice(0, 15))} />
@@ -1297,15 +1378,42 @@ export default function AddClient() {
                   </div>
                 </div>
               ) : null}
-              <div className="md:col-span-2 grid gap-3 md:grid-cols-2">
+
+              <RegistrationHistory
+                history={vatHistory}
+                taxType="VAT"
+                canManageTaskDrawer={canManageTaskDrawer}
+                setDrawerTaskId={setDrawerTaskId}
+              />
+
+              <div className="md:col-span-2 grid gap-3 md:grid-cols-2 pt-4 border-t border-slate-100 mt-4">
+                {isCtDeregistered && (
+                  <div className="md:col-span-2 rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-semibold text-amber-800 flex items-center gap-2">
+                    <span className="flex h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" />
+                    This client's CT registration has been deregistered.
+                  </div>
+                )}
                 <div className="space-y-2">
                   <label className="text-[14px] font-bold text-slate-700" htmlFor="client-ct-status">CT Registration Status</label>
                   <div className="flex flex-wrap items-center gap-3">
-                    <select id="client-ct-status" className="input min-w-[240px] flex-1" value={form.ctStatus} onChange={(e) => update("ctStatus", e.target.value)}>
+                    <select
+                      id="client-ct-status"
+                      className="input min-w-[240px] flex-1"
+                      value={form.ctStatus}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setForm((f) => ({
+                          ...f,
+                          ctStatus: val,
+                          ...(val !== "Registered" ? { ctRegistrationTask: "", ctRegistrationTaskId: "" } : {})
+                        }));
+                      }}
+                    >
                       <option>Registered</option>
                       <option>Not Registered</option>
+                      <option>Deregistered</option>
                     </select>
-                    {form.ctRegistrationTaskId && (
+                    {form.ctRegistrationTaskId && form.ctStatus !== "Registered" && (
                       <button
                         type="button"
                         className="rounded-full border border-[#bfdbfe] bg-white px-3 py-2 text-xs font-extrabold text-[#1e3a8a] transition hover:bg-blue-50"
@@ -1323,7 +1431,40 @@ export default function AddClient() {
                     )}
                   </div>
                 </div>
-                {shouldShowCtRegistrationFields ? (
+                {isCtDeregistered ? (
+                  <>
+                    <Field label="Financial Year" field="client-ct-fye">
+                      <select className="input bg-slate-100 text-slate-500 cursor-not-allowed" value={form.fye} disabled={true}>
+                        {FINANCIAL_YEAR_OPTIONS.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="CT Registration Number (TIN)" field="client-ct-tin">
+                      <input className="input bg-slate-100 text-slate-500 cursor-not-allowed" value={form.ctTin} readOnly={true} />
+                    </Field>
+                    <Field label="CT Registration Date" field="client-ct-date">
+                      <input className="input bg-slate-100 text-slate-500 cursor-not-allowed" type="date" value={form.ctDate} readOnly={true} />
+                    </Field>
+                    <Field label="CT De-Registration Date" field="client-ct-dereg-date">
+                      <input className="input" type="date" value={form.ctDeregDate} onChange={(e) => update("ctDeregDate", e.target.value)} />
+                    </Field>
+
+                    {!form.ctRegistrationTaskId ? (
+                      <div className="md:col-span-2 rounded-2xl border border-dashed border-[#cbd5e1] bg-slate-50 p-4">
+                        <div className="text-sm font-bold text-slate-900">CT registration task required</div>
+                        <p className="mt-1 text-sm text-slate-600">
+                          This client's CT registration is deregistered. Create a CT registration task to start the process of re-registering them.
+                        </p>
+                        <div className="mt-3 flex flex-wrap items-center gap-3">
+                          <button type="button" className="text-sm font-bold text-[#1e3a8a] underline underline-offset-4 cursor-pointer hover:text-[#1d4ed8] transition-colors" onClick={openCtRegistrationTask}>
+                            Create CT registration task
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
+                ) : shouldShowCtRegistrationFields ? (
                   <>
                     <Field label="Financial Year" field="client-ct-fye">
                       <select className="input" value={form.fye} onChange={(e) => update("fye", e.target.value)}>
@@ -1352,6 +1493,13 @@ export default function AddClient() {
                     </div>
                   </div>
                 ) : null}
+
+                <RegistrationHistory
+                  history={ctHistory}
+                  taxType="CT"
+                  canManageTaskDrawer={canManageTaskDrawer}
+                  setDrawerTaskId={setDrawerTaskId}
+                />
               </div>
             </div>
           )}
@@ -1967,3 +2115,162 @@ function Field({ label, field, children }) {
   //   </div>
   // );
 }
+
+function RegistrationHistory({ history = [], taxType = "VAT", canManageTaskDrawer, setDrawerTaskId }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const navigate = useNavigate();
+
+  if (!history || history.length === 0) return null;
+
+  const pageSize = 5;
+  const totalEntries = history.length;
+  const totalPages = Math.ceil(totalEntries / pageSize);
+  
+  const reversedHistory = history.slice().reverse();
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const displayedEntries = reversedHistory.slice(startIndex, endIndex);
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "";
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  return (
+    <div className="md:col-span-2 mt-4 rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex w-full items-center justify-between bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-bold text-slate-800">
+            View Registration History ({history.length} {history.length === 1 ? "entry" : "entries"})
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+          <span>{isOpen ? "Collapse" : "Expand"}</span>
+          <ChevronDown className={`h-4 w-4 transform transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+        </div>
+      </button>
+
+      {isOpen && (
+        <div className="border-t border-slate-100 p-4">
+          <div className="relative border-l-2 border-slate-150 pl-6 ml-3 space-y-6 my-2">
+            {displayedEntries.map((entry, index) => {
+              const chronologicalIndex = totalEntries - 1 - (startIndex + index);
+              return (
+                <div key={entry._id || chronologicalIndex} className="relative">
+                  {/* Timeline bullet */}
+                  <span className="absolute -left-[31px] top-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-amber-500 bg-white">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                  </span>
+
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 shadow-xs hover:border-slate-200 transition-all">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-md bg-amber-50 px-2 py-0.5 text-xs font-extrabold text-amber-700 uppercase tracking-wider">
+                          Deregistered #{chronologicalIndex + 1}
+                        </span>
+                        {entry.linkedTo === -1 && (
+                          <span className="rounded-md bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">
+                            → Re-registered
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-slate-400 font-medium">
+                        Archived: {formatDate(entry.archivedAt)}
+                      </span>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 text-sm">
+                      <div>
+                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                          {taxType === "VAT" ? "TRN" : "TIN"}
+                        </div>
+                        <div className="font-extrabold text-slate-700">{entry.trn || entry.tin || "N/A"}</div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                          Filing / Financial Period
+                        </div>
+                        <div className="font-semibold text-slate-700">
+                          {entry.filingFrequency || entry.financialYearEnd || "N/A"}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                          Active Period
+                        </div>
+                        <div className="font-semibold text-slate-700">
+                          {formatDate(entry.registrationDate)} – {formatDate(entry.deregistrationDate)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {entry.registrationTaskId && (
+                      <div className="mt-3 flex items-center justify-end border-t border-slate-100 pt-2 text-xs">
+                        <button
+                          type="button"
+                          className="rounded-full border border-blue-150 bg-white px-2.5 py-1 font-bold text-blue-700 transition hover:bg-blue-50"
+                          onClick={() => {
+                            if (!entry.registrationTask) return;
+                            if (canManageTaskDrawer) {
+                              setDrawerTaskId(entry.registrationTask);
+                              return;
+                            }
+                            navigate(`/tasks/${entry.registrationTask}`);
+                          }}
+                        >
+                          Related Task: {entry.registrationTaskId}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-slate-150 pt-4 mt-4">
+              <span className="text-xs text-slate-500 font-semibold">
+                Showing {startIndex + 1}-{Math.min(endIndex, totalEntries)} of {totalEntries} entries
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className={`rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 transition hover:bg-slate-50 ${currentPage === 1 ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                >
+                  Previous
+                </button>
+                <span className="text-xs text-slate-700 font-extrabold px-1">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className={`rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 transition hover:bg-slate-50 ${currentPage === totalPages ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
