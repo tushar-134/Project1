@@ -113,33 +113,43 @@ async function dailyTaskNotifications() {
 }
 
 async function taskScheduler() {
-
   const now = new Date();
-
-  const today = new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate() - 15
-    // Create task 15 days before due date
-  ));
-
-  console.log("Now running task scheduler for ", today);
+  
+  // Find all recurring tasks whose next due date is within the
+  // maximum configured daysBeforeDue window from today (99 days max).
+  const maxWindow = 99;
+  const windowStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const windowEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + maxWindow + 1));
+  
+  console.log("Now running task scheduler for window: ", windowStart, " to ", windowEnd);
 
   const tasks = await Task.find({
     isRecurring: true,
     recurringGeneratedTask: null,
-    "recurringConfig.nextDueDate": today
+    "recurringConfig.nextDueDate": { $gte: windowStart, $lt: windowEnd }
   });
 
   if (!tasks.length) {
-    console.log("No recurring tasks found");
+    console.log("No recurring tasks found in window");
     return;
   }
 
+  const todayMs = windowStart.getTime();
+  let generatedCount = 0;
+  
   for (const task of tasks) {
-    await maybeGenerateNextRecurringTask(task);
+    const daysBeforeDue = task.recurringConfig?.daysBeforeDue || 15;
+    const nextDueMs = new Date(task.recurringConfig.nextDueDate).getTime();
+    const daysUntilDue = Math.ceil((nextDueMs - todayMs) / 86400000);
+    
+    // Only generate if we are within the daysBeforeDue window
+    if (daysUntilDue <= daysBeforeDue) {
+      await maybeGenerateNextRecurringTask(task);
+      generatedCount++;
+    }
   }
-
+  
+  console.log(`Generated ${generatedCount} recurring tasks`);
 }
 
 cron.schedule("0 4 * * *", dailyTaskNotifications, { timezone: "UTC" });

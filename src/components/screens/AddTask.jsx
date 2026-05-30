@@ -8,7 +8,7 @@ import { useUsers } from "../../hooks/useUsers";
 import { useTasks } from "../../hooks/useTasks";
 import { categoryService } from "../../services/categoryService";
 import { mapCategory } from "../../utils/adapterUtils";
-import { getFYOptions, getQuarters, getCurrentFYAndQuarter } from "../../utils/periodUtils";
+import { getFYOptions, getQuarters, getCurrentFYAndQuarter, getQuarterFromVatFrequency } from "../../utils/periodUtils";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
@@ -46,9 +46,7 @@ export default function AddTask() {
     periodQuarter: "",
     description: prefillTask?.description || "",
     frequency: "monthly",
-    dayOfWeek: "Sun",
-    dateOfMonth: 1,
-    monthOfYear: 1,
+    daysBeforeDue: 15,
     nextDue: "2026-06-30",
     endDate: ""
   });
@@ -60,7 +58,8 @@ export default function AddTask() {
     const raw = category?.rawTaskTypes || [];
     return raw.find((t) => t.name === type) || null;
   }, [category, type]);
-  const showPeriod = selectedRawType ? (selectedRawType.showPeriod !== false) : true;
+  const showFY = selectedRawType ? (selectedRawType.showFY ?? selectedRawType.showPeriod ?? true) : true;
+  const showQuarter = selectedRawType ? (selectedRawType.showQuarter ?? selectedRawType.showPeriod ?? true) : true;
   const showRecurring = selectedRawType ? (selectedRawType.showRecurring !== false) : true;
 
 
@@ -80,17 +79,38 @@ export default function AddTask() {
   }, []);
 
   // Auto-populate FY and Quarter once a client is selected (new tasks only).
-  // Clears the fields when client is deselected; re-computes when client changes.
+  // Clears the fields when client is deselected; re-computes when client changes or category changes.
   useEffect(() => {
     if (isEditMode) return;
     if (!details.client) {
       setDetails((prev) => ({ ...prev, periodFY: "", periodQuarter: "" }));
       return;
     }
-    const { fy, quarter } = getCurrentFYAndQuarter(clientFYE);
+    
+    let fy = "";
+    let quarter = "";
+    const fye = clientFYE;
+    
+    // Use raw Category Name for logic (categoryId may be generic mapped id e.g. "vat")
+    if (categoryName === "VAT") {
+      const { fy: computedFy } = getCurrentFYAndQuarter(fye);
+      fy = computedFy;
+      const vatFreq = selectedClient?.vatDetails?.filingFrequency || "";
+      quarter = getQuarterFromVatFrequency(vatFreq, new Date());
+    } else if (categoryName === "CT" || categoryName === "Corporate Tax") {
+      const ctFye = selectedClient?.ctDetails?.financialYearEnd || fye;
+      const { fy: computedFy } = getCurrentFYAndQuarter(ctFye);
+      fy = computedFy;
+      quarter = ""; // CT only uses FY
+    } else {
+      const current = getCurrentFYAndQuarter(fye);
+      fy = current.fy;
+      quarter = current.quarter;
+    }
+    
     setDetails((prev) => ({ ...prev, periodFY: fy, periodQuarter: quarter }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [details.client, clientFYE, isEditMode]);
+  }, [details.client, clientFYE, isEditMode, categoryName]);
   useEffect(() => {
     if (!isEditMode) return;
 
@@ -127,9 +147,7 @@ export default function AddTask() {
         periodQuarter: task.periodQuarter || "",
         description: task.description || "",
         frequency: task.recurringConfig?.frequency || "monthly",
-        dayOfWeek: task.recurringConfig?.dayOfWeek || "Sun",
-        dateOfMonth: task.recurringConfig?.dateOfMonth || 1,
-        monthOfYear: task.recurringConfig?.monthOfYear || 1,
+        daysBeforeDue: task.recurringConfig?.daysBeforeDue || 15,
         nextDue: task.recurringConfig?.nextDueDate?.slice?.(0, 10) || "",
         endDate: task.recurringConfig?.endDate?.slice?.(0, 10) || "",
       });
@@ -171,13 +189,7 @@ export default function AddTask() {
 
   const handleRecurrenceChange = (updatedFields) => {
     const nextDetails = { ...details, ...updatedFields };
-    const nextDue = calculateFrontendNextDue(
-      nextDetails.dueDate,
-      nextDetails.frequency,
-      nextDetails.dayOfWeek,
-      nextDetails.dateOfMonth,
-      nextDetails.monthOfYear
-    );
+    const nextDue = calculateFrontendNextDue(nextDetails.dueDate, nextDetails.frequency);
     setDetails({ ...nextDetails, nextDue });
   };
 
@@ -266,16 +278,14 @@ export default function AddTask() {
         client: details.client,
         assignedTo: details.assigned || undefined,
         dueDate: details.dueDate,
-        // Structured period fields — send only when the Period section is visible.
-        periodFY: showPeriod ? (details.periodFY || undefined) : undefined,
-        periodQuarter: showPeriod ? (details.periodQuarter || undefined) : undefined,
+        // Structured period fields — send only when their respective toggle is visible.
+        periodFY: showFY ? (details.periodFY || undefined) : undefined,
+        periodQuarter: showQuarter ? (details.periodQuarter || undefined) : undefined,
         description: details.description,
         isRecurring: effectiveRecurring,
         recurringConfig: effectiveRecurring ? {
           frequency: details.frequency,
-          dayOfWeek: details.frequency === "weekly" ? details.dayOfWeek : undefined,
-          dateOfMonth: (details.frequency === "monthly" || details.frequency === "quarterly" || details.frequency === "annual") ? details.dateOfMonth : undefined,
-          monthOfYear: details.frequency === "annual" ? details.monthOfYear : undefined,
+          daysBeforeDue: details.daysBeforeDue,
           nextDueDate: details.nextDue,
           endDate: details.endDate || undefined
         } : undefined,
@@ -354,6 +364,49 @@ export default function AddTask() {
             </Field>
             <Field label="Assign To" field="taskAssignedTo"><select className="input" value={details.assigned} onChange={(e) => setDetails({ ...details, assigned: e.target.value })}><option value="">Unassigned</option>{state.users.map((u) => <option key={u.id} value={u._id}>{u.name}</option>)}</select></Field>
             <Field label="Due Date*" field="taskDueDate"><input className="input" type="date" value={details.dueDate} onChange={(e) => handleRecurrenceChange({ dueDate: e.target.value })} /></Field>
+            {showFY && (
+              <Field 
+                label={
+                  <span className="flex items-center gap-2">
+                    <span>Financial Year</span>
+                    {details.client && selectedClient?.financialYearEnd && (
+                      <span 
+                        className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-[#1e3a8a]"
+                        style={{ textTransform: "none", letterSpacing: "normal" }}
+                      >
+                        FYE: {selectedClient.financialYearEnd}
+                      </span>
+                    )}
+                  </span>
+                } 
+                field="taskPeriodFY"
+              >
+                <select
+                  className="input"
+                  value={details.periodFY}
+                  onChange={(e) => setDetails({ ...details, periodFY: e.target.value })}
+                >
+                  <option value="">Select FY</option>
+                  {fyOptions.map((fy) => (
+                    <option key={fy} value={fy}>{fy}</option>
+                  ))}
+                </select>
+              </Field>
+            )}
+            {showQuarter && (
+              <Field label="Quarter" field="taskPeriodQuarter">
+                <select
+                  className="input"
+                  value={details.periodQuarter}
+                  onChange={(e) => setDetails({ ...details, periodQuarter: e.target.value })}
+                >
+                  <option value="">Select Quarter</option>
+                  {quarterOptions.map((q) => (
+                    <option key={q.value} value={q.value}>{q.value}</option>
+                  ))}
+                </select>
+              </Field>
+            )}
             <Field label="Description / Notes" field="taskDescription"><textarea className="input textarea" value={details.description} onChange={(e) => setDetails({ ...details, description: e.target.value })} /></Field>
           </div>
           <div className="mt-4 space-y-3">
@@ -365,46 +418,6 @@ export default function AddTask() {
             />
             <AttachmentList attachments={attachments} onDelete={removeAttachment} />
           </div>
-
-          {/* ── Period section ─────────────────────────────────────────── */}
-          {showPeriod && (
-            <div className="mt-4 rounded-xl border border-[#e2e8f0] bg-slate-50/60 p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <span className="text-[11px] font-extrabold uppercase tracking-[.08em] text-slate-500">Period</span>
-                {details.client && selectedClient?.financialYearEnd && (
-                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-[#1e3a8a]">
-                    FYE: {selectedClient.financialYearEnd}
-                  </span>
-                )}
-              </div>
-              <div className="grid gap-3 md:grid-cols-2">
-                <Field label="Financial Year" field="taskPeriodFY">
-                  <select
-                    className="input"
-                    value={details.periodFY}
-                    onChange={(e) => setDetails({ ...details, periodFY: e.target.value })}
-                  >
-                    <option value="">Select FY</option>
-                    {fyOptions.map((fy) => (
-                      <option key={fy} value={fy}>{fy}</option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Period" field="taskPeriodQuarter">
-                  <select
-                    className="input"
-                    value={details.periodQuarter}
-                    onChange={(e) => setDetails({ ...details, periodQuarter: e.target.value })}
-                  >
-                    <option value="">Select Period</option>
-                    {quarterOptions.map((q) => (
-                      <option key={q.value} value={q.value}>{q.value}</option>
-                    ))}
-                  </select>
-                </Field>
-              </div>
-            </div>
-          )}
           {showRecurring && (
             <>
               <ToggleRow label="Recurring Task" checked={recurring} onChange={(val) => {
@@ -412,10 +425,7 @@ export default function AddTask() {
                 if (val && !details.nextDue) {
                   const nextDue = calculateFrontendNextDue(
                     details.dueDate,
-                    details.frequency,
-                    details.dayOfWeek,
-                    details.dateOfMonth,
-                    details.monthOfYear
+                    details.frequency
                   );
                   setDetails(prev => ({ ...prev, nextDue }));
                 }
@@ -441,57 +451,16 @@ export default function AddTask() {
 
                   {/* Dynamic Frequency Settings Row */}
                   <div className="grid gap-3 md:grid-cols-3 border-t border-slate-200/60 pt-3">
-                    {details.frequency === "weekly" && (
-                      <Field label="Select Day" field="taskWeeklyDay">
-                        <select className="input" value={details.dayOfWeek} onChange={(e) => handleRecurrenceChange({ dayOfWeek: e.target.value })}>
-                          <option value="Sun">Sunday</option>
-                          <option value="Mon">Monday</option>
-                          <option value="Tue">Tuesday</option>
-                          <option value="Wed">Wednesday</option>
-                          <option value="Thu">Thursday</option>
-                          <option value="Fri">Friday</option>
-                          <option value="Sat">Saturday</option>
-                        </select>
-                      </Field>
-                    )}
-
-                    {(details.frequency === "monthly" || details.frequency === "quarterly") && (
-                      <Field label="Select Date" field="taskDateOfMonth">
-                        <select className="input" value={details.dateOfMonth} onChange={(e) => handleRecurrenceChange({ dateOfMonth: Number(e.target.value) })}>
-                          {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-                            <option key={d} value={d}>Day {d}</option>
-                          ))}
-                        </select>
-                      </Field>
-                    )}
-
-                    {details.frequency === "annual" && (
-                      <>
-                        <Field label="Select Month" field="taskMonthOfYear">
-                          <select className="input" value={details.monthOfYear} onChange={(e) => handleRecurrenceChange({ monthOfYear: Number(e.target.value) })}>
-                            <option value={1}>January</option>
-                            <option value={2}>February</option>
-                            <option value={3}>March</option>
-                            <option value={4}>April</option>
-                            <option value={5}>May</option>
-                            <option value={6}>June</option>
-                            <option value={7}>July</option>
-                            <option value={8}>August</option>
-                            <option value={9}>September</option>
-                            <option value={10}>October</option>
-                            <option value={11}>November</option>
-                            <option value={12}>December</option>
-                          </select>
-                        </Field>
-                        <Field label="Select Date" field="taskDateOfMonth">
-                          <select className="input" value={details.dateOfMonth} onChange={(e) => handleRecurrenceChange({ dateOfMonth: Number(e.target.value) })}>
-                            {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
-                              <option key={d} value={d}>Day {d}</option>
-                            ))}
-                          </select>
-                        </Field>
-                      </>
-                    )}
+                    <Field label="Days to create before Due date" field="taskDaysBeforeDue">
+                      <input 
+                        className="input" 
+                        type="number" 
+                        min="1" 
+                        max="99" 
+                        value={details.daysBeforeDue} 
+                        onChange={(e) => handleRecurrenceChange({ daysBeforeDue: Number(e.target.value) })} 
+                      />
+                    </Field>
                   </div>
                 </div>
               </div>
@@ -648,114 +617,29 @@ function openAttachmentFile(attachment) {
   window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
 }
 
-// --- RECURRING TASK HIGH-PRECISION DATE CALCULATORS ---
-
-function getNextWeeklyDate(baseDate, targetDayStr) {
-  const dayMap = { "Sun": 0, "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6 };
-  const targetDay = dayMap[targetDayStr];
-  if (targetDay === undefined) return baseDate;
-
-  const result = new Date(baseDate);
-  for (let i = 1; i <= 7; i++) {
-    result.setUTCDate(result.getUTCDate() + 1);
-    if (result.getUTCDay() === targetDay) {
-      return result;
-    }
-  }
-  return result;
-}
-
-function getNextMonthlyDate(baseDate, targetDate) {
-  const currentYear = baseDate.getUTCFullYear();
-  const currentMonth = baseDate.getUTCMonth();
-  let targetYear = currentYear;
-  let targetMonth = currentMonth + 1;
-  if (targetMonth > 11) {
-    targetMonth = 0;
-    targetYear += 1;
-  }
-
-  const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
-
-  if (targetDate <= daysInTargetMonth) {
-    return new Date(Date.UTC(targetYear, targetMonth, targetDate));
-  } else {
-    let nextMonth = targetMonth + 1;
-    let nextYear = targetYear;
-    if (nextMonth > 11) {
-      nextMonth = 0;
-      nextYear += 1;
-    }
-    return new Date(Date.UTC(nextYear, nextMonth, 1));
-  }
-}
-
-function getNextQuarterlyDate(baseDate, targetDate) {
-  const currentYear = baseDate.getUTCFullYear();
-  const currentMonth = baseDate.getUTCMonth();
-  let targetMonth = currentMonth + 3;
-  let targetYear = currentYear;
-  while (targetMonth > 11) {
-    targetMonth -= 12;
-    targetYear += 1;
-  }
-
-  const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
-
-  if (targetDate <= daysInTargetMonth) {
-    return new Date(Date.UTC(targetYear, targetMonth, targetDate));
-  } else {
-    let nextMonth = targetMonth + 1;
-    let nextYear = targetYear;
-    if (nextMonth > 11) {
-      nextMonth = 0;
-      nextYear += 1;
-    }
-    return new Date(Date.UTC(nextYear, nextMonth, 1));
-  }
-}
-
-function getNextYearlyDate(baseDate, targetMonth, targetDate) {
-  const targetMonth0 = targetMonth - 1;
-  const currentYear = baseDate.getUTCFullYear();
-  const targetYear = currentYear + 1;
-
-  const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth0 + 1, 0)).getUTCDate();
-
-  if (targetDate <= daysInTargetMonth) {
-    return new Date(Date.UTC(targetYear, targetMonth0, targetDate));
-  } else {
-    let nextMonth = targetMonth0 + 1;
-    let nextYear = targetYear;
-    if (nextMonth > 11) {
-      nextMonth = 0;
-      nextYear += 1;
-    }
-    return new Date(Date.UTC(nextYear, nextMonth, 1));
-  }
-}
-
-function calculateFrontendNextDue(dueDateStr, frequency, dayOfWeek, dateOfMonth, monthOfYear) {
+function calculateFrontendNextDue(dueDateStr, frequency) {
   if (!dueDateStr) return "";
   const baseDate = new Date(dueDateStr);
   if (isNaN(baseDate.getTime())) return "";
 
-  let nextDate;
+  const nextDate = new Date(baseDate);
   switch (frequency) {
     case "weekly":
-      nextDate = getNextWeeklyDate(baseDate, dayOfWeek || "Sun");
+      nextDate.setUTCDate(nextDate.getUTCDate() + 7);
       break;
     case "monthly":
-      nextDate = getNextMonthlyDate(baseDate, dateOfMonth || 1);
+      nextDate.setUTCMonth(nextDate.getUTCMonth() + 1);
       break;
     case "quarterly":
-      nextDate = getNextQuarterlyDate(baseDate, dateOfMonth || 1);
+      nextDate.setUTCMonth(nextDate.getUTCMonth() + 3);
+      break;
+    case "semi_annual":
+      nextDate.setUTCMonth(nextDate.getUTCMonth() + 6);
       break;
     case "annual":
-      nextDate = getNextYearlyDate(baseDate, monthOfYear || 1, dateOfMonth || 1);
+      nextDate.setUTCFullYear(nextDate.getUTCFullYear() + 1);
       break;
     default:
-      nextDate = new Date(baseDate);
       nextDate.setUTCMonth(nextDate.getUTCMonth() + 1);
   }
 

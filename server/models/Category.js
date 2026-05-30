@@ -14,7 +14,8 @@ const categorySchema = new mongoose.Schema({
       isActive: { type: Boolean, default: true },
       // Field-visibility toggles — default true so existing task types keep all fields visible (backward compatible).
       // New task types should send explicit false values from the frontend modal.
-      showPeriod: { type: Boolean, default: true },
+      showFY: { type: Boolean, default: true },
+      showQuarter: { type: Boolean, default: true },
       showRecurring: { type: Boolean, default: true },
       showAwaitingFta: { type: Boolean, default: true },
     },

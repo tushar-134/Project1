@@ -18,8 +18,8 @@ exports.addTaskType = async (req, res, next) => {
     const category = await Category.findById(req.params.id);
     if (!category) return res.status(404).json({ message: "Category not found" });
     // Accept visibility toggle fields from the frontend modal; new task types send explicit false values.
-    const { name, showPeriod = false, showRecurring = false, showAwaitingFta = false } = req.body;
-    category.taskTypes.push({ name, isActive: true, showPeriod, showRecurring, showAwaitingFta });
+    const { name, showFY = false, showQuarter = false, showRecurring = false, showAwaitingFta = false } = req.body;
+    category.taskTypes.push({ name, isActive: true, showFY, showQuarter, showRecurring, showAwaitingFta });
     await category.save();
     res.status(201).json(category);
   } catch (error) { next(error); }
@@ -31,9 +31,10 @@ exports.updateTaskType = async (req, res, next) => {
     const taskType = category.taskTypes.id(req.params.typeId);
     if (!taskType) return res.status(404).json({ message: "Task type not found" });
     // Allow updating the name and all three visibility toggles from the edit modal.
-    const { name, showPeriod, showRecurring, showAwaitingFta } = req.body;
+    const { name, showFY, showQuarter, showRecurring, showAwaitingFta } = req.body;
     if (name !== undefined) taskType.name = name;
-    if (showPeriod !== undefined) taskType.showPeriod = showPeriod;
+    if (showFY !== undefined) taskType.showFY = showFY;
+    if (showQuarter !== undefined) taskType.showQuarter = showQuarter;
     if (showRecurring !== undefined) taskType.showRecurring = showRecurring;
     if (showAwaitingFta !== undefined) taskType.showAwaitingFta = showAwaitingFta;
     await category.save();

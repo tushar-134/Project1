@@ -8,7 +8,7 @@ import Card from "../ui/Card.jsx";
 import Toggle from "../ui/Toggle.jsx";
 
 // Default state for the Task Type modal — all visibility toggles start off for new task types.
-const EMPTY_TASK_TYPE = { name: "", showPeriod: false, showRecurring: false };
+const EMPTY_TASK_TYPE = { name: "", showFY: false, showQuarter: false, showRecurring: false };
 
 export default function Categories({ setSettingsHeaderAction }) {
   const { state, dispatch } = useApp();
@@ -72,7 +72,8 @@ export default function Categories({ setSettingsHeaderAction }) {
     setTtEditingTypeId(type._id);
     setTtForm({
       name: type.name || "",
-      showPeriod: type.showPeriod ?? true,   // existing task types: respect saved value (DB defaults true)
+      showFY: type.showFY ?? type.showPeriod ?? true,        // fallback to showPeriod for older types
+      showQuarter: type.showQuarter ?? type.showPeriod ?? true,
       showRecurring: type.showRecurring ?? true,
     });
     setTtModal(true);
@@ -145,21 +146,26 @@ export default function Categories({ setSettingsHeaderAction }) {
                         {type._id && (
                           <div className="flex items-center gap-1">
                             {[
-                              { key: "showPeriod", label: "P" },
+                              { key: "showFY", label: "FY" },
+                              { key: "showQuarter", label: "Q" },
                               { key: "showRecurring", label: "R" },
-                            ].map(({ key, label }) => (
-                              <span
-                                key={key}
-                                title={`${key === "showPeriod" ? "Period" : "Recurring"}: ${type[key] !== false ? "Visible" : "Hidden"}`}
-                                className={`rounded px-1.5 py-0.5 text-[9px] font-black leading-none ${
-                                  type[key] !== false
-                                    ? "bg-blue-100 text-blue-700"
-                                    : "bg-slate-200 text-slate-400"
-                                }`}
-                              >
-                                {label}
-                              </span>
-                            ))}
+                            ].map(({ key, label }) => {
+                              // Provide backward compat for showPeriod
+                              const isVisible = type[key] ?? type.showPeriod ?? true;
+                              return (
+                                <span
+                                  key={key}
+                                  title={`${key === "showFY" ? "Financial Year" : key === "showQuarter" ? "Quarter" : "Recurring"}: ${isVisible ? "Visible" : "Hidden"}`}
+                                  className={`rounded px-1.5 py-0.5 text-[9px] font-black leading-none ${
+                                    isVisible
+                                      ? "bg-blue-100 text-blue-700"
+                                      : "bg-slate-200 text-slate-400"
+                                  }`}
+                                >
+                                  {label}
+                                </span>
+                              );
+                            })}
                           </div>
                         )}
                         <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${active ? "bg-emerald-50 text-[#059669]" : "bg-slate-200 text-slate-500"}`}>
@@ -251,7 +257,8 @@ export default function Categories({ setSettingsHeaderAction }) {
               </p>
 
               {[
-                { key: "showPeriod", label: "Period", description: "The task period field (e.g. Q1 2026)" },
+                { key: "showFY", label: "Financial Year", description: "The task Financial Year field (e.g. FY 2026)" },
+                { key: "showQuarter", label: "Quarter", description: "The task Quarter field (e.g. Q1)" },
                 { key: "showRecurring", label: "Recurring Task", description: "Recurring task toggle and schedule settings" },
               ].map(({ key, label, description }) => (
                 <div key={key} className="flex items-center justify-between rounded-lg border border-[#e2e8f0] px-3 py-2.5">
