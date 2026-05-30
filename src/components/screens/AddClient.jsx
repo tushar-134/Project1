@@ -250,7 +250,7 @@ export default function AddClient() {
   const vatFilingFrequencyOptions = useMemo(() => getVatFilingFrequencyOptions(form.fye), [form.fye]);
   const shouldShowVatRegistrationFields = form.vatStatus !== "Not Registered";
   const shouldShowCtRegistrationFields = form.ctStatus !== "Not Registered";
-  const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "Dubai", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
+  const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
 
   const [contacts, setContacts] = useState([{
     name: "",
@@ -512,7 +512,7 @@ export default function AddClient() {
         documentFile: null,
         documents: mapExistingDocuments(licence.documents, licence.documentUrl),
         persisted: true,
-      })) : [{ number: "", issue: "", expiry: "", authority: "Dubai", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
+      })) : [{ number: "", issue: "", expiry: "", authority: "", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
       setContacts((client.contactPersons || []).length ? client.contactPersons.map((person) => ({
         name: person.fullName || "",
         designation: person.designation || "",
@@ -1173,7 +1173,7 @@ export default function AddClient() {
               isUserSearchLoading={isUserSearchLoading}
             />
           )}
-          {tab === 1 && <Repeat title="Trade Licence" items={licences} setItems={setLicences} blank={{ number: "", issue: "", expiry: "", authority: "Dubai", type: "", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }} render={(lic, i, patch) => {
+          {tab === 1 && <Repeat title="Trade Licence" items={licences} setItems={setLicences} blank={{ number: "", issue: "", expiry: "", authority: "", type: "", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }} render={(lic, i, patch) => {
             const authoritySearch = authoritySearches[i] || "";
             const authorityOptions = lic.authority && !ISSUING_AUTHORITY_OPTIONS.some((option) => option.id === lic.authority)
               ? [{ id: lic.authority, label: lic.authority }, ...ISSUING_AUTHORITY_OPTIONS]
