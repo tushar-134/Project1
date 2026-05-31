@@ -90,7 +90,7 @@ export default function AddTask() {
   useEffect(() => {
     if (isEditMode) return;
     if (!details.client) {
-      setDetails((prev) => ({ ...prev, periodFY: "", periodQuarter: "" }));
+      setDetailsRaw((prev) => ({ ...prev, periodFY: "", periodQuarter: "" }));
       return;
     }
     
@@ -352,7 +352,7 @@ export default function AddTask() {
 
   return (
     <div className="space-y-5">
-      <UnsavedChangesGuard isDirty={isDirty} />
+      <UnsavedChangesGuard isDirty={step === 3 && isDirty} />
       <div className="grid gap-3 md:grid-cols-3">
         {["Select Category", "Select Task Type", "Task Details"].map((label, i) => (
           <Step 
