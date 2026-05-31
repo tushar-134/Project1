@@ -46,17 +46,6 @@ export default function Settings() {
       {/* ── Top bar: hamburger + header ── */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-4">
-          {/* Collapse/Expand Arrow instead of hamburger */}
-          <button
-            type="button"
-            aria-label={sidebarOpen ? "Close settings menu" : "Open settings menu"}
-            aria-expanded={sidebarOpen}
-            onClick={() => setSidebarOpen((o) => !o)}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-800"
-            title={sidebarOpen ? "Close menu" : "Open menu"}
-          >
-            {sidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
-          </button>
 
           {activeTab && (
             <div className="flex min-w-0 items-center gap-3">
@@ -77,12 +66,23 @@ export default function Settings() {
       {/* ── Inline layout: collapsible left nav + content ── */}
       <div className="flex min-h-[560px] gap-4">
 
-        {/* Collapsible nav panel — inline, not fixed */}
+        {/* Collapsible nav panel wrapper */}
         <div
-          className={`shrink-0 overflow-hidden rounded-2xl bg-white border border-[#e2e8f0] shadow-sm transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)] ${
+          className={`shrink-0 relative transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)] ${
             sidebarOpen ? "w-[240px]" : "w-[80px]"
           }`}
         >
+          {/* Toggle Button on the edge */}
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="hidden lg:grid absolute -right-[12px] top-[26px] h-[24px] w-[24px] place-items-center rounded-full bg-[#7c3aed] text-white shadow-md hover:bg-[#6d28d9] transition-colors z-[60] border-2 border-white"
+            aria-label={sidebarOpen ? "Collapse settings sidebar" : "Expand settings sidebar"}
+          >
+            {sidebarOpen ? <ChevronLeft size={13} strokeWidth={3} /> : <ChevronRight size={13} strokeWidth={3} />}
+          </button>
+
+          {/* Actual Sidebar box */}
+          <div className="w-full h-full overflow-hidden rounded-2xl bg-white border border-[#e2e8f0] shadow-sm flex flex-col">
           {/* Nav header */}
           <div className={`flex items-center ${sidebarOpen ? "px-4 gap-3" : "justify-center px-0"} py-4 border-b border-[#e2e8f0] min-h-[65px]`}>
             <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#7c3aed] text-white shadow-sm">
@@ -108,7 +108,6 @@ export default function Settings() {
                     type="button"
                     onClick={() => {
                       setActiveId(tab.id);
-                      setSidebarOpen(false);
                     }}
                     className={`group flex w-full h-11 items-center gap-3 ${sidebarOpen ? "rounded-2xl px-2" : "justify-center px-0"} font-semibold transition-all duration-200 relative ${
                       isActive
@@ -131,6 +130,7 @@ export default function Settings() {
               })}
             </div>
           </nav>
+          </div>
         </div>
 
         {/* Content panel */}
