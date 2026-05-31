@@ -341,7 +341,7 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
 
                 {/* Comment thread */}
                 {(() => {
-                  const comments = parseComments(visit.remarks);
+                  const comments = parseComments(visit.remarks).reverse();
                   return comments.length === 0 ? (
                     <p className="mb-4 text-[13px] text-slate-400 italic">No comments yet.</p>
                   ) : (
