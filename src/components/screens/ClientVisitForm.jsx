@@ -272,7 +272,7 @@ export default function ClientVisitForm() {
     return (
       <div className="space-y-5">
         <div className="page-kicker">Field Operations</div>
-        <h1 className="screen-title">{isEditMode ? "Edit Visit" : "Schedule New Visit"}</h1>
+        <h1 className="screen-title">{isEditMode ? "Edit Visit" : "New Visit"}</h1>
         <Card className="p-8 text-center text-[14px] font-semibold text-slate-500">Loading visit...</Card>
       </div>
     );
@@ -291,7 +291,7 @@ export default function ClientVisitForm() {
         </button>
         <div className="min-w-0 flex-1">
           <div className="page-kicker">Field Operations</div>
-          <h1 className="screen-title">{isEditMode ? "Edit Visit" : "Schedule New Visit"}</h1>
+          <h1 className="screen-title">{isEditMode ? "Edit Visit" : "New Visit"}</h1>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button variant="ghost" onClick={() => navigate("/client-visits")} disabled={saving}>
@@ -299,7 +299,7 @@ export default function ClientVisitForm() {
           </Button>
           <Button onClick={saveVisit} disabled={saving}>
             <Save size={15} />
-            {saving ? (isEditMode ? "Saving..." : "Scheduling...") : (isEditMode ? "Save Changes" : "Schedule Visit")}
+            {saving ? "Saving..." : isEditMode ? "Save Changes" : "Save Visit"}
           </Button>
         </div>
       </div>
