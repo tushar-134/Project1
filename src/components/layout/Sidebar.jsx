@@ -66,7 +66,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose = () => {}, 
       }),
     }))
     .filter((group) => group.links.length);
-  const asideClass = `side-scroll fixed left-0 top-0 z-50 flex h-dvh flex-col overflow-y-auto bg-gradient-to-b from-[#1e3a8a] to-[#172d6b] text-white shadow-[4px_0_32px_rgba(0,0,0,0.22)] transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)] 
+  const asideClass = `side-scroll fixed left-0 top-0 z-50 flex h-dvh flex-col overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] bg-gradient-to-b from-[#1e3a8a] to-[#172d6b] text-white shadow-[4px_0_32px_rgba(0,0,0,0.22)] transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)] 
     w-[272px] max-w-[88vw] ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
     lg:translate-x-0 ${collapsed ? "lg:w-[88px]" : "lg:w-[240px]"}`;
   return (
@@ -82,7 +82,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose = () => {}, 
         {/* Toggle Button for Desktop */}
         <button
           onClick={onToggleCollapse}
-          className="hidden lg:grid absolute -right-3.5 top-[18px] h-7 w-7 place-items-center rounded-full bg-white/10 text-white shadow-md hover:bg-white/20 border border-white/20 transition-colors z-10"
+          className="hidden lg:grid absolute -right-3.5 top-[18px] h-7 w-7 place-items-center rounded-full bg-white text-slate-800 shadow-md hover:bg-slate-100 transition-colors z-10"
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed ? <ChevronRight size={16} strokeWidth={3} /> : <ChevronLeft size={16} strokeWidth={3} />}
@@ -111,16 +111,11 @@ export default function Sidebar({ mobileOpen = false, onMobileClose = () => {}, 
 
         <nav className="flex-1 px-2.5 py-4">
           {visibleNavItems.map((group) => (
-            <div key={group.section} className="mb-5">
+            <div key={group.section} className={collapsed ? "mb-0.5" : "mb-5"}>
               {!collapsed && (
                 <div className="mb-1.5 px-3 text-[9.5px] font-extrabold uppercase tracking-[.14em] text-white/38">
                   {group.section}
                 </div>
-              )}
-              {collapsed && (
-                 <div className="mb-1.5 px-3 text-[9.5px] font-black text-center text-white/38">
-                   &bull;&bull;&bull;
-                 </div>
               )}
               <div className="space-y-0.5">
                 {group.links.map(({ label, to, icon: Icon, badge }) => {
