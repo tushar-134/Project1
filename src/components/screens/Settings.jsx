@@ -51,7 +51,7 @@ export default function Settings() {
         {/* Toggle Button on the edge */}
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="hidden lg:grid absolute -right-[12px] top-[26px] h-[24px] w-[24px] place-items-center rounded-full bg-[#7c3aed] text-white shadow-md hover:bg-[#6d28d9] transition-colors z-[60] border-2 border-white"
+          className="hidden lg:grid absolute -right-[12px] top-[26px] h-[24px] w-[24px] place-items-center rounded-full bg-[#1e3a8a] text-white shadow-md hover:bg-[#172d6b] transition-colors z-[60] border-2 border-white"
           aria-label={sidebarOpen ? "Collapse settings sidebar" : "Expand settings sidebar"}
         >
           {sidebarOpen ? <ChevronLeft size={13} strokeWidth={3} /> : <ChevronRight size={13} strokeWidth={3} />}
@@ -61,7 +61,7 @@ export default function Settings() {
         <div className="w-full h-full overflow-hidden rounded-2xl bg-white border border-[#e2e8f0] shadow-sm flex flex-col">
           {/* Nav header */}
           <div className={`flex items-center ${sidebarOpen ? "px-4 gap-3" : "justify-center px-0"} py-4 border-b border-[#e2e8f0] min-h-[65px]`}>
-            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#7c3aed] text-white shadow-sm">
+            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#1e3a8a] text-white shadow-sm">
               <Settings2 size={16} />
             </div>
             {sidebarOpen && (
@@ -87,14 +87,14 @@ export default function Settings() {
                     }}
                     className={`group flex w-full h-11 items-center gap-3 ${sidebarOpen ? "rounded-2xl px-2" : "justify-center px-0"} font-semibold transition-all duration-200 relative ${
                       isActive
-                        ? "text-[#7c3aed]"
-                        : "text-slate-500 hover:text-emerald-600"
+                        ? "text-[#1e3a8a]"
+                        : "text-slate-500 hover:text-blue-700"
                     }`}
                   >
                     <div className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all duration-300 ${
                       isActive
-                        ? "bg-purple-50 text-[#7c3aed] ring-2 ring-purple-100 ring-offset-2 ring-offset-white"
-                        : "text-slate-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 group-hover:ring-2 group-hover:ring-emerald-100 group-hover:ring-offset-2 group-hover:ring-offset-white"
+                        ? "bg-blue-50 text-[#1e3a8a] ring-2 ring-blue-200 ring-offset-2 ring-offset-white"
+                        : "text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600 group-hover:ring-2 group-hover:ring-blue-100 group-hover:ring-offset-2 group-hover:ring-offset-white"
                     }`}>
                       <Icon size={18} strokeWidth={isActive ? 2.5 : 2} className="relative z-10" />
                     </div>
