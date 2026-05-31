@@ -169,7 +169,7 @@ export default function FtaTracker() {
               type="button"
               onClick={refresh}
               disabled={loading}
-              className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-blue-200 hover:bg-blue-50 hover:text-[#1e3a8a] disabled:cursor-not-allowed disabled:opacity-60"
+              className="grid h-8 w-8 place-items-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 hover:text-emerald-800 disabled:cursor-not-allowed disabled:opacity-60"
               aria-label="Refresh FTA tracker"
               title="Refresh"
             >

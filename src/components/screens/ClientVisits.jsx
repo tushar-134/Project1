@@ -256,7 +256,7 @@ export default function ClientVisits() {
 
           <div className="flex shrink-0 items-center gap-2 xl:justify-end">
             <div ref={exportRef} className="relative">
-              <Button variant="ghost" onClick={() => setExportOpen((open) => !open)}>
+              <Button variant="outlinePurple" onClick={() => setExportOpen((open) => !open)}>
                 <Download size={16} />
                 Export
                 <ChevronDown size={14} className={`transition ${exportOpen ? "rotate-180" : ""}`} />
