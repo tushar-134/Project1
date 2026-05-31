@@ -232,6 +232,10 @@ async function getVisitOr404(req, res) {
   return visit;
 }
 
+function escapeRegex(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 async function buildFilteredVisits(req, { exportMode = false } = {}) {
   const {
     status,
@@ -248,84 +252,153 @@ async function buildFilteredVisits(req, { exportMode = false } = {}) {
     limit = 10,
   } = req.query;
 
-  const visits = await ClientVisit.find(visitScope(req)).populate(populateVisit);
-  const hydrated = await Promise.all(visits.map((visit) => backfillVisit(visit)));
-  const term = String(clientName || "").trim().toLowerCase();
-  const userTerm = String(userName || "").trim().toLowerCase();
+  const query = { ...visitScope(req) };
+
+  // 1. Status Filter
+  if (status && status !== "all") {
+    query.status = { $in: status.split(",") };
+  }
+
+  // 2. Visit Type Filter
+  if (visitType && visitType !== "all") {
+    query.visitType = visitType;
+  }
+
+  // 3. Client Type Filter
+  if (clientType && clientType !== "all") {
+    query.clientType = clientType;
+  }
+
+  // 4. Client ID Filter
+  if (clientId) {
+    query.client = clientId;
+  }
+
+  // 5. Client Name / Search Filter
+  if (clientName && String(clientName).trim()) {
+    const term = String(clientName).trim();
+    const regex = new RegExp(escapeRegex(term), "i");
+
+    // Resolve matching existing clients
+    const matchedClients = await Client.find({
+      $or: [
+        { legalName: regex },
+        { fileNo: regex }
+      ]
+    }).select("_id").lean();
+    const matchedClientIds = matchedClients.map((c) => c._id);
+
+    query.$or = [
+      { client: { $in: matchedClientIds } },
+      { "newClient.authorityName": regex },
+      { location: regex },
+      { "newClient.location": regex }
+    ];
+  }
+
+  // 6. User Name Filter
+  if (userName && String(userName).trim()) {
+    const term = String(userName).trim();
+    const regex = new RegExp(escapeRegex(term), "i");
+
+    const matchedUsers = await User.find({ name: regex }).select("_id").lean();
+    const matchedUserIds = matchedUsers.map((u) => u._id);
+
+    query["assignedUsers.user"] = { $in: matchedUserIds };
+  }
+
+  // 7. Date Range Filter
   const from = fromDate ? new Date(fromDate) : null;
   const to = toDate ? new Date(toDate) : null;
   if (to) to.setHours(23, 59, 59, 999);
 
-  let items = hydrated.filter((visit) => {
-    if (status && status !== "all") {
-      const statusArray = status.split(",");
-      if (!statusArray.includes(visit.status)) return false;
-    }
-    if (visitType && visitType !== "all" && visit.visitType !== visitType) return false;
-    if (clientType && clientType !== "all" && visit.clientType !== clientType) return false;
-    if (clientId && String(visit.client?._id || visit.client || "") !== String(clientId)) return false;
-    if (term) {
-      const haystack = [visitClientName(visit), visit.client?.fileNo, visit.location]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      if (!haystack.includes(term)) return false;
-    }
-    if (userTerm) {
-      const names = (visit.assignedUsers || []).map((entry) => String(entry.user?.name || "").toLowerCase());
-      if (!names.some((name) => name.includes(userTerm))) return false;
-    }
-    if (from && new Date(visit.visitDate) < from) return false;
-    if (to && new Date(visit.visitDate) > to) return false;
-    return true;
-  });
+  if (from || to) {
+    query.visitDate = {};
+    if (from) query.visitDate.$gte = from;
+    if (to) query.visitDate.$lte = to;
+  }
 
+  // 8. Sorting Configuration
   const direction = sortDir === "asc" ? 1 : -1;
-  items.sort((left, right) => {
-    let a;
-    let b;
-    switch (sortBy) {
-      case "visitId":
-        a = left.visitId || "";
-        b = right.visitId || "";
-        break;
-      case "client":
-        a = visitClientName(left);
-        b = visitClientName(right);
-        break;
-      case "status":
-        a = left.status || "";
-        b = right.status || "";
-        break;
-      case "type":
-        a = left.visitType || "";
-        b = right.visitType || "";
-        break;
-      case "createdAt":
-        a = new Date(left.createdAt).getTime();
-        b = new Date(right.createdAt).getTime();
-        break;
-      case "visitDate":
-      default:
-        a = combineDateAndTime(left.visitDate, left.visitTime) || new Date(left.visitDate);
-        b = combineDateAndTime(right.visitDate, right.visitTime) || new Date(right.visitDate);
-        a = a.getTime();
-        b = b.getTime();
-        break;
-    }
-    if (a < b) return -1 * direction;
-    if (a > b) return 1 * direction;
-    return 0;
-  });
+  let dbSort = {};
+  switch (sortBy) {
+    case "visitId":
+      dbSort = { visitId: direction };
+      break;
+    case "status":
+      dbSort = { status: direction };
+      break;
+    case "type":
+      dbSort = { visitType: direction };
+      break;
+    case "createdAt":
+      dbSort = { createdAt: direction };
+      break;
+    case "visitDate":
+    default:
+      dbSort = { visitDate: direction, visitTime: direction };
+      break;
+  }
 
-  const total = items.length;
-  if (!exportMode) {
+  // Count total matching records natively in MongoDB
+  const total = await ClientVisit.countDocuments(query);
+
+  let visitsQuery = ClientVisit.find(query).populate(populateVisit);
+  
+  if (sortBy !== "client") {
+    visitsQuery = visitsQuery.sort(dbSort);
+  }
+
+  const isClientSort = sortBy === "client";
+  let visits;
+
+  if (isClientSort && !exportMode) {
+    // Elegant graceful degradation for clientName alphabetical sort:
+    // Fetch matching, populate, sort in-memory, then slice/paginate
+    const allVisits = await visitsQuery;
+    const hydrated = await Promise.all(allVisits.map((visit) => backfillVisit(visit)));
+    hydrated.sort((left, right) => {
+      const a = visitClientName(left);
+      const b = visitClientName(right);
+      if (a < b) return -1 * direction;
+      if (a > b) return 1 * direction;
+      return 0;
+    });
+
     const pageNumber = Math.max(1, Number(page) || 1);
     const pageSize = Math.max(1, Math.min(100, Number(limit) || 10));
     const start = (pageNumber - 1) * pageSize;
-    items = items.slice(start, start + pageSize);
+    visits = hydrated.slice(start, start + pageSize);
+  } else if (!exportMode) {
+    // High-performance database pagination (covers 99% of visit tracker requests)
+    const pageNumber = Math.max(1, Number(page) || 1);
+    const pageSize = Math.max(1, Math.min(100, Number(limit) || 10));
+    
+    visitsQuery = visitsQuery.skip((pageNumber - 1) * pageSize).limit(pageSize);
+    const pageVisits = await visitsQuery;
+    // Only backfill/hydrate the paginated slice (e.g. 10 items instead of full DB)
+    visits = await Promise.all(pageVisits.map((visit) => backfillVisit(visit)));
+  } else {
+    // Export mode: fetch and backfill all records matching query
+    const allVisits = await visitsQuery;
+    const hydrated = await Promise.all(allVisits.map((visit) => backfillVisit(visit)));
+    if (isClientSort) {
+      hydrated.sort((left, right) => {
+        const a = visitClientName(left);
+        const b = visitClientName(right);
+        if (a < b) return -1 * direction;
+        if (a > b) return 1 * direction;
+        return 0;
+      });
+    }
+    visits = hydrated;
+  }
+
+  if (!exportMode) {
+    const pageNumber = Math.max(1, Number(page) || 1);
+    const pageSize = Math.max(1, Math.min(100, Number(limit) || 10));
     return {
-      items: items.map(serializeVisit),
+      items: visits.map(serializeVisit),
       total,
       page: pageNumber,
       pages: Math.max(1, Math.ceil(total / pageSize)),
@@ -334,7 +407,7 @@ async function buildFilteredVisits(req, { exportMode = false } = {}) {
     };
   }
 
-  return items.map(serializeVisit);
+  return visits.map(serializeVisit);
 }
 
 function exportRows(visits = [], requestedColumns = []) {

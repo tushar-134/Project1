@@ -797,6 +797,24 @@ exports.bulkUpload = async (req, res, next) => {
     let added = 0, failed = 0;
     const seenLicences = new Set();
 
+    // Batch pre-fetch active users to avoid querying inside the loop
+    const activeUsers = await User.find({ isActive: true }).select("_id email").lean();
+    const userMap = new Map(activeUsers.map((u) => [String(u.email || "").trim().toLowerCase(), u._id]));
+
+    // Batch query existing licence numbers to check for duplicates in one roundtrip
+    const licenceNumbers = rows
+      .map((r) => String(r.licenceNumber || r.licence || "").trim())
+      .filter(Boolean);
+    const existingClients = licenceNumbers.length
+      ? await Client.find({
+          isActive: true,
+          "tradeLicences.licenceNumber": { $in: licenceNumbers },
+        }).select("tradeLicences.licenceNumber").lean()
+      : [];
+    const existingLicenceSet = new Set(
+      existingClients.flatMap((c) => (c.tradeLicences || []).map((l) => String(l.licenceNumber || "").trim().toLowerCase()))
+    );
+
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const serial = row.serial || i + 1;
@@ -825,12 +843,8 @@ exports.bulkUpload = async (req, res, next) => {
         }
         seenLicences.add(licence.toLowerCase());
 
-        // Check against existing clients in database
-        const exists = await Client.findOne({
-          isActive: true,
-          "tradeLicences.licenceNumber": licence,
-        });
-        if (exists) {
+        // Check against existing clients in database (using pre-fetched batch results)
+        if (existingLicenceSet.has(licence.toLowerCase())) {
           results.push({
             serial,
             status: "error",
@@ -841,8 +855,9 @@ exports.bulkUpload = async (req, res, next) => {
           continue;
         }
 
-        // Resolve assigned user by email
-        const assignedUser = await resolveAssignedUser(row.assignedUserEmailId || row.assignedUser);
+        // Resolve assigned user by email in-memory
+        const emailKey = String(row.assignedUserEmailId || row.assignedUser || "").trim().toLowerCase();
+        const assignedUser = emailKey ? userMap.get(emailKey) : undefined;
 
         const payload = buildClientPayload(row, req.user._id);
         if (assignedUser) payload.assignedUser = assignedUser;
@@ -851,6 +866,9 @@ exports.bulkUpload = async (req, res, next) => {
         const client = await Client.create(payload);
         results.push({ serial, status: "success", legalName, clientId: client._id });
         added++;
+        
+        // Add to existing licences to protect against duplicate inputs in this batch if any are skipped or not caught
+        existingLicenceSet.add(licence.toLowerCase());
       } catch (error) {
         results.push({ serial, status: "error", legalName, error: error.message });
         failed++;
