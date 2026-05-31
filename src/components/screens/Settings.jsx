@@ -1,4 +1,4 @@
-import { Boxes, Folders, Settings2, Users, LayoutGrid } from "lucide-react";
+import { Boxes, Folders, Settings2, Users, LayoutGrid, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { canManageCategories, canManageGroups, canViewUsers } from "../../utils/permissions.js";
@@ -46,18 +46,16 @@ export default function Settings() {
       {/* ── Top bar: hamburger + header ── */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-4">
-          {/* Animated hamburger — scoped to this page */}
+          {/* Collapse/Expand Arrow instead of hamburger */}
           <button
             type="button"
             aria-label={sidebarOpen ? "Close settings menu" : "Open settings menu"}
             aria-expanded={sidebarOpen}
             onClick={() => setSidebarOpen((o) => !o)}
-            className="settings-hamburger-btn shrink-0"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-800"
             title={sidebarOpen ? "Close menu" : "Open menu"}
           >
-            <span className={`settings-bar ${sidebarOpen ? "sbar-top-open" : ""}`} />
-            <span className={`settings-bar ${sidebarOpen ? "sbar-mid-open" : ""}`} />
-            <span className={`settings-bar ${sidebarOpen ? "sbar-bot-open" : ""}`} />
+            {sidebarOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
           </button>
 
           {activeTab && (
@@ -82,18 +80,20 @@ export default function Settings() {
         {/* Collapsible nav panel — inline, not fixed */}
         <div
           className={`shrink-0 overflow-hidden rounded-2xl bg-white border border-[#e2e8f0] shadow-sm transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)] ${
-            sidebarOpen ? "w-[240px] opacity-100" : "w-0 opacity-0 border-transparent shadow-none"
+            sidebarOpen ? "w-[240px]" : "w-[80px]"
           }`}
         >
           {/* Nav header */}
-          <div className="flex items-center gap-3 px-4 py-4 border-b border-[#e2e8f0]">
+          <div className={`flex items-center ${sidebarOpen ? "px-4 gap-3" : "justify-center px-0"} py-4 border-b border-[#e2e8f0] min-h-[65px]`}>
             <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#7c3aed] text-white shadow-sm">
               <Settings2 size={16} />
             </div>
-            <div className="min-w-0">
-              <div className="text-[14px] font-extrabold leading-tight tracking-tight text-slate-900">Settings</div>
-              <div className="text-[10px] font-semibold text-slate-500">Management</div>
-            </div>
+            {sidebarOpen && (
+              <div className="min-w-0 transition-opacity duration-300">
+                <div className="text-[14px] font-extrabold leading-tight tracking-tight text-slate-900">Settings</div>
+                <div className="text-[10px] font-semibold text-slate-500">Management</div>
+              </div>
+            )}
           </div>
 
           {/* Nav items */}
@@ -110,7 +110,7 @@ export default function Settings() {
                       setActiveId(tab.id);
                       setSidebarOpen(false);
                     }}
-                    className={`group flex w-full h-11 items-center gap-3 rounded-2xl px-2 font-semibold transition-all duration-200 relative ${
+                    className={`group flex w-full h-11 items-center gap-3 ${sidebarOpen ? "rounded-2xl px-2" : "justify-center px-0"} font-semibold transition-all duration-200 relative ${
                       isActive
                         ? "text-[#7c3aed]"
                         : "text-slate-500 hover:text-emerald-600"
@@ -123,7 +123,9 @@ export default function Settings() {
                     }`}>
                       <Icon size={18} strokeWidth={isActive ? 2.5 : 2} className="relative z-10" />
                     </div>
-                    <span className="min-w-0 flex-1 truncate text-left text-[13px] font-bold">{tab.label}</span>
+                    {sidebarOpen && (
+                      <span className="min-w-0 flex-1 truncate text-left text-[13px] font-bold">{tab.label}</span>
+                    )}
                   </button>
                 );
               })}
