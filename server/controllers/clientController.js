@@ -39,6 +39,12 @@ const populateClient = [
   { path: "contactPersons.passport.documents.uploadedBy", select: "name" },
 ];
 
+const populateClientList = [
+  { path: "assignedUser", select: "name" },
+  { path: "group", select: "name" },
+  { path: "createdBy", select: "name" },
+];
+
 function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -86,7 +92,7 @@ async function buildClientListQuery(req) {
   }
   if (assignedUser) andClauses.push({ assignedUser });
   if (req.user.role === "task_only") {
-    const assignedClientIds = await Task.find({ assignedTo: req.user._id }).distinct("client");
+    const assignedClientIds = await Task.distinct("client", { assignedTo: req.user._id });
     andClauses.push({ _id: { $in: assignedClientIds } });
   }
   if (search) andClauses.push(buildClientSearchClause(search));
@@ -419,7 +425,7 @@ exports.listClients = async (req, res, next) => {
     const pages = Math.max(1, Math.ceil(total / limit));
     const page = Math.min(requestedPage, pages);
     const clients = await Client.find(query)
-      .populate(populateClient)
+      .populate(populateClientList)
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit);

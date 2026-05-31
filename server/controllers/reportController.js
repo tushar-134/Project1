@@ -23,9 +23,15 @@ exports.dashboardStats = async (req, res, next) => {
 
     // For activity logs, scope to the selected month's date range
     const activityDateScope = dueDate ? { createdAt: dueDate } : {};
-    const activityTaskIds = req.user.role === "task_only"
-      ? await Task.find({ assignedTo: req.user._id }).distinct("_id")
-      : null;
+    
+    let activityTaskIds = null;
+    let visibleTaskClientIds = null;
+
+    if (req.user.role === "task_only") {
+      const tasks = await Task.find({ assignedTo: req.user._id }).select("_id client").lean();
+      activityTaskIds = tasks.map((t) => t._id);
+      visibleTaskClientIds = tasks.map((t) => t.client).filter(Boolean);
+    }
 
     // Overdue query: tasks whose dueDate is within the selected month AND before now
     const now = new Date();
@@ -37,9 +43,6 @@ exports.dashboardStats = async (req, res, next) => {
         : { $lt: now },
     };
 
-    const visibleTaskClientIds = req.user.role === "task_only"
-      ? await Task.find({ assignedTo: req.user._id }).distinct("client")
-      : null;
     const clientScope = {
       isActive: true,
       ...(req.user.role === "task_only"
@@ -47,7 +50,12 @@ exports.dashboardStats = async (req, res, next) => {
         : {}),
     };
 
-    const [totalClients, pendingTasks, overdueTasks, ftaPending, recentActivity] = await Promise.all([
+    const catMatchStage = {
+      ...(dueDate ? { dueDate } : {}),
+      ...roleScope,
+    };
+
+    const [totalClients, pendingTasks, overdueTasks, ftaPending, recentActivity, catAgg] = await Promise.all([
       Client.countDocuments(clientScope),
       Task.countDocuments({ ...taskScope, status: { $ne: "completed" } }),
       Task.countDocuments(overdueScope),
@@ -56,27 +64,22 @@ exports.dashboardStats = async (req, res, next) => {
         ...(req.user.role === "task_only" ? { task: { $in: activityTaskIds } } : {}),
         ...activityDateScope,
       })
-        .populate({ path: "task", populate: { path: "client", select: "legalName" } })
+        .populate({ path: "task", select: "_id taskId category taskType dueDate client", populate: { path: "client", select: "legalName" } })
         .populate("user", "name")
         .sort({ createdAt: -1 })
         .limit(10),
+      Task.aggregate([
+        { $match: catMatchStage },
+        { $group: {
+          _id: "$category",
+          active: { $sum: { $cond: [{ $ne: ["$status", "completed"] }, 1, 0] } },
+          closed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
+          pending: { $sum: { $cond: [{ $ne: ["$status", "completed"] }, 1, 0] } },
+          overdue: { $sum: { $cond: [{ $and: [{ $ne: ["$status", "completed"] }, { $lt: ["$dueDate", now] }] }, 1, 0] } },
+        }},
+      ]),
     ]);
 
-    // Category breakdown — aggregation scoped to month, split by active vs closed
-    const catMatchStage = {
-      ...(dueDate ? { dueDate } : {}),
-      ...roleScope,
-    };
-    const catAgg = await Task.aggregate([
-      { $match: catMatchStage },
-      { $group: {
-        _id: "$category",
-        active: { $sum: { $cond: [{ $ne: ["$status", "completed"] }, 1, 0] } },
-        closed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
-        pending: { $sum: { $cond: [{ $ne: ["$status", "completed"] }, 1, 0] } },
-        overdue: { $sum: { $cond: [{ $and: [{ $ne: ["$status", "completed"] }, { $lt: ["$dueDate", now] }] }, 1, 0] } },
-      }},
-    ]);
     const categoryBreakdown = catAgg.map((c) => ({ category: c._id, active: c.active, closed: c.closed, pending: c.pending, overdue: c.overdue }));
     res.json({ totalClients, pendingTasks, overdueTasks, ftaPending, categoryBreakdown, recentActivity });
   } catch (error) { next(error); }
