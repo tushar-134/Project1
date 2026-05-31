@@ -90,6 +90,9 @@ function normalizeStatusFilterValue(value) {
   if (!value) return [];
   const raw = String(value).trim();
   if (!raw) return [];
+  if (raw.toLowerCase() === "active") {
+    return ["Not Yet Started", "WIP", "Submitted to FTA"];
+  }
   const found = FILTER_STATUSES.find((s) => s.toLowerCase() === raw.toLowerCase());
   return found ? [found] : [];
 }
