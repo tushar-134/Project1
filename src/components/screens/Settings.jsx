@@ -41,48 +41,24 @@ export default function Settings() {
   }
 
   return (
-    <div className="space-y-4">
-
-      {/* ── Top bar: hamburger + header ── */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-4">
-
-          {activeTab && (
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#1e3a8a] text-white shadow-md">
-                <activeTab.icon size={20} />
-              </div>
-              <div className="min-w-0">
-                <div className="truncate text-[17px] font-black text-slate-900">{activeTab.label}</div>
-                <div className="text-[12px] font-medium text-slate-500">{activeTab.description}</div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {headerAction && <div className="shrink-0">{headerAction}</div>}
-      </div>
-
-      {/* ── Inline layout: collapsible left nav + content ── */}
-      <div className="flex min-h-[560px] gap-4">
-
-        {/* Collapsible nav panel wrapper */}
-        <div
-          className={`shrink-0 relative transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)] ${
-            sidebarOpen ? "w-[240px]" : "w-[80px]"
-          }`}
+    <div className="flex min-h-[560px] gap-4">
+      {/* Collapsible nav panel wrapper */}
+      <div
+        className={`shrink-0 relative transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)] ${
+          sidebarOpen ? "w-[240px]" : "w-[80px]"
+        }`}
+      >
+        {/* Toggle Button on the edge */}
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="hidden lg:grid absolute -right-[12px] top-[26px] h-[24px] w-[24px] place-items-center rounded-full bg-[#7c3aed] text-white shadow-md hover:bg-[#6d28d9] transition-colors z-[60] border-2 border-white"
+          aria-label={sidebarOpen ? "Collapse settings sidebar" : "Expand settings sidebar"}
         >
-          {/* Toggle Button on the edge */}
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="hidden lg:grid absolute -right-[12px] top-[26px] h-[24px] w-[24px] place-items-center rounded-full bg-[#7c3aed] text-white shadow-md hover:bg-[#6d28d9] transition-colors z-[60] border-2 border-white"
-            aria-label={sidebarOpen ? "Collapse settings sidebar" : "Expand settings sidebar"}
-          >
-            {sidebarOpen ? <ChevronLeft size={13} strokeWidth={3} /> : <ChevronRight size={13} strokeWidth={3} />}
-          </button>
+          {sidebarOpen ? <ChevronLeft size={13} strokeWidth={3} /> : <ChevronRight size={13} strokeWidth={3} />}
+        </button>
 
-          {/* Actual Sidebar box */}
-          <div className="w-full h-full overflow-hidden rounded-2xl bg-white border border-[#e2e8f0] shadow-sm flex flex-col">
+        {/* Actual Sidebar box */}
+        <div className="w-full h-full overflow-hidden rounded-2xl bg-white border border-[#e2e8f0] shadow-sm flex flex-col">
           {/* Nav header */}
           <div className={`flex items-center ${sidebarOpen ? "px-4 gap-3" : "justify-center px-0"} py-4 border-b border-[#e2e8f0] min-h-[65px]`}>
             <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#7c3aed] text-white shadow-sm">
@@ -130,17 +106,33 @@ export default function Settings() {
               })}
             </div>
           </nav>
+        </div>
+      </div>
+
+      {/* Content panel */}
+      <div className="min-w-0 flex-1 flex flex-col rounded-2xl border border-[#e2e8f0] bg-white shadow-sm overflow-hidden">
+        {/* Top bar header moved inside the box */}
+        <div className="flex flex-wrap items-center justify-between gap-4 p-6 border-b border-[#e2e8f0]">
+          <div className="flex min-w-0 items-center gap-4">
+            {activeTab && (
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#1e3a8a] text-white shadow-md">
+                  <activeTab.icon size={20} />
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate text-[17px] font-black text-slate-900">{activeTab.label}</div>
+                  <div className="text-[12px] font-medium text-slate-500">{activeTab.description}</div>
+                </div>
+              </div>
+            )}
           </div>
+          {headerAction && <div className="shrink-0">{headerAction}</div>}
         </div>
 
-        {/* Content panel */}
-        <div className="min-w-0 flex-1 overflow-x-auto rounded-2xl border border-[#e2e8f0] bg-white shadow-sm">
-
-          <div className="p-6">
-            {ActiveComponent && <ActiveComponent setSettingsHeaderAction={setHeaderAction} />}
-          </div>
+        {/* Page Content */}
+        <div className="p-6 flex-1 overflow-x-auto">
+          {ActiveComponent && <ActiveComponent setSettingsHeaderAction={setHeaderAction} />}
         </div>
-
       </div>
     </div>
   );
