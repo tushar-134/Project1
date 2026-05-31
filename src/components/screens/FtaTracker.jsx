@@ -392,7 +392,6 @@ export default function FtaTracker() {
                 <th>Assigned</th>
                 <th>FTA Status</th>
                 <th>Recurring</th>
-                {!isTaskOnly && <th>Edit</th>}
               </tr>
             </thead>
             <tbody>
@@ -461,17 +460,6 @@ export default function FtaTracker() {
                       </span>
                     )}
                   </td>
-                  {!isTaskOnly && (
-                    <td>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => navigate(`/tasks/edit/${item.id}`)}
-                      >
-                        Edit
-                      </Button>
-                    </td>
-                  )}
                 </tr>
               ))}
             </tbody>
