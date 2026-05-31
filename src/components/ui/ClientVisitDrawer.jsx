@@ -15,6 +15,15 @@ function titleStatus(value) {
     .join(" ");
 }
 
+const COMMENT_COLORS = [
+  "bg-blue-50 border-blue-100",
+  "bg-emerald-50 border-emerald-100",
+  "bg-amber-50 border-amber-100",
+  "bg-purple-50 border-purple-100",
+  "bg-rose-50 border-rose-100",
+  "bg-indigo-50 border-indigo-100",
+];
+
 function formatDate(value) {
   if (!value) return "-";
   const date = new Date(value);
@@ -351,7 +360,7 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
                           <div className="flex-shrink-0 h-8 w-8 rounded-full bg-[#1e3a8a] flex items-center justify-center text-[12px] font-extrabold text-white">
                             {String(comment.author || "?").charAt(0).toUpperCase()}
                           </div>
-                          <div className="flex-1 rounded-2xl bg-[#f8fbff] border border-[#e2e8f0] px-4 py-3">
+                          <div className={`flex-1 rounded-2xl border px-4 py-3 ${COMMENT_COLORS[idx % COMMENT_COLORS.length]}`}>
                             <div className="flex items-center justify-between gap-2 mb-1.5">
                               <span className="text-[12px] font-extrabold text-slate-700">{comment.author || "—"}</span>
                               {comment.at && (

@@ -66,6 +66,15 @@ const actionMeta = {
   "Generated Recurrence": { color: "#0891b2", bg: "bg-cyan-50", border: "border-cyan-200", icon: "↻" },
 };
 
+const COMMENT_COLORS = [
+  "bg-blue-50 border-blue-100",
+  "bg-emerald-50 border-emerald-100",
+  "bg-amber-50 border-amber-100",
+  "bg-purple-50 border-purple-100",
+  "bg-rose-50 border-rose-100",
+  "bg-indigo-50 border-indigo-100",
+];
+
 function getActionMeta(action) {
   return actionMeta[action] || { color: "#64748b", bg: "bg-slate-50", border: "border-slate-200", icon: "•" };
 }
@@ -383,7 +392,7 @@ export default function TaskDetail() {
                     <div className="flex-shrink-0 h-7 w-7 rounded-full bg-[#1e3a8a] flex items-center justify-center text-[10px] font-extrabold text-white">
                       {String(comment.author || "?").charAt(0).toUpperCase()}
                     </div>
-                    <div className="flex-1 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2">
+                    <div className={`flex-1 rounded-xl border px-3 py-2 ${COMMENT_COLORS[idx % COMMENT_COLORS.length]}`}>
                       <div className="flex items-center justify-between gap-2 mb-1">
                         <span className="text-[11px] font-extrabold text-slate-700">{comment.author || "—"}</span>
                         {comment.at && (
