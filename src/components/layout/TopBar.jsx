@@ -186,7 +186,7 @@ export default function TopBar({ title, navOpen = false, onMenuClick }) {
         {/* Hamburger — always 3 bars; sidebar has its own close (X) button */}
         <button
           onClick={onMenuClick}
-          className="hamburger-btn"
+          className="hamburger-btn lg:hidden"
           aria-label={navOpen ? "Close navigation" : "Open navigation"}
           aria-expanded={navOpen}
           title={navOpen ? "Close menu" : "Open menu"}

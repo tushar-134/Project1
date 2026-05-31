@@ -66,7 +66,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose = () => {}, 
       }),
     }))
     .filter((group) => group.links.length);
-  const asideClass = `side-scroll fixed left-0 top-0 z-50 flex h-dvh flex-col overflow-y-auto bg-white border-r border-[#e2e8f0] shadow-sm transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)] 
+  const asideClass = `side-scroll fixed left-0 top-0 z-50 flex h-dvh flex-col overflow-y-auto bg-gradient-to-b from-[#1e3a8a] to-[#172d6b] text-white shadow-[4px_0_32px_rgba(0,0,0,0.22)] transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)] 
     w-[272px] max-w-[88vw] ${mobileOpen ? "translate-x-0" : "-translate-x-full"}
     lg:translate-x-0 ${collapsed ? "lg:w-[88px]" : "lg:w-[240px]"}`;
   return (
@@ -82,47 +82,47 @@ export default function Sidebar({ mobileOpen = false, onMobileClose = () => {}, 
         {/* Toggle Button for Desktop */}
         <button
           onClick={onToggleCollapse}
-          className="hidden lg:grid absolute -right-3.5 top-[18px] h-7 w-7 place-items-center rounded-full bg-[#6d28d9] text-white shadow-md hover:bg-[#5b21b6] transition-colors z-10"
+          className="hidden lg:grid absolute -right-3.5 top-[18px] h-7 w-7 place-items-center rounded-full bg-white/10 text-white shadow-md hover:bg-white/20 border border-white/20 transition-colors z-10"
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed ? <ChevronRight size={16} strokeWidth={3} /> : <ChevronLeft size={16} strokeWidth={3} />}
         </button>
 
         {/* Sidebar header */}
-        <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} gap-3 px-4 py-[14px] min-h-[64px]`}>
+        <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} gap-3 px-4 py-3.5 min-h-[56px] border-b border-white/10`}>
           <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-[#6d28d9] text-[15px] font-black text-white shadow-lg shadow-purple-500/20">FB</div>
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#eab308] text-[15px] font-black text-white shadow-lg shadow-yellow-500/30">FB</div>
             {!collapsed && (
               <div className="min-w-0 transition-opacity duration-300">
-                <div className="text-[15px] font-extrabold leading-tight tracking-tight text-slate-900">Filing Buddy</div>
-                <div className="text-[11px] font-bold text-slate-500">Accounting LLC</div>
+                <div className="text-[14px] font-extrabold leading-tight tracking-tight text-white">Filing Buddy</div>
+                <div className="text-[10px] font-semibold text-white/55">Accounting LLC</div>
               </div>
             )}
           </div>
           {/* Mobile Close Button */}
           <button
             onClick={onMobileClose}
-            className="lg:hidden grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 active:scale-95"
+            className="lg:hidden grid h-8 w-8 place-items-center rounded-lg text-white/60 transition hover:bg-white/12 hover:text-white active:scale-95"
             aria-label="Close navigation"
           >
-            <X size={18} />
+            <X size={16} />
           </button>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-6">
+        <nav className="flex-1 px-2.5 py-4">
           {visibleNavItems.map((group) => (
-            <div key={group.section} className="">
+            <div key={group.section} className="mb-5">
               {!collapsed && (
-                <div className="mb-2 px-3 text-[10px] font-extrabold uppercase tracking-[.15em] text-slate-400">
+                <div className="mb-1.5 px-3 text-[9.5px] font-extrabold uppercase tracking-[.14em] text-white/38">
                   {group.section}
                 </div>
               )}
               {collapsed && (
-                 <div className="mb-3 px-3 text-[10px] font-black text-center text-slate-300">
+                 <div className="mb-1.5 px-3 text-[9.5px] font-black text-center text-white/38">
                    &bull;&bull;&bull;
                  </div>
               )}
-              <div className="space-y-1">
+              <div className="space-y-0.5">
                 {group.links.map(({ label, to, icon: Icon, badge }) => {
                   const displayBadge = to === "/tasks/fta-tracker" && ftaCount > 0 ? ftaCount : badge;
                   
@@ -133,28 +133,28 @@ export default function Sidebar({ mobileOpen = false, onMobileClose = () => {}, 
                       end={to === "/contacts"}
                       title={collapsed ? label : undefined}
                       className={({ isActive }) =>
-                        `group flex h-11 items-center gap-3 rounded-[14px] px-3 font-semibold transition-all duration-200 relative ${
+                        `group flex h-9 items-center gap-3 rounded-xl px-3 font-semibold transition-all duration-150 relative ${
                           isActive
-                            ? "bg-[#6d28d9] text-white shadow-md shadow-purple-500/20"
-                            : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                            ? "bg-white/16 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.16)] shadow-[0_2px_8px_rgba(0,0,0,.15)]"
+                            : "text-white/70 hover:bg-white/9 hover:text-white"
                         } ${collapsed ? "justify-center" : ""}`
                       }
                     >
                       {({ isActive }) => (
                         <>
-                          <Icon size={20} strokeWidth={isActive ? 2.5 : 2} className="shrink-0" />
+                          <Icon size={16} className={`shrink-0 ${isActive ? "opacity-100" : "opacity-80"}`} />
                           {!collapsed && (
-                            <span className="min-w-0 flex-1 truncate text-[13.5px]">{label}</span>
+                            <span className="min-w-0 flex-1 truncate text-[12.5px]">{label}</span>
                           )}
                           {!collapsed && displayBadge && (
                             <span className={`grid h-5 min-w-[20px] place-items-center rounded-full px-1.5 text-[10px] font-black ${
-                              isActive ? "bg-white text-[#6d28d9]" : "bg-purple-100 text-[#6d28d9]"
+                              isActive ? "bg-white/20 text-white" : "bg-white/10 text-white/80"
                             }`}>
                               {displayBadge}
                             </span>
                           )}
                           {collapsed && displayBadge && (
-                             <span className={`absolute right-2 top-2 h-2.5 w-2.5 rounded-full ring-2 ring-white ${
+                             <span className={`absolute right-1 top-1 h-2 w-2 rounded-full ring-2 ring-[#172d6b] ${
                                isActive ? "bg-white" : "bg-[#ef4444]"
                              }`} />
                           )}
