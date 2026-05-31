@@ -381,7 +381,7 @@ export default function ClientVisitForm() {
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Visit Date *">
                 <div className="relative">
-                  <input className="input pr-10" type="date" min={todayValue()} value={form.visitDate} onChange={(event) => updateField("visitDate", event.target.value)} />
+                  <input className="input pr-10" type="date" value={form.visitDate} onChange={(event) => updateField("visitDate", event.target.value)} />
                   <Calendar className="pointer-events-none absolute right-4 top-3 text-slate-400" size={16} />
                 </div>
               </Field>
