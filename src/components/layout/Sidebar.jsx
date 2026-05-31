@@ -16,7 +16,7 @@ export const navItems = [
   { section: "Tasks", links: [
     { label: "Add Task", to: "/tasks/add", icon: FilePlus2 },
     { label: "Task List", to: "/tasks/list", icon: ClipboardList },
-    { label: "FTA Tracker", to: "/tasks/fta-tracker", icon: Landmark, badge: "3" },
+    { label: "FTA Tracker", to: "/tasks/fta-tracker", icon: Landmark },
   ]},
   { section: "Field Operations", links: [
     { label: "Client Visits", to: "/client-visits", icon: MapPinned },
@@ -118,9 +118,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose = () => {}, 
                 </div>
               )}
               <div className="space-y-0.5">
-                {group.links.map(({ label, to, icon: Icon, badge }) => {
-                  const displayBadge = to === "/tasks/fta-tracker" && ftaCount > 0 ? ftaCount : badge;
-                  
+                {group.links.map(({ label, to, icon: Icon }) => {
                   return (
                     <NavLink
                       key={to}
@@ -140,13 +138,6 @@ export default function Sidebar({ mobileOpen = false, onMobileClose = () => {}, 
                           <Icon size={20} strokeWidth={isActive ? 2.5 : 2} className={`shrink-0 ${isActive ? "opacity-100" : "opacity-80"}`} />
                           {!collapsed && (
                             <span className="min-w-0 flex-1 truncate text-[12.5px]">{label}</span>
-                          )}
-                          {!collapsed && displayBadge && (
-                            <span className={`grid h-5 min-w-[20px] place-items-center rounded-full px-1.5 text-[10px] font-black ${
-                              isActive ? "bg-white/20 text-white" : "bg-white/10 text-white/80"
-                            }`}>
-                              {displayBadge}
-                            </span>
                           )}
                         </>
                       )}
