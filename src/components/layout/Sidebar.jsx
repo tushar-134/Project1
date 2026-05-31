@@ -130,8 +130,8 @@ export default function Sidebar({ mobileOpen = false, onMobileClose = () => {}, 
                         className={({ isActive }) =>
                           `group flex h-9 items-center gap-3 rounded-xl px-3 font-semibold transition-all duration-150 relative ${
                             isActive
-                              ? "bg-white/16 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.16)] shadow-[0_2px_8px_rgba(0,0,0,.15)]"
-                              : "text-white/70 hover:bg-white/9 hover:text-white"
+                              ? "bg-[#1e3a8a] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.18),0_2px_8px_rgba(23,45,107,.26)]"
+                              : "text-white/70 hover:bg-[#172d6b] hover:text-white"
                           } ${collapsed ? "justify-center" : ""}`
                         }
                       >

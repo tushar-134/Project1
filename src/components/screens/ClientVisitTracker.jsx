@@ -6,11 +6,12 @@ import { useAuth } from "../../context/AuthContext.jsx";
 import { useClients } from "../../hooks/useClients";
 import { useUsers } from "../../hooks/useUsers";
 import { clientVisitService } from "../../services/clientVisitService";
-import { ROLE_LABELS } from "../../utils/permissions.js";
+import { canManageClientVisits, ROLE_LABELS } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
+import ClientVisitDrawer from "../ui/ClientVisitDrawer.jsx";
 import ClientVisitHistoryDrawer from "../ui/ClientVisitHistoryDrawer.jsx";
 import Table from "../ui/Table.jsx";
 
@@ -94,6 +95,8 @@ export default function ClientVisitTracker() {
   const [selectedVisitorByVisit, setSelectedVisitorByVisit] = useState({});
   const [timeDrafts, setTimeDrafts] = useState({});
   const [historyClient, setHistoryClient] = useState(null);
+  const [drawerVisitId, setDrawerVisitId] = useState(null);
+  const canManageVisits = canManageClientVisits(currentUser?.role);
 
   const hasFetchedClients = useRef(false);
 
@@ -530,6 +533,19 @@ export default function ClientVisitTracker() {
         clientId={historyClient?.id}
         clientName={historyClient?.name}
         onClose={() => setHistoryClient(null)}
+        onVisitClick={(visitId) => {
+          setHistoryClient(null);
+          setDrawerVisitId(visitId);
+        }}
+      />
+
+      <ClientVisitDrawer
+        visitId={drawerVisitId}
+        canManage={canManageVisits}
+        onClose={() => setDrawerVisitId(null)}
+        onVisitUpdated={(updatedVisit) => {
+          setVisits((current) => current.map((visit) => (visit._id === updatedVisit._id ? updatedVisit : visit)));
+        }}
       />
     </div>
   );

@@ -1,4 +1,4 @@
-import { Briefcase, ChevronDown, Download, Plus, Search, SquarePen } from "lucide-react";
+import { Briefcase, ChevronDown, CircleChevronRight, Download, Plus, Search, SquarePen } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -10,8 +10,8 @@ import { canManageClientVisits } from "../../utils/permissions.js";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
-import ClientDrawer from "../ui/ClientDrawer.jsx";
 import ClientVisitDrawer from "../ui/ClientVisitDrawer.jsx";
+import ClientVisitHistoryDrawer from "../ui/ClientVisitHistoryDrawer.jsx";
 import ExportModal from "../ui/ExportModal.jsx";
 import StatusPill from "../ui/StatusPill.jsx";
 import Table from "../ui/Table.jsx";
@@ -76,7 +76,7 @@ export default function ClientVisits() {
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState({ key: "visitDate", direction: "desc" });
   const [drawerVisitId, setDrawerVisitId] = useState(null);
-  const [drawerClientId, setDrawerClientId] = useState(null);
+  const [historyClient, setHistoryClient] = useState(null);
   const exportRef = useRef(null);
 
   const BASE_EXPORT_FIELDS = [
@@ -322,10 +322,13 @@ export default function ClientVisits() {
                   {visit.client?._id ? (
                     <button
                       type="button"
-                      className="font-black text-[#1e3a8a] hover:underline text-left"
-                      onClick={() => setDrawerClientId(visit.client._id)}
+                      className="group inline-flex items-center gap-2 text-left font-black text-[#1e3a8a] hover:underline"
+                      onClick={() => setHistoryClient({ id: visit.client._id, name: visit.clientName })}
                     >
-                      {visit.clientName}
+                      <span>{visit.clientName}</span>
+                      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#1e3a8a] text-white shadow-sm transition group-hover:bg-[#172d6b] group-hover:translate-x-0.5">
+                        <CircleChevronRight size={16} strokeWidth={2.5} />
+                      </span>
                     </button>
                   ) : (
                     <div className="font-black text-slate-900">{visit.clientName}</div>
@@ -392,9 +395,14 @@ export default function ClientVisits() {
         onVisitUpdated={handleVisitUpdated}
       />
 
-      <ClientDrawer
-        clientId={drawerClientId}
-        onClose={() => setDrawerClientId(null)}
+      <ClientVisitHistoryDrawer
+        clientId={historyClient?.id}
+        clientName={historyClient?.name}
+        onClose={() => setHistoryClient(null)}
+        onVisitClick={(visitId) => {
+          setHistoryClient(null);
+          setDrawerVisitId(visitId);
+        }}
       />
 
       <ExportModal
