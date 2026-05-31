@@ -342,7 +342,17 @@ export default function AddTask() {
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 md:grid-cols-3">{["Select Category", "Select Task Type", "Task Details"].map((label, i) => <Step key={label} n={i + 1} active={step >= i + 1} label={label} />)}</div>
+      <div className="grid gap-3 md:grid-cols-3">
+        {["Select Category", "Select Task Type", "Task Details"].map((label, i) => (
+          <Step 
+            key={label} 
+            n={i + 1} 
+            active={step >= i + 1} 
+            label={label} 
+            onClick={() => setStep(i + 1)} 
+          />
+        ))}
+      </div>
       {step === 1 && <Card className="p-4"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{state.categories.map((cat) => <button key={cat.id} onClick={() => selectCategory(cat.id)} className="rounded-xl border border-[#e2e8f0] bg-white p-4 text-left transition hover:border-[#1e3a8a] hover:shadow"><div className="mb-3 h-2 w-10 rounded-full" style={{ background: cat.color }} /><div className="font-extrabold">{cat.name}</div><div className="mt-1 text-[12px] text-slate-500">{cat.taskTypes.length} task types</div></button>)}</div></Card>}
       {step === 2 && <Card className="p-4"><div className="mb-3 text-[14px] font-extrabold">Task types for {category.name}</div><div className="flex flex-wrap gap-2">{chips.map((chip) => <button key={chip} onClick={() => setType(chip)} className={`rounded-full px-3 py-2 text-[12px] font-extrabold ${type === chip ? "bg-[#1e3a8a] text-white" : "bg-slate-100 text-slate-600"}`}>{chip}</button>)}</div><div className="mt-5 flex gap-2"><Button variant="ghost" onClick={() => setStep(1)}>Back</Button><Button onClick={() => setStep(3)}>Continue</Button></div></Card>}
       {step === 3 && (
@@ -481,7 +491,20 @@ export default function AddTask() {
     </div>
   );
 }
-function Step({ n, label, active }) { return <div className={`flex items-center gap-3 rounded-xl border p-3 ${active ? "border-[#1e3a8a] bg-white" : "border-[#e2e8f0] bg-white/60"}`}><div className={`grid h-7 w-7 place-items-center rounded-full text-[12px] font-black ${active ? "bg-[#1e3a8a] text-white" : "bg-slate-200 text-slate-500"}`}>{active ? <Check size={15} /> : n}</div><div className="font-extrabold">{label}</div></div>; }
+function Step({ n, label, active, onClick }) { 
+  return (
+    <button 
+      type="button" 
+      onClick={onClick} 
+      className={`w-full text-left flex items-center gap-3 rounded-xl border p-3 transition-colors hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a8a]/30 ${active ? "border-[#1e3a8a] bg-white" : "border-[#e2e8f0] bg-white/60 hover:bg-white cursor-pointer"}`}
+    >
+      <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[12px] font-black transition-colors ${active ? "bg-[#1e3a8a] text-white" : "bg-slate-200 text-slate-500"}`}>
+        {active ? <Check size={15} /> : n}
+      </div>
+      <div className="font-extrabold truncate">{label}</div>
+    </button>
+  ); 
+}
 
 function Field({ label, field, children }) {
   const control = isValidElement(children)
