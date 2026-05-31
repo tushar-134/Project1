@@ -24,7 +24,7 @@ export default function Settings() {
   const { currentUser } = useAuth();
   const role = currentUser?.role;
   const tabs = buildTabs(role);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeId, setActiveId] = useState(tabs[0]?.id ?? "");
   const [headerAction, setHeaderAction] = useState(null);
 
