@@ -366,7 +366,11 @@ exports.getTask = async (req, res, next) => {
     const task = await Task.findById(req.params.id).populate(populateTask);
     if (!task) return res.status(404).json({ message: "Task not found" });
     if (req.user.role === "task_only" && String(task.assignedTo?._id) !== String(req.user._id)) return res.status(403).json({ message: "Forbidden" });
-    res.json(task);
+    const logs = await ActivityLog.find({ task: task._id }).populate("user", "name email role").sort({ createdAt: -1 });
+    res.json({
+      ...task.toObject(),
+      logs
+    });
   } catch (error) { next(error); }
 };
 

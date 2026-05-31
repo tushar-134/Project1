@@ -98,13 +98,10 @@ export default function TaskDetail() {
       setLoading(true);
       setError(null);
       try {
-        const [taskData, logsData] = await Promise.all([
-          taskService.get(id),
-          taskService.getLogs(id),
-        ]);
+        const taskData = await taskService.get(id);
         if (active) {
           setTask(taskData);
-          setLogs(logsData);
+          setLogs(taskData.logs || []);
           setCommentInput("");
           setRemarkError("");
         }
@@ -172,8 +169,8 @@ export default function TaskDetail() {
       const updatedTask = await taskService.updateRemarks(task._id, JSON.stringify(next));
       setTask((current) => ({ ...current, remarks: updatedTask.remarks || "", updatedAt: updatedTask.updatedAt || current.updatedAt }));
       setCommentInput("");
-      const logsData = await taskService.getLogs(id);
-      setLogs(logsData);
+      const taskData = await taskService.get(id);
+      setLogs(taskData.logs || []);
     } catch (err) {
       setRemarkError(err.response?.data?.message || "Failed to post comment");
     } finally {

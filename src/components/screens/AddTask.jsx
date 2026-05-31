@@ -80,7 +80,7 @@ export default function AddTask() {
   const quarterOptions = useMemo(() => getQuarters(clientFYE), [clientFYE]);
   useEffect(() => {
     // The task wizard needs lookup data up front so each step can stay synchronous and snappy.
-    fetchClients({ limit: 100 }).catch(() => { });
+    fetchClients({ limit: 10 }).catch(() => { });
     fetchUsers().catch(() => { });
     categoryService.list().then((data) => dispatch({ type: "SET_RESOURCE", resource: "categories", payload: data.map(mapCategory) })).catch(() => { });
   }, []);

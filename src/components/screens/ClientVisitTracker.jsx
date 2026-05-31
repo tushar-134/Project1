@@ -1,5 +1,5 @@
 import { CalendarDays, Clock3, MapPinned, Plus, Search, UsersRound } from "lucide-react";
-import { cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
+import { cloneElement, isValidElement, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -95,17 +95,29 @@ export default function ClientVisitTracker() {
   const [timeDrafts, setTimeDrafts] = useState({});
   const [historyClient, setHistoryClient] = useState(null);
 
+  const hasFetchedClients = useRef(false);
+
   useEffect(() => {
     let active = true;
-    fetchClients({ limit: 200 }).catch(() => {
-      if (active) toast.error("Unable to load clients.");
-    });
-    if (currentUser?.role !== "task_only") {
+    if (!hasFetchedClients.current) {
+      hasFetchedClients.current = true;
+      fetchClients({ limit: 10 }).catch(() => {
+        if (active) toast.error("Unable to load clients.");
+      });
+    }
+    loadVisits(active);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    if (currentUser?.role && currentUser.role !== "task_only") {
       fetchUsers().catch(() => {
         if (active) toast.error("Unable to load users.");
       });
     }
-    loadVisits(active);
     return () => {
       active = false;
     };

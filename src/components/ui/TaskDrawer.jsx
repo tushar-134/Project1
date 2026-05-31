@@ -71,13 +71,10 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
     setLoading(true);
     setError(null);
     try {
-      const [taskData, logsData] = await Promise.all([
-        taskService.get(taskId),
-        taskService.getLogs(taskId),
-      ]);
+      const taskData = await taskService.get(taskId);
       if (active) {
         setTask(taskData);
-        setLogs(logsData);
+        setLogs(taskData.logs || []);
         setCommentInput("");
         setRemarkError("");
       }

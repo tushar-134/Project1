@@ -58,5 +58,8 @@ taskSchema.index({
   recurringGeneratedTask: 1,
   "recurringConfig.nextDueDate": 1
 });
+taskSchema.index({ client: 1, updatedAt: -1, createdAt: -1 });
+taskSchema.index({ assignedTo: 1, updatedAt: -1, createdAt: -1 });
+taskSchema.index({ updatedAt: -1 });
 
 module.exports = mongoose.model("Task", taskSchema);
