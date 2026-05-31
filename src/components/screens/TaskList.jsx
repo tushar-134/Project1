@@ -663,7 +663,7 @@ export default function TaskList() {
             <ColumnCustomizer visibility={colVisibility} onChange={updateColVisibility} />
 
             <button
-              className="grid h-8 w-8 place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
+              className="grid h-8 w-8 place-items-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 hover:text-emerald-800 disabled:opacity-40"
               onClick={refetchTasks}
               disabled={tasksLoading}
               aria-label="Refresh task list"
@@ -674,7 +674,7 @@ export default function TaskList() {
 
             {canManage && (
               <button
-                className="grid h-8 w-8 place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-600 transition hover:bg-slate-50"
+                className="grid h-8 w-8 place-items-center rounded-lg border border-purple-200 bg-purple-50 text-purple-700 transition hover:bg-purple-100 hover:text-purple-800"
                 onClick={() => setIsExportModalOpen(true)}
                 aria-label="Export tasks to Excel"
                 title="Export Excel"
@@ -1161,13 +1161,13 @@ function ColumnCustomizer({ visibility, onChange }) {
 
   return (
     <div ref={ref} className="relative">
-      <Button
-        variant="ghost"
-        size="sm"
+      <button
+        type="button"
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
         aria-haspopup="true"
         id="col-customizer-btn"
+        className="inline-flex h-8 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 text-[13px] font-bold text-blue-700 transition hover:bg-blue-100 hover:text-blue-800"
       >
         <Columns size={15} />
         Columns
@@ -1176,7 +1176,7 @@ function ColumnCustomizer({ visibility, onChange }) {
             {visibleCount}
           </span>
         )}
-      </Button>
+      </button>
 
       {open && (
         <div
