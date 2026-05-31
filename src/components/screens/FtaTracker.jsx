@@ -10,7 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useApp } from "../../context/AppContext.jsx";
 import { useTasks } from "../../hooks/useTasks";
@@ -20,6 +20,7 @@ import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
 import Table from "../ui/Table.jsx";
+import TaskDrawer from "../ui/TaskDrawer.jsx";
 
 const CATEGORY_FILTERS = sortOptionsWithOtherLast([
   "VAT",
@@ -81,9 +82,11 @@ export default function FtaTracker() {
   const { state } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { fetchFtaTracker, updateFtaStatus } = useTasks();
 
   const [activeTab, setActiveTab] = useState("in_review");
+  const [drawerTaskId, setDrawerTaskId] = useState(searchParams.get("drawer") || null);
   const [filters, setFilters] = useState(createEmptyFilters());
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -400,7 +403,21 @@ export default function FtaTracker() {
                     currentTab.id === "additional_query" ? "bg-yellow-50/60" : ""
                   }
                 >
-                  <td className="font-extrabold text-[#1e3a8a]">{item.taskId}</td>
+                  <td className="font-extrabold text-[#1e3a8a]">
+                    <button
+                      className="task-id-link"
+                      onClick={() => {
+                        if (!isTaskOnly) {
+                          setDrawerTaskId(item.id);
+                        } else {
+                          navigate(`/tasks/${item.id}`);
+                        }
+                      }}
+                      title={!isTaskOnly ? "Open task details" : "View task details"}
+                    >
+                      {item.taskId}
+                    </button>
+                  </td>
                   <td>{item.client}</td>
                   <td>
                     <Badge>{item.category}</Badge>
@@ -461,6 +478,20 @@ export default function FtaTracker() {
           </Table>
         )}
       </Card>
+
+      {!isTaskOnly && drawerTaskId && (
+        <TaskDrawer 
+          taskId={drawerTaskId} 
+          canManage={!isTaskOnly} 
+          onClose={() => {
+            setDrawerTaskId(null);
+            if (searchParams.has("drawer")) {
+              searchParams.delete("drawer");
+              setSearchParams(searchParams, { replace: true });
+            }
+          }} 
+        />
+      )}
     </div>
   );
 }
