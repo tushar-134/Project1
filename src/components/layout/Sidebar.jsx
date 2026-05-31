@@ -82,7 +82,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose = () => {}, 
         {/* Toggle Button for Desktop */}
         <button
           onClick={onToggleCollapse}
-          className="hidden lg:grid absolute -right-3.5 top-[18px] h-7 w-7 place-items-center rounded-full bg-white text-slate-800 shadow-md hover:bg-slate-100 transition-colors z-10"
+          className="hidden lg:grid absolute -right-3.5 top-[18px] h-[26px] w-[26px] place-items-center rounded-full bg-[#6d28d9] text-white shadow-lg hover:bg-[#5b21b6] transition-colors z-10"
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {collapsed ? <ChevronRight size={16} strokeWidth={3} /> : <ChevronLeft size={16} strokeWidth={3} />}
