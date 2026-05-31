@@ -81,23 +81,24 @@ export default function Settings() {
 
         {/* Collapsible nav panel — inline, not fixed */}
         <div
-          className={`shrink-0 overflow-hidden rounded-2xl border border-[#e2e8f0] bg-white shadow-sm transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)] ${
-            sidebarOpen ? "w-[220px] opacity-100" : "w-0 opacity-0 border-transparent shadow-none"
+          className={`shrink-0 overflow-hidden rounded-2xl bg-gradient-to-b from-[#1e3a8a] to-[#172d6b] text-white shadow-[0_4px_20px_rgba(0,0,0,0.15)] transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)] ${
+            sidebarOpen ? "w-[240px] opacity-100" : "w-0 opacity-0 shadow-none"
           }`}
         >
           {/* Nav header */}
-          <div className="border-b border-[#e2e8f0] bg-gradient-to-r from-[#1e3a8a] to-[#1d4ed8] px-4 py-3.5">
-            <div className="flex items-center gap-2">
-              <div className="grid h-7 w-7 place-items-center rounded-lg bg-white/15 text-white">
-                <Settings2 size={14} />
-              </div>
-              <span className="whitespace-nowrap text-[13px] font-extrabold text-white">Settings</span>
+          <div className="flex items-center gap-3 px-4 py-3.5 min-h-[56px] border-b border-white/10">
+            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/15 text-white shadow-sm">
+              <Settings2 size={16} />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[14px] font-extrabold leading-tight tracking-tight text-white">Settings</div>
+              <div className="text-[10px] font-semibold text-white/55">Management</div>
             </div>
           </div>
 
           {/* Nav items */}
-          <nav className="p-2.5">
-            <div className="space-y-1">
+          <nav className="flex-1 px-2.5 py-4">
+            <div className="space-y-0.5">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = tab.id === activeId;
@@ -109,31 +110,14 @@ export default function Settings() {
                       setActiveId(tab.id);
                       setSidebarOpen(false);
                     }}
-                    className={`group w-full rounded-xl px-3 py-2.5 text-left transition-all duration-150 ${
+                    className={`group flex w-full h-9 items-center gap-3 rounded-xl px-3 font-semibold transition-all duration-150 relative ${
                       isActive
-                        ? "bg-[#1e3a8a] text-white shadow-md shadow-blue-900/20"
-                        : "hover:bg-blue-50 hover:text-blue-900 border border-[#e2e8f0] hover:border-blue-200 bg-white"
+                        ? "bg-white/16 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,.16)] shadow-[0_2px_8px_rgba(0,0,0,.15)]"
+                        : "text-white/70 hover:bg-white/9 hover:text-white"
                     }`}
                   >
-                    <div className="flex items-center gap-2.5">
-                      <div
-                        className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition-colors ${
-                          isActive
-                            ? "bg-white/15 text-white"
-                            : "bg-slate-100 text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-700"
-                        }`}
-                      >
-                        <Icon size={16} />
-                      </div>
-                      <div className="min-w-0">
-                        <div className={`whitespace-nowrap text-[12.5px] font-extrabold leading-tight ${isActive ? "text-white" : "text-slate-800"}`}>
-                          {tab.label}
-                        </div>
-                        <div className={`whitespace-nowrap text-[9.5px] font-semibold uppercase tracking-wider ${isActive ? "text-white/65" : "text-slate-400"}`}>
-                          {tab.category}
-                        </div>
-                      </div>
-                    </div>
+                    <Icon size={20} strokeWidth={isActive ? 2.5 : 2} className={`shrink-0 ${isActive ? "opacity-100" : "opacity-80"}`} />
+                    <span className="min-w-0 flex-1 truncate text-left text-[12.5px]">{tab.label}</span>
                   </button>
                 );
               })}
