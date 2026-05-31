@@ -137,7 +137,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose = () => {}, 
                     >
                       {({ isActive }) => (
                         <>
-                          <Icon size={16} className={`shrink-0 ${isActive ? "opacity-100" : "opacity-80"}`} />
+                          <Icon size={20} strokeWidth={isActive ? 2.5 : 2} className={`shrink-0 ${isActive ? "opacity-100" : "opacity-80"}`} />
                           {!collapsed && (
                             <span className="min-w-0 flex-1 truncate text-[12.5px]">{label}</span>
                           )}
