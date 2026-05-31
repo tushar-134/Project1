@@ -148,11 +148,6 @@ export default function Sidebar({ mobileOpen = false, onMobileClose = () => {}, 
                               {displayBadge}
                             </span>
                           )}
-                          {collapsed && displayBadge && (
-                             <span className={`absolute right-1 top-1 h-2 w-2 rounded-full ring-2 ring-[#172d6b] ${
-                               isActive ? "bg-white" : "bg-[#ef4444]"
-                             }`} />
-                          )}
                         </>
                       )}
                     </NavLink>
