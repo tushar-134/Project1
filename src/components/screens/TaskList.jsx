@@ -310,7 +310,7 @@ export default function TaskList() {
   // controlled from the column filter row rather than the old chip section.
   const [scope, setScope] = useState(searchParams.get("scope") || "By Month");
   const [month, setMonth] = useState(initialMonth);
-  const [drawerTaskId, setDrawerTaskId] = useState(null);
+  const [drawerTaskId, setDrawerTaskId] = useState(searchParams.get("drawer") || null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   const BASE_EXPORT_FIELDS = COLUMN_DEFS.map((c) => ({ key: c.key, label: c.label }));
@@ -1001,7 +1001,17 @@ export default function TaskList() {
       </TaskSection>
 
       {canManage && drawerTaskId && (
-        <TaskDrawer taskId={drawerTaskId} canManage={canManage} onClose={() => setDrawerTaskId(null)} />
+        <TaskDrawer 
+          taskId={drawerTaskId} 
+          canManage={canManage} 
+          onClose={() => {
+            setDrawerTaskId(null);
+            if (searchParams.has("drawer")) {
+              searchParams.delete("drawer");
+              setSearchParams(searchParams, { replace: true });
+            }
+          }} 
+        />
       )}
 
       <ExportModal
