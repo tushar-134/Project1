@@ -199,7 +199,7 @@ export default function ClientDrawer({ clientId, onClose, expiryFocus = null }) 
             {client && canManage && (
               <Button variant="ghost" size="sm" onClick={() => navigate(`/clients/edit/${client._id}`)}>
                 <ExternalLink size={15} />
-                Edit page
+                View more
               </Button>
             )}
             <button type="button" onClick={onClose} className="grid h-10 w-10 place-items-center rounded-xl border border-[#dbe4f0] bg-slate-50 text-slate-500 transition hover:bg-slate-100" title="Close">
