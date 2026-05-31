@@ -78,16 +78,18 @@ export default function Sidebar({ mobileOpen = false, onMobileClose = () => {}, 
           onClick={onMobileClose}
         />
       )}
+      <button
+        onClick={onToggleCollapse}
+        className={`group hidden lg:flex fixed top-[20px] z-[60] h-[32px] w-[32px] items-center justify-center rounded-full bg-[#1e3a8a] text-white shadow-lg hover:bg-[#172d6b] hover:shadow-xl active:scale-90 transition-all duration-200 border-[3px] border-white ${collapsed ? "left-[72px]" : "left-[224px]"}`}
+        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+      >
+        {collapsed ? (
+          <ChevronRight size={15} strokeWidth={3} className="transition-transform duration-500 group-hover:rotate-[360deg]" />
+        ) : (
+          <ChevronLeft size={15} strokeWidth={3} className="transition-transform duration-500 group-hover:rotate-[360deg]" />
+        )}
+      </button>
       <aside className={asideClass} aria-hidden={!mobileOpen && typeof window !== 'undefined' && window.innerWidth < 1024}>
-        {/* Toggle Button for Desktop — floating circle at sidebar right edge matching reference design */}
-        <button
-          onClick={onToggleCollapse}
-          className="hidden lg:flex absolute -right-[16px] top-[20px] h-[32px] w-[32px] items-center justify-center rounded-full bg-[#6366f1] text-white shadow-lg hover:bg-[#4f46e5] hover:shadow-xl active:scale-90 transition-all duration-200 z-10 border-[3px] border-white"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {collapsed ? <ChevronRight size={15} strokeWidth={3} /> : <ChevronLeft size={15} strokeWidth={3} />}
-        </button>
-
         {/* Sidebar header */}
         <div className={`flex items-center ${collapsed ? "justify-center" : "justify-between"} gap-3 px-4 py-3.5 min-h-[56px] border-b border-white/10`}>
           <div className="flex items-center gap-3">
