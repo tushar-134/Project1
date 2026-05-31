@@ -218,8 +218,11 @@ async function backfillVisit(visit) {
     changed = true;
   }
 
-  if (changed) await visit.save();
-  return visit.populate(populateVisit);
+  if (changed) {
+    await visit.save();
+    return visit.populate(populateVisit);
+  }
+  return visit;
 }
 
 async function getVisitOr404(req, res) {

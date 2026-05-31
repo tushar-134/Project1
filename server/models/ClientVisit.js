@@ -66,7 +66,6 @@ const clientVisitSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 clientVisitSchema.index({ visitDate: -1, createdAt: -1 });
-clientVisitSchema.index({ visitId: 1 });
 clientVisitSchema.index({ client: 1, visitDate: -1 });
 clientVisitSchema.index({ "assignedUsers.user": 1, visitDate: -1 });
 clientVisitSchema.index({ status: 1, visitDate: -1 });
