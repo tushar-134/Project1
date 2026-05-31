@@ -1,5 +1,5 @@
 import { ArrowLeft, Calendar, Clock3, Save, Search, UsersRound } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
@@ -90,9 +90,17 @@ export default function ClientVisitForm() {
   const [loading, setLoading] = useState(isEditMode);
   const [saving, setSaving] = useState(false);
 
+  const hasFetchedClients = useRef(false);
+
   useEffect(() => {
-    fetchClients({ limit: 500 }).catch(() => toast.error("Unable to load clients."));
-    if (currentUser?.role !== "task_only") {
+    if (!hasFetchedClients.current) {
+      hasFetchedClients.current = true;
+      fetchClients({ limit: 10 }).catch(() => toast.error("Unable to load clients."));
+    }
+  }, [fetchClients]);
+
+  useEffect(() => {
+    if (currentUser?.role && currentUser.role !== "task_only") {
       fetchUsers().catch(() => toast.error("Unable to load users."));
     }
   }, [currentUser?.role]);

@@ -149,24 +149,6 @@ function displayCategoryName(category) {
   return CATEGORY_LABELS[category] || category || "";
 }
 
-async function fetchAllClientsForLookup() {
-  const firstPage = await clientService.list({ page: 1, limit: LOOKUP_PAGE_SIZE });
-  const rawFirstClients = Array.isArray(firstPage) ? firstPage : (firstPage.clients || firstPage.items || []);
-  const firstClients = rawFirstClients.map(mapClient);
-  const pages = Number(firstPage.pages) || 1;
-  if (pages <= 1) return firstClients;
-
-  const remaining = await Promise.all(
-    Array.from({ length: pages - 1 }, (_, index) =>
-      clientService.list({ page: index + 2, limit: LOOKUP_PAGE_SIZE })
-    )
-  );
-  return remaining.reduce((items, pageData) => {
-    const rawPageClients = Array.isArray(pageData) ? pageData : (pageData.clients || pageData.items || []);
-    const pageClients = rawPageClients.map(mapClient);
-    return [...items, ...pageClients];
-  }, firstClients);
-}
 
 function buildActiveColumnFilterSummary(filters) {
   return [
@@ -364,32 +346,26 @@ export default function TaskList() {
   const tasksLoading = Boolean(state.loading.tasks);
   const taskError = state.errors.tasks;
 
+  const hasFetchedClients = useRef(false);
+
   useEffect(() => {
     if (canManage) {
       fetchUsers().catch(() => {});
-      fetchClients({ limit: 1000 }).catch(() => {});
     }
   }, [canManage]);
+
+  useEffect(() => {
+    if (!hasFetchedClients.current) {
+      hasFetchedClients.current = true;
+      fetchClients({ limit: 10 }).catch(() => {});
+    }
+  }, [fetchClients]);
 
   useEffect(() => {
     categoryService.list()
       .then((data) => dispatch({ type: "SET_RESOURCE", resource: "categories", payload: data.map(mapCategory) }))
       .catch(() => {});
   }, [dispatch]);
-
-  useEffect(() => {
-    let active = true;
-    fetchAllClientsForLookup()
-      .then((clients) => {
-        if (active) dispatch({ type: "SET_RESOURCE", resource: "clients", payload: clients });
-      })
-      .catch(() => {
-        fetchClients({ limit: LOOKUP_PAGE_SIZE }).catch(() => {});
-      });
-    return () => {
-      active = false;
-    };
-  }, [dispatch, fetchClients]);
 
   const serverFilters = useMemo(() => ({
     category: deferredColumnFilters.category || undefined,
