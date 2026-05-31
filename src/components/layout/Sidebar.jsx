@@ -79,13 +79,13 @@ export default function Sidebar({ mobileOpen = false, onMobileClose = () => {}, 
         />
       )}
       <aside className={asideClass} aria-hidden={!mobileOpen && typeof window !== 'undefined' && window.innerWidth < 1024}>
-        {/* Toggle Button for Desktop — positioned at sidebar edge, vertically centered with logo */}
+        {/* Toggle Button for Desktop — floating circle at sidebar right edge matching reference design */}
         <button
           onClick={onToggleCollapse}
-          className="hidden lg:grid absolute -right-[13px] top-[22px] h-[24px] w-[24px] place-items-center rounded-full bg-[#6366f1] text-white shadow-md hover:bg-[#4f46e5] transition-colors z-10 border-2 border-white"
+          className="hidden lg:flex absolute -right-[16px] top-[20px] h-[32px] w-[32px] items-center justify-center rounded-full bg-[#6366f1] text-white shadow-lg hover:bg-[#4f46e5] hover:shadow-xl active:scale-90 transition-all duration-200 z-10 border-[3px] border-white"
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          {collapsed ? <ChevronRight size={13} strokeWidth={3} /> : <ChevronLeft size={13} strokeWidth={3} />}
+          {collapsed ? <ChevronRight size={15} strokeWidth={3} /> : <ChevronLeft size={15} strokeWidth={3} />}
         </button>
 
         {/* Sidebar header */}
