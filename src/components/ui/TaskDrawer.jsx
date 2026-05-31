@@ -315,11 +315,39 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
                   <div className="mb-3 task-detail-field-label">
                     <MessageSquare size={13} /> Comments
                   </div>
+                  {/* Post new comment */}
+                  {canEditRemarks && (
+                    <div className="mb-5 border-b border-[#e2e8f0] pb-5">
+                      <textarea
+                        id="task-drawer-remark"
+                        name="taskDrawerRemark"
+                        className="input min-h-20"
+                        placeholder="Write a comment…"
+                        value={commentInput}
+                        onChange={(event) => setCommentInput(event.target.value)}
+                        disabled={remarkSaving}
+                        onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleCommentPost(); }}
+                      />
+                      {remarkError && (
+                        <div className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">
+                          {remarkError}
+                        </div>
+                      )}
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <span className="text-[10px] text-slate-400">Ctrl+Enter to post</span>
+                        <Button size="sm" onClick={handleCommentPost} disabled={remarkSaving || !commentInput.trim()}>
+                          <MessageSquare size={13} />
+                          {remarkSaving ? "Posting..." : "Post Comment"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Comment thread */}
                   {(() => {
                     const comments = parseComments(task.remarks).reverse();
                     return comments.length === 0 ? (
-                      <p className="mb-3 text-[12px] text-slate-400 italic">No comments yet. Be the first to add one.</p>
+                      <p className="mb-3 text-[12px] text-slate-400 italic">No comments yet.</p>
                     ) : (
                       <div className="mb-3 space-y-3">
                         {comments.map((comment, idx) => (
@@ -345,32 +373,6 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
                       </div>
                     );
                   })()}
-                  {canEditRemarks && (
-                    <>
-                      <textarea
-                        id="task-drawer-remark"
-                        name="taskDrawerRemark"
-                        className="input min-h-20"
-                        placeholder="Write a comment…"
-                        value={commentInput}
-                        onChange={(event) => setCommentInput(event.target.value)}
-                        disabled={remarkSaving}
-                        onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleCommentPost(); }}
-                      />
-                      {remarkError && (
-                        <div className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[12px] font-semibold text-red-700">
-                          {remarkError}
-                        </div>
-                      )}
-                      <div className="mt-2 flex items-center justify-between gap-2">
-                        <span className="text-[10px] text-slate-400">Ctrl+Enter to post</span>
-                        <Button size="sm" onClick={handleCommentPost} disabled={remarkSaving || !commentInput.trim()}>
-                          <MessageSquare size={13} />
-                          {remarkSaving ? "Posting..." : "Post Comment"}
-                        </Button>
-                      </div>
-                    </>
-                  )}
                 </div>
 
                 {!!task.attachments?.length && (

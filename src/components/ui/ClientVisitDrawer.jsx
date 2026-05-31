@@ -313,11 +313,37 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
                   Comments
                 </div>
 
+                {/* Post new comment */}
+                {canManage || (visit.assignedUsers || []).some((entry) => String(entry.user?._id || entry.user) === String(currentUser?._id || currentUser?.id)) ? (
+                  <div className="mb-5 border-b border-[#e2e8f0] pb-5">
+                    <textarea
+                      className="input min-h-[90px] py-3 text-[14px]"
+                      placeholder="Write a comment…"
+                      value={commentInput}
+                      onChange={(event) => setCommentInput(event.target.value)}
+                      disabled={remarkSaving}
+                      onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleCommentPost(); }}
+                    />
+                    {remarkError && (
+                      <div className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-semibold text-red-700">
+                        {remarkError}
+                      </div>
+                    )}
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <span className="text-[12px] font-semibold text-slate-400">Ctrl+Enter or ⌘+Enter to post</span>
+                      <Button size="sm" onClick={handleCommentPost} disabled={remarkSaving || !commentInput.trim()}>
+                        <MessageSquare size={14} />
+                        {remarkSaving ? "Posting..." : "Post Comment"}
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+
                 {/* Comment thread */}
                 {(() => {
                   const comments = parseComments(visit.remarks);
                   return comments.length === 0 ? (
-                    <p className="mb-4 text-[13px] text-slate-400 italic">No comments yet. Be the first to add one.</p>
+                    <p className="mb-4 text-[13px] text-slate-400 italic">No comments yet.</p>
                   ) : (
                     <div className="mb-5 space-y-4 max-h-[280px] overflow-y-auto pr-2 custom-scrollbar">
                       {comments.map((comment, idx) => (
@@ -343,32 +369,6 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
                     </div>
                   );
                 })()}
-
-                {/* Post new comment */}
-                {canManage || (visit.assignedUsers || []).some((entry) => String(entry.user?._id || entry.user) === String(currentUser?._id || currentUser?.id)) ? (
-                  <div className="border-t border-[#e2e8f0] pt-4 mt-2">
-                    <textarea
-                      className="input min-h-[90px] py-3 text-[14px]"
-                      placeholder="Write a comment…"
-                      value={commentInput}
-                      onChange={(event) => setCommentInput(event.target.value)}
-                      disabled={remarkSaving}
-                      onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleCommentPost(); }}
-                    />
-                    {remarkError && (
-                      <div className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-semibold text-red-700">
-                        {remarkError}
-                      </div>
-                    )}
-                    <div className="mt-3 flex items-center justify-between gap-2">
-                      <span className="text-[12px] font-semibold text-slate-400">Ctrl+Enter or ⌘+Enter to post</span>
-                      <Button size="sm" onClick={handleCommentPost} disabled={remarkSaving || !commentInput.trim()}>
-                        <MessageSquare size={14} />
-                        {remarkSaving ? "Posting..." : "Post Comment"}
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
               </div>
 
               <Card className="p-5">
