@@ -232,6 +232,13 @@ export default function AddClient() {
   const isEditMode = Boolean(id);
   const { createClient, getClient, updateClient, uploadAttachment, uploadDocument, deleteAttachment, deleteDocument } = useClients();
   const [tab, setTab] = useState(() => Number(location.state?.activeTab) || 0);
+  const getInitialViewModeTabs = () => {
+    if (Array.isArray(location.state?.viewModeTabs)) {
+      return tabs.map((_, index) => Boolean(location.state.viewModeTabs[index]));
+    }
+    return tabs.map(() => Boolean(location.state?.viewMode));
+  };
+  const [viewModeTabs, setViewModeTabs] = useState(getInitialViewModeTabs);
   const countries = useMemo(() => {
     const names = new Intl.DisplayNames(["en"], { type: "region" });
     let codes = countryCodes;
@@ -422,6 +429,7 @@ export default function AddClient() {
 
   useEffect(() => {
     if (!isEditMode) return;
+    setViewModeTabs(getInitialViewModeTabs());
     getClient(id).then((client) => {
       const createdRegistrationTask = location.state?.createdRegistrationTask || null;
       const jurisdictionLabels = {
@@ -1162,10 +1170,22 @@ export default function AddClient() {
         }
         setIsDirty(false);
         toast.success(continueToNext ? "Progress saved." : (pendingAttachments.length || pendingLicenceDocuments.length || pendingContactDocuments.length ? "Client created and documents uploaded." : "Client created successfully."));
-        if (continueToNext) navigate(`/clients/edit/${createdClientId}`, { replace: true });
+        if (continueToNext) {
+          navigate(`/clients/edit/${createdClientId}`, {
+            replace: true,
+            state: { viewModeTabs: tabs.map((_, index) => index === tab) },
+          });
+        }
       }
       if (continueToNext) {
-        setTab((current) => Math.min(current + 1, tabs.length - 1));
+        const completedTab = tab;
+        const nextTab = Math.min(completedTab + 1, tabs.length - 1);
+        setViewModeTabs((current) => current.map((value, index) => {
+          if (index === completedTab) return true;
+          if (index === nextTab) return false;
+          return value;
+        }));
+        setTab(nextTab);
         return true;
       }
       navigate("/clients/list");
@@ -1197,12 +1217,36 @@ export default function AddClient() {
   };
   const isFirstTab = tab === 0;
   const isLastTab = tab === tabs.length - 1;
+  const isViewMode = Boolean(viewModeTabs[tab]);
+  const showViewToggle = true;
   return (
     <div className="space-y-5">
 
       <Card>
-        <div className="flex overflow-x-auto rounded-t-xl border-b border-[#e2e8f0] bg-slate-50 p-2">{tabs.map((t, i) => <button key={t} onClick={() => setTab(i)} className={`mr-1 whitespace-nowrap rounded-lg px-3 py-2 text-[12px] font-extrabold ${tab === i ? "bg-[#1e3a8a] text-white" : "text-slate-600 hover:bg-white"}`}>{t}</button>)}</div>
+        <div className="flex flex-col gap-3 rounded-t-xl border-b border-[#e2e8f0] bg-slate-50 p-2 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex overflow-x-auto">{tabs.map((t, i) => <button key={t} onClick={() => setTab(i)} className={`mr-1 whitespace-nowrap rounded-lg px-3 py-2 text-[12px] font-extrabold ${tab === i ? "bg-[#1e3a8a] text-white" : "text-slate-600 hover:bg-white"}`}>{t}</button>)}</div>
+          {showViewToggle && (
+            <div className="flex shrink-0 items-center justify-end gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-extrabold text-slate-700 shadow-sm">
+              <span>{isViewMode ? "View mode" : "Edit mode"}</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={isViewMode}
+                onClick={() => setViewModeTabs((current) => current.map((value, index) => index === tab ? !value : value))}
+                className={`relative h-6 w-11 rounded-full transition ${isViewMode ? "bg-[#1e3a8a]" : "bg-slate-300"}`}
+              >
+                <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition ${isViewMode ? "left-6" : "left-1"}`} />
+              </button>
+            </div>
+          )}
+        </div>
         <div className="p-4">
+          {isViewMode && (
+            <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-[13px] font-semibold text-[#1e3a8a]">
+              View mode is on. Turn it off from the top-right toggle to edit this client.
+            </div>
+          )}
+          <fieldset disabled={isViewMode} className={isViewMode ? "opacity-80" : ""}>
           {tab === 0 && (
             <Basic
               form={form}
@@ -1800,12 +1844,13 @@ export default function AddClient() {
             </div>
           )}
           {tab === 7 && <div className="space-y-3"><AttachmentUploadZone description={attachmentDescription} onDescriptionChange={setAttachmentDescription} onFiles={uploadFiles} isUploading={isUploading} /><div className="overflow-x-auto"><table className="table min-w-max"><thead><tr><th>Name</th><th>Size</th><th>Type</th><th>Description</th><th>Uploaded On</th><th>Uploaded By</th><th>Actions</th></tr></thead><tbody>{attachments.length === 0 && <tr><td colSpan={7} className="text-center text-slate-500">No attachments uploaded yet.</td></tr>}{attachments.map((a) => <tr key={a.id || a.name}><td>{a.name}</td><td>{a.size}</td><td>{a.type}</td><td>{a.description || "-"}</td><td>{a.uploadedOn}</td><td>{a.uploadedBy}</td><td><Button size="sm" variant="ghost" disabled={!a.url && !a.file} onClick={() => openDocumentFile(a)}>Open</Button> {(currentUser?.role === "admin" || !a.saved) && <Button size="sm" variant="danger" onClick={() => removeAttachment(a)}>Delete</Button>}</td></tr>)}</tbody></table></div></div>}
+          </fieldset>
         </div>
         <div className="flex flex-col gap-3 border-t border-[#e2e8f0] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
           <Button variant="ghost" onClick={goPrevious} disabled={isFirstTab || isSaving}>Previous</Button>
           <div className="flex justify-end gap-2">
-            {!isLastTab && <Button onClick={saveAndContinue} disabled={isSaving}>{isSaving ? "Saving..." : "Save and Continue"}</Button>}
-            {isLastTab && <Button onClick={() => saveClient()} disabled={isSaving}>{isSaving ? "Saving..." : "Add Client"}</Button>}
+            {!isLastTab && <Button onClick={saveAndContinue} disabled={isSaving || isViewMode}>{isSaving ? "Saving..." : "Save and Continue"}</Button>}
+            {isLastTab && <Button onClick={() => saveClient()} disabled={isSaving || isViewMode}>{isSaving ? "Saving..." : "Add Client"}</Button>}
           </div>
         </div>
       </Card>
