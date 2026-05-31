@@ -10,8 +10,8 @@ import { canManageClientVisits } from "../../utils/permissions.js";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
+import ClientDrawer from "../ui/ClientDrawer.jsx";
 import ClientVisitDrawer from "../ui/ClientVisitDrawer.jsx";
-import ClientVisitHistoryDrawer from "../ui/ClientVisitHistoryDrawer.jsx";
 import ExportModal from "../ui/ExportModal.jsx";
 import StatusPill from "../ui/StatusPill.jsx";
 import Table from "../ui/Table.jsx";
@@ -25,6 +25,12 @@ const statusOptions = [
 ];
 
 const visitTypeOptions = ["All Types", "Requirement Gathering", "Verification", "Onboarding Discussion", "Follow Up", "Collection", "Meeting"];
+
+const clientTypeOptions = [
+  { value: "all", label: "All Clients" },
+  { value: "new", label: "New Clients" },
+  { value: "existing", label: "Existing Clients" },
+];
 
 function formatDate(value) {
   if (!value) return "-";
@@ -55,8 +61,8 @@ export default function ClientVisits() {
   const [activeTab, setActiveTab] = useState("all");
   const [filters, setFilters] = useState({
     status: "all",
-    visitType: "all",
     clientType: "all",
+    visitType: "all",
     clientName: "",
     fromDate: "",
     toDate: "",
@@ -70,7 +76,7 @@ export default function ClientVisits() {
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState({ key: "visitDate", direction: "desc" });
   const [drawerVisitId, setDrawerVisitId] = useState(null);
-  const [historyClient, setHistoryClient] = useState(null); // { id, name }
+  const [drawerClientId, setDrawerClientId] = useState(null);
   const exportRef = useRef(null);
 
   const BASE_EXPORT_FIELDS = [
@@ -94,8 +100,8 @@ export default function ClientVisits() {
     page,
     limit: 10,
     status: filters.status,
-    visitType: filters.visitType,
     clientType: filters.clientType,
+    visitType: filters.visitType,
     clientName: filters.clientName,
     fromDate: filters.fromDate,
     toDate: filters.toDate,
@@ -215,7 +221,6 @@ export default function ClientVisits() {
       <Card className="p-5">
         <div className="grid items-end gap-3 xl:grid-cols-[1fr_1fr_1.25fr_1fr_1fr_auto]">
 
-
           <FilterField label="Visit Type">
             <select className="input" value={filters.visitType} onChange={(event) => updateFilter("visitType", event.target.value)}>
               {visitTypeOptions.map((option) => (
@@ -229,9 +234,9 @@ export default function ClientVisits() {
 
           <FilterField label="Client Type">
             <select className="input" value={filters.clientType} onChange={(event) => updateFilter("clientType", event.target.value)}>
-              <option value="all">All Clients</option>
-              <option value="existing">Existing Client</option>
-              <option value="new">New Client</option>
+              {clientTypeOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
             </select>
           </FilterField>
 
@@ -295,7 +300,7 @@ export default function ClientVisits() {
               <SortableHeader label="Visit ID" onClick={() => toggleSort("visitId")} />
               <SortableHeader label="Client" onClick={() => toggleSort("client")} />
               <SortableHeader label="Schedule" onClick={() => toggleSort("visitDate")} />
-              <SortableHeader label="Visit Type" onClick={() => toggleSort("type")} />
+              <SortableHeader label="Type" onClick={() => toggleSort("type")} />
               <th>Visited By</th>
               <SortableHeader label="Status" onClick={() => toggleSort("status")} />
               <th>Actions</th>
@@ -318,7 +323,7 @@ export default function ClientVisits() {
                     <button
                       type="button"
                       className="font-black text-[#1e3a8a] hover:underline text-left"
-                      onClick={() => setHistoryClient({ id: visit.client._id, name: visit.clientName })}
+                      onClick={() => setDrawerClientId(visit.client._id)}
                     >
                       {visit.clientName}
                     </button>
@@ -387,14 +392,9 @@ export default function ClientVisits() {
         onVisitUpdated={handleVisitUpdated}
       />
 
-      <ClientVisitHistoryDrawer
-        clientId={historyClient?.id}
-        clientName={historyClient?.name}
-        onClose={() => setHistoryClient(null)}
-        onVisitClick={(visitId) => {
-          setHistoryClient(null);
-          setDrawerVisitId(visitId);
-        }}
+      <ClientDrawer
+        clientId={drawerClientId}
+        onClose={() => setDrawerClientId(null)}
       />
 
       <ExportModal

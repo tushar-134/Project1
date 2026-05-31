@@ -82,10 +82,10 @@ export default function Sidebar({ mobileOpen = false, onMobileClose = () => {}, 
         {/* Toggle Button for Desktop — positioned at sidebar edge, vertically centered with logo */}
         <button
           onClick={onToggleCollapse}
-          className="hidden lg:grid absolute -right-[12px] top-[26px] h-[24px] w-[24px] place-items-center rounded-full bg-[#eab308] text-white shadow-md hover:bg-[#ca8a04] transition-colors z-[60] border-2 border-white"
+          className="hidden lg:grid absolute -right-[12px] top-[26px] h-[26px] w-[26px] place-items-center rounded-full bg-[#eab308] text-white shadow-md hover:bg-[#ca8a04] transition-colors z-[60] border-2 border-white"
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          {collapsed ? <ChevronRight size={13} strokeWidth={3} /> : <ChevronLeft size={13} strokeWidth={3} />}
+          {collapsed ? <ChevronRight size={14} strokeWidth={3} /> : <ChevronLeft size={14} strokeWidth={3} />}
         </button>
 
         {/* Scrollable Inner Container */}
