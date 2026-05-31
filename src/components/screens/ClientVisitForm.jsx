@@ -13,6 +13,7 @@ import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
 import UserAvatar from "../ui/UserAvatar.jsx";
+import UnsavedChangesGuard from "../ui/UnsavedChangesGuard.jsx";
 
 const visitTypes = ["Requirement Gathering", "Verification", "Onboarding Discussion", "Follow Up", "Collection", "Meeting"];
 
@@ -85,7 +86,9 @@ export default function ClientVisitForm() {
   const { state } = useApp();
   const { fetchClients } = useClients();
   const { fetchUsers } = useUsers();
-  const [form, setForm] = useState(() => blankForm(currentUser));
+  const [isDirty, setIsDirty] = useState(false);
+  const [form, setFormRaw] = useState(() => blankForm(currentUser));
+  const setForm = (val) => { setIsDirty(true); setFormRaw(val); };
   const [userSearch, setUserSearch] = useState("");
   const [loading, setLoading] = useState(isEditMode);
   const [saving, setSaving] = useState(false);
@@ -104,7 +107,7 @@ export default function ClientVisitForm() {
     clientVisitService.get(id)
       .then((visit) => {
         if (!active) return;
-        setForm({
+        setFormRaw({
           clientType: visit.clientType || "existing",
           clientId: visit.client?._id || "",
           newClient: {
@@ -159,7 +162,7 @@ export default function ClientVisitForm() {
     if (form.clientType !== "existing" || !form.clientId) return;
     const client = state.clients.find((entry) => String(entry._id || entry.id) === String(form.clientId));
     if (!client) return;
-    setForm((current) => {
+    setFormRaw((current) => {
       const assignedId = client.assignedUser?._id || client.assignedUser || "";
       const nextAssignedUsers = assignedId && currentUser?.role !== "task_only"
         ? current.assignedUsers.includes(assignedId) ? current.assignedUsers : [...current.assignedUsers, assignedId]
@@ -256,6 +259,7 @@ export default function ClientVisitForm() {
         await clientVisitService.create(payload);
         toast.success("Visit scheduled.");
       }
+      setIsDirty(false);
       navigate("/client-visits");
     } catch (error) {
       toast.error(normalizeError(error));
@@ -276,6 +280,7 @@ export default function ClientVisitForm() {
 
   return (
     <div className="space-y-5">
+      <UnsavedChangesGuard isDirty={isDirty} />
       <div className="flex items-center gap-4">
         <button
           type="button"

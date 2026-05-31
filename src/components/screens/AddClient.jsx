@@ -14,6 +14,7 @@ import CustomFieldModal from "../ui/CustomFieldModal.jsx";
 import TaskDrawer from "../ui/TaskDrawer.jsx";
 import { DIAL_CODE_OPTIONS } from "../../utils/dialCodeOptions.js";
 import { getPhoneNumberSpec, normalizeDialCode, normalizePhoneNumber } from "../../utils/phoneUtils.js";
+import UnsavedChangesGuard from "../ui/UnsavedChangesGuard.jsx";
 
 const tabs = ["Basic Details", "Trade Licences", "Contact Persons", "VAT / CT", "Client Group", "Portal Logins", "Custom Fields", "Attachments"];
 const blankPortal = { name: "", url: "", username: "", password: "", notes: "" };
@@ -242,11 +243,13 @@ export default function AddClient() {
     const base = codes.map((code) => names.of(code)).filter(Boolean).sort();
     return ["United Arab Emirates", ...[...new Set(base)].filter((country) => country !== "United Arab Emirates")];
   }, []);
-  const [form, setForm] = useState({
+  const [isDirty, setIsDirty] = useState(false);
+  const [form, setFormRaw] = useState({
     clientType: "", fileNo: "", legalName: "", tradeName: "", fye: "Jan - Dec", jurisdiction: "Mainland", assigned: "",
     country: "United Arab Emirates", emirate: "Dubai", street: "", poBox: "", postalCode: "", differentAddress: false, correspondence: "",
     vatTrn: "", vatStatus: "Registered", vatDate: "", vatDeregDate: "", vatFreq: "Jan-Mar", vatRegistrationTask: "", vatRegistrationTaskId: "", ctTin: "", ctStatus: "Not Registered", ctDate: "", ctDeregDate: "", ctRegistrationTask: "", ctRegistrationTaskId: "", group: "", newGroup: "",
   });
+  const setForm = (val) => { setIsDirty(true); setFormRaw(val); };
   const vatFilingFrequencyOptions = useMemo(() => getVatFilingFrequencyOptions(form.fye), [form.fye]);
   const shouldShowVatRegistrationFields = form.vatStatus !== "Not Registered";
   const shouldShowCtRegistrationFields = form.ctStatus !== "Not Registered";
@@ -254,9 +257,10 @@ export default function AddClient() {
   const isCtDeregistered = form.ctStatus === "Deregistered";
   const [vatHistory, setVatHistory] = useState([]);
   const [ctHistory, setCtHistory] = useState([]);
-  const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
+  const [licences, setLicencesRaw] = useState([{ number: "", issue: "", expiry: "", authority: "", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
+  const setLicences = (val) => { setIsDirty(true); setLicencesRaw(val); };
 
-  const [contacts, setContacts] = useState([{
+  const [contacts, setContactsRaw] = useState([{
     name: "",
     designation: "",
     email: "",
@@ -282,13 +286,16 @@ export default function AddClient() {
     passportDocuments: [],
     persisted: false,
   }]);
-  const [portals, setPortals] = useState([blankPortal]);
+  const setContacts = (val) => { setIsDirty(true); setContactsRaw(val); };
+  const [portals, setPortalsRaw] = useState([blankPortal]);
+  const setPortals = (val) => { setIsDirty(true); setPortalsRaw(val); };
   const [visiblePortalPasswords, setVisiblePortalPasswords] = useState({});
   const [attachments, setAttachments] = useState([]);
   const [attachmentDescription, setAttachmentDescription] = useState("");
   const [authoritySearches, setAuthoritySearches] = useState({});
   const [customFieldModal, setCustomFieldModal] = useState(false);
-  const [customFieldValues, setCustomFieldValues] = useState({});
+  const [customFieldValues, setCustomFieldValuesRaw] = useState({});
+  const setCustomFieldValues = (val) => { setIsDirty(true); setCustomFieldValuesRaw(val); };
   const [selectedFieldKeys, setSelectedFieldKeys] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [userOptions, setUserOptions] = useState([]);
@@ -301,7 +308,10 @@ export default function AddClient() {
   const [isSaving, setIsSaving] = useState(false);
   const [drawerTaskId, setDrawerTaskId] = useState(null);
   const handledCreatedRegistrationTaskRef = useRef("");
-  const update = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+  const update = (key, value) => setFormRaw((f) => {
+    setIsDirty(true);
+    return { ...f, [key]: value };
+  });
   const canManageTaskDrawer = currentUser?.role === "admin" || currentUser?.role === "manager";
   const openVatRegistrationTask = () => {
     if (!isEditMode || !id) {
@@ -404,7 +414,7 @@ export default function AddClient() {
   }, [groupSearch, loadGroupOptions]);
 
   useEffect(() => {
-    setForm((current) => {
+    setFormRaw((current) => {
       const normalizedVatFrequency = normalizeVatFilingFrequency(current.vatFreq, current.fye);
       return normalizedVatFrequency === current.vatFreq ? current : { ...current, vatFreq: normalizedVatFrequency };
     });
@@ -430,7 +440,7 @@ export default function AddClient() {
       const nextCtStatus = apiCtStatus === "registered" ? "Registered" : apiCtStatus === "deregistered" ? "Deregistered" : "Not Registered";
       const nextCtRegistrationTask = createdRegistrationTask?.taxType === "ct" ? createdRegistrationTask.taskMongoId || "" : client.ctDetails?.registrationTask || "";
       const nextCtRegistrationTaskId = createdRegistrationTask?.taxType === "ct" ? createdRegistrationTask.taskId || "" : client.ctDetails?.registrationTaskId || "";
-      setForm({
+      setFormRaw({
         clientType: client.clientType === "natural" ? "Natural Person" : "Legal Person",
         fileNo: client.fileNo || "",
         legalName: client.legalName || "",
@@ -504,13 +514,13 @@ export default function AddClient() {
         dispatch({ type: "SET_RESOURCE", resource: "groups", payload: mergeOptions(state.groups || [], [selectedGroup]) });
       }
       const clientFields = client.customFields || {};
-      setCustomFieldValues(clientFields);
+      setCustomFieldValuesRaw(clientFields);
       
       // Identify which dynamic fields have values and should be "selected"
       const dynamicKeys = Object.keys(clientFields);
       setSelectedFieldKeys(dynamicKeys);
 
-      setLicences((client.tradeLicences || []).length ? client.tradeLicences.map((licence) => ({
+      setLicencesRaw((client.tradeLicences || []).length ? client.tradeLicences.map((licence) => ({
         number: licence.licenceNumber || "",
         issue: licence.issueDate?.slice?.(0, 10) || "",
         expiry: licence.expiryDate?.slice?.(0, 10) || "",
@@ -523,7 +533,7 @@ export default function AddClient() {
         documents: mapExistingDocuments(licence.documents, licence.documentUrl),
         persisted: true,
       })) : [{ number: "", issue: "", expiry: "", authority: "", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
-      setContacts((client.contactPersons || []).length ? client.contactPersons.map((person) => ({
+      setContactsRaw((client.contactPersons || []).length ? client.contactPersons.map((person) => ({
         name: person.fullName || "",
         designation: person.designation || "",
         email: person.email || "",
@@ -574,7 +584,7 @@ export default function AddClient() {
         passportDocuments: [],
         persisted: false,
       }]);
-      setPortals((client.portalLogins || []).length ? client.portalLogins.map((portal) => ({
+      setPortalsRaw((client.portalLogins || []).length ? client.portalLogins.map((portal) => ({
         name: portal.portalName || "",
         url: portal.portalUrl || "",
         username: portal.username || "",
@@ -1116,6 +1126,7 @@ export default function AddClient() {
             await uploadContactDocuments(id, document.index, document.files, document.section);
           }
         }
+        setIsDirty(false);
         toast.success(continueToNext ? "Progress saved." : "Client updated successfully.");
       } else {
         const created = await createClient(payload);
@@ -1149,6 +1160,7 @@ export default function AddClient() {
           }
           if (updatedClient?.attachments) setAttachments(mapAttachmentRows(updatedClient.attachments));
         }
+        setIsDirty(false);
         toast.success(continueToNext ? "Progress saved." : (pendingAttachments.length || pendingLicenceDocuments.length || pendingContactDocuments.length ? "Client created and documents uploaded." : "Client created successfully."));
         if (continueToNext) navigate(`/clients/edit/${createdClientId}`, { replace: true });
       }
@@ -1185,9 +1197,9 @@ export default function AddClient() {
   };
   const isFirstTab = tab === 0;
   const isLastTab = tab === tabs.length - 1;
-
   return (
     <div className="space-y-5">
+      <UnsavedChangesGuard isDirty={isDirty} />
       <Card>
         <div className="flex overflow-x-auto rounded-t-xl border-b border-[#e2e8f0] bg-slate-50 p-2">{tabs.map((t, i) => <button key={t} onClick={() => setTab(i)} className={`mr-1 whitespace-nowrap rounded-lg px-3 py-2 text-[12px] font-extrabold ${tab === i ? "bg-[#1e3a8a] text-white" : "text-slate-600 hover:bg-white"}`}>{t}</button>)}</div>
         <div className="p-4">

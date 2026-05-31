@@ -13,6 +13,7 @@ import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
 import Toggle from "../ui/Toggle.jsx";
+import UnsavedChangesGuard from "../ui/UnsavedChangesGuard.jsx";
 
 export default function AddTask() {
   const { state, dispatch } = useApp();
@@ -38,7 +39,8 @@ export default function AddTask() {
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
   const [attachments, setAttachments] = useState([]);
   const [attachmentDescription, setAttachmentDescription] = useState("");
-  const [details, setDetails] = useState({
+  const [isDirty, setIsDirty] = useState(false);
+  const [details, setDetailsRaw] = useState({
     client: prefillTask?.clientId || "",
     assigned: "",
     dueDate: "2026-05-31",
@@ -61,6 +63,11 @@ export default function AddTask() {
   const showFY = selectedRawType ? (selectedRawType.showFY ?? selectedRawType.showPeriod ?? true) : true;
   const showQuarter = selectedRawType ? (selectedRawType.showQuarter ?? selectedRawType.showPeriod ?? true) : true;
   const showRecurring = selectedRawType ? (selectedRawType.showRecurring !== false) : true;
+
+  const setDetails = (update) => {
+    setIsDirty(true);
+    setDetailsRaw(update);
+  };
 
 
   // Derive FY + Quarter options from the selected client's financialYearEnd.
@@ -108,7 +115,7 @@ export default function AddTask() {
       quarter = current.quarter;
     }
     
-    setDetails((prev) => ({ ...prev, periodFY: fy, periodQuarter: quarter }));
+    setDetailsRaw((prev) => ({ ...prev, periodFY: fy, periodQuarter: quarter }));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [details.client, clientFYE, isEditMode, categoryName]);
   useEffect(() => {
@@ -137,7 +144,7 @@ export default function AddTask() {
 
       // Handle both mapped shape (apiStatus) and raw API shape (status enum)
       setSavedStatus(task.apiStatus || task.status || "not_started");
-      setDetails({
+      setDetailsRaw({
         // Handle both mapped shape (clientId) and raw API shape (client._id)
         client: task.client?._id || task.clientId || (typeof task.client === "string" ? "" : task.client) || "",
         // Handle both mapped shape (assignedId) and raw API shape (assignedTo._id)
@@ -173,7 +180,7 @@ export default function AddTask() {
     setCategoryName(prefillTask.categoryName || "VAT");
     setType(prefillTask.type || "VAT Return");
     setStep(3);
-    setDetails((current) => ({
+    setDetailsRaw((current) => ({
       ...current,
       client: prefillTask.clientId || current.client,
       description: prefillTask.description || current.description,
@@ -216,6 +223,7 @@ export default function AddTask() {
         ...current,
         ...selected.map((file) => toPendingAttachment(file, note)),
       ]);
+      setIsDirty(true);
       setAttachmentDescription("");
       toast.success(selected.length === 1 ? "Attachment added. You can open it immediately." : "Attachments added. You can open them immediately.");
       return;
@@ -240,6 +248,7 @@ export default function AddTask() {
   async function removeAttachment(attachment) {
     if (!attachment.saved) {
       setAttachments((current) => current.filter((item) => item.id !== attachment.id));
+      setIsDirty(true);
       return;
     }
     try {
@@ -317,6 +326,7 @@ export default function AddTask() {
         setAttachments(mapAttachmentRows(savedTask?.attachments || []));
       }
       toast.success(isEditMode ? "Task updated successfully." : "Task created successfully.");
+      setIsDirty(false); // Reset dirty state before navigation
       if (!isEditMode && returnToClient?.clientId && savedTask?._id) {
         navigate(`/clients/edit/${returnToClient.clientId}`, {
           state: {
@@ -342,6 +352,7 @@ export default function AddTask() {
 
   return (
     <div className="space-y-5">
+      <UnsavedChangesGuard isDirty={isDirty} />
       <div className="grid gap-3 md:grid-cols-3">
         {["Select Category", "Select Task Type", "Task Details"].map((label, i) => (
           <Step 
