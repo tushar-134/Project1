@@ -38,6 +38,7 @@ export default function Users({ setSettingsHeaderAction }) {
   const { state } = useApp();
   const { currentUser } = useAuth();
   const { fetchUsers, updateRole, createUser, updateUser, deleteUser, updateStatus } = useUsers();
+  // Strictly restrict user management to admin roles
   const canManageUsers = currentUser?.role === "admin";
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
