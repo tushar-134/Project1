@@ -501,13 +501,7 @@ exports.createVisit = async (req, res, next) => {
       assignedUsers = [],
     } = req.body;
 
-    const scheduledDate = new Date(visitDate);
-    scheduledDate.setHours(0, 0, 0, 0);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (scheduledDate < today) {
-      return res.status(400).json({ message: "Visit date cannot be in the past." });
-    }
+
 
     if (clientType === "existing" && !client) {
       return res.status(400).json({ message: "Please select an existing client." });
@@ -604,13 +598,7 @@ exports.updateVisit = async (req, res, next) => {
       status = visit.status,
     } = req.body;
 
-    const scheduledDate = new Date(visitDate);
-    scheduledDate.setHours(0, 0, 0, 0);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (scheduledDate < today) {
-      return res.status(400).json({ message: "Visit date cannot be in the past." });
-    }
+
     if (clientType === "existing" && !client) {
       return res.status(400).json({ message: "Please select an existing client." });
     }
