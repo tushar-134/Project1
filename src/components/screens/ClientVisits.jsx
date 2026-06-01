@@ -322,7 +322,7 @@ export default function ClientVisits() {
                   {visit.client?._id ? (
                     <button
                       type="button"
-                      className="group inline-flex items-center gap-2 text-left font-black text-[#1e3a8a] hover:underline"
+                      className="group inline-flex items-center gap-2 text-left font-black text-[#1e3a8a] hover:underline cursor-pointer"
                       onClick={() => setHistoryClient({ id: visit.client._id, name: visit.clientName })}
                     >
                       <span>{visit.clientName}</span>

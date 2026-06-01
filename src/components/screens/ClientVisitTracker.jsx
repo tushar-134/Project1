@@ -353,7 +353,7 @@ export default function ClientVisitTracker() {
                     {visit.client?._id ? (
                       <button
                         type="button"
-                        className="font-extrabold text-[#1e3a8a] hover:underline text-left"
+                        className="font-extrabold text-[#1e3a8a] hover:underline text-left cursor-pointer"
                         onClick={() => setHistoryClient({ id: visit.client._id, name: visit.client?.legalName })}
                       >
                         {visit.client?.legalName}
