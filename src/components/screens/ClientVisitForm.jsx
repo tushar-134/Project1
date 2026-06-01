@@ -1,5 +1,5 @@
 import { ArrowLeft, Calendar, Clock3, Save, Search, UsersRound } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
@@ -13,6 +13,7 @@ import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
 import UserAvatar from "../ui/UserAvatar.jsx";
+import UnsavedChangesGuard from "../ui/UnsavedChangesGuard.jsx";
 
 const visitTypes = ["Requirement Gathering", "Verification", "Onboarding Discussion", "Follow Up", "Collection", "Meeting"];
 
@@ -85,14 +86,24 @@ export default function ClientVisitForm() {
   const { state } = useApp();
   const { fetchClients } = useClients();
   const { fetchUsers } = useUsers();
-  const [form, setForm] = useState(() => blankForm(currentUser));
+  const [isDirty, setIsDirty] = useState(false);
+  const [form, setFormRaw] = useState(() => blankForm(currentUser));
+  const setForm = (val) => { setIsDirty(true); setFormRaw(val); };
   const [userSearch, setUserSearch] = useState("");
   const [loading, setLoading] = useState(isEditMode);
   const [saving, setSaving] = useState(false);
 
+  const hasFetchedClients = useRef(false);
+
   useEffect(() => {
-    fetchClients({ limit: 500 }).catch(() => toast.error("Unable to load clients."));
-    if (currentUser?.role !== "task_only") {
+    if (!hasFetchedClients.current) {
+      hasFetchedClients.current = true;
+      fetchClients({ limit: 10 }).catch(() => toast.error("Unable to load clients."));
+    }
+  }, [fetchClients]);
+
+  useEffect(() => {
+    if (currentUser?.role && currentUser.role !== "task_only") {
       fetchUsers().catch(() => toast.error("Unable to load users."));
     }
   }, [currentUser?.role]);
@@ -104,7 +115,7 @@ export default function ClientVisitForm() {
     clientVisitService.get(id)
       .then((visit) => {
         if (!active) return;
-        setForm({
+        setFormRaw({
           clientType: visit.clientType || "existing",
           clientId: visit.client?._id || "",
           newClient: {
@@ -159,7 +170,7 @@ export default function ClientVisitForm() {
     if (form.clientType !== "existing" || !form.clientId) return;
     const client = state.clients.find((entry) => String(entry._id || entry.id) === String(form.clientId));
     if (!client) return;
-    setForm((current) => {
+    setFormRaw((current) => {
       const assignedId = client.assignedUser?._id || client.assignedUser || "";
       const nextAssignedUsers = assignedId && currentUser?.role !== "task_only"
         ? current.assignedUsers.includes(assignedId) ? current.assignedUsers : [...current.assignedUsers, assignedId]
@@ -256,6 +267,7 @@ export default function ClientVisitForm() {
         await clientVisitService.create(payload);
         toast.success("Visit scheduled.");
       }
+      setIsDirty(false);
       navigate("/client-visits");
     } catch (error) {
       toast.error(normalizeError(error));
@@ -268,7 +280,7 @@ export default function ClientVisitForm() {
     return (
       <div className="space-y-5">
         <div className="page-kicker">Field Operations</div>
-        <h1 className="screen-title">{isEditMode ? "Edit Visit" : "Schedule New Visit"}</h1>
+        <h1 className="screen-title">{isEditMode ? "Edit Visit" : "New Visit"}</h1>
         <Card className="p-8 text-center text-[14px] font-semibold text-slate-500">Loading visit...</Card>
       </div>
     );
@@ -276,6 +288,7 @@ export default function ClientVisitForm() {
 
   return (
     <div className="space-y-5">
+      <UnsavedChangesGuard isDirty={isDirty} />
       <div className="flex items-center gap-4">
         <button
           type="button"
@@ -286,7 +299,7 @@ export default function ClientVisitForm() {
         </button>
         <div className="min-w-0 flex-1">
           <div className="page-kicker">Field Operations</div>
-          <h1 className="screen-title">{isEditMode ? "Edit Visit" : "Schedule New Visit"}</h1>
+          <h1 className="screen-title">{isEditMode ? "Edit Visit" : "New Visit"}</h1>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button variant="ghost" onClick={() => navigate("/client-visits")} disabled={saving}>
@@ -294,7 +307,7 @@ export default function ClientVisitForm() {
           </Button>
           <Button onClick={saveVisit} disabled={saving}>
             <Save size={15} />
-            {saving ? (isEditMode ? "Saving..." : "Scheduling...") : (isEditMode ? "Save Changes" : "Schedule Visit")}
+            {saving ? "Saving..." : isEditMode ? "Save Changes" : "Save Visit"}
           </Button>
         </div>
       </div>
@@ -376,7 +389,7 @@ export default function ClientVisitForm() {
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Visit Date *">
                 <div className="relative">
-                  <input className="input pr-10" type="date" min={todayValue()} value={form.visitDate} onChange={(event) => updateField("visitDate", event.target.value)} />
+                  <input className="input pr-10" type="date" value={form.visitDate} onChange={(event) => updateField("visitDate", event.target.value)} />
                   <Calendar className="pointer-events-none absolute right-4 top-3 text-slate-400" size={16} />
                 </div>
               </Field>

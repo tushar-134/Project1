@@ -183,18 +183,6 @@ export default function TopBar({ title, navOpen = false, onMenuClick }) {
   return (
     <header className="relative flex min-h-[56px] shrink-0 items-center justify-between gap-3 border-b border-[#e2e8f0] bg-white px-3 py-2 shadow-sm sm:px-4 lg:px-6">
       <div className="flex min-w-0 items-center gap-3">
-        {/* Hamburger — always 3 bars; sidebar has its own close (X) button */}
-        <button
-          onClick={onMenuClick}
-          className="hamburger-btn"
-          aria-label={navOpen ? "Close navigation" : "Open navigation"}
-          aria-expanded={navOpen}
-          title={navOpen ? "Close menu" : "Open menu"}
-        >
-          <span className="hamburger-bar" />
-          <span className="hamburger-bar" />
-          <span className="hamburger-bar" />
-        </button>
         <h1 className="min-w-0 truncate text-[20px] font-extrabold text-slate-900 sm:text-[22px]">{title}</h1>
       </div>
       <div ref={wrapRef} className="relative flex shrink-0 items-center gap-2 sm:gap-4">

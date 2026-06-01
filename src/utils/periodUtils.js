@@ -186,3 +186,32 @@ export function getPeriodFromDate(dueDateStr, fyeString) {
   if (isNaN(date.getTime())) return { fy: "", quarter: "" };
   return getCurrentFYAndQuarter(fyeString, date);
 }
+
+/**
+ * Parse a VAT filing frequency string ("Jan-Mar || Apr-Jun || Jul-Sep || Oct-Dec")
+ * and return the quarter that the current (or reference) date falls into.
+ */
+export function getQuarterFromVatFrequency(filingFrequency, referenceDate) {
+  if (!filingFrequency) return "";
+  const date = referenceDate instanceof Date ? referenceDate : new Date(referenceDate || Date.now());
+  const month = date.getMonth();
+  
+  const parts = String(filingFrequency).split("||").map(p => p.trim());
+  for (const part of parts) {
+    if (!part) continue;
+    const [start, end] = part.split("-");
+    if (!start || !end) continue;
+    
+    const startIndex = MONTH_NAMES.findIndex(m => m.toLowerCase() === start.toLowerCase());
+    const endIndex = MONTH_NAMES.findIndex(m => m.toLowerCase() === end.toLowerCase());
+    
+    if (startIndex === -1 || endIndex === -1) continue;
+    
+    if (startIndex <= endIndex) {
+      if (month >= startIndex && month <= endIndex) return part;
+    } else {
+      if (month >= startIndex || month <= endIndex) return part;
+    }
+  }
+  return parts[0] || "";
+}

@@ -15,6 +15,15 @@ function titleStatus(value) {
     .join(" ");
 }
 
+const COMMENT_COLORS = [
+  "bg-blue-50 border-blue-100",
+  "bg-emerald-50 border-emerald-100",
+  "bg-amber-50 border-amber-100",
+  "bg-purple-50 border-purple-100",
+  "bg-rose-50 border-rose-100",
+  "bg-indigo-50 border-indigo-100",
+];
+
 function formatDate(value) {
   if (!value) return "-";
   const date = new Date(value);
@@ -313,40 +322,9 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
                   Comments
                 </div>
 
-                {/* Comment thread */}
-                {(() => {
-                  const comments = parseComments(visit.remarks);
-                  return comments.length === 0 ? (
-                    <p className="mb-4 text-[13px] text-slate-400 italic">No comments yet. Be the first to add one.</p>
-                  ) : (
-                    <div className="mb-5 space-y-4 max-h-[280px] overflow-y-auto pr-2 custom-scrollbar">
-                      {comments.map((comment, idx) => (
-                        <div key={idx} className="flex items-start gap-3">
-                          <div className="flex-shrink-0 h-8 w-8 rounded-full bg-[#1e3a8a] flex items-center justify-center text-[12px] font-extrabold text-white">
-                            {String(comment.author || "?").charAt(0).toUpperCase()}
-                          </div>
-                          <div className="flex-1 rounded-2xl bg-[#f8fbff] border border-[#e2e8f0] px-4 py-3">
-                            <div className="flex items-center justify-between gap-2 mb-1.5">
-                              <span className="text-[12px] font-extrabold text-slate-700">{comment.author || "—"}</span>
-                              {comment.at && (
-                                <span className="text-[11px] font-semibold text-slate-400">
-                                  {new Date(comment.at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-                                  {" at "}
-                                  {new Date(comment.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-[14px] leading-relaxed text-slate-700 whitespace-pre-wrap">{comment.text}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  );
-                })()}
-
                 {/* Post new comment */}
                 {canManage || (visit.assignedUsers || []).some((entry) => String(entry.user?._id || entry.user) === String(currentUser?._id || currentUser?.id)) ? (
-                  <div className="border-t border-[#e2e8f0] pt-4 mt-2">
+                  <div className="mb-5 border-b border-[#e2e8f0] pb-5">
                     <textarea
                       className="input min-h-[90px] py-3 text-[14px]"
                       placeholder="Write a comment…"
@@ -369,6 +347,37 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
                     </div>
                   </div>
                 ) : null}
+
+                {/* Comment thread */}
+                {(() => {
+                  const comments = parseComments(visit.remarks).reverse();
+                  return comments.length === 0 ? (
+                    <p className="mb-4 text-[13px] text-slate-400 italic">No comments yet.</p>
+                  ) : (
+                    <div className="mb-5 space-y-4 max-h-[280px] overflow-y-auto pr-2 custom-scrollbar">
+                      {comments.map((comment, idx) => (
+                        <div key={idx} className="flex items-start gap-3">
+                          <div className="flex-shrink-0 h-8 w-8 rounded-full bg-[#1e3a8a] flex items-center justify-center text-[12px] font-extrabold text-white">
+                            {String(comment.author || "?").charAt(0).toUpperCase()}
+                          </div>
+                          <div className={`flex-1 rounded-2xl border px-4 py-3 ${COMMENT_COLORS[idx % COMMENT_COLORS.length]}`}>
+                            <div className="flex items-center justify-between gap-2 mb-1.5">
+                              <span className="text-[12px] font-extrabold text-slate-700">{comment.author || "—"}</span>
+                              {comment.at && (
+                                <span className="text-[11px] font-semibold text-slate-400">
+                                  {new Date(comment.at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                                  {" at "}
+                                  {new Date(comment.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[14px] leading-relaxed text-slate-700 whitespace-pre-wrap">{comment.text}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
 
               <Card className="p-5">

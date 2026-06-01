@@ -39,6 +39,12 @@ const populateClient = [
   { path: "contactPersons.passport.documents.uploadedBy", select: "name" },
 ];
 
+const populateClientList = [
+  { path: "assignedUser", select: "name" },
+  { path: "group", select: "name" },
+  { path: "createdBy", select: "name" },
+];
+
 function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -86,7 +92,7 @@ async function buildClientListQuery(req) {
   }
   if (assignedUser) andClauses.push({ assignedUser });
   if (req.user.role === "task_only") {
-    const assignedClientIds = await Task.find({ assignedTo: req.user._id }).distinct("client");
+    const assignedClientIds = await Task.distinct("client", { assignedTo: req.user._id });
     andClauses.push({ _id: { $in: assignedClientIds } });
   }
   if (search) andClauses.push(buildClientSearchClause(search));
@@ -254,6 +260,13 @@ function validateVatTrn(vatDetails = {}) {
   const trn = String(vatDetails?.trn || "").trim();
   if (status === "registered" && !trn) return "VAT TRN is required when VAT status is registered.";
   if (trn && !/^1\d{14}$/.test(trn)) return "VAT TRN must be a 15-digit number starting with 1.";
+  if (status === "registered" && !vatDetails?.registrationDate) return "VAT Registration Date is required when VAT status is registered.";
+  return null;
+}
+
+function validateCtDetails(ctDetails = {}) {
+  const status = String(ctDetails?.status || "").trim();
+  if (status === "registered" && !ctDetails?.registrationDate) return "CT Registration Date is required when CT status is registered.";
   return null;
 }
 
@@ -412,7 +425,7 @@ exports.listClients = async (req, res, next) => {
     const pages = Math.max(1, Math.ceil(total / limit));
     const page = Math.min(requestedPage, pages);
     const clients = await Client.find(query)
-      .populate(populateClient)
+      .populate(populateClientList)
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit);
@@ -462,6 +475,8 @@ exports.createClient = async (req, res, next) => {
     if (clientAssignError) return res.status(clientAssignError.status).json({ message: clientAssignError.message });
     const vatTrnError = validateVatTrn(req.body.vatDetails);
     if (vatTrnError) return res.status(400).json({ message: vatTrnError });
+    const ctDetailsError = validateCtDetails(req.body.ctDetails);
+    if (ctDetailsError) return res.status(400).json({ message: ctDetailsError });
     const invalidEidIndex = findInvalidEmiratesId(req.body.contactPersons);
     if (invalidEidIndex >= 0) return res.status(400).json({ message: `Contact person ${invalidEidIndex + 1}: Emirates ID must match 784-XXXX-XXXXXXX-X.` });
     if (req.body.group) {
@@ -522,6 +537,10 @@ exports.updateClient = async (req, res, next) => {
       const vatTrnError = validateVatTrn({ ...(client.vatDetails || {}), ...(req.body.vatDetails || {}) });
       if (vatTrnError) return res.status(400).json({ message: vatTrnError });
     }
+    if ("ctDetails" in req.body) {
+      const ctDetailsError = validateCtDetails({ ...(client.ctDetails || {}), ...(req.body.ctDetails || {}) });
+      if (ctDetailsError) return res.status(400).json({ message: ctDetailsError });
+    }
     if ("group" in req.body && req.body.group) {
       const groupExists = await ClientGroup.exists({ _id: req.body.group });
       if (!groupExists) return res.status(400).json({ message: "Selected group not found." });
@@ -546,6 +565,94 @@ exports.updateClient = async (req, res, next) => {
     if (Array.isArray(req.body.contactPersons)) {
       req.body.contactPersons = normalizeContactPersonsForPersistence(req.body.contactPersons, client.contactPersons || []);
     }
+
+    // Auto-archiving and history logic
+    if ("vatDetails" in req.body && req.body.vatDetails) {
+      if (req.body.vatDetails.status === "deregistered") {
+        const oldStatus = client.vatDetails?.status;
+        if (oldStatus === "registered") {
+          const newHistoryEntry = {
+            trn: client.vatDetails.trn,
+            status: "deregistered",
+            registrationDate: client.vatDetails.registrationDate,
+            deregistrationDate: req.body.vatDetails.deregistrationDate || new Date(),
+            filingFrequency: client.vatDetails.filingFrequency,
+            registrationTask: client.vatDetails.registrationTask,
+            registrationTaskId: client.vatDetails.registrationTaskId,
+            archivedAt: new Date(),
+            linkedTo: null,
+          };
+          if (!client.vatDetails.history) {
+            client.vatDetails.history = [];
+          }
+          client.vatDetails.history.push(newHistoryEntry);
+        }
+      } else if (req.body.vatDetails.status === "registered") {
+        const oldStatus = client.vatDetails?.status;
+        if (oldStatus === "deregistered") {
+          if (client.vatDetails.history && client.vatDetails.history.length > 0) {
+            const lastIndex = client.vatDetails.history.length - 1;
+            client.vatDetails.history[lastIndex].linkedTo = -1;
+          }
+          req.body.vatDetails.deregistrationDate = null;
+        }
+      }
+      
+      // Update individual fields of client.vatDetails directly
+      client.vatDetails.trn = req.body.vatDetails.trn;
+      client.vatDetails.status = req.body.vatDetails.status;
+      client.vatDetails.registrationDate = req.body.vatDetails.registrationDate;
+      client.vatDetails.deregistrationDate = req.body.vatDetails.deregistrationDate;
+      client.vatDetails.filingFrequency = req.body.vatDetails.filingFrequency;
+      client.vatDetails.registrationTask = req.body.vatDetails.registrationTask;
+      client.vatDetails.registrationTaskId = req.body.vatDetails.registrationTaskId;
+
+      delete req.body.vatDetails;
+    }
+
+    if ("ctDetails" in req.body && req.body.ctDetails) {
+      if (req.body.ctDetails.status === "deregistered") {
+        const oldStatus = client.ctDetails?.status;
+        if (oldStatus === "registered") {
+          const newHistoryEntry = {
+            tin: client.ctDetails.tin,
+            status: "deregistered",
+            registrationDate: client.ctDetails.registrationDate,
+            deregistrationDate: req.body.ctDetails.deregistrationDate || new Date(),
+            financialYearEnd: client.ctDetails.financialYearEnd,
+            registrationTask: client.ctDetails.registrationTask,
+            registrationTaskId: client.ctDetails.registrationTaskId,
+            archivedAt: new Date(),
+            linkedTo: null,
+          };
+          if (!client.ctDetails.history) {
+            client.ctDetails.history = [];
+          }
+          client.ctDetails.history.push(newHistoryEntry);
+        }
+      } else if (req.body.ctDetails.status === "registered") {
+        const oldStatus = client.ctDetails?.status;
+        if (oldStatus === "deregistered") {
+          if (client.ctDetails.history && client.ctDetails.history.length > 0) {
+            const lastIndex = client.ctDetails.history.length - 1;
+            client.ctDetails.history[lastIndex].linkedTo = -1;
+          }
+          req.body.ctDetails.deregistrationDate = null;
+        }
+      }
+
+      // Update individual fields of client.ctDetails directly
+      client.ctDetails.tin = req.body.ctDetails.tin;
+      client.ctDetails.status = req.body.ctDetails.status;
+      client.ctDetails.registrationDate = req.body.ctDetails.registrationDate;
+      client.ctDetails.deregistrationDate = req.body.ctDetails.deregistrationDate;
+      client.ctDetails.financialYearEnd = req.body.ctDetails.financialYearEnd;
+      client.ctDetails.registrationTask = req.body.ctDetails.registrationTask;
+      client.ctDetails.registrationTaskId = req.body.ctDetails.registrationTaskId;
+
+      delete req.body.ctDetails;
+    }
+
     const candidate = {
       legalName: "legalName" in req.body ? req.body.legalName : client.legalName,
       vatDetails: "vatDetails" in req.body ? req.body.vatDetails : client.vatDetails,
@@ -696,6 +803,24 @@ exports.bulkUpload = async (req, res, next) => {
     let added = 0, failed = 0;
     const seenLicences = new Set();
 
+    // Batch pre-fetch active users to avoid querying inside the loop
+    const activeUsers = await User.find({ isActive: true }).select("_id email").lean();
+    const userMap = new Map(activeUsers.map((u) => [String(u.email || "").trim().toLowerCase(), u._id]));
+
+    // Batch query existing licence numbers to check for duplicates in one roundtrip
+    const licenceNumbers = rows
+      .map((r) => String(r.licenceNumber || r.licence || "").trim())
+      .filter(Boolean);
+    const existingClients = licenceNumbers.length
+      ? await Client.find({
+          isActive: true,
+          "tradeLicences.licenceNumber": { $in: licenceNumbers },
+        }).select("tradeLicences.licenceNumber").lean()
+      : [];
+    const existingLicenceSet = new Set(
+      existingClients.flatMap((c) => (c.tradeLicences || []).map((l) => String(l.licenceNumber || "").trim().toLowerCase()))
+    );
+
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       const serial = row.serial || i + 1;
@@ -724,12 +849,8 @@ exports.bulkUpload = async (req, res, next) => {
         }
         seenLicences.add(licence.toLowerCase());
 
-        // Check against existing clients in database
-        const exists = await Client.findOne({
-          isActive: true,
-          "tradeLicences.licenceNumber": licence,
-        });
-        if (exists) {
+        // Check against existing clients in database (using pre-fetched batch results)
+        if (existingLicenceSet.has(licence.toLowerCase())) {
           results.push({
             serial,
             status: "error",
@@ -740,8 +861,9 @@ exports.bulkUpload = async (req, res, next) => {
           continue;
         }
 
-        // Resolve assigned user by email
-        const assignedUser = await resolveAssignedUser(row.assignedUserEmailId || row.assignedUser);
+        // Resolve assigned user by email in-memory
+        const emailKey = String(row.assignedUserEmailId || row.assignedUser || "").trim().toLowerCase();
+        const assignedUser = emailKey ? userMap.get(emailKey) : undefined;
 
         const payload = buildClientPayload(row, req.user._id);
         if (assignedUser) payload.assignedUser = assignedUser;
@@ -750,6 +872,9 @@ exports.bulkUpload = async (req, res, next) => {
         const client = await Client.create(payload);
         results.push({ serial, status: "success", legalName, clientId: client._id });
         added++;
+        
+        // Add to existing licences to protect against duplicate inputs in this batch if any are skipped or not caught
+        existingLicenceSet.add(licence.toLowerCase());
       } catch (error) {
         results.push({ serial, status: "error", legalName, error: error.message });
         failed++;

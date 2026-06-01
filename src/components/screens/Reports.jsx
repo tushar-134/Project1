@@ -428,7 +428,7 @@ export default function Reports() {
             <input className="mt-1 block rounded border border-[#cbd5e1] px-3 py-2 text-[14px]" inputMode="numeric" placeholder="dd/mm/yyyy" value={draftRange.endDate} onChange={(event) => setDraftRange((current) => ({ ...current, endDate: event.target.value }))} />
           </label>
           <Button onClick={applyRange}>Apply</Button>
-          <Button variant="ghost" onClick={downloadCsv} disabled={downloading}>
+          <Button variant="outlinePurple" onClick={downloadCsv} disabled={downloading}>
             <Download size={16} /> {downloading ? "Preparing CSV" : "Download CSV Report"}
           </Button>
         </div>

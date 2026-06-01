@@ -29,9 +29,10 @@ const taskSchema = new mongoose.Schema({
   isRecurring: { type: Boolean, default: false },
   recurringConfig: {
     frequency: { type: String, enum: ["weekly", "monthly", "quarterly", "semi_annual", "annual", "custom"] },
-    dayOfWeek: { type: String }, // For weekly: "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"
-    dateOfMonth: { type: Number }, // For monthly, quarterly, yearly: 1 - 31
-    monthOfYear: { type: Number }, // For yearly: 1 - 12
+    dayOfWeek: { type: String }, // kept for backward compatibility
+    dateOfMonth: { type: Number }, // kept for backward compatibility
+    monthOfYear: { type: Number }, // kept for backward compatibility
+    daysBeforeDue: { type: Number, min: 1, max: 99, default: 15 },
     nextDueDate: Date,
     endDate: Date,
   },
@@ -57,5 +58,8 @@ taskSchema.index({
   recurringGeneratedTask: 1,
   "recurringConfig.nextDueDate": 1
 });
+taskSchema.index({ client: 1, updatedAt: -1, createdAt: -1 });
+taskSchema.index({ assignedTo: 1, updatedAt: -1, createdAt: -1 });
+taskSchema.index({ updatedAt: -1 });
 
 module.exports = mongoose.model("Task", taskSchema);
