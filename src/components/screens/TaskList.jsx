@@ -290,11 +290,13 @@ export default function TaskList() {
   const [searchParams] = useSearchParams();
   const { fetchTasks, updateStatus, updateAssignee, exportTasks } = useTasks();
   const initialMonth = searchParams.get("month") || getCurrentMonthValue();
+  const initialMonthScopedOverdue = searchParams.get("overdue") === "true" && Boolean(searchParams.get("month"));
 
   // Scope & month still live as top-level state (drive server query) but are now
   // controlled from the column filter row rather than the old chip section.
-  const [scope, setScope] = useState(searchParams.get("scope") || "By Month");
+  const [scope, setScope] = useState(searchParams.get("scope") || (initialMonthScopedOverdue ? "Overdue" : "By Month"));
   const [month, setMonth] = useState(initialMonth);
+  const [monthScopedOverdue, setMonthScopedOverdue] = useState(initialMonthScopedOverdue);
   const [drawerTaskId, setDrawerTaskId] = useState(searchParams.get("drawer") || null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
@@ -373,7 +375,7 @@ export default function TaskList() {
   const serverFilters = useMemo(() => ({
     category: deferredColumnFilters.category || undefined,
     status: deferredColumnFilters.status?.length > 0 ? deferredColumnFilters.status.join(",") : undefined,
-    month: scope === "By Month" ? month : undefined,
+    month: scope === "By Month" || monthScopedOverdue ? month : undefined,
     overdue: scope === "Overdue" ? "true" : undefined,
     taskId: deferredColumnFilters.taskId || undefined,
     client: deferredColumnFilters.client || undefined,
@@ -384,7 +386,7 @@ export default function TaskList() {
     recurring: deferredColumnFilters.recurring || undefined,
     createdAt: deferredColumnFilters.createdAt || undefined,
     updatedAt: deferredColumnFilters.updatedAt || undefined,
-  }), [deferredColumnFilters, month, scope]);
+  }), [deferredColumnFilters, month, monthScopedOverdue, scope]);
 
   const requestParams = useMemo(() => ({ ...serverFilters, page, limit: PAGE_SIZE }), [page, serverFilters]);
   const filterRef = useRef(requestParams);
@@ -447,6 +449,7 @@ export default function TaskList() {
   const updateScope = (value) => {
     setPage(1);
     setScope(value);
+    setMonthScopedOverdue(false);
   };
 
   const clearColumnFilters = () => {
@@ -458,6 +461,7 @@ export default function TaskList() {
     setPage(1);
     setScope("By Month");
     setMonth(initialMonth);
+    setMonthScopedOverdue(false);
     setColumnFilters(createEmptyColumnFilters());
   };
 
@@ -473,6 +477,7 @@ export default function TaskList() {
     setIsExportModalOpen(false);
     downloadBlob(await exportTasks(params), "tasks_full_export.xlsx");
   };
+  const isMonthControlDisabled = scope !== "By Month" && !monthScopedOverdue;
 
   const exportSelected = async (selectedKeys) => {
     const cols = selectedKeys.join(",");
@@ -623,7 +628,7 @@ export default function TaskList() {
 
           {/* Month selector + action buttons */}
           <div className="flex flex-wrap items-center gap-2">
-            <label htmlFor="task-list-month" className={`flex items-center gap-1.5 ${scope !== "By Month" ? "opacity-50" : ""}`}>
+            <label htmlFor="task-list-month" className={`flex items-center gap-1.5 ${isMonthControlDisabled ? "opacity-50" : ""}`}>
               <span className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Month</span>
               <input
                 id="task-list-month"
@@ -631,7 +636,7 @@ export default function TaskList() {
                 className="input h-8 w-[130px] text-[13px]"
                 type="month"
                 value={month}
-                disabled={scope !== "By Month"}
+                disabled={isMonthControlDisabled}
                 onChange={(event) => {
                   setPage(1);
                   setMonth(event.target.value);

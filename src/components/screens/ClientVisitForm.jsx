@@ -1,6 +1,6 @@
 import { ArrowLeft, Calendar, Clock3, Save, Search, UsersRound } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -80,6 +80,7 @@ function normalizeError(error) {
 
 export default function ClientVisitForm() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams();
   const isEditMode = Boolean(id);
   const { currentUser } = useAuth();
@@ -94,6 +95,20 @@ export default function ClientVisitForm() {
   const [saving, setSaving] = useState(false);
 
   const hasFetchedClients = useRef(false);
+
+  useEffect(() => {
+    if (isEditMode) return;
+    const prefill = location.state?.prefillVisit;
+    if (!prefill) return;
+    setFormRaw((current) => ({
+      ...current,
+      clientType: prefill.clientType || current.clientType,
+      clientId: prefill.clientId || current.clientId,
+      newClient: prefill.newClient ? { ...current.newClient, ...prefill.newClient } : current.newClient,
+      location: prefill.location || current.location,
+      assignedUsers: prefill.assignedUsers?.length ? prefill.assignedUsers : current.assignedUsers,
+    }));
+  }, [isEditMode, location.state]);
 
   useEffect(() => {
     if (!hasFetchedClients.current) {

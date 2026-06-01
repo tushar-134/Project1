@@ -281,8 +281,14 @@ async function taskQuery(req) {
   // clobber the month's $lt boundary. We now apply the month window first, then
   // tighten $lt to today only when no month is selected (overdue standalone).
   if (month) {
-    const [y, m] = month.split("-").map(Number);
-    query.dueDate = { $gte: new Date(Date.UTC(y, m - 1, 1)), $lt: new Date(Date.UTC(y, m, 1)) };
+    const match = String(month).match(/^(\d{4})-(\d{2})$/);
+    if (match) {
+      const y = Number(match[1]);
+      const m = Number(match[2]);
+      if (Number.isInteger(y) && Number.isInteger(m) && m >= 1 && m <= 12) {
+        query.dueDate = { $gte: new Date(Date.UTC(y, m - 1, 1)), $lt: new Date(Date.UTC(y, m, 1)) };
+      }
+    }
   }
   if (overdue === "true") {
     if (query.dueDate) {

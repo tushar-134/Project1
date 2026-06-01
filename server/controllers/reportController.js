@@ -6,7 +6,12 @@ const ActivityLog = require("../models/ActivityLog");
 
 function monthRange(month) {
   if (!month) return null;
-  const [y, m] = month.split("-").map(Number);
+  const match = String(month).match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+  const [, year, monthNumber] = match;
+  const y = Number(year);
+  const m = Number(monthNumber);
+  if (!Number.isInteger(y) || !Number.isInteger(m) || m < 1 || m > 12) return null;
   return { $gte: new Date(Date.UTC(y, m - 1, 1)), $lt: new Date(Date.UTC(y, m, 1)) };
 }
 
