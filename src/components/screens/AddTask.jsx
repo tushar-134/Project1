@@ -76,14 +76,34 @@ export default function AddTask() {
     [state.clients, details.client]
   );
   const clientFYE = selectedClient?.financialYearEnd || "Jan - Dec";
+  const vatFilingFrequency = selectedClient?.vatDetails?.filingFrequency || "";
   const fyOptions = useMemo(() => getFYOptions(clientFYE), [clientFYE]);
-  const quarterOptions = useMemo(() => getQuarters(clientFYE), [clientFYE]);
+  // For VAT category, build quarter options from the client's VAT filing frequency so the
+  // auto-populated value (from getQuarterFromVatFrequency) always matches an available option.
+  // For all other categories fall back to the FYE-based quarters.
+  const quarterOptions = useMemo(() => {
+    if (categoryName === "VAT" && vatFilingFrequency) {
+      const parts = vatFilingFrequency.split("||").map((p) => p.trim()).filter(Boolean);
+      if (parts.length) {
+        return parts.map((p, i) => ({ value: p, startMonth: 0, endMonth: 0, quarterIndex: i }));
+      }
+    }
+    return getQuarters(clientFYE);
+  }, [clientFYE, categoryName, vatFilingFrequency]);
   useEffect(() => {
-    // The task wizard needs lookup data up front so each step can stay synchronous and snappy.
-    fetchClients({ limit: 10 }).catch(() => { });
+    // Fetch users and categories on mount — these are needed from Step 1 onwards.
     fetchUsers().catch(() => { });
     categoryService.list().then((data) => dispatch({ type: "SET_RESOURCE", resource: "categories", payload: data.map(mapCategory) })).catch(() => { });
   }, []);
+
+  // Fetch clients only when Step 3 is active (or immediately when edit mode skips to Step 3).
+  // The ClientComboBox handles its own server-side search when opened, so the initial fetch
+  // is only needed to populate selectedClient for FY/Quarter auto-computation.
+  useEffect(() => {
+    if (step < 3) return;
+    fetchClients({ limit: 10 }).catch(() => { });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   // Auto-populate FY and Quarter once a client is selected (new tasks only).
   // Clears the fields when client is deselected; re-computes when client changes or category changes.
