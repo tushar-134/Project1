@@ -23,9 +23,15 @@ exports.dashboardStats = async (req, res, next) => {
 
     // For activity logs, scope to the selected month's date range
     const activityDateScope = dueDate ? { createdAt: dueDate } : {};
-    const activityTaskIds = req.user.role === "task_only"
-      ? await Task.find({ assignedTo: req.user._id }).distinct("_id")
-      : null;
+    
+    let activityTaskIds = null;
+    let visibleTaskClientIds = null;
+
+    if (req.user.role === "task_only") {
+      const tasks = await Task.find({ assignedTo: req.user._id }).select("_id client").lean();
+      activityTaskIds = tasks.map((t) => t._id);
+      visibleTaskClientIds = tasks.map((t) => t.client).filter(Boolean);
+    }
 
     // Overdue = ALL uncompleted tasks past their due date, regardless of selected month
     const now = new Date();
@@ -35,9 +41,6 @@ exports.dashboardStats = async (req, res, next) => {
       dueDate: { $lt: now },
     };
 
-    const visibleTaskClientIds = req.user.role === "task_only"
-      ? await Task.find({ assignedTo: req.user._id }).distinct("client")
-      : null;
     const clientScope = {
       isActive: true,
       ...(req.user.role === "task_only"
@@ -45,7 +48,12 @@ exports.dashboardStats = async (req, res, next) => {
         : {}),
     };
 
-    const [totalClients, pendingTasks, overdueTasks, ftaPending, recentActivity] = await Promise.all([
+    const catMatchStage = {
+      ...(dueDate ? { dueDate } : {}),
+      ...roleScope,
+    };
+
+    const [totalClients, pendingTasks, overdueTasks, ftaPending, recentActivity, catAgg, overdueAgg] = await Promise.all([
       Client.countDocuments(clientScope),
       Task.countDocuments({ ...taskScope, status: { $ne: "completed" } }),
       Task.countDocuments(overdueScope),
@@ -54,18 +62,10 @@ exports.dashboardStats = async (req, res, next) => {
         ...(req.user.role === "task_only" ? { task: { $in: activityTaskIds } } : {}),
         ...activityDateScope,
       })
-        .populate({ path: "task", populate: { path: "client", select: "legalName" } })
+        .populate({ path: "task", select: "_id taskId category taskType dueDate client", populate: { path: "client", select: "legalName" } })
         .populate("user", "name")
         .sort({ createdAt: -1 })
         .limit(10),
-    ]);
-
-    // Category breakdown — active/closed/pending scoped to selected month; overdue spans all time
-    const catMatchStage = {
-      ...(dueDate ? { dueDate } : {}),
-      ...roleScope,
-    };
-    const [catAgg, overdueAgg] = await Promise.all([
       Task.aggregate([
         { $match: catMatchStage },
         { $group: {
@@ -75,16 +75,14 @@ exports.dashboardStats = async (req, res, next) => {
           pending: { $sum: { $cond: [{ $ne: ["$status", "completed"] }, 1, 0] } },
         }},
       ]),
-      // Overdue per category — no lower date bound so past-month tasks are included
       Task.aggregate([
         { $match: { ...roleScope, status: { $ne: "completed" }, dueDate: { $lt: now } } },
         { $group: { _id: "$category", overdue: { $sum: 1 } } },
       ]),
     ]);
+
     const overdueByCat = new Map(overdueAgg.map((c) => [c._id, c.overdue]));
-    // Merge: start with month-scoped categories, inject all-time overdue counts
     const catMap = new Map(catAgg.map((c) => [c._id, c]));
-    // Also surface categories that only appear in overdueAgg (no tasks due this month)
     for (const [cat] of overdueByCat) {
       if (!catMap.has(cat)) catMap.set(cat, { _id: cat, active: 0, closed: 0, pending: 0 });
     }

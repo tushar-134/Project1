@@ -15,6 +15,7 @@ import TaskDrawer from "../ui/TaskDrawer.jsx";
 import { DIAL_CODE_OPTIONS } from "../../utils/dialCodeOptions.js";
 import { getPhoneNumberSpec, normalizeDialCode, normalizePhoneNumber } from "../../utils/phoneUtils.js";
 
+
 const tabs = ["Basic Details", "Trade Licences", "Contact Persons", "VAT / CT", "Client Group", "Portal Logins", "Custom Fields", "Attachments"];
 const blankPortal = { name: "", url: "", username: "", password: "", notes: "" };
 const DROPDOWN_PAGE_SIZE = 5;
@@ -231,6 +232,13 @@ export default function AddClient() {
   const isEditMode = Boolean(id);
   const { createClient, getClient, updateClient, uploadAttachment, uploadDocument, deleteAttachment, deleteDocument } = useClients();
   const [tab, setTab] = useState(() => Number(location.state?.activeTab) || 0);
+  const getInitialViewModeTabs = () => {
+    if (Array.isArray(location.state?.viewModeTabs)) {
+      return tabs.map((_, index) => Boolean(location.state.viewModeTabs[index]));
+    }
+    return tabs.map(() => Boolean(location.state?.viewMode));
+  };
+  const [viewModeTabs, setViewModeTabs] = useState(getInitialViewModeTabs);
   const countries = useMemo(() => {
     const names = new Intl.DisplayNames(["en"], { type: "region" });
     let codes = countryCodes;
@@ -242,17 +250,24 @@ export default function AddClient() {
     const base = codes.map((code) => names.of(code)).filter(Boolean).sort();
     return ["United Arab Emirates", ...[...new Set(base)].filter((country) => country !== "United Arab Emirates")];
   }, []);
-  const [form, setForm] = useState({
+  const [isDirty, setIsDirty] = useState(false);
+  const [form, setFormRaw] = useState({
     clientType: "", fileNo: "", legalName: "", tradeName: "", fye: "Jan - Dec", jurisdiction: "Mainland", assigned: "",
     country: "United Arab Emirates", emirate: "Dubai", street: "", poBox: "", postalCode: "", differentAddress: false, correspondence: "",
-    vatTrn: "", vatStatus: "Registered", vatDate: "", vatFreq: "Jan-Mar", vatRegistrationTask: "", vatRegistrationTaskId: "", ctTin: "", ctStatus: "Not Registered", ctDate: "", ctRegistrationTask: "", ctRegistrationTaskId: "", group: "", newGroup: "",
+    vatTrn: "", vatStatus: "Registered", vatDate: "", vatDeregDate: "", vatFreq: "Jan-Mar", vatRegistrationTask: "", vatRegistrationTaskId: "", ctTin: "", ctStatus: "Not Registered", ctDate: "", ctDeregDate: "", ctRegistrationTask: "", ctRegistrationTaskId: "", group: "", newGroup: "",
   });
+  const setForm = (val) => { setIsDirty(true); setFormRaw(val); };
   const vatFilingFrequencyOptions = useMemo(() => getVatFilingFrequencyOptions(form.fye), [form.fye]);
   const shouldShowVatRegistrationFields = form.vatStatus !== "Not Registered";
   const shouldShowCtRegistrationFields = form.ctStatus !== "Not Registered";
-  const [licences, setLicences] = useState([{ number: "", issue: "", expiry: "", authority: "", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
+  const isVatDeregistered = form.vatStatus === "Deregistered";
+  const isCtDeregistered = form.ctStatus === "Deregistered";
+  const [vatHistory, setVatHistory] = useState([]);
+  const [ctHistory, setCtHistory] = useState([]);
+  const [licences, setLicencesRaw] = useState([{ number: "", issue: "", expiry: "", authority: "", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
+  const setLicences = (val) => { setIsDirty(true); setLicencesRaw(val); };
 
-  const [contacts, setContacts] = useState([{
+  const [contacts, setContactsRaw] = useState([{
     name: "",
     designation: "",
     email: "",
@@ -278,13 +293,16 @@ export default function AddClient() {
     passportDocuments: [],
     persisted: false,
   }]);
-  const [portals, setPortals] = useState([blankPortal]);
+  const setContacts = (val) => { setIsDirty(true); setContactsRaw(val); };
+  const [portals, setPortalsRaw] = useState([blankPortal]);
+  const setPortals = (val) => { setIsDirty(true); setPortalsRaw(val); };
   const [visiblePortalPasswords, setVisiblePortalPasswords] = useState({});
   const [attachments, setAttachments] = useState([]);
   const [attachmentDescription, setAttachmentDescription] = useState("");
   const [authoritySearches, setAuthoritySearches] = useState({});
   const [customFieldModal, setCustomFieldModal] = useState(false);
-  const [customFieldValues, setCustomFieldValues] = useState({});
+  const [customFieldValues, setCustomFieldValuesRaw] = useState({});
+  const setCustomFieldValues = (val) => { setIsDirty(true); setCustomFieldValuesRaw(val); };
   const [selectedFieldKeys, setSelectedFieldKeys] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [userOptions, setUserOptions] = useState([]);
@@ -297,7 +315,10 @@ export default function AddClient() {
   const [isSaving, setIsSaving] = useState(false);
   const [drawerTaskId, setDrawerTaskId] = useState(null);
   const handledCreatedRegistrationTaskRef = useRef("");
-  const update = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+  const update = (key, value) => setFormRaw((f) => {
+    setIsDirty(true);
+    return { ...f, [key]: value };
+  });
   const canManageTaskDrawer = currentUser?.role === "admin" || currentUser?.role === "manager";
   const openVatRegistrationTask = () => {
     if (!isEditMode || !id) {
@@ -400,7 +421,7 @@ export default function AddClient() {
   }, [groupSearch, loadGroupOptions]);
 
   useEffect(() => {
-    setForm((current) => {
+    setFormRaw((current) => {
       const normalizedVatFrequency = normalizeVatFilingFrequency(current.vatFreq, current.fye);
       return normalizedVatFrequency === current.vatFreq ? current : { ...current, vatFreq: normalizedVatFrequency };
     });
@@ -408,6 +429,7 @@ export default function AddClient() {
 
   useEffect(() => {
     if (!isEditMode) return;
+    setViewModeTabs(getInitialViewModeTabs());
     getClient(id).then((client) => {
       const createdRegistrationTask = location.state?.createdRegistrationTask || null;
       const jurisdictionLabels = {
@@ -418,13 +440,15 @@ export default function AddClient() {
       };
       const primaryContact = client.contactPersons?.find((person) => person.isPrimary) || client.contactPersons?.[0] || {};
       const nextFye = normalizeFinancialYearEnd(client.financialYearEnd || client.ctDetails?.financialYearEnd || "");
-      const nextVatStatus = client.vatDetails?.status === "registered" ? "Registered" : "Not Registered";
+      const apiVatStatus = client.vatDetails?.status || "not_registered";
+      const nextVatStatus = apiVatStatus === "registered" ? "Registered" : apiVatStatus === "deregistered" ? "Deregistered" : "Not Registered";
       const nextVatRegistrationTask = createdRegistrationTask?.taxType === "vat" ? createdRegistrationTask.taskMongoId || "" : client.vatDetails?.registrationTask || "";
       const nextVatRegistrationTaskId = createdRegistrationTask?.taxType === "vat" ? createdRegistrationTask.taskId || "" : client.vatDetails?.registrationTaskId || "";
-      const nextCtStatus = client.ctDetails?.status === "registered" ? "Registered" : "Not Registered";
+      const apiCtStatus = client.ctDetails?.status || "not_registered";
+      const nextCtStatus = apiCtStatus === "registered" ? "Registered" : apiCtStatus === "deregistered" ? "Deregistered" : "Not Registered";
       const nextCtRegistrationTask = createdRegistrationTask?.taxType === "ct" ? createdRegistrationTask.taskMongoId || "" : client.ctDetails?.registrationTask || "";
       const nextCtRegistrationTaskId = createdRegistrationTask?.taxType === "ct" ? createdRegistrationTask.taskId || "" : client.ctDetails?.registrationTaskId || "";
-      setForm({
+      setFormRaw({
         clientType: client.clientType === "natural" ? "Natural Person" : "Legal Person",
         fileNo: client.fileNo || "",
         legalName: client.legalName || "",
@@ -442,17 +466,21 @@ export default function AddClient() {
         vatTrn: client.vatDetails?.trn || "",
         vatStatus: nextVatStatus,
         vatDate: client.vatDetails?.registrationDate?.slice?.(0, 10) || "",
+        vatDeregDate: client.vatDetails?.deregistrationDate?.slice?.(0, 10) || "",
         vatFreq: normalizeVatFilingFrequency(client.vatDetails?.filingFrequency, nextFye),
         vatRegistrationTask: nextVatRegistrationTask,
         vatRegistrationTaskId: nextVatRegistrationTaskId,
         ctTin: client.ctDetails?.tin || "",
         ctStatus: nextCtStatus,
         ctDate: client.ctDetails?.registrationDate?.slice?.(0, 10) || "",
+        ctDeregDate: client.ctDetails?.deregistrationDate?.slice?.(0, 10) || "",
         ctRegistrationTask: nextCtRegistrationTask,
         ctRegistrationTaskId: nextCtRegistrationTaskId,
         group: client.group?._id || client.group || "",
         newGroup: "",
       });
+      setVatHistory(client.vatDetails?.history || []);
+      setCtHistory(client.ctDetails?.history || []);
       const createdTaskKey = createdRegistrationTask?.taskMongoId ? `${id}:${createdRegistrationTask.taxType}:${createdRegistrationTask.taskMongoId}` : "";
       if (createdTaskKey && handledCreatedRegistrationTaskRef.current !== createdTaskKey) {
         handledCreatedRegistrationTaskRef.current = createdTaskKey;
@@ -494,13 +522,13 @@ export default function AddClient() {
         dispatch({ type: "SET_RESOURCE", resource: "groups", payload: mergeOptions(state.groups || [], [selectedGroup]) });
       }
       const clientFields = client.customFields || {};
-      setCustomFieldValues(clientFields);
+      setCustomFieldValuesRaw(clientFields);
       
       // Identify which dynamic fields have values and should be "selected"
       const dynamicKeys = Object.keys(clientFields);
       setSelectedFieldKeys(dynamicKeys);
 
-      setLicences((client.tradeLicences || []).length ? client.tradeLicences.map((licence) => ({
+      setLicencesRaw((client.tradeLicences || []).length ? client.tradeLicences.map((licence) => ({
         number: licence.licenceNumber || "",
         issue: licence.issueDate?.slice?.(0, 10) || "",
         expiry: licence.expiryDate?.slice?.(0, 10) || "",
@@ -513,7 +541,7 @@ export default function AddClient() {
         documents: mapExistingDocuments(licence.documents, licence.documentUrl),
         persisted: true,
       })) : [{ number: "", issue: "", expiry: "", authority: "", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
-      setContacts((client.contactPersons || []).length ? client.contactPersons.map((person) => ({
+      setContactsRaw((client.contactPersons || []).length ? client.contactPersons.map((person) => ({
         name: person.fullName || "",
         designation: person.designation || "",
         email: person.email || "",
@@ -564,7 +592,7 @@ export default function AddClient() {
         passportDocuments: [],
         persisted: false,
       }]);
-      setPortals((client.portalLogins || []).length ? client.portalLogins.map((portal) => ({
+      setPortalsRaw((client.portalLogins || []).length ? client.portalLogins.map((portal) => ({
         name: portal.portalName || "",
         url: portal.portalUrl || "",
         username: portal.username || "",
@@ -905,6 +933,23 @@ export default function AddClient() {
         toast.error("VAT TRN must be a 15-digit number starting with 1.");
         return false;
       }
+      if (vatStatus === "Registered" && !form.vatDate) {
+        toast.error("VAT Registration Date is required when VAT status is Registered.");
+        return false;
+      }
+      if (vatStatus === "Deregistered" && !form.vatDeregDate) {
+        toast.error("De-Registration Date is required when VAT status is Deregistered.");
+        return false;
+      }
+      const ctStatus = String(form.ctStatus || "").trim();
+      if (ctStatus === "Registered" && !form.ctDate) {
+        toast.error("CT Registration Date is required when CT status is Registered.");
+        return false;
+      }
+      if (ctStatus === "Deregistered" && !form.ctDeregDate) {
+        toast.error("De-Registration Date is required when CT status is Deregistered.");
+        return false;
+      }
     }
     const shouldValidateContacts = !continueToNext || tab >= 2;
     const shouldValidateTradeLicences = !continueToNext || tab >= 1;
@@ -1007,16 +1052,18 @@ export default function AddClient() {
       if (includeVatCt) {
         payload.vatDetails = {
           trn: shouldShowVatRegistrationFields ? form.vatTrn : "",
-          status: form.vatStatus === "Registered" ? "registered" : "not_registered",
+          status: form.vatStatus === "Registered" ? "registered" : form.vatStatus === "Deregistered" ? "deregistered" : "not_registered",
           registrationDate: shouldShowVatRegistrationFields ? form.vatDate : undefined,
+          deregistrationDate: form.vatStatus === "Deregistered" ? form.vatDeregDate || undefined : undefined,
           filingFrequency: shouldShowVatRegistrationFields ? normalizeVatFilingFrequency(form.vatFreq, form.fye) : undefined,
           registrationTask: form.vatRegistrationTask || undefined,
           registrationTaskId: form.vatRegistrationTaskId || undefined,
         };
         payload.ctDetails = {
           tin: shouldShowCtRegistrationFields ? form.ctTin : "",
-          status: form.ctStatus === "Registered" ? "registered" : "not_registered",
+          status: form.ctStatus === "Registered" ? "registered" : form.ctStatus === "Deregistered" ? "deregistered" : "not_registered",
           registrationDate: shouldShowCtRegistrationFields ? form.ctDate : undefined,
+          deregistrationDate: form.ctStatus === "Deregistered" ? form.ctDeregDate || undefined : undefined,
           financialYearEnd: form.fye,
           registrationTask: form.ctRegistrationTask || undefined,
           registrationTaskId: form.ctRegistrationTaskId || undefined,
@@ -1087,6 +1134,7 @@ export default function AddClient() {
             await uploadContactDocuments(id, document.index, document.files, document.section);
           }
         }
+        setIsDirty(false);
         toast.success(continueToNext ? "Progress saved." : "Client updated successfully.");
       } else {
         const created = await createClient(payload);
@@ -1120,11 +1168,24 @@ export default function AddClient() {
           }
           if (updatedClient?.attachments) setAttachments(mapAttachmentRows(updatedClient.attachments));
         }
+        setIsDirty(false);
         toast.success(continueToNext ? "Progress saved." : (pendingAttachments.length || pendingLicenceDocuments.length || pendingContactDocuments.length ? "Client created and documents uploaded." : "Client created successfully."));
-        if (continueToNext) navigate(`/clients/edit/${createdClientId}`, { replace: true });
+        if (continueToNext) {
+          navigate(`/clients/edit/${createdClientId}`, {
+            replace: true,
+            state: { viewModeTabs: tabs.map((_, index) => index === tab) },
+          });
+        }
       }
       if (continueToNext) {
-        setTab((current) => Math.min(current + 1, tabs.length - 1));
+        const completedTab = tab;
+        const nextTab = Math.min(completedTab + 1, tabs.length - 1);
+        setViewModeTabs((current) => current.map((value, index) => {
+          if (index === completedTab) return true;
+          if (index === nextTab) return false;
+          return value;
+        }));
+        setTab(nextTab);
         return true;
       }
       navigate("/clients/list");
@@ -1156,12 +1217,36 @@ export default function AddClient() {
   };
   const isFirstTab = tab === 0;
   const isLastTab = tab === tabs.length - 1;
-
+  const isViewMode = Boolean(viewModeTabs[tab]);
+  const showViewToggle = true;
   return (
     <div className="space-y-5">
+
       <Card>
-        <div className="flex overflow-x-auto rounded-t-xl border-b border-[#e2e8f0] bg-slate-50 p-2">{tabs.map((t, i) => <button key={t} onClick={() => setTab(i)} className={`mr-1 whitespace-nowrap rounded-lg px-3 py-2 text-[12px] font-extrabold ${tab === i ? "bg-[#1e3a8a] text-white" : "text-slate-600 hover:bg-white"}`}>{t}</button>)}</div>
+        <div className="flex flex-col gap-3 rounded-t-xl border-b border-[#e2e8f0] bg-slate-50 p-2 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex overflow-x-auto">{tabs.map((t, i) => <button key={t} onClick={() => setTab(i)} className={`mr-1 whitespace-nowrap rounded-lg px-3 py-2 text-[12px] font-extrabold ${tab === i ? "bg-[#1e3a8a] text-white" : "text-slate-600 hover:bg-white"}`}>{t}</button>)}</div>
+          {showViewToggle && (
+            <div className="flex shrink-0 items-center justify-end gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-extrabold text-slate-700 shadow-sm">
+              <span>{isViewMode ? "View mode" : "Edit mode"}</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={isViewMode}
+                onClick={() => setViewModeTabs((current) => current.map((value, index) => index === tab ? !value : value))}
+                className={`relative h-6 w-11 rounded-full transition ${isViewMode ? "bg-[#1e3a8a]" : "bg-slate-300"}`}
+              >
+                <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition ${isViewMode ? "left-6" : "left-1"}`} />
+              </button>
+            </div>
+          )}
+        </div>
         <div className="p-4">
+          {isViewMode && (
+            <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-[13px] font-semibold text-[#1e3a8a]">
+              View mode is on. Turn it off from the top-right toggle to edit this client.
+            </div>
+          )}
+          <fieldset disabled={isViewMode} className={isViewMode ? "opacity-80" : ""}>
           {tab === 0 && (
             <Basic
               form={form}
@@ -1243,14 +1328,33 @@ export default function AddClient() {
           )}
           {tab === 3 && (
             <div className="grid gap-3 md:grid-cols-2">
+              {isVatDeregistered && (
+                <div className="md:col-span-2 rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-semibold text-amber-800 flex items-center gap-2">
+                  <span className="flex h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" />
+                  This client's VAT registration has been deregistered.
+                </div>
+              )}
               <div className="space-y-2">
                 <label className="text-[14px] font-bold text-slate-700" htmlFor="client-vat-status">VAT Registration Status</label>
                 <div className="flex flex-wrap items-center gap-3">
-                  <select id="client-vat-status" className="input min-w-[240px] flex-1" value={form.vatStatus} onChange={(e) => update("vatStatus", e.target.value)}>
+                  <select
+                    id="client-vat-status"
+                    className="input min-w-[240px] flex-1"
+                    value={form.vatStatus}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setForm((f) => ({
+                        ...f,
+                        vatStatus: val,
+                        ...(val !== "Registered" ? { vatRegistrationTask: "", vatRegistrationTaskId: "" } : {})
+                      }));
+                    }}
+                  >
                     <option>Registered</option>
                     <option>Not Registered</option>
+                    <option>Deregistered</option>
                   </select>
-                  {form.vatRegistrationTaskId && (
+                  {form.vatRegistrationTaskId && form.vatStatus !== "Registered" && (
                     <button
                       type="button"
                       className="rounded-full border border-[#bfdbfe] bg-white px-3 py-2 text-xs font-extrabold text-[#1e3a8a] transition hover:bg-blue-50"
@@ -1268,7 +1372,40 @@ export default function AddClient() {
                   )}
                 </div>
               </div>
-              {shouldShowVatRegistrationFields ? (
+              {isVatDeregistered ? (
+                <>
+                  <Field label="VAT TRN" field="client-vat-trn">
+                    <input className="input bg-slate-100 text-slate-500 cursor-not-allowed" inputMode="numeric" maxLength={15} placeholder="15 digits starting with 1" value={form.vatTrn} readOnly={true} />
+                  </Field>
+                  <Field label="VAT Registration Date" field="client-vat-date">
+                    <input className="input bg-slate-100 text-slate-500 cursor-not-allowed" type="date" value={form.vatDate} readOnly={true} />
+                  </Field>
+                  <Field label="VAT Filing Frequency" field="client-vat-frequency">
+                    <select className="input bg-slate-100 text-slate-500 cursor-not-allowed" value={form.vatFreq} disabled={true}>
+                      {vatFilingFrequencyOptions.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="VAT De-Registration Date" field="client-vat-dereg-date">
+                    <input className="input" type="date" value={form.vatDeregDate} onChange={(e) => update("vatDeregDate", e.target.value)} />
+                  </Field>
+
+                  {!form.vatRegistrationTaskId ? (
+                    <div className="md:col-span-2 rounded-2xl border border-dashed border-[#cbd5e1] bg-slate-50 p-4">
+                      <div className="text-sm font-bold text-slate-900">VAT registration task required</div>
+                      <p className="mt-1 text-sm text-slate-600">
+                        This client's VAT registration is deregistered. Create a VAT registration task to start the process of re-registering them.
+                      </p>
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <button type="button" className="text-sm font-bold text-[#1e3a8a] underline underline-offset-4 cursor-pointer hover:text-[#1d4ed8] transition-colors" onClick={openVatRegistrationTask}>
+                          Create VAT registration task
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </>
+              ) : shouldShowVatRegistrationFields ? (
                 <>
                   <Field label="VAT TRN" field="client-vat-trn">
                     <input className="input" inputMode="numeric" maxLength={15} placeholder="15 digits starting with 1" value={form.vatTrn} onChange={(e) => update("vatTrn", String(e.target.value || "").replace(/\D+/g, "").slice(0, 15))} />
@@ -1297,15 +1434,42 @@ export default function AddClient() {
                   </div>
                 </div>
               ) : null}
-              <div className="md:col-span-2 grid gap-3 md:grid-cols-2">
+
+              <RegistrationHistory
+                history={vatHistory}
+                taxType="VAT"
+                canManageTaskDrawer={canManageTaskDrawer}
+                setDrawerTaskId={setDrawerTaskId}
+              />
+
+              <div className="md:col-span-2 grid gap-3 md:grid-cols-2 pt-4 border-t border-slate-100 mt-4">
+                {isCtDeregistered && (
+                  <div className="md:col-span-2 rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-semibold text-amber-800 flex items-center gap-2">
+                    <span className="flex h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" />
+                    This client's CT registration has been deregistered.
+                  </div>
+                )}
                 <div className="space-y-2">
                   <label className="text-[14px] font-bold text-slate-700" htmlFor="client-ct-status">CT Registration Status</label>
                   <div className="flex flex-wrap items-center gap-3">
-                    <select id="client-ct-status" className="input min-w-[240px] flex-1" value={form.ctStatus} onChange={(e) => update("ctStatus", e.target.value)}>
+                    <select
+                      id="client-ct-status"
+                      className="input min-w-[240px] flex-1"
+                      value={form.ctStatus}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setForm((f) => ({
+                          ...f,
+                          ctStatus: val,
+                          ...(val !== "Registered" ? { ctRegistrationTask: "", ctRegistrationTaskId: "" } : {})
+                        }));
+                      }}
+                    >
                       <option>Registered</option>
                       <option>Not Registered</option>
+                      <option>Deregistered</option>
                     </select>
-                    {form.ctRegistrationTaskId && (
+                    {form.ctRegistrationTaskId && form.ctStatus !== "Registered" && (
                       <button
                         type="button"
                         className="rounded-full border border-[#bfdbfe] bg-white px-3 py-2 text-xs font-extrabold text-[#1e3a8a] transition hover:bg-blue-50"
@@ -1323,7 +1487,40 @@ export default function AddClient() {
                     )}
                   </div>
                 </div>
-                {shouldShowCtRegistrationFields ? (
+                {isCtDeregistered ? (
+                  <>
+                    <Field label="Financial Year" field="client-ct-fye">
+                      <select className="input bg-slate-100 text-slate-500 cursor-not-allowed" value={form.fye} disabled={true}>
+                        {FINANCIAL_YEAR_OPTIONS.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="CT Registration Number (TIN)" field="client-ct-tin">
+                      <input className="input bg-slate-100 text-slate-500 cursor-not-allowed" value={form.ctTin} readOnly={true} />
+                    </Field>
+                    <Field label="CT Registration Date" field="client-ct-date">
+                      <input className="input bg-slate-100 text-slate-500 cursor-not-allowed" type="date" value={form.ctDate} readOnly={true} />
+                    </Field>
+                    <Field label="CT De-Registration Date" field="client-ct-dereg-date">
+                      <input className="input" type="date" value={form.ctDeregDate} onChange={(e) => update("ctDeregDate", e.target.value)} />
+                    </Field>
+
+                    {!form.ctRegistrationTaskId ? (
+                      <div className="md:col-span-2 rounded-2xl border border-dashed border-[#cbd5e1] bg-slate-50 p-4">
+                        <div className="text-sm font-bold text-slate-900">CT registration task required</div>
+                        <p className="mt-1 text-sm text-slate-600">
+                          This client's CT registration is deregistered. Create a CT registration task to start the process of re-registering them.
+                        </p>
+                        <div className="mt-3 flex flex-wrap items-center gap-3">
+                          <button type="button" className="text-sm font-bold text-[#1e3a8a] underline underline-offset-4 cursor-pointer hover:text-[#1d4ed8] transition-colors" onClick={openCtRegistrationTask}>
+                            Create CT registration task
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
+                ) : shouldShowCtRegistrationFields ? (
                   <>
                     <Field label="Financial Year" field="client-ct-fye">
                       <select className="input" value={form.fye} onChange={(e) => update("fye", e.target.value)}>
@@ -1352,6 +1549,13 @@ export default function AddClient() {
                     </div>
                   </div>
                 ) : null}
+
+                <RegistrationHistory
+                  history={ctHistory}
+                  taxType="CT"
+                  canManageTaskDrawer={canManageTaskDrawer}
+                  setDrawerTaskId={setDrawerTaskId}
+                />
               </div>
             </div>
           )}
@@ -1640,12 +1844,13 @@ export default function AddClient() {
             </div>
           )}
           {tab === 7 && <div className="space-y-3"><AttachmentUploadZone description={attachmentDescription} onDescriptionChange={setAttachmentDescription} onFiles={uploadFiles} isUploading={isUploading} /><div className="overflow-x-auto"><table className="table min-w-max"><thead><tr><th>Name</th><th>Size</th><th>Type</th><th>Description</th><th>Uploaded On</th><th>Uploaded By</th><th>Actions</th></tr></thead><tbody>{attachments.length === 0 && <tr><td colSpan={7} className="text-center text-slate-500">No attachments uploaded yet.</td></tr>}{attachments.map((a) => <tr key={a.id || a.name}><td>{a.name}</td><td>{a.size}</td><td>{a.type}</td><td>{a.description || "-"}</td><td>{a.uploadedOn}</td><td>{a.uploadedBy}</td><td><Button size="sm" variant="ghost" disabled={!a.url && !a.file} onClick={() => openDocumentFile(a)}>Open</Button> {(currentUser?.role === "admin" || !a.saved) && <Button size="sm" variant="danger" onClick={() => removeAttachment(a)}>Delete</Button>}</td></tr>)}</tbody></table></div></div>}
+          </fieldset>
         </div>
         <div className="flex flex-col gap-3 border-t border-[#e2e8f0] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
           <Button variant="ghost" onClick={goPrevious} disabled={isFirstTab || isSaving}>Previous</Button>
           <div className="flex justify-end gap-2">
-            {!isLastTab && <Button onClick={saveAndContinue} disabled={isSaving}>{isSaving ? "Saving..." : "Save and Continue"}</Button>}
-            {isLastTab && <Button onClick={() => saveClient()} disabled={isSaving}>{isSaving ? "Saving..." : "Add Client"}</Button>}
+            {!isLastTab && <Button onClick={saveAndContinue} disabled={isSaving || isViewMode}>{isSaving ? "Saving..." : "Save and Continue"}</Button>}
+            {isLastTab && <Button onClick={() => saveClient()} disabled={isSaving || isViewMode}>{isSaving ? "Saving..." : "Add Client"}</Button>}
           </div>
         </div>
       </Card>
@@ -1967,3 +2172,162 @@ function Field({ label, field, children }) {
   //   </div>
   // );
 }
+
+function RegistrationHistory({ history = [], taxType = "VAT", canManageTaskDrawer, setDrawerTaskId }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const navigate = useNavigate();
+
+  if (!history || history.length === 0) return null;
+
+  const pageSize = 5;
+  const totalEntries = history.length;
+  const totalPages = Math.ceil(totalEntries / pageSize);
+  
+  const reversedHistory = history.slice().reverse();
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = startIndex + pageSize;
+  const displayedEntries = reversedHistory.slice(startIndex, endIndex);
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "";
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+    } catch {
+      return dateStr;
+    }
+  };
+
+  return (
+    <div className="md:col-span-2 mt-4 rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex w-full items-center justify-between bg-slate-50 px-4 py-3 text-left transition hover:bg-slate-100"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-bold text-slate-800">
+            View Registration History ({history.length} {history.length === 1 ? "entry" : "entries"})
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
+          <span>{isOpen ? "Collapse" : "Expand"}</span>
+          <ChevronDown className={`h-4 w-4 transform transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+        </div>
+      </button>
+
+      {isOpen && (
+        <div className="border-t border-slate-100 p-4">
+          <div className="relative border-l-2 border-slate-150 pl-6 ml-3 space-y-6 my-2">
+            {displayedEntries.map((entry, index) => {
+              const chronologicalIndex = totalEntries - 1 - (startIndex + index);
+              return (
+                <div key={entry._id || chronologicalIndex} className="relative">
+                  {/* Timeline bullet */}
+                  <span className="absolute -left-[31px] top-1 flex h-4 w-4 items-center justify-center rounded-full border-2 border-amber-500 bg-white">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                  </span>
+
+                  <div className="rounded-xl border border-slate-100 bg-slate-50/50 p-3 shadow-xs hover:border-slate-200 transition-all">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-md bg-amber-50 px-2 py-0.5 text-xs font-extrabold text-amber-700 uppercase tracking-wider">
+                          Deregistered #{chronologicalIndex + 1}
+                        </span>
+                        {entry.linkedTo === -1 && (
+                          <span className="rounded-md bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">
+                            → Re-registered
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-slate-400 font-medium">
+                        Archived: {formatDate(entry.archivedAt)}
+                      </span>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 text-sm">
+                      <div>
+                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                          {taxType === "VAT" ? "TRN" : "TIN"}
+                        </div>
+                        <div className="font-extrabold text-slate-700">{entry.trn || entry.tin || "N/A"}</div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                          Filing / Financial Period
+                        </div>
+                        <div className="font-semibold text-slate-700">
+                          {entry.filingFrequency || entry.financialYearEnd || "N/A"}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                          Active Period
+                        </div>
+                        <div className="font-semibold text-slate-700">
+                          {formatDate(entry.registrationDate)} – {formatDate(entry.deregistrationDate)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {entry.registrationTaskId && (
+                      <div className="mt-3 flex items-center justify-end border-t border-slate-100 pt-2 text-xs">
+                        <button
+                          type="button"
+                          className="rounded-full border border-blue-150 bg-white px-2.5 py-1 font-bold text-blue-700 transition hover:bg-blue-50"
+                          onClick={() => {
+                            if (!entry.registrationTask) return;
+                            if (canManageTaskDrawer) {
+                              setDrawerTaskId(entry.registrationTask);
+                              return;
+                            }
+                            navigate(`/tasks/${entry.registrationTask}`);
+                          }}
+                        >
+                          Related Task: {entry.registrationTaskId}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between border-t border-slate-150 pt-4 mt-4">
+              <span className="text-xs text-slate-500 font-semibold">
+                Showing {startIndex + 1}-{Math.min(endIndex, totalEntries)} of {totalEntries} entries
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  className={`rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 transition hover:bg-slate-50 ${currentPage === 1 ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                >
+                  Previous
+                </button>
+                <span className="text-xs text-slate-700 font-extrabold px-1">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  className={`rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 transition hover:bg-slate-50 ${currentPage === totalPages ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+

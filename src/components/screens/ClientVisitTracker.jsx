@@ -1,16 +1,17 @@
 import { CalendarDays, Clock3, MapPinned, Plus, Search, UsersRound } from "lucide-react";
-import { cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
+import { cloneElement, isValidElement, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useClients } from "../../hooks/useClients";
 import { useUsers } from "../../hooks/useUsers";
 import { clientVisitService } from "../../services/clientVisitService";
-import { ROLE_LABELS } from "../../utils/permissions.js";
+import { canManageClientVisits, ROLE_LABELS } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
+import ClientVisitDrawer from "../ui/ClientVisitDrawer.jsx";
 import ClientVisitHistoryDrawer from "../ui/ClientVisitHistoryDrawer.jsx";
 import Table from "../ui/Table.jsx";
 
@@ -94,18 +95,32 @@ export default function ClientVisitTracker() {
   const [selectedVisitorByVisit, setSelectedVisitorByVisit] = useState({});
   const [timeDrafts, setTimeDrafts] = useState({});
   const [historyClient, setHistoryClient] = useState(null);
+  const [drawerVisitId, setDrawerVisitId] = useState(null);
+  const canManageVisits = canManageClientVisits(currentUser?.role);
+
+  const hasFetchedClients = useRef(false);
 
   useEffect(() => {
     let active = true;
-    fetchClients({ limit: 200 }).catch(() => {
-      if (active) toast.error("Unable to load clients.");
-    });
-    if (currentUser?.role !== "task_only") {
+    if (!hasFetchedClients.current) {
+      hasFetchedClients.current = true;
+      fetchClients({ limit: 10 }).catch(() => {
+        if (active) toast.error("Unable to load clients.");
+      });
+    }
+    loadVisits(active);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    if (currentUser?.role && currentUser.role !== "task_only") {
       fetchUsers().catch(() => {
         if (active) toast.error("Unable to load users.");
       });
     }
-    loadVisits(active);
     return () => {
       active = false;
     };
@@ -338,7 +353,7 @@ export default function ClientVisitTracker() {
                     {visit.client?._id ? (
                       <button
                         type="button"
-                        className="font-extrabold text-[#1e3a8a] hover:underline text-left"
+                        className="font-extrabold text-[#1e3a8a] hover:underline text-left cursor-pointer"
                         onClick={() => setHistoryClient({ id: visit.client._id, name: visit.client?.legalName })}
                       >
                         {visit.client?.legalName}
@@ -518,6 +533,19 @@ export default function ClientVisitTracker() {
         clientId={historyClient?.id}
         clientName={historyClient?.name}
         onClose={() => setHistoryClient(null)}
+        onVisitClick={(visitId) => {
+          setHistoryClient(null);
+          setDrawerVisitId(visitId);
+        }}
+      />
+
+      <ClientVisitDrawer
+        visitId={drawerVisitId}
+        canManage={canManageVisits}
+        onClose={() => setDrawerVisitId(null)}
+        onVisitUpdated={(updatedVisit) => {
+          setVisits((current) => current.map((visit) => (visit._id === updatedVisit._id ? updatedVisit : visit)));
+        }}
       />
     </div>
   );

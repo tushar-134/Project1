@@ -1,4 +1,4 @@
-import { Boxes, Folders, Settings2, Users, LayoutGrid } from "lucide-react";
+import { Boxes, Folders, Settings2, Users, LayoutGrid, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { canManageCategories, canManageGroups, canViewUsers } from "../../utils/permissions.js";
@@ -41,62 +41,39 @@ export default function Settings() {
   }
 
   return (
-    <div className="space-y-4">
-
-      {/* ── Top bar: hamburger + header ── */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex min-w-0 items-center gap-4">
-          {/* Animated hamburger — scoped to this page */}
-          <button
-            type="button"
-            aria-label={sidebarOpen ? "Close settings menu" : "Open settings menu"}
-            aria-expanded={sidebarOpen}
-            onClick={() => setSidebarOpen((o) => !o)}
-            className="settings-hamburger-btn shrink-0"
-            title={sidebarOpen ? "Close menu" : "Open menu"}
-          >
-            <span className={`settings-bar ${sidebarOpen ? "sbar-top-open" : ""}`} />
-            <span className={`settings-bar ${sidebarOpen ? "sbar-mid-open" : ""}`} />
-            <span className={`settings-bar ${sidebarOpen ? "sbar-bot-open" : ""}`} />
-          </button>
-
-          {activeTab && (
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#1e3a8a] text-white shadow-md">
-                <activeTab.icon size={20} />
-              </div>
-              <div className="min-w-0">
-                <div className="truncate text-[17px] font-black text-slate-900">{activeTab.label}</div>
-                <div className="text-[12px] font-medium text-slate-500">{activeTab.description}</div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {headerAction && <div className="shrink-0">{headerAction}</div>}
-      </div>
-
-      {/* ── Inline layout: collapsible left nav + content ── */}
-      <div className="flex min-h-[560px] gap-4">
-
-        {/* Collapsible nav panel — inline, not fixed */}
-        <div
-          className={`shrink-0 overflow-hidden rounded-2xl border border-[#e2e8f0] bg-white shadow-sm transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)] ${
-            sidebarOpen ? "w-[220px] opacity-100" : "w-0 opacity-0 border-transparent shadow-none"
-          }`}
+    <div className="flex min-h-[560px] gap-4">
+      {/* Collapsible nav panel wrapper */}
+      <div
+        className={`shrink-0 relative transition-all duration-300 ease-[cubic-bezier(.4,0,.2,1)] ${
+          sidebarOpen ? "w-[240px]" : "w-[80px]"
+        }`}
+      >
+        {/* Toggle Button on the edge */}
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="hidden lg:grid absolute -right-[12px] top-[26px] h-[24px] w-[24px] place-items-center rounded-full bg-[#1e3a8a] text-white shadow-md hover:bg-[#172d6b] transition-colors z-[60] border-2 border-white"
+          aria-label={sidebarOpen ? "Collapse settings sidebar" : "Expand settings sidebar"}
         >
+          {sidebarOpen ? <ChevronLeft size={13} strokeWidth={3} /> : <ChevronRight size={13} strokeWidth={3} />}
+        </button>
+
+        {/* Actual Sidebar box */}
+        <div className="w-full h-full overflow-hidden rounded-2xl bg-white border border-[#e2e8f0] shadow-sm flex flex-col">
           {/* Nav header */}
-          <div className="border-b border-[#e2e8f0] bg-gradient-to-r from-[#1e3a8a] to-[#1d4ed8] px-4 py-3.5">
-            <div className="flex items-center gap-2">
-              <div className="grid h-7 w-7 place-items-center rounded-lg bg-white/15 text-white">
-                <Settings2 size={14} />
-              </div>
-              <span className="whitespace-nowrap text-[13px] font-extrabold text-white">Settings</span>
+          <div className={`flex items-center ${sidebarOpen ? "px-4 gap-3" : "justify-center px-0"} py-4 border-b border-[#e2e8f0] min-h-[65px]`}>
+            <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-[#1e3a8a] text-white shadow-sm">
+              <Settings2 size={16} />
             </div>
+            {sidebarOpen && (
+              <div className="min-w-0 transition-opacity duration-300">
+                <div className="text-[14px] font-extrabold leading-tight tracking-tight text-slate-900">Settings</div>
+                <div className="text-[10px] font-semibold text-slate-500">Management</div>
+              </div>
+            )}
           </div>
 
           {/* Nav items */}
-          <nav className="p-2.5">
+          <nav className="flex-1 px-3 py-4">
             <div className="space-y-1">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
@@ -107,48 +84,55 @@ export default function Settings() {
                     type="button"
                     onClick={() => {
                       setActiveId(tab.id);
-                      setSidebarOpen(false);
                     }}
-                    className={`group w-full rounded-xl px-3 py-2.5 text-left transition-all duration-150 ${
+                    className={`group flex w-full h-11 items-center gap-3 ${sidebarOpen ? "rounded-2xl px-2" : "justify-center px-0"} font-semibold transition-all duration-200 relative ${
                       isActive
-                        ? "bg-[#1e3a8a] text-white shadow-md shadow-blue-900/20"
-                        : "hover:bg-blue-50 hover:text-blue-900 border border-[#e2e8f0] hover:border-blue-200 bg-white"
+                        ? "text-[#1e3a8a]"
+                        : "text-slate-500 hover:text-blue-700"
                     }`}
                   >
-                    <div className="flex items-center gap-2.5">
-                      <div
-                        className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg transition-colors ${
-                          isActive
-                            ? "bg-white/15 text-white"
-                            : "bg-slate-100 text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-700"
-                        }`}
-                      >
-                        <Icon size={16} />
-                      </div>
-                      <div className="min-w-0">
-                        <div className={`whitespace-nowrap text-[12.5px] font-extrabold leading-tight ${isActive ? "text-white" : "text-slate-800"}`}>
-                          {tab.label}
-                        </div>
-                        <div className={`whitespace-nowrap text-[9.5px] font-semibold uppercase tracking-wider ${isActive ? "text-white/65" : "text-slate-400"}`}>
-                          {tab.category}
-                        </div>
-                      </div>
+                    <div className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-all duration-300 ${
+                      isActive
+                        ? "bg-blue-50 text-[#1e3a8a] ring-2 ring-blue-200 ring-offset-2 ring-offset-white"
+                        : "text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600 group-hover:ring-2 group-hover:ring-blue-100 group-hover:ring-offset-2 group-hover:ring-offset-white"
+                    }`}>
+                      <Icon size={18} strokeWidth={isActive ? 2.5 : 2} className="relative z-10" />
                     </div>
+                    {sidebarOpen && (
+                      <span className="min-w-0 flex-1 truncate text-left text-[13px] font-bold">{tab.label}</span>
+                    )}
                   </button>
                 );
               })}
             </div>
           </nav>
         </div>
+      </div>
 
-        {/* Content panel */}
-        <div className="min-w-0 flex-1 overflow-x-auto rounded-2xl border border-[#e2e8f0] bg-white shadow-sm">
-
-          <div className="p-6">
-            {ActiveComponent && <ActiveComponent setSettingsHeaderAction={setHeaderAction} />}
+      {/* Content panel */}
+      <div className="min-w-0 flex-1 flex flex-col rounded-2xl border border-[#e2e8f0] bg-white shadow-sm overflow-hidden">
+        {/* Top bar header moved inside the box */}
+        <div className="flex flex-wrap items-center justify-between gap-4 p-6 border-b border-[#e2e8f0]">
+          <div className="flex min-w-0 items-center gap-4">
+            {activeTab && (
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#1e3a8a] text-white shadow-md">
+                  <activeTab.icon size={20} />
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate text-[17px] font-black text-slate-900">{activeTab.label}</div>
+                  <div className="text-[12px] font-medium text-slate-500">{activeTab.description}</div>
+                </div>
+              </div>
+            )}
           </div>
+          {headerAction && <div className="shrink-0">{headerAction}</div>}
         </div>
 
+        {/* Page Content */}
+        <div className="p-6 flex-1 overflow-x-auto">
+          {ActiveComponent && <ActiveComponent setSettingsHeaderAction={setHeaderAction} />}
+        </div>
       </div>
     </div>
   );

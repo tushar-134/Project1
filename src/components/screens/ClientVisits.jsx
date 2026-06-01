@@ -1,4 +1,4 @@
-import { Briefcase, ChevronDown, Download, Plus, Search, SquarePen } from "lucide-react";
+import { Briefcase, ChevronDown, CircleChevronRight, Download, Plus, Search, SquarePen } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -25,6 +25,12 @@ const statusOptions = [
 ];
 
 const visitTypeOptions = ["All Types", "Requirement Gathering", "Verification", "Onboarding Discussion", "Follow Up", "Collection", "Meeting"];
+
+const clientTypeOptions = [
+  { value: "all", label: "All Clients" },
+  { value: "new", label: "New Clients" },
+  { value: "existing", label: "Existing Clients" },
+];
 
 function formatDate(value) {
   if (!value) return "-";
@@ -55,8 +61,8 @@ export default function ClientVisits() {
   const [activeTab, setActiveTab] = useState("all");
   const [filters, setFilters] = useState({
     status: "all",
-    visitType: "all",
     clientType: "all",
+    visitType: "all",
     clientName: "",
     fromDate: "",
     toDate: "",
@@ -70,7 +76,7 @@ export default function ClientVisits() {
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState({ key: "visitDate", direction: "desc" });
   const [drawerVisitId, setDrawerVisitId] = useState(null);
-  const [historyClient, setHistoryClient] = useState(null); // { id, name }
+  const [historyClient, setHistoryClient] = useState(null);
   const exportRef = useRef(null);
 
   const BASE_EXPORT_FIELDS = [
@@ -94,8 +100,8 @@ export default function ClientVisits() {
     page,
     limit: 10,
     status: filters.status,
-    visitType: filters.visitType,
     clientType: filters.clientType,
+    visitType: filters.visitType,
     clientName: filters.clientName,
     fromDate: filters.fromDate,
     toDate: filters.toDate,
@@ -215,7 +221,6 @@ export default function ClientVisits() {
       <Card className="p-5">
         <div className="grid items-end gap-3 xl:grid-cols-[1fr_1fr_1.25fr_1fr_1fr_auto]">
 
-
           <FilterField label="Visit Type">
             <select className="input" value={filters.visitType} onChange={(event) => updateFilter("visitType", event.target.value)}>
               {visitTypeOptions.map((option) => (
@@ -229,9 +234,9 @@ export default function ClientVisits() {
 
           <FilterField label="Client Type">
             <select className="input" value={filters.clientType} onChange={(event) => updateFilter("clientType", event.target.value)}>
-              <option value="all">All Clients</option>
-              <option value="existing">Existing Client</option>
-              <option value="new">New Client</option>
+              {clientTypeOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
             </select>
           </FilterField>
 
@@ -256,7 +261,7 @@ export default function ClientVisits() {
 
           <div className="flex shrink-0 items-center gap-2 xl:justify-end">
             <div ref={exportRef} className="relative">
-              <Button variant="ghost" onClick={() => setExportOpen((open) => !open)}>
+              <Button variant="outlinePurple" onClick={() => setExportOpen((open) => !open)}>
                 <Download size={16} />
                 Export
                 <ChevronDown size={14} className={`transition ${exportOpen ? "rotate-180" : ""}`} />
@@ -295,7 +300,7 @@ export default function ClientVisits() {
               <SortableHeader label="Visit ID" onClick={() => toggleSort("visitId")} />
               <SortableHeader label="Client" onClick={() => toggleSort("client")} />
               <SortableHeader label="Schedule" onClick={() => toggleSort("visitDate")} />
-              <SortableHeader label="Visit Type" onClick={() => toggleSort("type")} />
+              <SortableHeader label="Type" onClick={() => toggleSort("type")} />
               <th>Visited By</th>
               <SortableHeader label="Status" onClick={() => toggleSort("status")} />
               <th>Actions</th>
@@ -317,10 +322,13 @@ export default function ClientVisits() {
                   {visit.client?._id ? (
                     <button
                       type="button"
-                      className="font-black text-[#1e3a8a] hover:underline text-left"
+                      className="group inline-flex items-center gap-2 text-left font-black text-[#1e3a8a] hover:underline cursor-pointer"
                       onClick={() => setHistoryClient({ id: visit.client._id, name: visit.clientName })}
                     >
-                      {visit.clientName}
+                      <span>{visit.clientName}</span>
+                      <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#1e3a8a] text-white shadow-sm transition group-hover:bg-[#172d6b] group-hover:translate-x-0.5">
+                        <CircleChevronRight size={16} strokeWidth={2.5} />
+                      </span>
                     </button>
                   ) : (
                     <div className="font-black text-slate-900">{visit.clientName}</div>

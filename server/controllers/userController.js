@@ -62,10 +62,24 @@ exports.listUsers = async (req, res, next) => {
       usersQuery.lean(),
       requested ? User.countDocuments(query) : User.countDocuments(),
     ]);
-    const usersWithClients = await Promise.all(users.map(async (user) => {
-      const clients = await Client.find({ assignedUser: user._id, isActive: true }).select("legalName").lean();
-      return { ...user, assignedClients: clients };
+
+    const userIds = users.map((u) => u._id);
+    const allClients = userIds.length
+      ? await Client.find({ assignedUser: { $in: userIds }, isActive: true }).select("legalName assignedUser").lean()
+      : [];
+
+    const clientsByUserId = {};
+    allClients.forEach((client) => {
+      const uId = String(client.assignedUser);
+      if (!clientsByUserId[uId]) clientsByUserId[uId] = [];
+      clientsByUserId[uId].push(client);
+    });
+
+    const usersWithClients = users.map((user) => ({
+      ...user,
+      assignedClients: clientsByUserId[String(user._id)] || [],
     }));
+
     if (!requested) return res.json(usersWithClients);
     res.json({ items: usersWithClients, total, page, limit, pages: Math.ceil(total / limit) });
   } catch (error) { next(error); }

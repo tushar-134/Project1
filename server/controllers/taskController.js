@@ -74,90 +74,7 @@ function toStoredFileEntry(uploadedFile, userId, description = "") {
   };
 }
 
-function getNextWeeklyDate(baseDate, targetDayStr) {
-  const dayMap = { "Sun": 0, "Mon": 1, "Tue": 2, "Wed": 3, "Thu": 4, "Fri": 5, "Sat": 6 };
-  const targetDay = dayMap[targetDayStr];
-  if (targetDay === undefined) return null;
-  
-  const result = new Date(baseDate);
-  for (let i = 1; i <= 7; i++) {
-    result.setUTCDate(result.getUTCDate() + 1);
-    if (result.getUTCDay() === targetDay) {
-      return result;
-    }
-  }
-  return result;
-}
 
-function getNextMonthlyDate(baseDate, targetDate) {
-  const currentYear = baseDate.getUTCFullYear();
-  const currentMonth = baseDate.getUTCMonth();
-  let targetYear = currentYear;
-  let targetMonth = currentMonth + 1;
-  if (targetMonth > 11) {
-    targetMonth = 0;
-    targetYear += 1;
-  }
-  
-  const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
-  
-  if (targetDate <= daysInTargetMonth) {
-    return new Date(Date.UTC(targetYear, targetMonth, targetDate));
-  } else {
-    let nextMonth = targetMonth + 1;
-    let nextYear = targetYear;
-    if (nextMonth > 11) {
-      nextMonth = 0;
-      nextYear += 1;
-    }
-    return new Date(Date.UTC(nextYear, nextMonth, 1));
-  }
-}
-
-function getNextQuarterlyDate(baseDate, targetDate) {
-  const currentYear = baseDate.getUTCFullYear();
-  const currentMonth = baseDate.getUTCMonth();
-  let targetMonth = currentMonth + 3;
-  let targetYear = currentYear;
-  while (targetMonth > 11) {
-    targetMonth -= 12;
-    targetYear += 1;
-  }
-  
-  const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
-  
-  if (targetDate <= daysInTargetMonth) {
-    return new Date(Date.UTC(targetYear, targetMonth, targetDate));
-  } else {
-    let nextMonth = targetMonth + 1;
-    let nextYear = targetYear;
-    if (nextMonth > 11) {
-      nextMonth = 0;
-      nextYear += 1;
-    }
-    return new Date(Date.UTC(nextYear, nextMonth, 1));
-  }
-}
-
-function getNextYearlyDate(baseDate, targetMonth, targetDate) {
-  const targetMonth0 = targetMonth - 1;
-  const currentYear = baseDate.getUTCFullYear();
-  const targetYear = currentYear + 1;
-  
-  const daysInTargetMonth = new Date(Date.UTC(targetYear, targetMonth0 + 1, 0)).getUTCDate();
-  
-  if (targetDate <= daysInTargetMonth) {
-    return new Date(Date.UTC(targetYear, targetMonth0, targetDate));
-  } else {
-    let nextMonth = targetMonth0 + 1;
-    let nextYear = targetYear;
-    if (nextMonth > 11) {
-      nextMonth = 0;
-      nextYear += 1;
-    }
-    return new Date(Date.UTC(nextYear, nextMonth, 1));
-  }
-}
 
 function addFrequency(dateValue, frequency) {
   const date = asDate(dateValue);
@@ -186,35 +103,22 @@ function addFrequency(dateValue, frequency) {
 
 function calculateNextOccurrence(baseDate, config) {
   if (!baseDate || !config) return null;
-  const { frequency, dayOfWeek, dateOfMonth, monthOfYear } = config;
+  const { frequency } = config;
   const date = asDate(baseDate);
   if (!date) return null;
 
-  switch (frequency) {
-    case "weekly":
-      return getNextWeeklyDate(date, dayOfWeek || "Sun");
-    case "monthly":
-      return getNextMonthlyDate(date, dateOfMonth || 1);
-    case "quarterly":
-      return getNextQuarterlyDate(date, dateOfMonth || 1);
-    case "annual":
-      return getNextYearlyDate(date, monthOfYear || 1, dateOfMonth || 1);
-    default:
-      return addFrequency(date, frequency);
-  }
+  return addFrequency(date, frequency);
 }
 
 function normalizeRecurringFields(body, fallbackDueDate) {
   if (!body.isRecurring) return { isRecurring: false, recurringConfig: undefined };
   const rc = body.recurringConfig || {};
   const frequency = rc.frequency;
-  const dayOfWeek = rc.dayOfWeek;
-  const dateOfMonth = rc.dateOfMonth ? Number(rc.dateOfMonth) : undefined;
-  const monthOfYear = rc.monthOfYear ? Number(rc.monthOfYear) : undefined;
+  const daysBeforeDue = rc.daysBeforeDue ? Number(rc.daysBeforeDue) : 15;
 
   const dueDate = asDate(body.dueDate || fallbackDueDate);
   const providedNextDueDate = asDate(rc.nextDueDate);
-  const calculatedNextDueDate = calculateNextOccurrence(dueDate, { frequency, dayOfWeek, dateOfMonth, monthOfYear });
+  const calculatedNextDueDate = calculateNextOccurrence(dueDate, { frequency });
   const nextDueDate = providedNextDueDate && (!dueDate || providedNextDueDate > dueDate)
     ? providedNextDueDate
     : (providedNextDueDate || calculatedNextDueDate);
@@ -223,9 +127,7 @@ function normalizeRecurringFields(body, fallbackDueDate) {
     isRecurring: true,
     recurringConfig: {
       frequency,
-      dayOfWeek,
-      dateOfMonth,
-      monthOfYear,
+      daysBeforeDue,
       nextDueDate: nextDueDate || undefined,
       endDate: endDate || undefined,
     },
@@ -290,21 +192,22 @@ function getPeriodFromDateServer(date, fyeString) {
   if (!task?.isRecurring || task.recurringGeneratedTask) return null;
   const rc = task.recurringConfig || {};
   const frequency = rc.frequency;
-  const dayOfWeek = rc.dayOfWeek;
-  const dateOfMonth = rc.dateOfMonth;
-  const monthOfYear = rc.monthOfYear;
+  const daysBeforeDue = rc.daysBeforeDue;
 
   const nextDueDate = asDate(rc.nextDueDate) || calculateNextOccurrence(task.dueDate, rc);
   if (!nextDueDate) return null;
   const endDate = asDate(rc.endDate);
   if (endDate && nextDueDate > endDate) return null;
 
-  const followingDueDate = calculateNextOccurrence(nextDueDate, { frequency, dayOfWeek, dateOfMonth, monthOfYear });
+  const followingDueDate = calculateNextOccurrence(nextDueDate, { frequency });
 
   // Compute the period for the new task from its due date and the client's FYE config.
   // The client may or may not be populated at this point, so we guard carefully.
   const clientFYE =
     (task.client && typeof task.client === "object" ? task.client.financialYearEnd : null) || "Jan - Dec";
+  
+  // Note: For VAT and CT specific period resolution we ideally need the full client object,
+  // but if it's missing, getPeriodFromDateServer handles standard FY/Quarter logic based on FYE.
   const nextPeriod = getPeriodFromDateServer(nextDueDate, clientFYE);
 
   const nextTask = await Task.create({
@@ -321,9 +224,7 @@ function getPeriodFromDateServer(date, fyeString) {
     isRecurring: true,
     recurringConfig: {
       frequency,
-      dayOfWeek,
-      dateOfMonth,
-      monthOfYear,
+      daysBeforeDue,
       nextDueDate: followingDueDate || undefined,
       endDate: endDate || undefined,
     },
@@ -465,7 +366,11 @@ exports.getTask = async (req, res, next) => {
     const task = await Task.findById(req.params.id).populate(populateTask);
     if (!task) return res.status(404).json({ message: "Task not found" });
     if (req.user.role === "task_only" && String(task.assignedTo?._id) !== String(req.user._id)) return res.status(403).json({ message: "Forbidden" });
-    res.json(task);
+    const logs = await ActivityLog.find({ task: task._id }).populate("user", "name email role").sort({ createdAt: -1 });
+    res.json({
+      ...task.toObject(),
+      logs
+    });
   } catch (error) { next(error); }
 };
 
@@ -852,9 +757,5 @@ exports.exportTasks = async (req, res, next) => {
 exports.maybeGenerateNextRecurringTask =  maybeGenerateNextRecurringTask ;
 // Export helper functions for testing
 exports._test = {
-  getNextWeeklyDate,
-  getNextMonthlyDate,
-  getNextQuarterlyDate,
-  getNextYearlyDate,
   calculateNextOccurrence
 };

@@ -24,6 +24,15 @@ const actionMeta = {
   "Generated Recurrence": { color: "#0891b2", bg: "bg-cyan-50", border: "border-cyan-200", icon: "R" },
 };
 
+const COMMENT_COLORS = [
+  "bg-blue-50 border-blue-100",
+  "bg-emerald-50 border-emerald-100",
+  "bg-amber-50 border-amber-100",
+  "bg-purple-50 border-purple-100",
+  "bg-rose-50 border-rose-100",
+  "bg-indigo-50 border-indigo-100",
+];
+
 function formatDate(dateStr) {
   if (!dateStr) return "-";
   const d = new Date(dateStr);
@@ -62,13 +71,10 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
     setLoading(true);
     setError(null);
     try {
-      const [taskData, logsData] = await Promise.all([
-        taskService.get(taskId),
-        taskService.getLogs(taskId),
-      ]);
+      const taskData = await taskService.get(taskId);
       if (active) {
         setTask(taskData);
-        setLogs(logsData);
+        setLogs(taskData.logs || []);
         setCommentInput("");
         setRemarkError("");
       }
@@ -315,38 +321,9 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
                   <div className="mb-3 task-detail-field-label">
                     <MessageSquare size={13} /> Comments
                   </div>
-                  {/* Comment thread */}
-                  {(() => {
-                    const comments = parseComments(task.remarks).reverse();
-                    return comments.length === 0 ? (
-                      <p className="mb-3 text-[12px] text-slate-400 italic">No comments yet. Be the first to add one.</p>
-                    ) : (
-                      <div className="mb-3 space-y-3">
-                        {comments.map((comment, idx) => (
-                          <div key={idx} className="flex items-start gap-2.5">
-                            <div className="flex-shrink-0 h-7 w-7 rounded-full bg-[#1e3a8a] flex items-center justify-center text-[10px] font-extrabold text-white">
-                              {String(comment.author || "?").charAt(0).toUpperCase()}
-                            </div>
-                            <div className="flex-1 rounded-xl bg-slate-50 border border-slate-100 px-3 py-2">
-                              <div className="flex items-center justify-between gap-2 mb-1">
-                                <span className="text-[11px] font-extrabold text-slate-700">{comment.author || "—"}</span>
-                                {comment.at && (
-                                  <span className="text-[10px] text-slate-400">
-                                    {new Date(comment.at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-                                    {" at "}
-                                    {new Date(comment.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[13px] leading-relaxed text-slate-700 whitespace-pre-wrap">{comment.text}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    );
-                  })()}
+                  {/* Post new comment */}
                   {canEditRemarks && (
-                    <>
+                    <div className="mb-5 border-b border-[#e2e8f0] pb-5">
                       <textarea
                         id="task-drawer-remark"
                         name="taskDrawerRemark"
@@ -369,8 +346,39 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
                           {remarkSaving ? "Posting..." : "Post Comment"}
                         </Button>
                       </div>
-                    </>
+                    </div>
                   )}
+
+                  {/* Comment thread */}
+                  {(() => {
+                    const comments = parseComments(task.remarks).reverse();
+                    return comments.length === 0 ? (
+                      <p className="mb-3 text-[12px] text-slate-400 italic">No comments yet.</p>
+                    ) : (
+                      <div className="mb-3 space-y-3">
+                        {comments.map((comment, idx) => (
+                          <div key={idx} className="flex items-start gap-2.5">
+                            <div className="flex-shrink-0 h-7 w-7 rounded-full bg-[#1e3a8a] flex items-center justify-center text-[10px] font-extrabold text-white">
+                              {String(comment.author || "?").charAt(0).toUpperCase()}
+                            </div>
+                            <div className={`flex-1 rounded-xl border px-3 py-2 ${COMMENT_COLORS[idx % COMMENT_COLORS.length]}`}>
+                              <div className="flex items-center justify-between gap-2 mb-1">
+                                <span className="text-[11px] font-extrabold text-slate-700">{comment.author || "—"}</span>
+                                {comment.at && (
+                                  <span className="text-[10px] text-slate-400">
+                                    {new Date(comment.at).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                                    {" at "}
+                                    {new Date(comment.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[13px] leading-relaxed text-slate-700 whitespace-pre-wrap">{comment.text}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {!!task.attachments?.length && (

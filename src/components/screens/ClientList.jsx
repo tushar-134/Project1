@@ -139,13 +139,13 @@ function ColumnCustomizer({ visibility, onChange }) {
 
   return (
     <div ref={ref} className="relative">
-      <Button
-        variant="ghost"
-        size="sm"
+      <button
+        type="button"
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
         aria-haspopup="true"
         id="col-customizer-btn"
+        className="inline-flex h-8 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 text-[13px] font-bold text-blue-700 transition hover:bg-blue-100 hover:text-blue-800"
       >
         <Columns size={15} />
         Columns
@@ -154,7 +154,7 @@ function ColumnCustomizer({ visibility, onChange }) {
             {visibleCount}
           </span>
         )}
-      </Button>
+      </button>
 
       {open && (
         <div
@@ -583,7 +583,7 @@ export default function ClientList() {
                 title="Refresh client list"
                 onClick={refetchClients}
                 disabled={clientsLoading}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-[#1e3a8a] disabled:opacity-50"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 hover:text-emerald-800 disabled:opacity-50"
               >
                 <RefreshCw size={15} className={clientsLoading ? "animate-spin" : ""} />
               </button>
@@ -593,7 +593,7 @@ export default function ClientList() {
                   type="button"
                   title="Import clients"
                   onClick={() => navigate("/clients/bulk-upload")}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-[#1e3a8a]"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 text-amber-700 transition hover:bg-amber-100 hover:text-amber-800"
                 >
                   <Upload size={15} />
                 </button>
@@ -603,7 +603,7 @@ export default function ClientList() {
                   type="button"
                   title="Export clients to Excel"
                   onClick={openExportModal}
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-[#1e3a8a]"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-purple-200 bg-purple-50 text-purple-700 transition hover:bg-purple-100 hover:text-purple-800"
                 >
                   <Download size={15} />
                 </button>

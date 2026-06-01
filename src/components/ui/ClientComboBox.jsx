@@ -1,5 +1,7 @@
 import { ChevronDown, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { clientService } from "../../services/clientService";
+import { mapClient } from "../../utils/adapterUtils";
 
 /**
  * Searchable client combobox.
@@ -23,20 +25,66 @@ export default function ClientComboBox({
   const [inputValue, setInputValue] = useState("");
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const [localClients, setLocalClients] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  // Synchronize localClients with the clients prop on mount/change
+  useEffect(() => {
+    setLocalClients(clients);
+  }, [clients]);
 
   // Resolve display name for the currently selected value
   const selected = useNameAsValue
-    ? clients.find((c) => (c.name || c.legalName) === value)
-    : clients.find((c) => (c._id || c.id) === value);
+    ? localClients.find((c) => (c.name || c.legalName) === value)
+    : localClients.find((c) => (c._id || c.id) === value);
+
+  // If a value is selected but not in the clients array, fetch it by ID so it displays correctly
+  useEffect(() => {
+    if (!value || useNameAsValue) return;
+    const exists = clients.some((c) => (c._id || c.id) === value);
+    if (!exists) {
+      clientService.get(value)
+        .then((data) => {
+          if (data) {
+            const mapped = mapClient(data);
+            setLocalClients((prev) => {
+              const alreadyHas = prev.some((c) => (c._id || c.id) === mapped._id);
+              return alreadyHas ? prev : [...prev, mapped];
+            });
+          }
+        })
+        .catch(() => {});
+    }
+  }, [value, clients, useNameAsValue]);
+
+  // Debounced search when input changes and the dropdown is open
+  useEffect(() => {
+    if (!open) return;
+
+    const delayDebounce = setTimeout(() => {
+      setLoading(true);
+      clientService.list({ search: inputValue.trim() || undefined, limit: 10 })
+        .then((data) => {
+          const raw = Array.isArray(data) ? data : (data.clients || data.items || []);
+          const mapped = raw.map(mapClient);
+          setLocalClients(mapped);
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    }, 250);
+
+    return () => clearTimeout(delayDebounce);
+  }, [inputValue, open]);
 
   // Filter clients by the current typed query
-  const filtered = clients.filter((c) => {
+  const filtered = localClients.filter((c) => {
     const name = c.name || c.legalName || "";
     return !inputValue.trim() || name.toLowerCase().includes(inputValue.toLowerCase());
   });
 
   // When closed and a client is selected, show its name; while open keep typed query
   const displayValue = open ? inputValue : (selected ? (selected.name || selected.legalName) : inputValue);
+
 
   useEffect(() => {
     function onOutside(e) {
@@ -109,7 +157,12 @@ export default function ClientComboBox({
       </div>
       {open && (
         <ul className="absolute top-full left-0 z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-[#e2e8f0] bg-white shadow-lg custom-scrollbar">
-          {filtered.length === 0 ? (
+          {loading ? (
+            <li className="flex items-center gap-2 px-4 py-3 text-[12px] text-slate-400">
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-[#1e3a8a]" />
+              Searching...
+            </li>
+          ) : filtered.length === 0 ? (
             <li className="px-4 py-3 text-[12px] text-slate-400">No clients found</li>
           ) : (
             filtered.map((c) => {

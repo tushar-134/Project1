@@ -267,7 +267,7 @@ export default function Contacts() {
     <div className="space-y-5">
       <div className="flex justify-end">
         <div className="flex flex-wrap justify-end gap-2">
-          <Button variant="ghost" onClick={() => setBulkOpen(true)}>
+          <Button variant="outlineAmber" onClick={() => setBulkOpen(true)}>
             <UploadCloud size={16} />
             Bulk Upload
           </Button>
@@ -424,7 +424,7 @@ export default function Contacts() {
                     disabled={bulkImporting}
                   />
                 </label>
-                <Button variant="ghost" onClick={downloadBulkTemplate} disabled={bulkImporting}>
+                <Button variant="outlinePurple" onClick={downloadBulkTemplate} disabled={bulkImporting}>
                   <Download size={16} />
                   Template
                 </Button>

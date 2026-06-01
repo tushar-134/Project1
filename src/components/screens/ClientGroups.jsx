@@ -245,11 +245,11 @@ export default function ClientGroups({ setSettingsHeaderAction }) {
             </select>
           </label>
 
-          <Button variant="ghost" onClick={exportGroupsExcel} disabled={!!selectedExportClientId}>
+          <Button variant="outlinePurple" onClick={exportGroupsExcel} disabled={!!selectedExportClientId}>
             <Download size={16} />
             Export Group-wise
           </Button>
-          <Button variant="ghost" onClick={exportClientsExcel}>
+          <Button variant="outlinePurple" onClick={exportClientsExcel}>
             <Download size={16} />
             Export Client-wise
           </Button>

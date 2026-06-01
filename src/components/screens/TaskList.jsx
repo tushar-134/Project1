@@ -34,8 +34,8 @@ const COLUMN_DEFS = [
 
 const ALL_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed"];
 const BASE_STATUSES = ["Not Yet Started", "WIP", "Completed"]; // for non-FTA tasks
-// "Active" = all non-completed/non-approved; surfaced in both column filter and scope logic
-const FILTER_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed", "Active", "All"];
+// "Active" = all non-completed/non-approved; surfaced in scope logic
+const FILTER_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed", "All"];
 const SCOPE_OPTIONS = ["By Month", "Overdue", "All"];
 // Column count updated: +2 for Created Date and Last Modified
 const TASK_TABLE_COLUMNS = 10;
@@ -90,6 +90,9 @@ function normalizeStatusFilterValue(value) {
   if (!value) return [];
   const raw = String(value).trim();
   if (!raw) return [];
+  if (raw.toLowerCase() === "active") {
+    return ["Not Yet Started", "WIP", "Submitted to FTA"];
+  }
   const found = FILTER_STATUSES.find((s) => s.toLowerCase() === raw.toLowerCase());
   return found ? [found] : [];
 }
@@ -149,24 +152,6 @@ function displayCategoryName(category) {
   return CATEGORY_LABELS[category] || category || "";
 }
 
-async function fetchAllClientsForLookup() {
-  const firstPage = await clientService.list({ page: 1, limit: LOOKUP_PAGE_SIZE });
-  const rawFirstClients = Array.isArray(firstPage) ? firstPage : (firstPage.clients || firstPage.items || []);
-  const firstClients = rawFirstClients.map(mapClient);
-  const pages = Number(firstPage.pages) || 1;
-  if (pages <= 1) return firstClients;
-
-  const remaining = await Promise.all(
-    Array.from({ length: pages - 1 }, (_, index) =>
-      clientService.list({ page: index + 2, limit: LOOKUP_PAGE_SIZE })
-    )
-  );
-  return remaining.reduce((items, pageData) => {
-    const rawPageClients = Array.isArray(pageData) ? pageData : (pageData.clients || pageData.items || []);
-    const pageClients = rawPageClients.map(mapClient);
-    return [...items, ...pageClients];
-  }, firstClients);
-}
 
 function buildActiveColumnFilterSummary(filters) {
   return [
@@ -310,7 +295,7 @@ export default function TaskList() {
   // controlled from the column filter row rather than the old chip section.
   const [scope, setScope] = useState(searchParams.get("scope") || "By Month");
   const [month, setMonth] = useState(initialMonth);
-  const [drawerTaskId, setDrawerTaskId] = useState(null);
+  const [drawerTaskId, setDrawerTaskId] = useState(searchParams.get("drawer") || null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   const BASE_EXPORT_FIELDS = COLUMN_DEFS.map((c) => ({ key: c.key, label: c.label }));
@@ -364,32 +349,26 @@ export default function TaskList() {
   const tasksLoading = Boolean(state.loading.tasks);
   const taskError = state.errors.tasks;
 
+  const hasFetchedClients = useRef(false);
+
   useEffect(() => {
     if (canManage) {
       fetchUsers().catch(() => {});
-      fetchClients({ limit: 1000 }).catch(() => {});
     }
   }, [canManage]);
+
+  useEffect(() => {
+    if (!hasFetchedClients.current) {
+      hasFetchedClients.current = true;
+      fetchClients({ limit: 10 }).catch(() => {});
+    }
+  }, [fetchClients]);
 
   useEffect(() => {
     categoryService.list()
       .then((data) => dispatch({ type: "SET_RESOURCE", resource: "categories", payload: data.map(mapCategory) }))
       .catch(() => {});
   }, [dispatch]);
-
-  useEffect(() => {
-    let active = true;
-    fetchAllClientsForLookup()
-      .then((clients) => {
-        if (active) dispatch({ type: "SET_RESOURCE", resource: "clients", payload: clients });
-      })
-      .catch(() => {
-        fetchClients({ limit: LOOKUP_PAGE_SIZE }).catch(() => {});
-      });
-    return () => {
-      active = false;
-    };
-  }, [dispatch, fetchClients]);
 
   const serverFilters = useMemo(() => ({
     category: deferredColumnFilters.category || undefined,
@@ -663,7 +642,7 @@ export default function TaskList() {
             <ColumnCustomizer visibility={colVisibility} onChange={updateColVisibility} />
 
             <button
-              className="grid h-8 w-8 place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
+              className="grid h-8 w-8 place-items-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 transition hover:bg-emerald-100 hover:text-emerald-800 disabled:opacity-40"
               onClick={refetchTasks}
               disabled={tasksLoading}
               aria-label="Refresh task list"
@@ -674,7 +653,7 @@ export default function TaskList() {
 
             {canManage && (
               <button
-                className="grid h-8 w-8 place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-600 transition hover:bg-slate-50"
+                className="grid h-8 w-8 place-items-center rounded-lg border border-purple-200 bg-purple-50 text-purple-700 transition hover:bg-purple-100 hover:text-purple-800"
                 onClick={() => setIsExportModalOpen(true)}
                 aria-label="Export tasks to Excel"
                 title="Export Excel"
@@ -1001,7 +980,17 @@ export default function TaskList() {
       </TaskSection>
 
       {canManage && drawerTaskId && (
-        <TaskDrawer taskId={drawerTaskId} canManage={canManage} onClose={() => setDrawerTaskId(null)} />
+        <TaskDrawer 
+          taskId={drawerTaskId} 
+          canManage={canManage} 
+          onClose={() => {
+            setDrawerTaskId(null);
+            if (searchParams.has("drawer")) {
+              searchParams.delete("drawer");
+              setSearchParams(searchParams, { replace: true });
+            }
+          }} 
+        />
       )}
 
       <ExportModal
@@ -1151,13 +1140,13 @@ function ColumnCustomizer({ visibility, onChange }) {
 
   return (
     <div ref={ref} className="relative">
-      <Button
-        variant="ghost"
-        size="sm"
+      <button
+        type="button"
         onClick={() => setOpen((prev) => !prev)}
         aria-expanded={open}
         aria-haspopup="true"
         id="col-customizer-btn"
+        className="inline-flex h-8 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 text-[13px] font-bold text-blue-700 transition hover:bg-blue-100 hover:text-blue-800"
       >
         <Columns size={15} />
         Columns
@@ -1166,7 +1155,7 @@ function ColumnCustomizer({ visibility, onChange }) {
             {visibleCount}
           </span>
         )}
-      </Button>
+      </button>
 
       {open && (
         <div
