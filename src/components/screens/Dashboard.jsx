@@ -58,7 +58,7 @@ export default function Dashboard() {
   const { state, dispatch } = useApp();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
-  const [month, setMonth] = useState(new Date(2026, 4, 1));
+  const [month, setMonth] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [drawerTaskId, setDrawerTaskId] = useState(null);
   const [tileOrder, setTileOrder] = useState(DEFAULT_DASHBOARD_TILE_ORDER);
   const [visibleTileNames, setVisibleTileNames] = useState(DEFAULT_DASHBOARD_TILE_ORDER);
