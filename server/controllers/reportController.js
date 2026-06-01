@@ -33,14 +33,12 @@ exports.dashboardStats = async (req, res, next) => {
       visibleTaskClientIds = tasks.map((t) => t.client).filter(Boolean);
     }
 
-    // Overdue query: tasks whose dueDate is within the selected month AND before now
+    // Overdue = ALL uncompleted tasks past their due date, regardless of selected month
     const now = new Date();
     const overdueScope = {
       ...roleScope,
       status: { $ne: "completed" },
-      dueDate: dueDate
-        ? { $gte: dueDate.$gte, $lt: now < dueDate.$lt ? now : dueDate.$lt }
-        : { $lt: now },
+      dueDate: { $lt: now },
     };
 
     const clientScope = {
@@ -55,7 +53,7 @@ exports.dashboardStats = async (req, res, next) => {
       ...roleScope,
     };
 
-    const [totalClients, pendingTasks, overdueTasks, ftaPending, recentActivity, catAgg] = await Promise.all([
+    const [totalClients, pendingTasks, overdueTasks, ftaPending, recentActivity, catAgg, overdueAgg] = await Promise.all([
       Client.countDocuments(clientScope),
       Task.countDocuments({ ...taskScope, status: { $ne: "completed" } }),
       Task.countDocuments(overdueScope),
@@ -75,12 +73,26 @@ exports.dashboardStats = async (req, res, next) => {
           active: { $sum: { $cond: [{ $ne: ["$status", "completed"] }, 1, 0] } },
           closed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
           pending: { $sum: { $cond: [{ $ne: ["$status", "completed"] }, 1, 0] } },
-          overdue: { $sum: { $cond: [{ $and: [{ $ne: ["$status", "completed"] }, { $lt: ["$dueDate", now] }] }, 1, 0] } },
         }},
+      ]),
+      Task.aggregate([
+        { $match: { ...roleScope, status: { $ne: "completed" }, dueDate: { $lt: now } } },
+        { $group: { _id: "$category", overdue: { $sum: 1 } } },
       ]),
     ]);
 
-    const categoryBreakdown = catAgg.map((c) => ({ category: c._id, active: c.active, closed: c.closed, pending: c.pending, overdue: c.overdue }));
+    const overdueByCat = new Map(overdueAgg.map((c) => [c._id, c.overdue]));
+    const catMap = new Map(catAgg.map((c) => [c._id, c]));
+    for (const [cat] of overdueByCat) {
+      if (!catMap.has(cat)) catMap.set(cat, { _id: cat, active: 0, closed: 0, pending: 0 });
+    }
+    const categoryBreakdown = [...catMap.values()].map((c) => ({
+      category: c._id,
+      active: c.active,
+      closed: c.closed,
+      pending: c.pending,
+      overdue: overdueByCat.get(c._id) || 0,
+    }));
     res.json({ totalClients, pendingTasks, overdueTasks, ftaPending, categoryBreakdown, recentActivity });
   } catch (error) { next(error); }
 };
