@@ -75,7 +75,7 @@ function buildActiveFilterSummary(columnFilters, query) {
   if (columnFilters.contact) chips.push(`Contact: ${columnFilters.contact}`);
   if (columnFilters.createdAt) chips.push(`Created: ${columnFilters.createdAt}`);
   if (columnFilters.createdBy) chips.push(`Created By: ${columnFilters.createdBy}`);
-  if (columnFilters.status && columnFilters.status !== "active") chips.push(`Status: ${columnFilters.status.charAt(0).toUpperCase() + columnFilters.status.slice(1)}`);
+  if (columnFilters.status && columnFilters.status !== "active") chips.push(`Contact Type: ${columnFilters.status.charAt(0).toUpperCase() + columnFilters.status.slice(1)}`);
   return chips;
 }
 
@@ -740,7 +740,7 @@ export default function ClientList() {
               </select>
             </FilterField>
 
-            <FilterField label="Status" htmlFor="client-filter-status">
+            <FilterField label="Contact Type" htmlFor="client-filter-status">
               <select
                 id="client-filter-status"
                 className="input"
@@ -749,7 +749,6 @@ export default function ClientList() {
               >
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
-                <option value="all">All statuses</option>
               </select>
             </FilterField>
 
