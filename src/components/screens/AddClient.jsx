@@ -1233,25 +1233,21 @@ export default function AddClient() {
           <div className="flex overflow-x-auto">{tabs.map((t, i) => <button key={t} onClick={() => setTab(i)} className={`mr-1 whitespace-nowrap rounded-lg px-3 py-2 text-[12px] font-extrabold ${tab === i ? "bg-[#1e3a8a] text-white" : "text-slate-600 hover:bg-white"}`}>{t}</button>)}</div>
           {showViewToggle && (
             <div className="flex shrink-0 items-center justify-end gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-extrabold text-slate-700 shadow-sm">
-              <span>{isViewMode ? "View mode" : "Edit mode"}</span>
+              <span>Edit mode</span>
               <button
                 type="button"
                 role="switch"
-                aria-checked={isViewMode}
+                aria-checked={!isViewMode}
                 onClick={() => setViewModeTabs((current) => current.map((value, index) => index === tab ? !value : value))}
-                className={`relative h-6 w-11 rounded-full transition ${isViewMode ? "bg-[#1e3a8a]" : "bg-slate-300"}`}
+                className={`relative h-6 w-11 rounded-full transition ${isViewMode ? "bg-slate-300" : "bg-[#1e3a8a]"}`}
               >
-                <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition ${isViewMode ? "left-6" : "left-1"}`} />
+                <span className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition ${isViewMode ? "left-1" : "left-6"}`} />
               </button>
             </div>
           )}
         </div>
         <div className="p-4">
-          {isViewMode && (
-            <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-[13px] font-semibold text-[#1e3a8a]">
-              View mode is on. Turn it off from the top-right toggle to edit this client.
-            </div>
-          )}
+
           <fieldset disabled={isViewMode} className={isViewMode ? "opacity-80" : ""}>
           {tab === 0 && (
             <Basic
