@@ -27,6 +27,7 @@ export default function ClientComboBox({
   const ref = useRef(null);
   const [localClients, setLocalClients] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState("");
 
   // Synchronize localClients with the clients prop on mount/change
   useEffect(() => {
@@ -61,15 +62,21 @@ export default function ClientComboBox({
   useEffect(() => {
     if (!open) return;
 
+    setLoading(true);
+    setFetchError("");
     const delayDebounce = setTimeout(() => {
-      setLoading(true);
-      clientService.list({ search: inputValue.trim() || undefined, limit: 10 })
+      clientService.list({ search: inputValue.trim() || undefined, limit: 10, status: "active" })
         .then((data) => {
-          const raw = Array.isArray(data) ? data : (data.clients || data.items || []);
+          const raw = Array.isArray(data)
+            ? data
+            : (data.clients || data.items || data.results || []);
           const mapped = raw.map(mapClient);
           setLocalClients(mapped);
         })
-        .catch(() => {})
+        .catch(() => {
+          setFetchError("Unable to load clients");
+          setLocalClients([]);
+        })
         .finally(() => setLoading(false));
     }, 250);
 
@@ -100,11 +107,13 @@ export default function ClientComboBox({
 
   function handleFocus() {
     setInputValue(""); // clear so user can type a fresh search
+    setFetchError("");
     setOpen(true);
   }
 
   function handleChange(e) {
     setInputValue(e.target.value);
+    setFetchError("");
     setOpen(true);
   }
 
@@ -162,6 +171,8 @@ export default function ClientComboBox({
               <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-[#1e3a8a]" />
               Searching...
             </li>
+          ) : fetchError ? (
+            <li className="px-4 py-3 text-[12px] font-semibold text-red-500">{fetchError}</li>
           ) : filtered.length === 0 ? (
             <li className="px-4 py-3 text-[12px] text-slate-400">No clients found</li>
           ) : (

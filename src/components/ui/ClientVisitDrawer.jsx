@@ -318,43 +318,51 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {/* Option A — navigate to AddClient pre-filled */}
-                    <Button
-                      size="sm"
-                      onClick={() => navigate("/clients/new", {
-                        state: {
-                          fromVisitId: visit._id,
-                          newClient: visit.newClient || {},
-                        },
-                      })}
-                    >
-                      <UserCheck size={14} />
-                      Convert to Client
-                    </Button>
+                    {canManage ? (
+                      <>
+                        {/* Option A — navigate to AddClient pre-filled */}
+                        <Button
+                          size="sm"
+                          onClick={() => navigate("/clients/add", {
+                            state: {
+                              fromVisitId: visit._id,
+                              newClient: visit.newClient || {},
+                            },
+                          })}
+                        >
+                          <UserCheck size={14} />
+                          Convert to Client
+                        </Button>
 
-                    {/* Option B — link to already-created client inline */}
-                    {!showLinkBox ? (
-                      <Button size="sm" variant="ghost" onClick={() => setShowLinkBox(true)}>
-                        <Link2 size={14} />
-                        Link to Existing
-                      </Button>
+                        {/* Option B — link to already-created client inline */}
+                        {!showLinkBox ? (
+                          <Button size="sm" variant="ghost" onClick={() => setShowLinkBox(true)}>
+                            <Link2 size={14} />
+                            Link to Existing
+                          </Button>
+                        ) : (
+                          <div className="flex w-full flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-white p-3">
+                            <div className="flex-1 min-w-[180px]">
+                              <ClientComboBox
+                                value={linkClientId}
+                                onChange={setLinkClientId}
+                                placeholder="Search & select client…"
+                              />
+                            </div>
+                            <Button size="sm" onClick={handleLinkClient} disabled={!linkClientId || linkSaving}>
+                              <Save size={13} />
+                              {linkSaving ? "Linking…" : "Confirm Link"}
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => { setShowLinkBox(false); setLinkClientId(""); }}>
+                              <X size={13} />
+                              Cancel
+                            </Button>
+                          </div>
+                        )}
+                      </>
                     ) : (
-                      <div className="flex w-full flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-white p-3">
-                        <div className="flex-1 min-w-[180px]">
-                          <ClientComboBox
-                            value={linkClientId}
-                            onChange={setLinkClientId}
-                            placeholder="Search & select client…"
-                          />
-                        </div>
-                        <Button size="sm" onClick={handleLinkClient} disabled={!linkClientId || linkSaving}>
-                          <Save size={13} />
-                          {linkSaving ? "Linking…" : "Confirm Link"}
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => { setShowLinkBox(false); setLinkClientId(""); }}>
-                          <X size={13} />
-                          Cancel
-                        </Button>
+                      <div className="rounded-xl border border-amber-200 bg-white px-3 py-2 text-[12px] font-semibold text-slate-600">
+                        Only Admin and Manager users can convert this visit to a client or link it to an existing client.
                       </div>
                     )}
                   </div>
