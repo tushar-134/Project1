@@ -168,7 +168,7 @@ export default function ClientVisitForm() {
         _id: currentUser._id || currentUser.id,
         id: currentUser._id || currentUser.id,
         name: currentUser.name,
-        role: "Task Only",
+        role: "Associate",
       }];
     }
     const term = userSearch.trim().toLowerCase();

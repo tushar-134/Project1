@@ -1,7 +1,7 @@
 export const ROLE_LABELS = {
   admin: "Admin",
   manager: "Manager",
-  task_only: "Task Only",
+  task_only: "Associate",
 };
 
 export function hasAnyRole(role, roles = []) {

@@ -20,7 +20,7 @@ function normalizeMobile(value) {
 
 const DEFAULT_DIAL_CODE = "+971";
 const ROLE_DETAILS = {
-  "Task Only": {
+  Associate: {
     summary: "Execution-only access",
     text: "Can work only on assigned tasks. Cannot assign work and cannot delete work.",
   },
@@ -42,7 +42,7 @@ export default function Users({ setSettingsHeaderAction }) {
   const canManageUsers = currentUser?.role === "admin";
   const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [form, setForm] = useState({ name: "", email: "", mobileCountryCode: DEFAULT_DIAL_CODE, mobile: "", role: "Task Only", password: "", confirmPassword: "" });
+  const [form, setForm] = useState({ name: "", email: "", mobileCountryCode: DEFAULT_DIAL_CODE, mobile: "", role: "Associate", password: "", confirmPassword: "" });
   const [mobileError, setMobileError] = useState("");
   const [saving, setSaving] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
@@ -70,7 +70,7 @@ export default function Users({ setSettingsHeaderAction }) {
     if (saving) return;
     setModalOpen(false);
     setEditingUser(null);
-    setForm({ name: "", email: "", mobileCountryCode: DEFAULT_DIAL_CODE, mobile: "", role: "Task Only", password: "", confirmPassword: "" });
+    setForm({ name: "", email: "", mobileCountryCode: DEFAULT_DIAL_CODE, mobile: "", role: "Associate", password: "", confirmPassword: "" });
     setMobileError("");
     setClientSearch("");
     setShowPassword(false);
@@ -79,7 +79,7 @@ export default function Users({ setSettingsHeaderAction }) {
 
   function handleAddUser() {
     setEditingUser(null);
-    setForm({ name: "", email: "", mobileCountryCode: DEFAULT_DIAL_CODE, mobile: "", role: "Task Only", password: "", confirmPassword: "" });
+    setForm({ name: "", email: "", mobileCountryCode: DEFAULT_DIAL_CODE, mobile: "", role: "Associate", password: "", confirmPassword: "" });
     setMobileError("");
     setModalOpen(true);
   }
@@ -94,7 +94,7 @@ export default function Users({ setSettingsHeaderAction }) {
       email: user.email || "",
       mobileCountryCode,
       mobile: mobileNumber,
-      role: user.role || "Task Only",
+      role: user.role || "Associate",
       password: "",
       confirmPassword: "",
     });
@@ -165,13 +165,13 @@ export default function Users({ setSettingsHeaderAction }) {
           email: form.email.trim(),
           mobileCountryCode,
           mobile,
-          role: form.role || "Task Only",
+          role: form.role || "Associate",
         };
         if (form.password) payload.password = form.password;
         await updateUser(editingUser._id, payload);
         toast.success("User updated successfully.");
       } else {
-        await createUser({ name: form.name.trim(), email: form.email.trim(), mobileCountryCode, mobile, role: form.role || "Task Only", password: form.password });
+        await createUser({ name: form.name.trim(), email: form.email.trim(), mobileCountryCode, mobile, role: form.role || "Associate", password: form.password });
         toast.success("User created successfully.");
       }
       closeModal();
@@ -238,7 +238,7 @@ export default function Users({ setSettingsHeaderAction }) {
         <Card className="p-4">
           <div className="mb-2 text-[14px] font-extrabold">Role permissions</div>
           <div className="grid gap-3 md:grid-cols-3">
-            <Role title="Task Only" summary={ROLE_DETAILS["Task Only"].summary} text={ROLE_DETAILS["Task Only"].text} />
+            <Role title="Associate" summary={ROLE_DETAILS.Associate.summary} text={ROLE_DETAILS.Associate.text} />
             <Role title="Manager" summary={ROLE_DETAILS.Manager.summary} text={ROLE_DETAILS.Manager.text} />
             <Role title="Admin" summary={ROLE_DETAILS.Admin.summary} text={ROLE_DETAILS.Admin.text} />
           </div>
@@ -341,7 +341,7 @@ export default function Users({ setSettingsHeaderAction }) {
                     disabled={!canManageUsers || currentUser?.id === u._id}
                     onChange={(e) => handleRoleChange(u, e.target.value)}
                   >
-                    <option value="Task Only">Task only</option>
+                    <option value="Associate">Associate</option>
                     <option>Manager</option>
                     <option>Admin</option>
                   </select>
@@ -426,7 +426,7 @@ export default function Users({ setSettingsHeaderAction }) {
               </Field>
               <Field label="Role" field="user-form-role">
                 <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                  <option value="Task Only">Task only</option>
+                  <option value="Associate">Associate</option>
                   <option>Manager</option>
                   <option>Admin</option>
                 </select>
