@@ -355,14 +355,19 @@ exports.listTasks = async (req, res, next) => {
   try {
     const { page: requestedPage, limit } = parsePagination(req.query, 20);
     const query = await taskQuery(req);
-    const total = await Task.countDocuments(query);
+    const skip = (requestedPage - 1) * limit;
+
+    const [total, tasks] = await Promise.all([
+      Task.countDocuments(query),
+      Task.find(query)
+        .populate(populateTask)
+        .sort({ updatedAt: -1, createdAt: -1, taskId: 1 })
+        .skip(skip)
+        .limit(limit)
+    ]);
+
     const pages = Math.max(1, Math.ceil(total / limit));
     const page = Math.min(requestedPage, pages);
-    const tasks = await Task.find(query)
-      .populate(populateTask)
-      .sort({ updatedAt: -1, createdAt: -1, taskId: 1 })
-      .skip((page - 1) * limit)
-      .limit(limit);
     res.json({ tasks, total, page, pages, limit });
   } catch (error) { next(error); }
 };
