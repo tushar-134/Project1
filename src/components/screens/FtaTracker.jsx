@@ -63,7 +63,7 @@ const TABS = [
 const FTA_STATUSES = ["In Review", "Additional Query From FTA", "Approved"];
 
 function createEmptyFilters() {
-  return { client: "", category: "", assigned: "", recurring: "", dueDate: "" };
+  return { client: "", category: "", assigned: "", dueDate: "" };
 }
 
 function buildFilterSummary(f) {
@@ -71,7 +71,7 @@ function buildFilterSummary(f) {
     f.client ? `Client: ${f.client}` : null,
     f.category ? `Category: ${f.category}` : null,
     f.assigned ? `Assigned: ${f.assigned}` : null,
-    f.recurring ? `Recurring: ${f.recurring === "recurring" ? "Recurring" : "One-time"}` : null,
+
     f.dueDate ? `Due Date: ${f.dueDate}` : null,
   ].filter(Boolean);
 }
@@ -110,8 +110,7 @@ export default function FtaTracker() {
       return false;
     if (filters.assigned && !item.assigned?.toLowerCase().includes(filters.assigned.toLowerCase()))
       return false;
-    if (filters.recurring === "recurring" && !item.recurring) return false;
-    if (filters.recurring === "one-time" && item.recurring) return false;
+
     if (filters.dueDate && item.dueDate !== filters.dueDate) return false;
     return true;
   });
@@ -305,19 +304,7 @@ export default function FtaTracker() {
                   </select>
                 </FilterField>
 
-                {/* Recurring */}
-                <FilterField label="Recurring" htmlFor="fta-filter-recurring">
-                  <select
-                    id="fta-filter-recurring"
-                    className="input"
-                    value={filters.recurring}
-                    onChange={(e) => updateFilter("recurring", e.target.value)}
-                  >
-                    <option value="">All tasks</option>
-                    <option value="recurring">Recurring</option>
-                    <option value="one-time">One-time</option>
-                  </select>
-                </FilterField>
+
 
                 {/* Due Date */}
                 <FilterField label="Due Date" htmlFor="fta-filter-due-date">
@@ -391,7 +378,6 @@ export default function FtaTracker() {
                 <th>Submitted On</th>
                 <th>Assigned</th>
                 <th>FTA Status</th>
-                <th>Recurring</th>
               </tr>
             </thead>
             <tbody>
@@ -453,13 +439,7 @@ export default function FtaTracker() {
                       </select>
                     )}
                   </td>
-                  <td>
-                    {item.recurring && (
-                      <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-extrabold text-[#1e3a8a]">
-                        Recurring
-                      </span>
-                    )}
-                  </td>
+
                 </tr>
               ))}
             </tbody>
