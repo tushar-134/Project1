@@ -1,4 +1,4 @@
-import { AlertTriangle, Calendar, Clock3, ExternalLink, Mail, MapPin, MessageSquare, NotebookPen, Pencil, Phone, Save, User, UsersRound, X, XCircle } from "lucide-react";
+import { AlertTriangle, Calendar, Clock3, ExternalLink, Link2, Mail, MapPin, MessageSquare, NotebookPen, Pencil, Phone, Save, User, UserCheck, UsersRound, X, XCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { clientVisitService } from "../../services/clientVisitService.js";
@@ -7,6 +7,7 @@ import Button from "./Button.jsx";
 import Card from "./Card.jsx";
 import StatusPill from "./StatusPill.jsx";
 import UserAvatar from "./UserAvatar.jsx";
+import ClientComboBox from "./ClientComboBox.jsx";
 
 function titleStatus(value) {
   return String(value || "")
@@ -82,6 +83,10 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
   const [commentInput, setCommentInput] = useState("");
   const [remarkSaving, setRemarkSaving] = useState(false);
   const [remarkError, setRemarkError] = useState("");
+  // Conversion / linking state
+  const [showLinkBox, setShowLinkBox] = useState(false);
+  const [linkClientId, setLinkClientId] = useState("");
+  const [linkSaving, setLinkSaving] = useState(false);
 
   const loadVisit = useCallback(async (active = true) => {
     setLoading(true);
@@ -201,6 +206,27 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
     navigate(`/client-visits/${visitId}/edit`);
   }
 
+  async function handleLinkClient() {
+    if (!linkClientId || linkSaving) return;
+    setLinkSaving(true);
+    setError("");
+    try {
+      const updated = await clientVisitService.update(visit._id, {
+        clientType: "existing",
+        client: linkClientId,
+        newClient: undefined,
+      });
+      setVisit(updated);
+      onVisitUpdated(updated);
+      setShowLinkBox(false);
+      setLinkClientId("");
+    } catch (err) {
+      setError(err.response?.data?.message || "Unable to link client.");
+    } finally {
+      setLinkSaving(false);
+    }
+  }
+
   function openNewVisitPage() {
     if (!visit) return;
     navigate("/client-visits/new", {
@@ -274,6 +300,63 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
                   <div className="flex items-center gap-2">
                     <AlertTriangle size={14} />
                     <span>{error}</span>
+                  </div>
+                </Card>
+              )}
+
+              {/* ── Client Conversion Card (only for prospective / new-client visits) ── */}
+              {visit.clientType === "new" && (
+                <Card className="border border-amber-200 bg-amber-50 p-5">
+                  <div className="mb-3 flex items-center gap-2">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white">
+                      <UserCheck size={15} />
+                    </span>
+                    <div>
+                      <div className="text-[14px] font-black text-slate-900">Prospective Client</div>
+                      <div className="text-[11px] font-semibold text-slate-500">This visit was logged for a new (prospective) client. Convert or link once they're onboarded.</div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {/* Option A — navigate to AddClient pre-filled */}
+                    <Button
+                      size="sm"
+                      onClick={() => navigate("/clients/new", {
+                        state: {
+                          fromVisitId: visit._id,
+                          newClient: visit.newClient || {},
+                        },
+                      })}
+                    >
+                      <UserCheck size={14} />
+                      Convert to Client
+                    </Button>
+
+                    {/* Option B — link to already-created client inline */}
+                    {!showLinkBox ? (
+                      <Button size="sm" variant="ghost" onClick={() => setShowLinkBox(true)}>
+                        <Link2 size={14} />
+                        Link to Existing
+                      </Button>
+                    ) : (
+                      <div className="flex w-full flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-white p-3">
+                        <div className="flex-1 min-w-[180px]">
+                          <ClientComboBox
+                            value={linkClientId}
+                            onChange={setLinkClientId}
+                            placeholder="Search & select client…"
+                          />
+                        </div>
+                        <Button size="sm" onClick={handleLinkClient} disabled={!linkClientId || linkSaving}>
+                          <Save size={13} />
+                          {linkSaving ? "Linking…" : "Confirm Link"}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => { setShowLinkBox(false); setLinkClientId(""); }}>
+                          <X size={13} />
+                          Cancel
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </Card>
               )}
