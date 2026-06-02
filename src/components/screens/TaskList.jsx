@@ -32,10 +32,10 @@ const COLUMN_DEFS = [
   { key: "updatedAt", label: "Last Modified", defaultOn: false, description: "When task was last updated" },
 ];
 
-const ALL_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed"];
-const BASE_STATUSES = ["Not Yet Started", "WIP", "Completed"]; // for non-FTA tasks
+const ALL_STATUSES = ["Not Yet Started", "In Progress", "Submitted to FTA", "Completed"];
+const BASE_STATUSES = ["Not Yet Started", "In Progress", "Completed"]; // for non-FTA tasks
 // "Active" = all non-completed/non-approved; surfaced in scope logic
-const FILTER_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed", "All"];
+const FILTER_STATUSES = ["Not Yet Started", "In Progress", "Submitted to FTA", "Completed", "All"];
 const SCOPE_OPTIONS = ["By Month", "Overdue", "All"];
 // Column count updated: +2 for Created Date and Last Modified
 const TASK_TABLE_COLUMNS = 10;
@@ -64,7 +64,7 @@ const OPTION_ACRONYMS = new Map([
 
 const STATUS_PILL = {
   "Not Yet Started": { bg: "bg-slate-100", text: "text-slate-600" },
-  WIP: { bg: "bg-blue-50", text: "text-blue-700" },
+  "In Progress": { bg: "bg-blue-50", text: "text-blue-700" },
   Completed: { bg: "bg-green-100", text: "text-green-700" },
   "Submitted to FTA": { bg: "bg-purple-50", text: "text-purple-700" },
 };
@@ -91,7 +91,7 @@ function normalizeStatusFilterValue(value) {
   const raw = String(value).trim();
   if (!raw) return [];
   if (raw.toLowerCase() === "active") {
-    return ["Not Yet Started", "WIP", "Submitted to FTA"];
+    return ["Not Yet Started", "In Progress", "Submitted to FTA"];
   }
   const found = FILTER_STATUSES.find((s) => s.toLowerCase() === raw.toLowerCase());
   return found ? [found] : [];
@@ -431,7 +431,7 @@ export default function TaskList() {
 
   const completedCount = rows.filter((task) => task.status === "Completed").length;
   const workingCount = rows.length - completedCount;
-  const activeCount = rows.filter((task) => task.status === "Not Yet Started" || task.status === "WIP").length;
+  const activeCount = rows.filter((task) => task.status === "Not Yet Started" || task.status === "In Progress").length;
   const activeColumnFilters = buildActiveColumnFilterSummary(columnFilters);
   const hasColumnFilters = activeColumnFilters.length > 0;
   const hasActiveFilters = hasColumnFilters || scope !== "By Month" || month !== initialMonth;

@@ -1,13 +1,13 @@
 export const statusToApi = {
   "Not Yet Started": "not_started",
-  WIP: "wip",
+  "In Progress": "wip",
   Completed: "completed",
   "Submitted to FTA": "submitted_to_fta",
 };
 
 export const statusFromApi = {
   not_started: "Not Yet Started",
-  wip: "WIP",
+  wip: "In Progress",
   completed: "Completed",
   submitted_to_fta: "Submitted to FTA",
 };

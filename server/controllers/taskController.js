@@ -12,14 +12,14 @@ const xlsx = require("xlsx");
 // Human-readable status labels for notification messages
 const STATUS_LABEL = {
   not_started: "Not Yet Started",
-  wip: "WIP",
+  wip: "In Progress",
   submitted_to_fta: "Submitted to FTA",
   completed: "Completed",
 };
 // Reverse map: UI label → DB enum value
 const LABEL_TO_STATUS = {
   "Not Yet Started": "not_started",
-  "WIP": "wip",
+  "In Progress": "wip",
   "Submitted to FTA": "submitted_to_fta",
   "Completed": "completed",
 };

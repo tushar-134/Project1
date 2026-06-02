@@ -21,7 +21,7 @@ The Data Adapter module converts raw MongoDB-shaped API responses into flatter, 
 | Display Label | API Value |
 |---------------|-----------|
 | `Not Yet Started` | `not_started` |
-| `WIP` | `wip` |
+| `In Progress` | `wip` |
 | `Completed` | `completed` |
 | `Submitted to FTA` | `submitted_to_fta` |
 

@@ -326,11 +326,11 @@ exports.exportCsv = async (req, res, next) => {
       const cursor = ActivityLog.find(dateMatch("updatedAt", range)).populate("user", "name email").populate({ path: "task", populate: { path: "client", select: "legalName" } }).sort({ updatedAt: -1 }).cursor({ batchSize: CSV_BATCH_SIZE });
       for await (const row of cursor) writeCsvRow(res, [row.task?.taskId, row.user?.name || row.user?.email, formatCsvDateTime(row.createdAt), row.task?.client?.legalName, row.task?.taskType, row.task?.category, row.action, formatCsvDateTime(row.updatedAt)]);
     } else if (report === "client-wise") {
-      writeCsvRow(res, ["Client", "File No", "Total", "Not Started", "WIP", "Completed", "Submitted to FTA", "Last Updated"]);
+      writeCsvRow(res, ["Client", "File No", "Total", "Not Started", "In Progress", "Completed", "Submitted to FTA", "Last Updated"]);
       const cursor = Task.aggregate(clientWisePipeline(range)).cursor({ batchSize: CSV_BATCH_SIZE });
       for await (const row of cursor) writeCsvRow(res, [row.client?.legalName, row.client?.fileNo, row.total, row.not_started, row.wip, row.completed, row.submitted_to_fta, formatCsvDateTime(row.updatedAt)]);
     } else if (report === "user-wise") {
-      writeCsvRow(res, ["User", "Email", "Role", "Total", "Not Started", "WIP", "Completed", "Submitted to FTA", "Last Updated"]);
+      writeCsvRow(res, ["User", "Email", "Role", "Total", "Not Started", "In Progress", "Completed", "Submitted to FTA", "Last Updated"]);
       const cursor = Task.aggregate(userWisePipeline(range)).cursor({ batchSize: CSV_BATCH_SIZE });
       for await (const row of cursor) writeCsvRow(res, [row.user?.name || "Unassigned", row.user?.email, row.user?.role, row.total, row.not_started, row.wip, row.completed, row.submitted_to_fta, formatCsvDateTime(row.updatedAt)]);
     } else {

@@ -1,6 +1,5 @@
 export const statusClasses = {
   "Not Yet Started": "bg-slate-100 text-slate-600",
-  WIP: "bg-sky-50 text-[#0ea5e9]",
   Completed: "bg-emerald-50 text-[#059669]",
   "Submitted to FTA": "bg-yellow-100 text-[#a16207]",
   Planned: "bg-slate-100 text-slate-700",
