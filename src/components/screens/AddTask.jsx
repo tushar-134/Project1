@@ -1,4 +1,5 @@
 import { cloneElement, isValidElement, useEffect, useMemo, useState, useRef } from "react";
+import { flushSync } from "react-dom";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { Check, Send, UploadCloud } from "lucide-react";
 import toast from "react-hot-toast";
@@ -402,7 +403,11 @@ export default function AddTask() {
         setAttachments(mapAttachmentRows(savedTask?.attachments || []));
       }
       toast.success(isEditMode ? "Task updated successfully." : "Task created successfully.");
-      setIsDirty(false); // Reset dirty state before navigation
+      
+      flushSync(() => {
+        setIsDirty(false); // Reset dirty state synchronously before navigation
+      });
+
       if (!isEditMode && returnToClient?.clientId && savedTask?._id) {
         navigate(`/clients/edit/${returnToClient.clientId}`, {
           state: {
