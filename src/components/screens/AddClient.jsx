@@ -176,8 +176,33 @@ const LICENCE_TYPE_OPTIONS = [
   "Industrial License",
   "Agricultural License",
   "Crafts License",
-  "Tourism License"
+  "Tourism License",
 ];
+const LEGACY_LICENCE_TYPE_LABELS = {
+  commercial: "Commercial License",
+  professional: "Professional License",
+  industrial: "Industrial License",
+  agricultural: "Agricultural License",
+  crafts: "Crafts License",
+  tourism: "Tourism License",
+};
+
+function normalizeLicenceTypeLabel(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return "";
+
+  const legacyMatch = LEGACY_LICENCE_TYPE_LABELS[normalized.toLowerCase()];
+  if (legacyMatch) return legacyMatch;
+
+  if (normalized.toLowerCase().includes("license")) {
+    return normalized
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
+  }
+
+  return `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)} License`;
+}
 
 function normalizeFinancialYearEnd(value) {
   if (!value) return "Jan - Dec";
@@ -275,7 +300,7 @@ export default function AddClient() {
   const isCtDeregistered = form.ctStatus === "Deregistered";
   const [vatHistory, setVatHistory] = useState([]);
   const [ctHistory, setCtHistory] = useState([]);
-  const [licences, setLicencesRaw] = useState([{ number: "", issue: "", expiry: "", authority: "", type: "Commercial License", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
+  const [licences, setLicencesRaw] = useState([{ number: "", issue: "", expiry: "", authority: "", type: "", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
   const setLicences = (val) => { setIsDirty(true); setLicencesRaw(val); };
 
   const [contacts, setContactsRaw] = useState([{
@@ -571,14 +596,14 @@ export default function AddClient() {
         issue: licence.issueDate?.slice?.(0, 10) || "",
         expiry: licence.expiryDate?.slice?.(0, 10) || "",
         authority: licence.issuingAuthority || "",
-        type: licence.licenceType ? (licence.licenceType.toLowerCase().includes("license") ? licence.licenceType.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") : `${licence.licenceType.charAt(0).toUpperCase()}${licence.licenceType.slice(1)} License`) : "Commercial License",
+        type: normalizeLicenceTypeLabel(licence.licenceType),
         email: licence.officialEmail || "",
         documentUrl: licence.documentUrl || "",
         documentName: licence.documentUrl ? licence.documentUrl.split("/").pop() : "",
         documentFile: null,
         documents: mapExistingDocuments(licence.documents, licence.documentUrl),
         persisted: true,
-      })) : [{ number: "", issue: "", expiry: "", authority: "", type: "Commercial License", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
+      })) : [{ number: "", issue: "", expiry: "", authority: "", type: "", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
       const loadedPersons = client.contactPersons || [];
       const primaryIdx = loadedPersons.findIndex((person) => person.isPrimary);
       setPrimaryContactIndex(primaryIdx >= 0 ? primaryIdx : 0);
@@ -1117,7 +1142,7 @@ export default function AddClient() {
             issueDate: licence.issue,
             expiryDate: licence.expiry,
             issuingAuthority: licence.authority,
-            licenceType: licence.type?.toLowerCase() || "commercial",
+            licenceType: licence.type?.toLowerCase() || "",
             officialEmail: licence.email,
             documentUrl: licence.documentUrl || undefined,
           }));
