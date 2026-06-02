@@ -24,7 +24,7 @@ const COLUMN_DEFS = [
   { key: "client",    label: "Client",        defaultOn: true,  description: "Name, type & jurisdiction" },
   { key: "group",     label: "Group",         defaultOn: true,  description: "Client group membership" },
   { key: "assignedTo", label: "Assigned To",  defaultOn: true,  description: "Assigned staff member" },
-  { key: "compliance",label: "Compliance",    defaultOn: true,  description: "VAT TRN" },
+  { key: "compliance",label: "VAT TRN",    defaultOn: true,  description: "VAT TRN" },
   { key: "licenceExpiry", label: "Licence Expiry", defaultOn: true, description: "Trade licence expiry date" },
   { key: "contact",   label: "Contact",       defaultOn: true,  description: "Primary contact details" },
   { key: "createdAt", label: "Created Date",  defaultOn: false, description: "Date the client was added" },
@@ -68,7 +68,7 @@ function buildActiveFilterSummary(columnFilters, query) {
   if (columnFilters.jurisdiction) chips.push(`Jurisdiction: ${columnFilters.jurisdiction}`);
   if (columnFilters.type) chips.push(`Type: ${columnFilters.type}`);
   if (columnFilters.group) chips.push(`Group: ${columnFilters.group}`);
-  if (columnFilters.compliance) chips.push(`Compliance: ${columnFilters.compliance}`);
+  if (columnFilters.compliance) chips.push(`VAT TRN: ${columnFilters.compliance}`);
   if (columnFilters.licenceExpiry) chips.push(`Licence Expiry: ${columnFilters.licenceExpiry}`);
   if (columnFilters.contact) chips.push(`Contact: ${columnFilters.contact}`);
   if (columnFilters.createdAt) chips.push(`Created: ${columnFilters.createdAt}`);
@@ -750,7 +750,7 @@ export default function ClientList() {
               </div>
             </FilterField>
 
-            <FilterField label="Compliance" htmlFor="client-filter-compliance">
+            <FilterField label="VAT TRN" htmlFor="client-filter-compliance">
               <div className="task-list-input-wrap">
                 <Search size={14} className="task-list-input-icon" aria-hidden="true" />
                 <input
@@ -833,7 +833,7 @@ export default function ClientList() {
               {isVisible("client")     && <th>Client</th>}
               {isVisible("group")      && <th>Group</th>}
               {isVisible("assignedTo") && <th>Assigned To</th>}
-              {isVisible("compliance") && <th>Compliance</th>}
+              {isVisible("compliance") && <th>VAT TRN</th>}
               {isVisible("licenceExpiry") && <th>Licence Expiry</th>}
               {isVisible("contact")    && <th>Contact Details</th>}
               {isVisible("createdAt")  && <th>Created Date</th>}
@@ -922,7 +922,7 @@ export default function ClientList() {
                 {isVisible("compliance") && (
                   <td>
                     <div className="space-y-1">
-                      <div><span className="font-semibold text-slate-500">VAT TRN:</span> {client.vatTrn || "—"}</div>
+                      <div><span className="font-semibold text-slate-500">TRN:</span> {client.vatTrn || "—"}</div>
                     </div>
                   </td>
                 )}
