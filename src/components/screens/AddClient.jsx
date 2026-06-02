@@ -294,6 +294,8 @@ export default function AddClient() {
     persisted: false,
   }]);
   const setContacts = (val) => { setIsDirty(true); setContactsRaw(val); };
+  // Index of the contact currently marked as Primary Contact (radio group)
+  const [primaryContactIndex, setPrimaryContactIndex] = useState(0);
   const [portals, setPortalsRaw] = useState([blankPortal]);
   const setPortals = (val) => { setIsDirty(true); setPortalsRaw(val); };
   const [visiblePortalPasswords, setVisiblePortalPasswords] = useState({});
@@ -541,7 +543,10 @@ export default function AddClient() {
         documents: mapExistingDocuments(licence.documents, licence.documentUrl),
         persisted: true,
       })) : [{ number: "", issue: "", expiry: "", authority: "", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
-      setContactsRaw((client.contactPersons || []).length ? client.contactPersons.map((person) => ({
+      const loadedPersons = client.contactPersons || [];
+      const primaryIdx = loadedPersons.findIndex((person) => person.isPrimary);
+      setPrimaryContactIndex(primaryIdx >= 0 ? primaryIdx : 0);
+      setContactsRaw(loadedPersons.length ? loadedPersons.map((person) => ({
         name: person.fullName || "",
         designation: person.designation || "",
         email: person.email || "",
@@ -549,7 +554,7 @@ export default function AddClient() {
         mobile: person.mobile?.number || "",
         whatsapp: person.whatsapp || "",
         alternate: person.alternateEmail || "",
-        primary: Boolean(person.isPrimary),
+        primary: Boolean(person.isOfficial ?? person.isPrimary),
         eid: person.emiratesId?.number || "",
         eidIssue: person.emiratesId?.issueDate?.slice?.(0, 10) || "",
         eidExpiry: person.emiratesId?.expiryDate?.slice?.(0, 10) || "",
@@ -1082,14 +1087,15 @@ export default function AddClient() {
           }));
       }
       if (includeContactPersons) {
-        payload.contactPersons = contacts.map((c) => ({
+        payload.contactPersons = contacts.map((c, idx) => ({
           fullName: c.name,
           designation: c.designation,
           email: c.email,
           mobile: { countryCode: normalizeDialCode(c.code), number: normalizePhoneNumber(c.mobile) },
           whatsapp: c.whatsapp,
           alternateEmail: c.alternate,
-          isPrimary: c.primary,
+          isPrimary: idx === primaryContactIndex,
+          isOfficial: c.primary,
           emiratesId: {
             number: c.eid,
             issueDate: c.eidIssue,
@@ -1303,10 +1309,29 @@ export default function AddClient() {
                 </Field>
                   <Field label="WhatsApp Number" field={`contact-whatsapp-${i}`}><input className="input" value={c.whatsapp} onChange={(e) => patch(i, { whatsapp: e.target.value })} /></Field>
                   <Field label="Alternate Email" field={`contact-alternate-${i}`}><input className="input" value={c.alternate} onChange={(e) => patch(i, { alternate: e.target.value })} /></Field>
-                  <label className="flex items-center gap-2 font-bold" htmlFor={`contact-primary-${i}`}><input id={`contact-primary-${i}`} name={`contactPrimary${i}`} type="checkbox" checked={c.primary} onChange={(e) => {
-                    const checked = e.target.checked;
-                    setContacts((current) => current.map((entry, idx) => idx === i ? { ...entry, primary: checked } : checked ? { ...entry, primary: false } : entry));
-                  }} /> Official Contact</label>
+                  <div className="flex flex-wrap items-center gap-4">
+                    <label className="flex items-center gap-2 font-bold" htmlFor={`contact-primary-${i}`}>
+                      <input
+                        id={`contact-primary-${i}`}
+                        name={`contactPrimary${i}`}
+                        type="checkbox"
+                        checked={c.primary}
+                        onChange={(e) => patch(i, { primary: e.target.checked })}
+                      />
+                      Official Contact
+                    </label>
+                    <label className="flex items-center gap-2 font-bold text-[#1e3a8a]" htmlFor={`contact-is-primary-${i}`}>
+                      <input
+                        id={`contact-is-primary-${i}`}
+                        name="primaryContact"
+                        type="radio"
+                        checked={primaryContactIndex === i}
+                        onChange={() => setPrimaryContactIndex(i)}
+                        className="accent-[#1e3a8a]"
+                      />
+                      Primary Contact
+                    </label>
+                  </div>
                   {c.primary && (
                     <>
                       <Field label="Emirates ID Number" field={`contact-eid-${i}`}><input className="input" placeholder="784-XXXX-XXXXXXX-X" value={c.eid} onChange={(e) => patch(i, { eid: formatEmiratesIdInput(e.target.value) })} /></Field>
