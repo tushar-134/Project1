@@ -961,7 +961,7 @@ export default function TaskList() {
         >
           {rows.map(renderTaskRow)}
         </TaskTableState>
-        {meta.pages > 1 && (
+        {meta.total > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 sm:px-5">
             <div className="text-[12px] font-semibold text-slate-500">
               Showing {Math.max(1, (meta.page - 1) * PAGE_SIZE + 1)} to {Math.min(meta.page * PAGE_SIZE, meta.total)} of {meta.total} tasks
@@ -970,7 +970,7 @@ export default function TaskList() {
               <Button variant="ghost" size="sm" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={meta.page <= 1}>
                 Previous
               </Button>
-              <span className="text-[12px] font-semibold text-slate-500">Page {meta.page} of {meta.pages}</span>
+              <span className="text-[12px] font-semibold text-slate-500">Page {meta.page} of {Math.max(1, meta.pages)}</span>
               <Button variant="ghost" size="sm" onClick={() => setPage((current) => Math.min(meta.pages || 1, current + 1))} disabled={meta.page >= meta.pages}>
                 Next
               </Button>
