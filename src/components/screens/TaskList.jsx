@@ -1,4 +1,4 @@
-import { ChevronDown, Columns, Download, RefreshCw, Search, SlidersHorizontal, X } from "lucide-react";
+import { ChevronDown, Columns, Download, Upload, RefreshCw, Search, SlidersHorizontal, X } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -32,10 +32,10 @@ const COLUMN_DEFS = [
   { key: "updatedAt", label: "Last Modified", defaultOn: false, description: "When task was last updated" },
 ];
 
-const ALL_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed"];
-const BASE_STATUSES = ["Not Yet Started", "WIP", "Completed"]; // for non-FTA tasks
+const ALL_STATUSES = ["Not Yet Started", "In Progress", "Submitted to FTA", "Completed"];
+const BASE_STATUSES = ["Not Yet Started", "In Progress", "Completed"]; // for non-FTA tasks
 // "Active" = all non-completed/non-approved; surfaced in scope logic
-const FILTER_STATUSES = ["Not Yet Started", "WIP", "Submitted to FTA", "Completed", "All"];
+const FILTER_STATUSES = ["Not Yet Started", "In Progress", "Submitted to FTA", "Completed", "All"];
 const SCOPE_OPTIONS = ["By Month", "Overdue", "All"];
 // Column count updated: +2 for Created Date and Last Modified
 const TASK_TABLE_COLUMNS = 10;
@@ -64,7 +64,7 @@ const OPTION_ACRONYMS = new Map([
 
 const STATUS_PILL = {
   "Not Yet Started": { bg: "bg-slate-100", text: "text-slate-600" },
-  WIP: { bg: "bg-blue-50", text: "text-blue-700" },
+  "In Progress": { bg: "bg-blue-50", text: "text-blue-700" },
   Completed: { bg: "bg-green-100", text: "text-green-700" },
   "Submitted to FTA": { bg: "bg-purple-50", text: "text-purple-700" },
 };
@@ -91,7 +91,7 @@ function normalizeStatusFilterValue(value) {
   const raw = String(value).trim();
   if (!raw) return [];
   if (raw.toLowerCase() === "active") {
-    return ["Not Yet Started", "WIP", "Submitted to FTA"];
+    return ["Not Yet Started", "In Progress", "Submitted to FTA"];
   }
   const found = FILTER_STATUSES.find((s) => s.toLowerCase() === raw.toLowerCase());
   return found ? [found] : [];
@@ -149,7 +149,26 @@ function buildNormalizedOptions(values) {
 }
 
 function displayCategoryName(category) {
-  return CATEGORY_LABELS[category] || category || "";
+  const c = CATEGORY_LABELS[category] || category || "";
+  if (!c) return "";
+  const upperCases = ["VAT", "CT", "FTA", "ESR", "MIS", "TRN", "TIN", "ID"];
+  const words = c.split(" ");
+  return words.map((word, i) => {
+    if (upperCases.includes(word.toUpperCase())) return word.toUpperCase();
+    if (i === 0) return word;
+    return word.toLowerCase();
+  }).join(" ");
+}
+
+function displayTypeName(type) {
+  if (!type) return "";
+  const upperCases = ["VAT", "CT", "FTA", "ESR", "MIS", "TRN", "TIN", "ID"];
+  const words = type.split(" ");
+  return words.map((word, i) => {
+    if (upperCases.includes(word.toUpperCase())) return word.toUpperCase();
+    if (i === 0) return word;
+    return word.toLowerCase();
+  }).join(" ");
 }
 
 
@@ -215,7 +234,7 @@ function StatusMultiSelect({ selected, onChange, open, setOpen, dropdownRef }) {
   const label = selected.length === 0
     ? "All statuses"
     : selected.length === 1
-      ? selected[0]
+      ? (selected[0] === "Not Yet Started" ? "Not yet started" : selected[0] === "In Progress" ? "In progress" : selected[0])
       : `${selected.length} statuses`;
 
   return (
@@ -265,7 +284,7 @@ function StatusMultiSelect({ selected, onChange, open, setOpen, dropdownRef }) {
                     </svg>
                   )}
                 </span>
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-extrabold ${bg} ${text}`}>{status}</span>
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-extrabold ${bg} ${text}`}>{status === "Not Yet Started" ? "Not yet started" : status === "In Progress" ? "In progress" : status}</span>
               </li>
             );
           })}
@@ -290,11 +309,13 @@ export default function TaskList() {
   const [searchParams] = useSearchParams();
   const { fetchTasks, updateStatus, updateAssignee, exportTasks } = useTasks();
   const initialMonth = searchParams.get("month") || getCurrentMonthValue();
+  const initialMonthScopedOverdue = searchParams.get("overdue") === "true" && Boolean(searchParams.get("month"));
 
   // Scope & month still live as top-level state (drive server query) but are now
   // controlled from the column filter row rather than the old chip section.
-  const [scope, setScope] = useState(searchParams.get("scope") || "By Month");
+  const [scope, setScope] = useState(searchParams.get("scope") || (initialMonthScopedOverdue ? "Overdue" : "By Month"));
   const [month, setMonth] = useState(initialMonth);
+  const [monthScopedOverdue, setMonthScopedOverdue] = useState(initialMonthScopedOverdue);
   const [drawerTaskId, setDrawerTaskId] = useState(searchParams.get("drawer") || null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
@@ -373,7 +394,7 @@ export default function TaskList() {
   const serverFilters = useMemo(() => ({
     category: deferredColumnFilters.category || undefined,
     status: deferredColumnFilters.status?.length > 0 ? deferredColumnFilters.status.join(",") : undefined,
-    month: scope === "By Month" ? month : undefined,
+    month: scope === "By Month" || monthScopedOverdue ? month : undefined,
     overdue: scope === "Overdue" ? "true" : undefined,
     taskId: deferredColumnFilters.taskId || undefined,
     client: deferredColumnFilters.client || undefined,
@@ -384,7 +405,7 @@ export default function TaskList() {
     recurring: deferredColumnFilters.recurring || undefined,
     createdAt: deferredColumnFilters.createdAt || undefined,
     updatedAt: deferredColumnFilters.updatedAt || undefined,
-  }), [deferredColumnFilters, month, scope]);
+  }), [deferredColumnFilters, month, monthScopedOverdue, scope]);
 
   const requestParams = useMemo(() => ({ ...serverFilters, page, limit: PAGE_SIZE }), [page, serverFilters]);
   const filterRef = useRef(requestParams);
@@ -429,7 +450,7 @@ export default function TaskList() {
 
   const completedCount = rows.filter((task) => task.status === "Completed").length;
   const workingCount = rows.length - completedCount;
-  const activeCount = rows.filter((task) => task.status === "Not Yet Started" || task.status === "WIP").length;
+  const activeCount = rows.filter((task) => task.status === "Not Yet Started" || task.status === "In Progress").length;
   const activeColumnFilters = buildActiveColumnFilterSummary(columnFilters);
   const hasColumnFilters = activeColumnFilters.length > 0;
   const hasActiveFilters = hasColumnFilters || scope !== "By Month" || month !== initialMonth;
@@ -447,6 +468,7 @@ export default function TaskList() {
   const updateScope = (value) => {
     setPage(1);
     setScope(value);
+    setMonthScopedOverdue(false);
   };
 
   const clearColumnFilters = () => {
@@ -458,6 +480,7 @@ export default function TaskList() {
     setPage(1);
     setScope("By Month");
     setMonth(initialMonth);
+    setMonthScopedOverdue(false);
     setColumnFilters(createEmptyColumnFilters());
   };
 
@@ -473,6 +496,7 @@ export default function TaskList() {
     setIsExportModalOpen(false);
     downloadBlob(await exportTasks(params), "tasks_full_export.xlsx");
   };
+  const isMonthControlDisabled = scope !== "By Month" && !monthScopedOverdue;
 
   const exportSelected = async (selectedKeys) => {
     const cols = selectedKeys.join(",");
@@ -559,7 +583,7 @@ export default function TaskList() {
                 }
               >
                 {ALL_STATUSES.map((item) => (
-                  <option key={item}>{item}</option>
+                  <option key={item} value={item}>{item === "Not Yet Started" ? "Not yet started" : item === "In Progress" ? "In progress" : item}</option>
                 ))}
               </select>
             ) : (
@@ -623,7 +647,7 @@ export default function TaskList() {
 
           {/* Month selector + action buttons */}
           <div className="flex flex-wrap items-center gap-2">
-            <label htmlFor="task-list-month" className={`flex items-center gap-1.5 ${scope !== "By Month" ? "opacity-50" : ""}`}>
+            <label htmlFor="task-list-month" className={`flex items-center gap-1.5 ${isMonthControlDisabled ? "opacity-50" : ""}`}>
               <span className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Month</span>
               <input
                 id="task-list-month"
@@ -631,7 +655,7 @@ export default function TaskList() {
                 className="input h-8 w-[130px] text-[13px]"
                 type="month"
                 value={month}
-                disabled={scope !== "By Month"}
+                disabled={isMonthControlDisabled}
                 onChange={(event) => {
                   setPage(1);
                   setMonth(event.target.value);
@@ -658,7 +682,7 @@ export default function TaskList() {
                 aria-label="Export tasks to Excel"
                 title="Export Excel"
               >
-                <Download size={14} />
+                <Upload size={14} />
               </button>
             )}
 
@@ -806,7 +830,7 @@ export default function TaskList() {
               >
                 <option value="">All task types</option>
                 {typeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
+                  <option key={option.value} value={option.value}>{displayTypeName(option.label)}</option>
                 ))}
               </select>
             </FilterField>
@@ -886,7 +910,7 @@ export default function TaskList() {
                 onChange={(event) => updateScope(event.target.value)}
               >
                 {SCOPE_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
+                  <option key={opt} value={opt}>{opt === "By Month" ? "By month" : opt}</option>
                 ))}
               </select>
             </FilterField>

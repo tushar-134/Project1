@@ -1,6 +1,6 @@
 import { ArrowLeft, Calendar, Clock3, Save, Search, UsersRound } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -80,6 +80,7 @@ function normalizeError(error) {
 
 export default function ClientVisitForm() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams();
   const isEditMode = Boolean(id);
   const { currentUser } = useAuth();
@@ -94,6 +95,20 @@ export default function ClientVisitForm() {
   const [saving, setSaving] = useState(false);
 
   const hasFetchedClients = useRef(false);
+
+  useEffect(() => {
+    if (isEditMode) return;
+    const prefill = location.state?.prefillVisit;
+    if (!prefill) return;
+    setFormRaw((current) => ({
+      ...current,
+      clientType: prefill.clientType || current.clientType,
+      clientId: prefill.clientId || current.clientId,
+      newClient: prefill.newClient ? { ...current.newClient, ...prefill.newClient } : current.newClient,
+      location: prefill.location || current.location,
+      assignedUsers: prefill.assignedUsers?.length ? prefill.assignedUsers : current.assignedUsers,
+    }));
+  }, [isEditMode, location.state]);
 
   useEffect(() => {
     if (!hasFetchedClients.current) {
@@ -321,8 +336,8 @@ export default function ClientVisitForm() {
               <div className="mb-2 text-[11px] font-black uppercase tracking-wider text-slate-500">Client Type *</div>
               <div className="flex flex-wrap gap-5">
                 {[
-                  { value: "existing", label: "Existing Client" },
-                  { value: "new", label: "New Client" },
+                  { value: "existing", label: "Existing client" },
+                  { value: "new", label: "New client" },
                 ].map((option) => (
                   <label key={option.value} className="inline-flex items-center gap-2 text-[14px] font-semibold text-slate-700">
                     <input
@@ -401,7 +416,7 @@ export default function ClientVisitForm() {
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Visit Type">
                 <select className="input" value={form.visitType} onChange={(event) => updateField("visitType", event.target.value)}>
-                  {visitTypes.map((option) => <option key={option} value={option}>{option}</option>)}
+                  {visitTypes.map((option) => <option key={option} value={option}>{option === "Requirement Gathering" ? "Requirement gathering" : option === "Onboarding Discussion" ? "Onboarding discussion" : option === "Follow Up" ? "Follow up" : option}</option>)}
                 </select>
               </Field>
               <Field label="Location">

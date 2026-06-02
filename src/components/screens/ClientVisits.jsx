@@ -1,4 +1,4 @@
-import { Briefcase, ChevronDown, CircleChevronRight, Download, Plus, Search, SquarePen } from "lucide-react";
+import { Briefcase, ChevronDown, CircleChevronRight, Download, Upload, Plus, Search, SquarePen } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -17,9 +17,9 @@ import StatusPill from "../ui/StatusPill.jsx";
 import Table from "../ui/Table.jsx";
 
 const statusOptions = [
-  { value: "all", label: "All Statuses" },
+  { value: "all", label: "All statuses" },
   { value: "planned", label: "Planned" },
-  { value: "in_progress", label: "In Progress" },
+  { value: "in_progress", label: "In progress" },
   { value: "completed", label: "Completed" },
   { value: "cancelled", label: "Cancelled" },
 ];
@@ -27,9 +27,9 @@ const statusOptions = [
 const visitTypeOptions = ["All Types", "Requirement Gathering", "Verification", "Onboarding Discussion", "Follow Up", "Collection", "Meeting"];
 
 const clientTypeOptions = [
-  { value: "all", label: "All Clients" },
-  { value: "new", label: "New Clients" },
-  { value: "existing", label: "Existing Clients" },
+  { value: "all", label: "All clients" },
+  { value: "new", label: "New clients" },
+  { value: "existing", label: "Existing clients" },
 ];
 
 function formatDate(value) {
@@ -224,7 +224,9 @@ export default function ClientVisits() {
           <FilterField label="Visit Type">
             <select className="input" value={filters.visitType} onChange={(event) => updateFilter("visitType", event.target.value)}>
               {visitTypeOptions.map((option) => (
-                <option key={option} value={option === "All Types" ? "all" : option}>{option}</option>
+                <option key={option} value={option === "All Types" ? "all" : option}>
+                  {option === "All Types" ? "All types" : option === "Requirement Gathering" ? "Requirement gathering" : option === "Onboarding Discussion" ? "Onboarding discussion" : option === "Follow Up" ? "Follow up" : option}
+                </option>
               ))}
               {visitTypes
                 .filter((option) => !visitTypeOptions.includes(option))
@@ -262,7 +264,7 @@ export default function ClientVisits() {
           <div className="flex shrink-0 items-center gap-2 xl:justify-end">
             <div ref={exportRef} className="relative">
               <Button variant="outlinePurple" onClick={() => setExportOpen((open) => !open)}>
-                <Download size={16} />
+                <Upload size={16} />
                 Export
                 <ChevronDown size={14} className={`transition ${exportOpen ? "rotate-180" : ""}`} />
               </Button>

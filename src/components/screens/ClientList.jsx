@@ -24,7 +24,7 @@ const COLUMN_DEFS = [
   { key: "client",    label: "Client",        defaultOn: true,  description: "Name, type & jurisdiction" },
   { key: "group",     label: "Group",         defaultOn: true,  description: "Client group membership" },
   { key: "assignedTo", label: "Assigned To",  defaultOn: true,  description: "Assigned staff member" },
-  { key: "compliance",label: "Compliance",    defaultOn: true,  description: "VAT TRN" },
+  { key: "compliance",label: "VAT TRN",    defaultOn: true,  description: "VAT TRN" },
   { key: "licenceExpiry", label: "Licence Expiry", defaultOn: true, description: "Trade licence expiry date" },
   { key: "contact",   label: "Contact",       defaultOn: true,  description: "Primary contact details" },
   { key: "createdAt", label: "Created Date",  defaultOn: false, description: "Date the client was added" },
@@ -68,7 +68,7 @@ function buildActiveFilterSummary(columnFilters, query) {
   if (columnFilters.jurisdiction) chips.push(`Jurisdiction: ${columnFilters.jurisdiction}`);
   if (columnFilters.type) chips.push(`Type: ${columnFilters.type}`);
   if (columnFilters.group) chips.push(`Group: ${columnFilters.group}`);
-  if (columnFilters.compliance) chips.push(`Compliance: ${columnFilters.compliance}`);
+  if (columnFilters.compliance) chips.push(`VAT TRN: ${columnFilters.compliance}`);
   if (columnFilters.licenceExpiry) chips.push(`Licence Expiry: ${columnFilters.licenceExpiry}`);
   if (columnFilters.contact) chips.push(`Contact: ${columnFilters.contact}`);
   if (columnFilters.createdAt) chips.push(`Created: ${columnFilters.createdAt}`);
@@ -595,7 +595,7 @@ export default function ClientList() {
                   onClick={() => navigate("/clients/bulk-upload")}
                   className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 text-amber-700 transition hover:bg-amber-100 hover:text-amber-800"
                 >
-                  <Upload size={15} />
+                  <Download size={15} />
                 </button>
               )}
               {canManage && (
@@ -605,7 +605,7 @@ export default function ClientList() {
                   onClick={openExportModal}
                   className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-purple-200 bg-purple-50 text-purple-700 transition hover:bg-purple-100 hover:text-purple-800"
                 >
-                  <Download size={15} />
+                  <Upload size={15} />
                 </button>
               )}
 
@@ -717,7 +717,7 @@ export default function ClientList() {
               >
                 <option value="">All jurisdictions</option>
                 {JURISDICTION_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
+                  <option key={opt} value={opt}>{opt === "Free Zone" ? "Free zone" : opt === "Designated Zone" ? "Designated zone" : opt}</option>
                 ))}
               </select>
             </FilterField>
@@ -731,7 +731,7 @@ export default function ClientList() {
               >
                 <option value="">All types</option>
                 {TYPE_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
+                  <option key={opt} value={opt}>{opt === "Legal Person" ? "Legal person" : opt === "Natural Person" ? "Natural person" : opt}</option>
                 ))}
               </select>
             </FilterField>
@@ -750,7 +750,7 @@ export default function ClientList() {
               </div>
             </FilterField>
 
-            <FilterField label="Compliance" htmlFor="client-filter-compliance">
+            <FilterField label="VAT TRN" htmlFor="client-filter-compliance">
               <div className="task-list-input-wrap">
                 <Search size={14} className="task-list-input-icon" aria-hidden="true" />
                 <input
@@ -833,7 +833,7 @@ export default function ClientList() {
               {isVisible("client")     && <th>Client</th>}
               {isVisible("group")      && <th>Group</th>}
               {isVisible("assignedTo") && <th>Assigned To</th>}
-              {isVisible("compliance") && <th>Compliance</th>}
+              {isVisible("compliance") && <th>VAT TRN</th>}
               {isVisible("licenceExpiry") && <th>Licence Expiry</th>}
               {isVisible("contact")    && <th>Contact Details</th>}
               {isVisible("createdAt")  && <th>Created Date</th>}
@@ -922,7 +922,7 @@ export default function ClientList() {
                 {isVisible("compliance") && (
                   <td>
                     <div className="space-y-1">
-                      <div><span className="font-semibold text-slate-500">VAT TRN:</span> {client.vatTrn || "—"}</div>
+                      <div><span className="font-semibold text-slate-500">TRN:</span> {client.vatTrn || "—"}</div>
                     </div>
                   </td>
                 )}

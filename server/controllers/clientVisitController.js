@@ -8,7 +8,7 @@ const { buildSimplePdf } = require("../utils/simplePdf");
 const { normalizeStoredUploadUrl } = require("../utils/uploadUrl");
 
 const populateVisit = [
-  { path: "client", select: "legalName fileNo assignedUser registeredAddress correspondenceAddress" },
+  { path: "client", select: "legalName fileNo assignedUser registeredAddress correspondenceAddress contactPersons" },
   { path: "assignedUsers.user", select: "name role email" },
   { path: "activityLogs.user", select: "name email role" },
   { path: "createdBy", select: "name email role" },

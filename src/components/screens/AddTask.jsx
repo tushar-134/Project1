@@ -14,6 +14,7 @@ import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
 import Toggle from "../ui/Toggle.jsx";
 import UnsavedChangesGuard from "../ui/UnsavedChangesGuard.jsx";
+import CustomSelect from "../ui/CustomSelect.jsx";
 
 export default function AddTask() {
   const { state, dispatch } = useApp();
@@ -76,14 +77,34 @@ export default function AddTask() {
     [state.clients, details.client]
   );
   const clientFYE = selectedClient?.financialYearEnd || "Jan - Dec";
+  const vatFilingFrequency = selectedClient?.vatDetails?.filingFrequency || "";
   const fyOptions = useMemo(() => getFYOptions(clientFYE), [clientFYE]);
-  const quarterOptions = useMemo(() => getQuarters(clientFYE), [clientFYE]);
+  // For VAT category, build quarter options from the client's VAT filing frequency so the
+  // auto-populated value (from getQuarterFromVatFrequency) always matches an available option.
+  // For all other categories fall back to the FYE-based quarters.
+  const quarterOptions = useMemo(() => {
+    if (categoryName === "VAT" && vatFilingFrequency) {
+      const parts = vatFilingFrequency.split("||").map((p) => p.trim()).filter(Boolean);
+      if (parts.length) {
+        return parts.map((p, i) => ({ value: p, startMonth: 0, endMonth: 0, quarterIndex: i }));
+      }
+    }
+    return getQuarters(clientFYE);
+  }, [clientFYE, categoryName, vatFilingFrequency]);
   useEffect(() => {
-    // The task wizard needs lookup data up front so each step can stay synchronous and snappy.
-    fetchClients({ limit: 10 }).catch(() => { });
+    // Fetch users and categories on mount — these are needed from Step 1 onwards.
     fetchUsers().catch(() => { });
     categoryService.list().then((data) => dispatch({ type: "SET_RESOURCE", resource: "categories", payload: data.map(mapCategory) })).catch(() => { });
   }, []);
+
+  // Fetch clients only when Step 3 is active (or immediately when edit mode skips to Step 3).
+  // The ClientComboBox handles its own server-side search when opened, so the initial fetch
+  // is only needed to populate selectedClient for FY/Quarter auto-computation.
+  useEffect(() => {
+    if (step < 3) return;
+    fetchClients({ limit: 10 }).catch(() => { });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   // Auto-populate FY and Quarter once a client is selected (new tasks only).
   // Clears the fields when client is deselected; re-computes when client changes or category changes.
@@ -186,6 +207,30 @@ export default function AddTask() {
       description: prefillTask.description || current.description,
     }));
   }, [isEditMode, prefillTask]);
+
+  useEffect(() => {
+    if (!isEditMode && !prefillTask) {
+      setStep(1);
+      setCategoryId("vat");
+      setCategoryName("VAT");
+      setDetailsRaw({
+        client: "",
+        assigned: "",
+        dueDate: "2026-05-31",
+        periodFY: "",
+        periodQuarter: "",
+        description: "",
+        frequency: "monthly",
+        daysBeforeDue: 15,
+        nextDue: "2026-06-30",
+        endDate: ""
+      });
+      setRecurring(false);
+      setAttachments([]);
+      setAttachmentDescription("");
+      setIsDirty(false);
+    }
+  }, [location.key, isEditMode, prefillTask]);
 
   useEffect(() => {
     if (!state.categories.length || !categoryName) return;
@@ -423,7 +468,16 @@ export default function AddTask() {
                 onChange={(id) => setDetails({ ...details, client: id })}
               />
             </Field>
-            <Field label="Assign To" field="taskAssignedTo"><select className="input" value={details.assigned} onChange={(e) => setDetails({ ...details, assigned: e.target.value })}><option value="">Unassigned</option>{state.users.map((u) => <option key={u.id} value={u._id}>{u.name}</option>)}</select></Field>
+            <Field label="Assign To" field="taskAssignedTo">
+              <CustomSelect
+                value={details.assigned}
+                onChange={(val) => setDetails({ ...details, assigned: val })}
+                options={[
+                  { value: "", label: "Unassigned" },
+                  ...state.users.map((u) => ({ value: u._id, label: u.name }))
+                ]}
+              />
+            </Field>
             <Field label="Due Date*" field="taskDueDate"><input className="input" type="date" value={details.dueDate} onChange={(e) => handleRecurrenceChange({ dueDate: e.target.value })} /></Field>
             {showFY && (
               <Field 
@@ -442,30 +496,26 @@ export default function AddTask() {
                 } 
                 field="taskPeriodFY"
               >
-                <select
-                  className="input"
+                <CustomSelect
                   value={details.periodFY}
-                  onChange={(e) => setDetails({ ...details, periodFY: e.target.value })}
-                >
-                  <option value="">Select FY</option>
-                  {fyOptions.map((fy) => (
-                    <option key={fy} value={fy}>{fy}</option>
-                  ))}
-                </select>
+                  onChange={(val) => setDetails({ ...details, periodFY: val })}
+                  options={[
+                    { value: "", label: "Select FY" },
+                    ...fyOptions.map((fy) => ({ value: fy, label: fy }))
+                  ]}
+                />
               </Field>
             )}
             {showQuarter && (
               <Field label="Quarter" field="taskPeriodQuarter">
-                <select
-                  className="input"
+                <CustomSelect
                   value={details.periodQuarter}
-                  onChange={(e) => setDetails({ ...details, periodQuarter: e.target.value })}
-                >
-                  <option value="">Select Quarter</option>
-                  {quarterOptions.map((q) => (
-                    <option key={q.value} value={q.value}>{q.value}</option>
-                  ))}
-                </select>
+                  onChange={(val) => setDetails({ ...details, periodQuarter: val })}
+                  options={[
+                    { value: "", label: "Select Quarter" },
+                    ...quarterOptions.map((q) => ({ value: q.value, label: q.value }))
+                  ]}
+                />
               </Field>
             )}
             <Field label="Description / Notes" field="taskDescription"><textarea className="input textarea" value={details.description} onChange={(e) => setDetails({ ...details, description: e.target.value })} /></Field>

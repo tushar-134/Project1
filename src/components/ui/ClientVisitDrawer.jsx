@@ -1,4 +1,4 @@
-import { AlertTriangle, Calendar, Clock3, ExternalLink, Link2, MapPin, MessageSquare, NotebookPen, Pencil, Save, User, UserCheck, UsersRound, X, XCircle } from "lucide-react";
+import { AlertTriangle, Calendar, Clock3, ExternalLink, Link2, Mail, MapPin, MessageSquare, NotebookPen, Pencil, Phone, Save, User, UserCheck, UsersRound, X, XCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { clientVisitService } from "../../services/clientVisitService.js";
@@ -52,6 +52,22 @@ function visitTimeToInput(value) {
   let hours = Number(match[1]) % 12;
   if (match[3].toUpperCase() === "PM") hours += 12;
   return `${String(hours).padStart(2, "0")}:${match[2]}`;
+}
+
+function getClientInfo(visit) {
+  const primaryContact = visit?.client?.contactPersons?.find((contact) => contact.isPrimary) || visit?.client?.contactPersons?.[0] || {};
+  const mobile = primaryContact.mobile?.number
+    ? [primaryContact.mobile.countryCode, primaryContact.mobile.number].filter(Boolean).join(" ")
+    : visit?.newClient?.mobileNumber
+      ? [visit.newClient.mobileCountryCode, visit.newClient.mobileNumber].filter(Boolean).join(" ")
+      : "-";
+
+  return {
+    name: visit?.clientName || visit?.client?.legalName || visit?.newClient?.authorityName || "-",
+    number: mobile || "-",
+    email: primaryContact.email || visit?.newClient?.email || "-",
+    location: visit?.clientLocation || visit?.location || visit?.newClient?.location || "-",
+  };
 }
 
 export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisitUpdated = () => {} }) {
@@ -209,6 +225,27 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
     } finally {
       setLinkSaving(false);
     }
+  }
+
+  function openNewVisitPage() {
+    if (!visit) return;
+    navigate("/client-visits/new", {
+      state: {
+        prefillVisit: {
+          clientType: visit.client?._id ? "existing" : "new",
+          clientId: visit.client?._id || "",
+          newClient: visit.client?._id ? undefined : {
+            authorityName: visit.newClient?.authorityName || visit.clientName || "",
+            mobileCountryCode: visit.newClient?.mobileCountryCode || "+971",
+            mobileNumber: visit.newClient?.mobileNumber || "",
+            email: visit.newClient?.email || "",
+            location: visit.newClient?.location || visit.clientLocation || visit.location || "",
+          },
+          location: visit.clientLocation || visit.location || visit.newClient?.location || "",
+          assignedUsers: (visit.assignedUsers || []).map((entry) => entry.user?._id || entry.user).filter(Boolean),
+        },
+      },
+    });
   }
 
   return (
@@ -397,6 +434,27 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
                   </Button>
                 </div>
               </Card>
+
+              {(() => {
+                const clientInfo = getClientInfo(visit);
+                return (
+                  <Card className="p-5">
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                      <div className="text-[16px] font-black text-slate-900">Client Information</div>
+                      <Button size="sm" onClick={openNewVisitPage}>
+                        <Calendar size={14} />
+                        Add Visit
+                      </Button>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Detail label="Name" icon={<User size={13} />}>{clientInfo.name}</Detail>
+                      <Detail label="Number" icon={<Phone size={13} />}>{clientInfo.number}</Detail>
+                      <Detail label="Email" icon={<Mail size={13} />}>{clientInfo.email}</Detail>
+                      <Detail label="Location" icon={<MapPin size={13} />}>{clientInfo.location}</Detail>
+                    </div>
+                  </Card>
+                );
+              })()}
 
               {/* Comments Section moved here */}
               <div className="rounded-2xl border border-[#e2e8f0] bg-white p-5 shadow-sm">

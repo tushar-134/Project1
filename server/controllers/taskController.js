@@ -12,14 +12,14 @@ const xlsx = require("xlsx");
 // Human-readable status labels for notification messages
 const STATUS_LABEL = {
   not_started: "Not Yet Started",
-  wip: "WIP",
+  wip: "In Progress",
   submitted_to_fta: "Submitted to FTA",
   completed: "Completed",
 };
 // Reverse map: UI label → DB enum value
 const LABEL_TO_STATUS = {
   "Not Yet Started": "not_started",
-  "WIP": "wip",
+  "In Progress": "wip",
   "Submitted to FTA": "submitted_to_fta",
   "Completed": "completed",
 };
@@ -281,8 +281,14 @@ async function taskQuery(req) {
   // clobber the month's $lt boundary. We now apply the month window first, then
   // tighten $lt to today only when no month is selected (overdue standalone).
   if (month) {
-    const [y, m] = month.split("-").map(Number);
-    query.dueDate = { $gte: new Date(Date.UTC(y, m - 1, 1)), $lt: new Date(Date.UTC(y, m, 1)) };
+    const match = String(month).match(/^(\d{4})-(\d{2})$/);
+    if (match) {
+      const y = Number(match[1]);
+      const m = Number(match[2]);
+      if (Number.isInteger(y) && Number.isInteger(m) && m >= 1 && m <= 12) {
+        query.dueDate = { $gte: new Date(Date.UTC(y, m - 1, 1)), $lt: new Date(Date.UTC(y, m, 1)) };
+      }
+    }
   }
   if (overdue === "true") {
     if (query.dueDate) {
@@ -349,14 +355,19 @@ exports.listTasks = async (req, res, next) => {
   try {
     const { page: requestedPage, limit } = parsePagination(req.query, 20);
     const query = await taskQuery(req);
-    const total = await Task.countDocuments(query);
+    const skip = (requestedPage - 1) * limit;
+
+    const [total, tasks] = await Promise.all([
+      Task.countDocuments(query),
+      Task.find(query)
+        .populate(populateTask)
+        .sort({ updatedAt: -1, createdAt: -1, taskId: 1 })
+        .skip(skip)
+        .limit(limit)
+    ]);
+
     const pages = Math.max(1, Math.ceil(total / limit));
     const page = Math.min(requestedPage, pages);
-    const tasks = await Task.find(query)
-      .populate(populateTask)
-      .sort({ updatedAt: -1, createdAt: -1, taskId: 1 })
-      .skip((page - 1) * limit)
-      .limit(limit);
     res.json({ tasks, total, page, pages, limit });
   } catch (error) { next(error); }
 };

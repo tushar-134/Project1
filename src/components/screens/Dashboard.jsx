@@ -58,7 +58,10 @@ export default function Dashboard() {
   const { state, dispatch } = useApp();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
-  const [month, setMonth] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [month, setMonth] = useState(() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  });
   const [drawerTaskId, setDrawerTaskId] = useState(null);
   const [tileOrder, setTileOrder] = useState(DEFAULT_DASHBOARD_TILE_ORDER);
   const [visibleTileNames, setVisibleTileNames] = useState(DEFAULT_DASHBOARD_TILE_ORDER);
@@ -69,11 +72,17 @@ export default function Dashboard() {
   const settingsRef = useRef(null);
   const monthText = month.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
   const canManage = canManageTasks(currentUser?.role);
-  const moveMonth = (delta) => setMonth(new Date(month.getFullYear(), month.getMonth() + delta, 1));
+  const moveMonth = (delta) => setMonth((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
   useEffect(() => {
     // Dashboard stats are month-sensitive, so the page refetches whenever the picker changes.
+    let isCurrentRequest = true;
     const selected = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
-    reportService.dashboardStats({ month: selected }).then((data) => dispatch({ type: "SET_DASHBOARD", payload: data })).catch(() => { });
+    reportService.dashboardStats({ month: selected }).then((data) => {
+      if (isCurrentRequest) dispatch({ type: "SET_DASHBOARD", payload: data });
+    }).catch(() => { });
+    return () => {
+      isCurrentRequest = false;
+    };
   }, [month, dispatch]);
   useEffect(() => {
     categoryService.list()
@@ -243,7 +252,7 @@ export default function Dashboard() {
       <div className="grid gap-3 md:grid-cols-3">
         <Stat icon={<FileText size={18} />} label="Total Clients" value={stats.totalClients || 0} color="text-[#1e3a8a]" onClick={() => navigate("/clients/list")} />
         <Stat icon={<Clock size={18} />} label="Pending Tasks" value={stats.pendingTasks || 0} color="text-[#eab308]" onClick={() => navigate(`/tasks/list?status=Active&month=${selectedMonth}`)} />
-        <Stat icon={<AlertTriangle size={18} />} label="Overdue" value={stats.overdueTasks || 0} color="text-[#dc2626]" onClick={() => navigate(`/tasks/list?status=Active&overdue=true&month=${selectedMonth}`)} />
+        <Stat icon={<AlertTriangle size={18} />} label="Overdue" value={stats.overdueTasks || 0} color="text-[#dc2626]" onClick={() => navigate(`/tasks/list?status=Active&scope=Overdue&overdue=true&month=${selectedMonth}`)} />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

@@ -170,7 +170,14 @@ const ISSUING_AUTHORITY_OPTIONS = [
   { id: "Innovation City", label: "Innovation City" },
 ];
 
-const LICENCE_TYPE_OPTIONS = ["Commercial", "Professional", "Industrial", "Tourism"];
+const LICENCE_TYPE_OPTIONS = [
+  "Commercial License",
+  "Professional License",
+  "Industrial License",
+  "Agricultural License",
+  "Crafts License",
+  "Tourism License"
+];
 
 function normalizeFinancialYearEnd(value) {
   if (!value) return "Jan - Dec";
@@ -268,7 +275,7 @@ export default function AddClient() {
   const isCtDeregistered = form.ctStatus === "Deregistered";
   const [vatHistory, setVatHistory] = useState([]);
   const [ctHistory, setCtHistory] = useState([]);
-  const [licences, setLicencesRaw] = useState([{ number: "", issue: "", expiry: "", authority: "", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
+  const [licences, setLicencesRaw] = useState([{ number: "", issue: "", expiry: "", authority: "", type: "Commercial License", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
   const setLicences = (val) => { setIsDirty(true); setLicencesRaw(val); };
 
   const [contacts, setContactsRaw] = useState([{
@@ -564,14 +571,14 @@ export default function AddClient() {
         issue: licence.issueDate?.slice?.(0, 10) || "",
         expiry: licence.expiryDate?.slice?.(0, 10) || "",
         authority: licence.issuingAuthority || "",
-        type: licence.licenceType ? `${licence.licenceType[0].toUpperCase()}${licence.licenceType.slice(1)}` : "",
+        type: licence.licenceType ? (licence.licenceType.toLowerCase().includes("license") ? licence.licenceType.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") : `${licence.licenceType.charAt(0).toUpperCase()}${licence.licenceType.slice(1)} License`) : "Commercial License",
         email: licence.officialEmail || "",
         documentUrl: licence.documentUrl || "",
         documentName: licence.documentUrl ? licence.documentUrl.split("/").pop() : "",
         documentFile: null,
         documents: mapExistingDocuments(licence.documents, licence.documentUrl),
         persisted: true,
-      })) : [{ number: "", issue: "", expiry: "", authority: "", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
+      })) : [{ number: "", issue: "", expiry: "", authority: "", type: "Commercial License", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
       const loadedPersons = client.contactPersons || [];
       const primaryIdx = loadedPersons.findIndex((person) => person.isPrimary);
       setPrimaryContactIndex(primaryIdx >= 0 ? primaryIdx : 0);
@@ -1408,9 +1415,9 @@ export default function AddClient() {
                       }));
                     }}
                   >
-                    <option>Registered</option>
-                    <option>Not Registered</option>
-                    <option>Deregistered</option>
+                    <option value="Registered">Registered</option>
+                    <option value="Not Registered">Not registered</option>
+                    <option value="Deregistered">Deregistered</option>
                   </select>
                   {form.vatRegistrationTaskId && form.vatStatus !== "Registered" && (
                     <button
@@ -1523,9 +1530,9 @@ export default function AddClient() {
                         }));
                       }}
                     >
-                      <option>Registered</option>
-                      <option>Not Registered</option>
-                      <option>Deregistered</option>
+                      <option value="Registered">Registered</option>
+                      <option value="Not Registered">Not registered</option>
+                      <option value="Deregistered">Deregistered</option>
                     </select>
                     {form.ctRegistrationTaskId && form.ctStatus !== "Registered" && (
                       <button
@@ -2154,8 +2161,8 @@ function Basic({ form, update, countries, users, userSearch, setUserSearch, isUs
         <Field label="Select Type*" field="client-type">
           <select className="input" required value={form.clientType} onChange={(e) => update("clientType", e.target.value)}>
             <option value="">Select type</option>
-            <option value="Legal Person">Legal Person</option>
-            <option value="Natural Person">Natural Person</option>
+            <option value="Legal Person">Legal person</option>
+            <option value="Natural Person">Natural person</option>
           </select>
         </Field>
         <Field label="File No." field="client-file-no"><input className="input" value={form.fileNo} onChange={(e) => update("fileNo", e.target.value)} /></Field>
@@ -2168,10 +2175,10 @@ function Basic({ form, update, countries, users, userSearch, setUserSearch, isUs
         </Field>
         <Field label="Jurisdiction" field="client-jurisdiction">
           <select className="input" value={form.jurisdiction} onChange={(e) => update("jurisdiction", e.target.value)}>
-            <option>Mainland</option>
-            <option>Free Zone</option>
-            <option>Designated Zone</option>
-            <option>Offshore</option>
+            <option value="Mainland">Mainland</option>
+            <option value="Free Zone">Free zone</option>
+            <option value="Designated Zone">Designated zone</option>
+            <option value="Offshore">Offshore</option>
           </select>
         </Field>
         <Field label="Assigned User" field="client-assigned-user">

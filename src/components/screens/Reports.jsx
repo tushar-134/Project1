@@ -1,4 +1,4 @@
-import { Activity, Clock, Download, FileText, ListChecks, User, Users, X } from "lucide-react";
+import { Activity, Clock, Download, Upload, FileText, ListChecks, User, Users, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../../context/AppContext.jsx";
 import { reportService } from "../../services/reportService";
@@ -267,7 +267,7 @@ const reportColumns = {
     ["File No", (row) => row.client?.fileNo || "-"],
     ["Total", (row) => row.total ?? 0],
     ["Not Started", (row) => row.not_started ?? 0],
-    ["WIP", (row) => row.wip ?? 0],
+    ["In Progress", (row) => row.wip ?? 0],
     ["Completed", (row) => row.completed ?? 0],
     ["Submitted to FTA", (row) => row.submitted_to_fta ?? 0],
     ["Last Updated", (row) => formatDateTime(row.updatedAt)],
@@ -278,7 +278,7 @@ const reportColumns = {
     ["Role", (row) => row.user?.role || "-"],
     ["Total", (row) => row.total ?? 0],
     ["Not Started", (row) => row.not_started ?? 0],
-    ["WIP", (row) => row.wip ?? 0],
+    ["In Progress", (row) => row.wip ?? 0],
     ["Completed", (row) => row.completed ?? 0],
     ["Submitted to FTA", (row) => row.submitted_to_fta ?? 0],
     ["Last Updated", (row) => formatDateTime(row.updatedAt)],
@@ -429,7 +429,7 @@ export default function Reports() {
           </label>
           <Button onClick={applyRange}>Apply</Button>
           <Button variant="outlinePurple" onClick={downloadCsv} disabled={downloading}>
-            <Download size={16} /> {downloading ? "Preparing CSV" : "Download CSV Report"}
+            <Upload size={16} /> {downloading ? "Preparing CSV" : "Download CSV Report"}
           </Button>
         </div>
         {rangeError && <div className="mt-2 text-[12px] font-semibold text-[#dc2626]">{rangeError}</div>}

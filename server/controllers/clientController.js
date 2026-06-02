@@ -421,14 +421,19 @@ exports.listClients = async (req, res, next) => {
   try {
     const { page: requestedPage, limit } = parsePagination(req.query, 20);
     const query = await buildClientListQuery(req);
-    const total = await Client.countDocuments(query);
+    const skip = (requestedPage - 1) * limit;
+    
+    const [total, clients] = await Promise.all([
+      Client.countDocuments(query),
+      Client.find(query)
+        .populate(populateClientList)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+    ]);
+
     const pages = Math.max(1, Math.ceil(total / limit));
     const page = Math.min(requestedPage, pages);
-    const clients = await Client.find(query)
-      .populate(populateClientList)
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit);
 
     // Attach active (non-completed) task counts per client for the list view summary pills.
     const clientIds = clients.map((c) => c._id);

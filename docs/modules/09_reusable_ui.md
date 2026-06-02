@@ -62,14 +62,14 @@ Used by: TopBar (role badge), Sidebar (section labels), Task/Client lists (categ
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `status` | String | Display label (e.g. `"WIP"`, `"Completed"`) |
+| `status` | String | Display label (e.g. `"In Progress"`, `"Completed"`) |
 
 Internally maps display labels to background/text color combinations:
 
 | Status | Color |
 |--------|-------|
 | `Not Yet Started` | Gray |
-| `WIP` | Blue |
+| `In Progress` | Blue |
 | `Completed` | Green |
 | `Submitted to FTA` | Purple |
 | `In Review` | Yellow |

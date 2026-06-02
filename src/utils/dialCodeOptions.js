@@ -1,5 +1,5 @@
 export const DIAL_CODE_OPTIONS = [
-  { label: "Dubai, UAE (+971)", value: "+971" },
+  { label: "UAE (+971)", value: "+971" },
   { label: "India (+91)", value: "+91" },
   { label: "United States / Canada (+1)", value: "+1" },
   { label: "United Kingdom (+44)", value: "+44" },

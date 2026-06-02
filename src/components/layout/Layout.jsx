@@ -6,7 +6,7 @@ import TopBar from "./TopBar.jsx";
 export default function Layout() {
   const { pathname } = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [desktopCollapsed, setDesktopCollapsed] = useState(true);
+  const [desktopCollapsed, setDesktopCollapsed] = useState(false);
   const title = navItems.flatMap((s) => s.links).find((link) => link.to === pathname)?.label || "Dashboard";
 
   return (

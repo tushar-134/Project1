@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ChevronLeft, Download, X, Columns, SlidersHorizontal } from "lucide-react";
+import { ChevronLeft, Download, Upload, X, Columns, SlidersHorizontal } from "lucide-react";
 
 /**
  * A reusable modal for exporting data with options for Visible Columns, All Fields, and Selected Fields.
@@ -71,7 +71,7 @@ export default function ExportModal({
               </button>
             )}
             <div className="grid h-7 w-7 place-items-center rounded-lg bg-[#1e3a8a] text-white">
-              <Download size={14} />
+              <Upload size={14} />
             </div>
             <div>
               <div className="text-sm font-extrabold text-slate-900">
@@ -126,7 +126,7 @@ export default function ExportModal({
                 >
                   <div className="flex items-center gap-3">
                     <div className="grid h-9 w-9 flex-none place-items-center rounded-lg bg-emerald-50 text-emerald-600 transition group-hover:bg-emerald-500 group-hover:text-white">
-                      <Download size={16} />
+                      <Upload size={16} />
                     </div>
                     <div>
                       <div className="text-[13px] font-extrabold text-slate-900">Export All Fields</div>
@@ -247,7 +247,7 @@ export default function ExportModal({
                 onClick={handleExportSelected}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-[#1e3a8a] px-4 py-2 text-[12px] font-extrabold text-white shadow-sm transition hover:bg-[#1e40af] disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <Download size={13} />
+                <Upload size={13} />
                 Download
               </button>
             </div>
