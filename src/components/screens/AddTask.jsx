@@ -44,13 +44,13 @@ export default function AddTask() {
   const [details, setDetailsRaw] = useState({
     client: prefillTask?.clientId || "",
     assigned: "",
-    dueDate: "2026-05-31",
+    dueDate: "",
     periodFY: "",
     periodQuarter: "",
     description: prefillTask?.description || "",
     frequency: "monthly",
     daysBeforeDue: 15,
-    nextDue: "2026-06-30",
+    nextDue: "",
     endDate: ""
   });
   const chips = useMemo(() => category?.taskTypes || [], [category]);
@@ -222,13 +222,13 @@ export default function AddTask() {
         setDetailsRaw({
           client: "",
           assigned: "",
-          dueDate: "2026-05-31",
+          dueDate: "",
           periodFY: "",
           periodQuarter: "",
           description: "",
           frequency: "monthly",
           daysBeforeDue: 15,
-          nextDue: "2026-06-30",
+          nextDue: "",
           endDate: ""
         });
         setRecurring(false);
