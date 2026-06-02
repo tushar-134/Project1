@@ -1701,7 +1701,7 @@ export default function AddClient() {
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                   {searchQuery && (
-                    <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl ring-1 ring-slate-900/5">
+                    <div className="absolute z-10 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl ring-1 ring-slate-900/5 custom-scrollbar">
                       {(state.customFields || [])
                         .filter(f => !selectedFieldKeys.includes(f.key))
                         .filter(f => f.label.toLowerCase().includes(searchQuery.toLowerCase()) || f.key.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -2071,7 +2071,7 @@ function SearchableSelect({ id, value, options, searchValue, onSearchChange, onC
               onChange={(event) => onSearchChange(event.target.value)}
             />
           </div>
-          <div className="max-h-56 overflow-auto">
+          <div className="max-h-56 overflow-y-auto custom-scrollbar">
             <button
               type="button"
               className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[13px] text-slate-600 hover:bg-slate-50 font-medium"

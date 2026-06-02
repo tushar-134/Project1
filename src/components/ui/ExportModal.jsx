@@ -182,7 +182,7 @@ export default function ExportModal({
         {/* ── Field picker / checklist view ── */}
         {exportMode === "select" && (
           <>
-            <div className="max-h-[360px] space-y-4 overflow-y-auto px-4 py-3">
+            <div className="max-h-[360px] space-y-4 overflow-y-auto px-4 py-3 custom-scrollbar">
               {/* Base fields */}
               <div>
                 <div className="mb-1.5 text-[10px] font-extrabold uppercase tracking-widest text-slate-400">
