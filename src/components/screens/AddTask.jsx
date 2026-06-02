@@ -1,4 +1,4 @@
-import { cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
+import { cloneElement, isValidElement, useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { Check, Send, UploadCloud } from "lucide-react";
 import toast from "react-hot-toast";
@@ -208,29 +208,37 @@ export default function AddTask() {
     }));
   }, [isEditMode, prefillTask]);
 
+  const initialLocationKey = useRef(location.key);
   useEffect(() => {
+    if (location.key === initialLocationKey.current) return;
+    
     if (!isEditMode && !prefillTask) {
-      setStep(1);
-      setCategoryId("vat");
-      setCategoryName("VAT");
-      setDetailsRaw({
-        client: "",
-        assigned: "",
-        dueDate: "2026-05-31",
-        periodFY: "",
-        periodQuarter: "",
-        description: "",
-        frequency: "monthly",
-        daysBeforeDue: 15,
-        nextDue: "2026-06-30",
-        endDate: ""
-      });
-      setRecurring(false);
-      setAttachments([]);
-      setAttachmentDescription("");
-      setIsDirty(false);
+      if (isDirty) {
+        toast.error("Task not saved, please save first.");
+      } else {
+        setStep(1);
+        setCategoryId("vat");
+        setCategoryName("VAT");
+        setDetailsRaw({
+          client: "",
+          assigned: "",
+          dueDate: "2026-05-31",
+          periodFY: "",
+          periodQuarter: "",
+          description: "",
+          frequency: "monthly",
+          daysBeforeDue: 15,
+          nextDue: "2026-06-30",
+          endDate: ""
+        });
+        setRecurring(false);
+        setAttachments([]);
+        setAttachmentDescription("");
+        setIsDirty(false);
+      }
     }
-  }, [location.key, isEditMode, prefillTask]);
+    initialLocationKey.current = location.key;
+  }, [location.key, isEditMode, prefillTask, isDirty]);
 
   useEffect(() => {
     if (!state.categories.length || !categoryName) return;
