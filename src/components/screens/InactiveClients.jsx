@@ -50,17 +50,6 @@ export default function InactiveClients({ setSettingsHeaderAction }) {
 
   return (
     <div className="space-y-4">
-      <Card className="p-4 border-amber-200 bg-amber-50">
-        <div className="flex gap-3 text-amber-800">
-          <AlertCircle className="mt-0.5 shrink-0 text-amber-500" size={18} />
-          <div className="text-[13px] leading-relaxed">
-            <span className="font-bold">Inactive Clients</span>
-            <br />
-            These clients have been deleted from the active client list. They remain here for historical records. Restoring a client will move them back to the active list.
-          </div>
-        </div>
-      </Card>
-      
       <Card>
         <Table>
           <thead>
@@ -69,17 +58,16 @@ export default function InactiveClients({ setSettingsHeaderAction }) {
               <th>File No</th>
               <th>Jurisdiction</th>
               <th>Archived Date</th>
-              <th className="w-24 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-[13px] font-semibold text-slate-400">Loading...</td>
+                <td colSpan={4} className="py-8 text-center text-[13px] font-semibold text-slate-400">Loading...</td>
               </tr>
             ) : clients.length === 0 ? (
               <tr>
-                <td colSpan={5} className="py-8 text-center text-[13px] font-semibold text-slate-400">No inactive clients found.</td>
+                <td colSpan={4} className="py-8 text-center text-[13px] font-semibold text-slate-400">No inactive clients found.</td>
               </tr>
             ) : (
               clients.map((c) => (
@@ -88,12 +76,6 @@ export default function InactiveClients({ setSettingsHeaderAction }) {
                   <td>{c.fileNo || "—"}</td>
                   <td className="capitalize">{c.jurisdiction || "—"}</td>
                   <td>{c.updatedAt ? new Date(c.updatedAt).toLocaleDateString() : "—"}</td>
-                  <td className="text-right">
-                    <Button size="sm" variant="outline" onClick={() => handleRestore(c._id)}>
-                      <ArchiveRestore size={14} />
-                      Restore
-                    </Button>
-                  </td>
                 </tr>
               ))
             )}
