@@ -80,7 +80,7 @@ export default function CustomFieldModal({ isOpen, onClose, onSave, editingId = 
           </button>
         </div>
 
-        <div className="max-h-[70vh] overflow-y-auto p-5 custom-scrollbar">
+        <div className="max-h-[70vh] overflow-y-auto p-5">
           <div className="space-y-4">
             <Field label="Field Label" help="Visible to users in forms">
               <input

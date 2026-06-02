@@ -256,7 +256,7 @@ function StatusMultiSelect({ selected, onChange, open, setOpen, dropdownRef }) {
         <ul
           role="listbox"
           aria-multiselectable="true"
-          className="absolute top-full left-0 z-50 mt-1 w-48 max-h-60 overflow-y-auto overflow-x-hidden rounded-xl border border-[#e2e8f0] bg-white shadow-lg custom-scrollbar"
+          className="absolute top-full left-0 z-50 mt-1 w-48 overflow-hidden rounded-xl border border-[#e2e8f0] bg-white shadow-lg"
         >
           {SELECTABLE_STATUSES.map((status) => {
             const checked = selected.includes(status);
