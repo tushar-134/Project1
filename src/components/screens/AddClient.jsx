@@ -8,6 +8,7 @@ import { useClients } from "../../hooks/useClients";
 import { mapUser } from "../../hooks/useUsers";
 import { userService } from "../../services/userService";
 import { groupService } from "../../services/groupService";
+import { clientVisitService } from "../../services/clientVisitService.js";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import CustomFieldModal from "../ui/CustomFieldModal.jsx";
@@ -230,6 +231,9 @@ export default function AddClient() {
   const location = useLocation();
   const { id } = useParams();
   const isEditMode = Boolean(id);
+  // ── Visit conversion: set when navigating from ClientVisitDrawer ──
+  const fromVisitId = location.state?.fromVisitId || null;
+  const visitNewClient = location.state?.newClient || null;
   const { createClient, getClient, updateClient, uploadAttachment, uploadDocument, deleteAttachment, deleteDocument } = useClients();
   const [tab, setTab] = useState(() => Number(location.state?.activeTab) || 0);
   const getInitialViewModeTabs = () => {
@@ -428,6 +432,31 @@ export default function AddClient() {
       return normalizedVatFrequency === current.vatFreq ? current : { ...current, vatFreq: normalizedVatFrequency };
     });
   }, [form.fye]);
+
+  // ── Pre-fill form when arriving from a "Convert to Client" visit flow ──
+  useEffect(() => {
+    if (isEditMode || !visitNewClient) return;
+    setFormRaw((current) => ({
+      ...current,
+      legalName: visitNewClient.authorityName || current.legalName,
+      tradeName: visitNewClient.authorityName || current.tradeName,
+    }));
+    if (visitNewClient.email || visitNewClient.mobileNumber) {
+      setContactsRaw((current) => current.map((contact, idx) =>
+        idx === 0
+          ? {
+              ...contact,
+              name: visitNewClient.authorityName || contact.name,
+              email: visitNewClient.email || contact.email,
+              mobile: visitNewClient.mobileNumber || contact.mobile,
+              code: visitNewClient.mobileCountryCode || contact.code,
+            }
+          : contact
+      ));
+    }
+  // Only run once on mount; visiting the page fresh should not keep re-firing
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!isEditMode) return;
@@ -1176,6 +1205,14 @@ export default function AddClient() {
         }
         setIsDirty(false);
         toast.success(continueToNext ? "Progress saved." : (pendingAttachments.length || pendingLicenceDocuments.length || pendingContactDocuments.length ? "Client created and documents uploaded." : "Client created successfully."));
+        // ── Auto-link: silently link the originating visit to this new client ──
+        if (fromVisitId && createdClientId && !continueToNext) {
+          clientVisitService.update(fromVisitId, {
+            clientType: "existing",
+            client: createdClientId,
+            newClient: undefined,
+          }).catch(() => { /* non-fatal — user can link manually from the drawer */ });
+        }
         if (continueToNext) {
           navigate(`/clients/edit/${createdClientId}`, {
             replace: true,
