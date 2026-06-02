@@ -545,12 +545,8 @@ export default function ClientList() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <InfoPill tone="navy" label={`${workingCount} with active tasks`} />
               <InfoPill tone="slate" label={`${meta.total} total`} />
               {draftCount > 0 && <InfoPill tone="amber" label={`${draftCount} incomplete`} />}
-              {meta.workingTasksTotal > 0 && (
-                <InfoPill tone="green" label={`${meta.workingTasksTotal} active tasks`} />
-              )}
               {clientsLoading && <InfoPill tone="amber" label="Refreshing" />}
               {hasActiveFilters && <InfoPill tone="blue" label={`${activeFilterCount} active filters`} />}
             </div>
@@ -917,11 +913,6 @@ export default function ClientList() {
                       <Badge color={client.type === "Legal Person" ? "bg-blue-50 text-[#1e3a8a]" : "bg-emerald-50 text-[#059669]"}>
                         {client.type}
                       </Badge>
-                      {client.activeTasks > 0 && (
-                        <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-extrabold text-amber-700">
-                          {client.activeTasks} active {client.activeTasks === 1 ? "task" : "tasks"}
-                        </span>
-                      )}
                     </div>
                   </td>
                 )}
