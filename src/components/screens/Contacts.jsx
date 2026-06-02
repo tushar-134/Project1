@@ -1,4 +1,4 @@
-import { Download, Mail, MapPin, MapPinned, Phone, Search, UploadCloud, UserRoundPlus, X } from "lucide-react";
+import { Download, Upload, Mail, MapPin, MapPinned, Phone, Search, UploadCloud, UserRoundPlus, X } from "lucide-react";
 import { cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import toast from "react-hot-toast";
@@ -268,7 +268,7 @@ export default function Contacts() {
       <div className="flex justify-end">
         <div className="flex flex-wrap justify-end gap-2">
           <Button variant="outlineAmber" onClick={() => setBulkOpen(true)}>
-            <UploadCloud size={16} />
+            <Download size={16} />
             Bulk Upload
           </Button>
           <Button onClick={() => setModalOpen(true)}>
@@ -425,7 +425,7 @@ export default function Contacts() {
                   />
                 </label>
                 <Button variant="outlinePurple" onClick={downloadBulkTemplate} disabled={bulkImporting}>
-                  <Download size={16} />
+                  <Upload size={16} />
                   Template
                 </Button>
               </div>

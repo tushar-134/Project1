@@ -1,4 +1,4 @@
-import { Activity, Clock, Download, FileText, ListChecks, User, Users, X } from "lucide-react";
+import { Activity, Clock, Download, Upload, FileText, ListChecks, User, Users, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../../context/AppContext.jsx";
 import { reportService } from "../../services/reportService";
@@ -429,7 +429,7 @@ export default function Reports() {
           </label>
           <Button onClick={applyRange}>Apply</Button>
           <Button variant="outlinePurple" onClick={downloadCsv} disabled={downloading}>
-            <Download size={16} /> {downloading ? "Preparing CSV" : "Download CSV Report"}
+            <Upload size={16} /> {downloading ? "Preparing CSV" : "Download CSV Report"}
           </Button>
         </div>
         {rangeError && <div className="mt-2 text-[12px] font-semibold text-[#dc2626]">{rangeError}</div>}

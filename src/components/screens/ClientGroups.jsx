@@ -1,4 +1,4 @@
-import { Download, Plus, Search, UserPlus, X } from "lucide-react";
+import { Download, Upload, Plus, Search, UserPlus, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
@@ -246,11 +246,11 @@ export default function ClientGroups({ setSettingsHeaderAction }) {
           </label>
 
           <Button variant="outlinePurple" onClick={exportGroupsExcel} disabled={!!selectedExportClientId}>
-            <Download size={16} />
+            <Upload size={16} />
             Export Group-wise
           </Button>
           <Button variant="outlinePurple" onClick={exportClientsExcel}>
-            <Download size={16} />
+            <Upload size={16} />
             Export Client-wise
           </Button>
         </div>
@@ -343,7 +343,7 @@ export default function ClientGroups({ setSettingsHeaderAction }) {
                   onClick={() => exportThisGroupClientsExcel(viewingGroup._id, viewingGroup.name)}
                   disabled={!(viewingGroup.clients || []).length}
                 >
-                  <Download size={16} />
+                  <Upload size={16} />
                   Export This Group (Client-wise)
                 </Button>
               </div>

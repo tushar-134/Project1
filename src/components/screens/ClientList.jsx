@@ -595,7 +595,7 @@ export default function ClientList() {
                   onClick={() => navigate("/clients/bulk-upload")}
                   className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 text-amber-700 transition hover:bg-amber-100 hover:text-amber-800"
                 >
-                  <Upload size={15} />
+                  <Download size={15} />
                 </button>
               )}
               {canManage && (
@@ -605,7 +605,7 @@ export default function ClientList() {
                   onClick={openExportModal}
                   className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-purple-200 bg-purple-50 text-purple-700 transition hover:bg-purple-100 hover:text-purple-800"
                 >
-                  <Download size={15} />
+                  <Upload size={15} />
                 </button>
               )}
 

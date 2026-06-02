@@ -1,4 +1,4 @@
-import { ChevronDown, Columns, Download, RefreshCw, Search, SlidersHorizontal, X } from "lucide-react";
+import { ChevronDown, Columns, Download, Upload, RefreshCw, Search, SlidersHorizontal, X } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -663,7 +663,7 @@ export default function TaskList() {
                 aria-label="Export tasks to Excel"
                 title="Export Excel"
               >
-                <Download size={14} />
+                <Upload size={14} />
               </button>
             )}
 

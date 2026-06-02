@@ -1,4 +1,4 @@
-import { AlertCircle, Check, CheckCircle2, Download, FileArchive, FolderOpen, Info, UploadCloud, X, XCircle } from "lucide-react";
+import { AlertCircle, Check, CheckCircle2, Download, Upload, FileArchive, FolderOpen, Info, UploadCloud, X, XCircle } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import JSZip from "jszip";
 import * as XLSX from "xlsx";
@@ -417,7 +417,7 @@ export default function BulkUpload() {
             </div>
           ))}
           <Button variant="accent" onClick={downloadTemplate}>
-            <Download size={16} />
+            <Upload size={16} />
             Download sample template
           </Button>
         </Card>
@@ -706,7 +706,7 @@ export default function BulkUpload() {
                 </>
               ) : (
                 <>
-                  <UploadCloud size={16} />
+                  <Download size={16} />
                   Submit Upload
                 </>
               )}
