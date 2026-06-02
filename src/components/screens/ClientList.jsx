@@ -922,7 +922,7 @@ export default function ClientList() {
                 {isVisible("compliance") && (
                   <td>
                     <div className="space-y-1">
-                      <div><span className="font-semibold text-slate-500">TRN:</span> {client.vatTrn || "—"}</div>
+                      <div>{client.vatTrn || "—"}</div>
                     </div>
                   </td>
                 )}
