@@ -14,6 +14,7 @@ import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
 import Toggle from "../ui/Toggle.jsx";
 import UnsavedChangesGuard from "../ui/UnsavedChangesGuard.jsx";
+import CustomSelect from "../ui/CustomSelect.jsx";
 
 export default function AddTask() {
   const { state, dispatch } = useApp();
@@ -427,7 +428,16 @@ export default function AddTask() {
                 onChange={(id) => setDetails({ ...details, client: id })}
               />
             </Field>
-            <Field label="Assign To" field="taskAssignedTo"><select className="input" value={details.assigned} onChange={(e) => setDetails({ ...details, assigned: e.target.value })}><option value="">Unassigned</option>{state.users.map((u) => <option key={u.id} value={u._id}>{u.name}</option>)}</select></Field>
+            <Field label="Assign To" field="taskAssignedTo">
+              <CustomSelect
+                value={details.assigned}
+                onChange={(val) => setDetails({ ...details, assigned: val })}
+                options={[
+                  { value: "", label: "Unassigned" },
+                  ...state.users.map((u) => ({ value: u._id, label: u.name }))
+                ]}
+              />
+            </Field>
             <Field label="Due Date*" field="taskDueDate"><input className="input" type="date" value={details.dueDate} onChange={(e) => handleRecurrenceChange({ dueDate: e.target.value })} /></Field>
             {showFY && (
               <Field 
@@ -446,30 +456,26 @@ export default function AddTask() {
                 } 
                 field="taskPeriodFY"
               >
-                <select
-                  className="input"
+                <CustomSelect
                   value={details.periodFY}
-                  onChange={(e) => setDetails({ ...details, periodFY: e.target.value })}
-                >
-                  <option value="">Select FY</option>
-                  {fyOptions.map((fy) => (
-                    <option key={fy} value={fy}>{fy}</option>
-                  ))}
-                </select>
+                  onChange={(val) => setDetails({ ...details, periodFY: val })}
+                  options={[
+                    { value: "", label: "Select FY" },
+                    ...fyOptions.map((fy) => ({ value: fy, label: fy }))
+                  ]}
+                />
               </Field>
             )}
             {showQuarter && (
               <Field label="Quarter" field="taskPeriodQuarter">
-                <select
-                  className="input"
+                <CustomSelect
                   value={details.periodQuarter}
-                  onChange={(e) => setDetails({ ...details, periodQuarter: e.target.value })}
-                >
-                  <option value="">Select Quarter</option>
-                  {quarterOptions.map((q) => (
-                    <option key={q.value} value={q.value}>{q.value}</option>
-                  ))}
-                </select>
+                  onChange={(val) => setDetails({ ...details, periodQuarter: val })}
+                  options={[
+                    { value: "", label: "Select Quarter" },
+                    ...quarterOptions.map((q) => ({ value: q.value, label: q.value }))
+                  ]}
+                />
               </Field>
             )}
             <Field label="Description / Notes" field="taskDescription"><textarea className="input textarea" value={details.description} onChange={(e) => setDetails({ ...details, description: e.target.value })} /></Field>
