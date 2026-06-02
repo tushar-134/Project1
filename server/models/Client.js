@@ -34,7 +34,7 @@ const clientSchema = new mongoose.Schema({
     licenceNumber: { type: String, required: true, trim: true },
     issuingAuthority: String,
     officialEmail: String,
-    licenceType: { type: String, enum: ["commercial", "professional", "industrial", "tourism"], default: "commercial" },
+    licenceType: { type: String, enum: ["commercial", "professional", "industrial", "tourism", "commercial license", "professional license", "industrial license", "agricultural license", "crafts license", "tourism license"], default: "commercial license" },
     issueDate: Date,
     expiryDate: Date,
     documentUrl: String,

@@ -169,7 +169,14 @@ const ISSUING_AUTHORITY_OPTIONS = [
   { id: "Innovation City", label: "Innovation City" },
 ];
 
-const LICENCE_TYPE_OPTIONS = ["Commercial", "Professional", "Industrial", "Tourism"];
+const LICENCE_TYPE_OPTIONS = [
+  "Commercial License",
+  "Professional License",
+  "Industrial License",
+  "Agricultural License",
+  "Crafts License",
+  "Tourism License"
+];
 
 function normalizeFinancialYearEnd(value) {
   if (!value) return "Jan - Dec";
@@ -264,7 +271,7 @@ export default function AddClient() {
   const isCtDeregistered = form.ctStatus === "Deregistered";
   const [vatHistory, setVatHistory] = useState([]);
   const [ctHistory, setCtHistory] = useState([]);
-  const [licences, setLicencesRaw] = useState([{ number: "", issue: "", expiry: "", authority: "", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
+  const [licences, setLicencesRaw] = useState([{ number: "", issue: "", expiry: "", authority: "", type: "Commercial License", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
   const setLicences = (val) => { setIsDirty(true); setLicencesRaw(val); };
 
   const [contacts, setContactsRaw] = useState([{
@@ -535,14 +542,14 @@ export default function AddClient() {
         issue: licence.issueDate?.slice?.(0, 10) || "",
         expiry: licence.expiryDate?.slice?.(0, 10) || "",
         authority: licence.issuingAuthority || "",
-        type: licence.licenceType ? `${licence.licenceType[0].toUpperCase()}${licence.licenceType.slice(1)}` : "",
+        type: licence.licenceType ? (licence.licenceType.toLowerCase().includes("license") ? licence.licenceType.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") : `${licence.licenceType.charAt(0).toUpperCase()}${licence.licenceType.slice(1)} License`) : "Commercial License",
         email: licence.officialEmail || "",
         documentUrl: licence.documentUrl || "",
         documentName: licence.documentUrl ? licence.documentUrl.split("/").pop() : "",
         documentFile: null,
         documents: mapExistingDocuments(licence.documents, licence.documentUrl),
         persisted: true,
-      })) : [{ number: "", issue: "", expiry: "", authority: "", type: "Commercial", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
+      })) : [{ number: "", issue: "", expiry: "", authority: "", type: "Commercial License", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
       const loadedPersons = client.contactPersons || [];
       const primaryIdx = loadedPersons.findIndex((person) => person.isPrimary);
       setPrimaryContactIndex(primaryIdx >= 0 ? primaryIdx : 0);
