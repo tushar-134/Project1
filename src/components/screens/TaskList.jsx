@@ -636,7 +636,6 @@ export default function TaskList() {
           {/* Stats pills */}
           <div className="flex flex-wrap items-center gap-2">
             <InfoPill tone="navy" label={`${workingCount} working`} />
-            <InfoPill tone="orange" label={`${activeCount} active tasks`} />
             <InfoPill tone="green" label={`${completedCount} completed`} />
             <InfoPill tone="slate" label={`${meta.total} matches`} />
             {tasksLoading && <InfoPill tone="amber" label="Refreshing…" />}
