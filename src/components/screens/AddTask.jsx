@@ -208,6 +208,30 @@ export default function AddTask() {
   }, [isEditMode, prefillTask]);
 
   useEffect(() => {
+    if (!isEditMode && !prefillTask) {
+      setStep(1);
+      setCategoryId("vat");
+      setCategoryName("VAT");
+      setDetailsRaw({
+        client: "",
+        assigned: "",
+        dueDate: "2026-05-31",
+        periodFY: "",
+        periodQuarter: "",
+        description: "",
+        frequency: "monthly",
+        daysBeforeDue: 15,
+        nextDue: "2026-06-30",
+        endDate: ""
+      });
+      setRecurring(false);
+      setAttachments([]);
+      setAttachmentDescription("");
+      setIsDirty(false);
+    }
+  }, [location.key, isEditMode, prefillTask]);
+
+  useEffect(() => {
     if (!state.categories.length || !categoryName) return;
     const resolved = state.categories.find((cat) => cat.id === categoryId)
       || state.categories.find((cat) => cat.name === categoryName);
