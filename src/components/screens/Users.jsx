@@ -341,7 +341,7 @@ export default function Users({ setSettingsHeaderAction }) {
                     disabled={!canManageUsers || currentUser?.id === u._id}
                     onChange={(e) => handleRoleChange(u, e.target.value)}
                   >
-                    <option>Task Only</option>
+                    <option value="Task Only">Task only</option>
                     <option>Manager</option>
                     <option>Admin</option>
                   </select>
@@ -426,7 +426,7 @@ export default function Users({ setSettingsHeaderAction }) {
               </Field>
               <Field label="Role" field="user-form-role">
                 <select className="input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                  <option>Task Only</option>
+                  <option value="Task Only">Task only</option>
                   <option>Manager</option>
                   <option>Admin</option>
                 </select>

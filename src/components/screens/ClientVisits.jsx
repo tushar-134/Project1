@@ -17,9 +17,9 @@ import StatusPill from "../ui/StatusPill.jsx";
 import Table from "../ui/Table.jsx";
 
 const statusOptions = [
-  { value: "all", label: "All Statuses" },
+  { value: "all", label: "All statuses" },
   { value: "planned", label: "Planned" },
-  { value: "in_progress", label: "In Progress" },
+  { value: "in_progress", label: "In progress" },
   { value: "completed", label: "Completed" },
   { value: "cancelled", label: "Cancelled" },
 ];
@@ -27,9 +27,9 @@ const statusOptions = [
 const visitTypeOptions = ["All Types", "Requirement Gathering", "Verification", "Onboarding Discussion", "Follow Up", "Collection", "Meeting"];
 
 const clientTypeOptions = [
-  { value: "all", label: "All Clients" },
-  { value: "new", label: "New Clients" },
-  { value: "existing", label: "Existing Clients" },
+  { value: "all", label: "All clients" },
+  { value: "new", label: "New clients" },
+  { value: "existing", label: "Existing clients" },
 ];
 
 function formatDate(value) {
@@ -224,7 +224,9 @@ export default function ClientVisits() {
           <FilterField label="Visit Type">
             <select className="input" value={filters.visitType} onChange={(event) => updateFilter("visitType", event.target.value)}>
               {visitTypeOptions.map((option) => (
-                <option key={option} value={option === "All Types" ? "all" : option}>{option}</option>
+                <option key={option} value={option === "All Types" ? "all" : option}>
+                  {option === "All Types" ? "All types" : option === "Requirement Gathering" ? "Requirement gathering" : option === "Onboarding Discussion" ? "Onboarding discussion" : option === "Follow Up" ? "Follow up" : option}
+                </option>
               ))}
               {visitTypes
                 .filter((option) => !visitTypeOptions.includes(option))

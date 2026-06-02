@@ -149,7 +149,26 @@ function buildNormalizedOptions(values) {
 }
 
 function displayCategoryName(category) {
-  return CATEGORY_LABELS[category] || category || "";
+  const c = CATEGORY_LABELS[category] || category || "";
+  if (!c) return "";
+  const upperCases = ["VAT", "CT", "FTA", "ESR", "MIS", "TRN", "TIN", "ID"];
+  const words = c.split(" ");
+  return words.map((word, i) => {
+    if (upperCases.includes(word.toUpperCase())) return word.toUpperCase();
+    if (i === 0) return word;
+    return word.toLowerCase();
+  }).join(" ");
+}
+
+function displayTypeName(type) {
+  if (!type) return "";
+  const upperCases = ["VAT", "CT", "FTA", "ESR", "MIS", "TRN", "TIN", "ID"];
+  const words = type.split(" ");
+  return words.map((word, i) => {
+    if (upperCases.includes(word.toUpperCase())) return word.toUpperCase();
+    if (i === 0) return word;
+    return word.toLowerCase();
+  }).join(" ");
 }
 
 
@@ -215,7 +234,7 @@ function StatusMultiSelect({ selected, onChange, open, setOpen, dropdownRef }) {
   const label = selected.length === 0
     ? "All statuses"
     : selected.length === 1
-      ? selected[0]
+      ? (selected[0] === "Not Yet Started" ? "Not yet started" : selected[0] === "In Progress" ? "In progress" : selected[0])
       : `${selected.length} statuses`;
 
   return (
@@ -265,7 +284,7 @@ function StatusMultiSelect({ selected, onChange, open, setOpen, dropdownRef }) {
                     </svg>
                   )}
                 </span>
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-extrabold ${bg} ${text}`}>{status}</span>
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-extrabold ${bg} ${text}`}>{status === "Not Yet Started" ? "Not yet started" : status === "In Progress" ? "In progress" : status}</span>
               </li>
             );
           })}
@@ -564,7 +583,7 @@ export default function TaskList() {
                 }
               >
                 {ALL_STATUSES.map((item) => (
-                  <option key={item}>{item}</option>
+                  <option key={item} value={item}>{item === "Not Yet Started" ? "Not yet started" : item === "In Progress" ? "In progress" : item}</option>
                 ))}
               </select>
             ) : (
@@ -811,7 +830,7 @@ export default function TaskList() {
               >
                 <option value="">All task types</option>
                 {typeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
+                  <option key={option.value} value={option.value}>{displayTypeName(option.label)}</option>
                 ))}
               </select>
             </FilterField>
@@ -891,7 +910,7 @@ export default function TaskList() {
                 onChange={(event) => updateScope(event.target.value)}
               >
                 {SCOPE_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
+                  <option key={opt} value={opt}>{opt === "By Month" ? "By month" : opt}</option>
                 ))}
               </select>
             </FilterField>

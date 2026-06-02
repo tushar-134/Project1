@@ -1,26 +1,26 @@
 export const statusToApi = {
-  "Not Yet Started": "not_started",
-  "In Progress": "wip",
+  "Not yet started": "not_started",
+  "In progress": "wip",
   Completed: "completed",
   "Submitted to FTA": "submitted_to_fta",
 };
 
 export const statusFromApi = {
-  not_started: "Not Yet Started",
-  wip: "In Progress",
+  not_started: "Not yet started",
+  wip: "In progress",
   completed: "Completed",
   submitted_to_fta: "Submitted to FTA",
 };
 
 export const ftaStatusToApi = {
-  "In Review": "in_review",
-  "Additional Query From FTA": "additional_query",
+  "In review": "in_review",
+  "Additional query from FTA": "additional_query",
   Approved: "approved",
 };
 
 export const ftaStatusFromApi = {
-  in_review: "In Review",
-  additional_query: "Additional Query From FTA",
+  in_review: "In review",
+  additional_query: "Additional query from FTA",
   approved: "Approved",
 };
 
@@ -33,8 +33,8 @@ export function daysOverdue(dueDate, status) {
 export function mapClient(client) {
   const jurisdictionLabels = {
     mainland: "Mainland",
-    freezone: "Free Zone",
-    designated_zone: "Designated Zone",
+    freezone: "Free zone",
+    designated_zone: "Designated zone",
     offshore: "Offshore",
   };
   const missingFields = Array.isArray(client.missingFields) ? client.missingFields : [];
@@ -45,7 +45,7 @@ export function mapClient(client) {
     // The original UI was built against a flatter prototype shape, so these adapters keep
     // the screens stable while the backend returns normalized Mongo documents.
     name: client.legalName,
-    type: client.clientType === "natural" ? "Natural Person" : "Legal Person",
+    type: client.clientType === "natural" ? "Natural person" : "Legal person",
     jurisdiction: jurisdictionLabels[client.jurisdiction] || client.jurisdiction,
     group: client.group?.name || "",
     assignedToName: client.assignedUser?.name || "",
@@ -66,10 +66,10 @@ export function mapClient(client) {
 
 export function mapTask(task) {
   const categoryLabels = {
-    CT: "Corporate Tax",
-    MIS: "MIS Reporting",
-    EInv: "E-Invoicing",
-    Refund: "VAT Refund",
+    CT: "Corporate tax",
+    MIS: "MIS reporting",
+    EInv: "E-invoicing",
+    Refund: "VAT refund",
   };
   return {
     ...task,

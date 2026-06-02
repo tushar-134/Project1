@@ -717,7 +717,7 @@ export default function ClientList() {
               >
                 <option value="">All jurisdictions</option>
                 {JURISDICTION_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
+                  <option key={opt} value={opt}>{opt === "Free Zone" ? "Free zone" : opt === "Designated Zone" ? "Designated zone" : opt}</option>
                 ))}
               </select>
             </FilterField>
@@ -731,7 +731,7 @@ export default function ClientList() {
               >
                 <option value="">All types</option>
                 {TYPE_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>{opt}</option>
+                  <option key={opt} value={opt}>{opt === "Legal Person" ? "Legal person" : opt === "Natural Person" ? "Natural person" : opt}</option>
                 ))}
               </select>
             </FilterField>

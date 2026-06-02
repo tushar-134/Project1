@@ -1371,9 +1371,9 @@ export default function AddClient() {
                       }));
                     }}
                   >
-                    <option>Registered</option>
-                    <option>Not Registered</option>
-                    <option>Deregistered</option>
+                    <option value="Registered">Registered</option>
+                    <option value="Not Registered">Not registered</option>
+                    <option value="Deregistered">Deregistered</option>
                   </select>
                   {form.vatRegistrationTaskId && form.vatStatus !== "Registered" && (
                     <button
@@ -1486,9 +1486,9 @@ export default function AddClient() {
                         }));
                       }}
                     >
-                      <option>Registered</option>
-                      <option>Not Registered</option>
-                      <option>Deregistered</option>
+                      <option value="Registered">Registered</option>
+                      <option value="Not Registered">Not registered</option>
+                      <option value="Deregistered">Deregistered</option>
                     </select>
                     {form.ctRegistrationTaskId && form.ctStatus !== "Registered" && (
                       <button
@@ -2117,8 +2117,8 @@ function Basic({ form, update, countries, users, userSearch, setUserSearch, isUs
         <Field label="Select Type*" field="client-type">
           <select className="input" required value={form.clientType} onChange={(e) => update("clientType", e.target.value)}>
             <option value="">Select type</option>
-            <option value="Legal Person">Legal Person</option>
-            <option value="Natural Person">Natural Person</option>
+            <option value="Legal Person">Legal person</option>
+            <option value="Natural Person">Natural person</option>
           </select>
         </Field>
         <Field label="File No." field="client-file-no"><input className="input" value={form.fileNo} onChange={(e) => update("fileNo", e.target.value)} /></Field>
@@ -2131,10 +2131,10 @@ function Basic({ form, update, countries, users, userSearch, setUserSearch, isUs
         </Field>
         <Field label="Jurisdiction" field="client-jurisdiction">
           <select className="input" value={form.jurisdiction} onChange={(e) => update("jurisdiction", e.target.value)}>
-            <option>Mainland</option>
-            <option>Free Zone</option>
-            <option>Designated Zone</option>
-            <option>Offshore</option>
+            <option value="Mainland">Mainland</option>
+            <option value="Free Zone">Free zone</option>
+            <option value="Designated Zone">Designated zone</option>
+            <option value="Offshore">Offshore</option>
           </select>
         </Field>
         <Field label="Assigned User" field="client-assigned-user">

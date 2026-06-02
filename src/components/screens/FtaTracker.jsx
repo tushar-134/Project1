@@ -281,7 +281,7 @@ export default function FtaTracker() {
                     <option value="">All categories</option>
                     {CATEGORY_FILTERS.map((f) => (
                       <option key={f} value={f}>
-                        {f}
+                        {f === "Corporate Tax" ? "Corporate tax" : f === "MIS Reporting" ? "MIS reporting" : f === "E-Invoicing" ? "E-invoicing" : f === "VAT Refund" ? "VAT refund" : f}
                       </option>
                     ))}
                   </select>
@@ -434,7 +434,7 @@ export default function FtaTracker() {
                         }
                       >
                         {FTA_STATUSES.map((s) => (
-                          <option key={s}>{s}</option>
+                          <option key={s} value={s}>{s === "In Review" ? "In review" : s === "Additional Query From FTA" ? "Additional query from FTA" : s}</option>
                         ))}
                       </select>
                     )}

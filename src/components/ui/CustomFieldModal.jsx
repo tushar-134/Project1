@@ -114,11 +114,11 @@ export default function CustomFieldModal({ isOpen, onClose, onSave, editingId = 
                 value={field.type}
                 onChange={(e) => setField({ ...field, type: e.target.value, options: e.target.value === "select" ? field.options : [] })}
               >
-                <option value="text">Short Text</option>
+                <option value="text">Short text</option>
                 <option value="number">Number</option>
                 <option value="date">Date</option>
-                <option value="select">Dropdown Select</option>
-                <option value="currency">Currency Amount</option>
+                <option value="select">Dropdown select</option>
+                <option value="currency">Currency amount</option>
               </select>
             </Field>
 
