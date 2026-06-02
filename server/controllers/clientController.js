@@ -80,7 +80,10 @@ function buildClientSearchClause(value) {
 
 async function buildClientListQuery(req) {
   const { search, jurisdiction, type, group, assignedUser, client, compliance, contact, createdAt, createdBy, licenceExpiry, status } = req.query;
-  const query = { isActive: status === "inactive" ? false : true };
+  const query = {};
+  if (status !== "all") {
+    query.isActive = status === "inactive" ? false : true;
+  }
   const andClauses = [];
 
   if (jurisdiction) andClauses.push({ jurisdiction: buildPattern(jurisdiction) });

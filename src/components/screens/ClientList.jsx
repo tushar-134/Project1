@@ -5,6 +5,7 @@ import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useClients } from "../../hooks/useClients";
 import { customFieldService } from "../../services/customFieldService.js";
+import { clientService } from "../../services/clientService.js";
 import { downloadBlob } from "../../utils/adapterUtils";
 import { canCreateClients, canManageClients } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
@@ -55,6 +56,7 @@ const EMPTY_COLUMN_FILTERS = {
   contact: "",
   createdAt: "",
   createdBy: "",
+  status: "active",
 };
 const PAGE_SIZE = 20;
 
@@ -73,6 +75,7 @@ function buildActiveFilterSummary(columnFilters, query) {
   if (columnFilters.contact) chips.push(`Contact: ${columnFilters.contact}`);
   if (columnFilters.createdAt) chips.push(`Created: ${columnFilters.createdAt}`);
   if (columnFilters.createdBy) chips.push(`Created By: ${columnFilters.createdBy}`);
+  if (columnFilters.status && columnFilters.status !== "active") chips.push(`Status: ${columnFilters.status.charAt(0).toUpperCase() + columnFilters.status.slice(1)}`);
   return chips;
 }
 
@@ -422,6 +425,7 @@ export default function ClientList() {
     contact: deferredColumnFilters.contact.trim() || undefined,
     createdAt: deferredColumnFilters.createdAt || undefined,
     createdBy: deferredColumnFilters.createdBy.trim() || undefined,
+    status: deferredColumnFilters.status || undefined,
   }), [deferredColumnFilters, deferredQuery, page]);
 
   const filterRef = useRef(requestParams);
@@ -451,9 +455,9 @@ export default function ClientList() {
 
   const rows = state.clients;
   const activeColumnFilters = buildActiveFilterSummary(columnFilters, query);
-  const hasColumnFilters = Object.values(columnFilters).some(Boolean);
+  const activeFilterCount = query.trim() ? activeColumnFilters.length - 1 : activeColumnFilters.length;
+  const hasColumnFilters = activeFilterCount > 0;
   const hasActiveFilters = Boolean(query.trim()) || hasColumnFilters;
-  const activeFilterCount = activeColumnFilters.length;
   const workingCount = rows.filter((c) => (c.activeTasks || 0) > 0).length;
   const draftCount = rows.filter((client) => client.isDraft).length;
 
@@ -736,6 +740,19 @@ export default function ClientList() {
               </select>
             </FilterField>
 
+            <FilterField label="Status" htmlFor="client-filter-status">
+              <select
+                id="client-filter-status"
+                className="input"
+                value={columnFilters.status || "active"}
+                onChange={(e) => updateColumnFilter("status", e.target.value)}
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="all">All statuses</option>
+              </select>
+            </FilterField>
+
             <FilterField label="Group" htmlFor="client-filter-group">
               <div className="task-list-input-wrap">
                 <Search size={14} className="task-list-input-icon" aria-hidden="true" />
@@ -955,7 +972,7 @@ export default function ClientList() {
                 {canManage && (
                   <td>
                     <div className="flex gap-1">
-                      {currentUser?.role === "admin" && (
+                      {currentUser?.role === "admin" && client.isActive !== false && (
                         <Button
                           size="sm"
                           variant="danger"
@@ -971,6 +988,24 @@ export default function ClientList() {
                           }}
                         >
                           <Trash2 size={14} />
+                        </Button>
+                      )}
+                      {currentUser?.role === "admin" && client.isActive === false && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            if (confirm("Restore client?")) {
+                              try {
+                                await clientService.restore(client._id);
+                                refetchClients().catch(() => {});
+                              } catch (e) {
+                                console.error(e);
+                              }
+                            }
+                          }}
+                        >
+                          Restore
                         </Button>
                       )}
                     </div>
