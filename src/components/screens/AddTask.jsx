@@ -253,6 +253,29 @@ export default function AddTask() {
     setStep(2);
   }
 
+  function resetForm() {
+    setStep(1);
+    setCategoryId("");
+    setCategoryName("");
+    setType("");
+    setRecurring(false);
+    setDetailsRaw({
+      client: "",
+      assigned: "",
+      dueDate: "",
+      periodFY: "",
+      periodQuarter: "",
+      description: "",
+      frequency: "monthly",
+      daysBeforeDue: 15,
+      nextDue: "",
+      endDate: "",
+    });
+    setAttachments([]);
+    setAttachmentDescription("");
+    setIsDirty(false);
+  }
+
   async function handleAttachmentFiles(files, description = "") {
     const selected = Array.from(files || []);
     if (!selected.length) return;
@@ -398,16 +421,33 @@ export default function AddTask() {
   return (
     <div className="space-y-5">
       <UnsavedChangesGuard isDirty={step === 3 && isDirty} />
-      <div className="grid gap-3 md:grid-cols-3">
-        {["Select Category", "Select Task Type", "Task Details"].map((label, i) => (
-          <Step 
-            key={label} 
-            n={i + 1} 
-            active={step >= i + 1} 
-            label={label} 
-            onClick={() => setStep(i + 1)} 
-          />
-        ))}
+      <div className="flex items-center justify-between gap-3">
+        <div className="grid flex-1 gap-3 md:grid-cols-3">
+          {["Select Category", "Select Task Type", "Task Details"].map((label, i) => (
+            <Step
+              key={label}
+              n={i + 1}
+              active={step >= i + 1}
+              label={label}
+              onClick={() => {
+                const target = i + 1;
+                // Only allow going back (not forward skipping);
+                // forward navigation happens via category click / Continue button.
+                if (target < step) setStep(target);
+              }}
+            />
+          ))}
+        </div>
+        {!isEditMode && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={resetForm}
+            title="Clear all selections and start fresh"
+          >
+            ↺ Start Over
+          </Button>
+        )}
       </div>
       {step === 1 && <Card className="p-4"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{state.categories.map((cat) => <button key={cat.id} onClick={() => selectCategory(cat.id)} className="rounded-xl border border-[#e2e8f0] bg-white p-4 text-left transition hover:border-[#1e3a8a] hover:shadow"><div className="mb-3 h-2 w-10 rounded-full" style={{ background: cat.color }} /><div className="font-extrabold">{cat.name}</div><div className="mt-1 text-[12px] text-slate-500">{cat.taskTypes.length} task types</div></button>)}</div></Card>}
       {step === 2 && <Card className="p-4"><div className="mb-3 text-[14px] font-extrabold">Task types for {category.name}</div><div className="flex flex-wrap gap-2">{chips.map((chip) => <button key={chip} onClick={() => setType(chip)} className={`rounded-full px-3 py-2 text-[12px] font-extrabold ${type === chip ? "bg-[#1e3a8a] text-white" : "bg-slate-100 text-slate-600"}`}>{chip}</button>)}</div><div className="mt-5 flex gap-2"><Button variant="ghost" onClick={() => setStep(1)}>Back</Button><Button onClick={() => setStep(3)}>Continue</Button></div></Card>}
