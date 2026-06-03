@@ -648,6 +648,7 @@ export default function ClientList() {
                     key={s}
                     type="button"
                     id={`client-status-toggle-${s.toLowerCase()}`}
+                    title={`View ${s.toLowerCase()} clients`}
                     onClick={() => handleStatusToggle(s)}
                     className={[
                       "relative inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-[12px] font-extrabold transition-all duration-200",
