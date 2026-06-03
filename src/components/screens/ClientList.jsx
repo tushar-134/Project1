@@ -623,36 +623,9 @@ export default function ClientList() {
           {/* Header row: title + summary pills */}
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-2xl">
-              <div className="flex items-center flex-wrap gap-4 text-[14px] font-extrabold text-slate-900">
-                <div className="flex items-center gap-2">
-                  <SlidersHorizontal size={16} className="text-[#1e3a8a]" />
-                  Filter and review clients
-                </div>
-                {/* Active / Inactive pill toggle (moved to left) */}
-                <div
-                  className="inline-flex items-center rounded-full p-1"
-                  style={{ background: isInactiveMode ? "#dc2626" : "#1e3a8a" }}
-                  role="group"
-                  aria-label="Client status filter"
-                >
-                  {["Active", "Inactive"].map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      id={`client-status-toggle-${s.toLowerCase()}`}
-                      onClick={() => handleStatusToggle(s)}
-                      className={[
-                        "rounded-full px-5 py-1.5 text-[13px] font-extrabold transition-all duration-200",
-                        clientStatus === s
-                          ? "bg-white shadow-sm"
-                          : "text-white/90 hover:text-white",
-                      ].join(" ")}
-                      style={clientStatus === s ? { color: isInactiveMode ? "#dc2626" : "#1e3a8a" } : {}}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
+              <div className="flex items-center gap-2 text-[14px] font-extrabold text-slate-900">
+                <SlidersHorizontal size={16} className="text-[#1e3a8a]" />
+                Filter and review clients
               </div>
               <p className="mt-1 text-[12px] font-medium text-slate-500">
                 Use the filters below to narrow the client list by name, type, jurisdiction, group, or contact details.
@@ -660,6 +633,32 @@ export default function ClientList() {
             </div>
 
 
+
+            {/* Active / Inactive toggle wrapper */}
+            <div
+              className="inline-flex items-center rounded-full p-1"
+              style={{ background: isInactiveMode ? "#dc2626" : "#1e3a8a" }}
+              role="group"
+              aria-label="Client status filter"
+            >
+              {["Active", "Inactive"].map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  id={`client-status-toggle-${s.toLowerCase()}`}
+                  onClick={() => handleStatusToggle(s)}
+                  className={[
+                    "rounded-full px-5 py-1.5 text-[13px] font-extrabold transition-all duration-200",
+                    clientStatus === s
+                      ? "bg-white shadow-sm"
+                      : "text-white/90 hover:text-white",
+                  ].join(" ")}
+                  style={clientStatus === s ? { color: isInactiveMode ? "#dc2626" : "#1e3a8a" } : {}}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
 
             <div className="flex flex-wrap items-center gap-2">
               <InfoPill tone="slate" label={`${meta.total} total`} />
