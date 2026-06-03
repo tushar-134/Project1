@@ -1071,7 +1071,7 @@ export default function ClientList() {
         )}
       </Card>
 
-      {drawerClientId && <ClientDrawer clientId={drawerClientId} isInactive={isInactiveMode} onClose={() => setDrawerClientId(null)} />}
+      {drawerClientId && <ClientDrawer clientId={drawerClientId} isInactive={isInactiveMode} onClose={() => setDrawerClientId(null)} onReactivate={() => { setDrawerClientId(null); refetchClients().catch(() => {}); }} />}
       <ExportModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
