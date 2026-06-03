@@ -51,7 +51,7 @@ function escapeRegex(value) {
 
 function parsePagination(query = {}, defaultLimit = 20) {
   const page = Math.max(1, Number(query.page) || 1);
-  const limit = Math.max(1, Math.min(100, Number(query.limit) || defaultLimit));
+  const limit = Math.max(1, Math.min(5000, Number(query.limit) || defaultLimit));
   return { page, limit };
 }
 

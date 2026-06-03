@@ -69,7 +69,7 @@ export default function ClientComboBox({
     setLoading(true);
     setFetchError("");
     const delayDebounce = setTimeout(() => {
-      clientService.list({ search: inputValue.trim() || undefined, page: 1, limit: 5000, status: "active" })
+      clientService.list({ search: inputValue.trim() || undefined, page: 1, limit: 5000, status: "all" })
         .then((data) => {
           if (requestId !== fetchRequestId.current) return;
           const raw = Array.isArray(data)
