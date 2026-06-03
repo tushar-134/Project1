@@ -58,11 +58,17 @@ exports.dashboardStats = async (req, res, next) => {
       ...roleScope,
     };
 
-    const [totalClients, pendingTasks, overdueTasks, ftaPending, recentActivity, catAgg, overdueAgg] = await Promise.all([
+    const [totalClients, pendingTasks, overdueTasks, ftaPending, expiredLicences, recentActivity, catAgg, overdueAgg] = await Promise.all([
       Client.countDocuments(clientScope),
       Task.countDocuments({ ...taskScope, status: { $ne: "completed" } }),
       Task.countDocuments(overdueScope),
       Task.countDocuments({ ...taskScope, isAwaitingFta: true, ftaStatus: { $ne: "approved" } }),
+      Client.countDocuments({
+        isActive: true,
+        "tradeLicences.0": { $exists: true },
+        "tradeLicences.expiryDate": { $lt: now },
+        ...(req.user.role === "task_only" ? { _id: { $in: visibleTaskClientIds } } : {}),
+      }),
       ActivityLog.find({
         ...(req.user.role === "task_only" ? { task: { $in: activityTaskIds } } : {}),
         ...activityDateScope,
@@ -98,7 +104,7 @@ exports.dashboardStats = async (req, res, next) => {
       pending: c.pending,
       overdue: overdueByCat.get(c._id) || 0,
     }));
-    res.json({ totalClients, pendingTasks, overdueTasks, ftaPending, categoryBreakdown, recentActivity });
+    res.json({ totalClients, pendingTasks, overdueTasks, ftaPending, expiredLicences, categoryBreakdown, recentActivity });
   } catch (error) { next(error); }
 };
 
