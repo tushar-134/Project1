@@ -651,7 +651,7 @@ export default function ClientList() {
                     title={`View ${s.toLowerCase()} clients`}
                     onClick={() => handleStatusToggle(s)}
                     className={[
-                      "relative inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-[12px] font-extrabold transition-all duration-200",
+                      "relative inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-[12px] font-extrabold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-50",
                       isSelected
                         ? (isInactiveTab ? "bg-red-50 shadow-sm border border-red-100 text-red-600" : "bg-white shadow-sm border border-slate-200 text-slate-900")
                         : "text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 border border-transparent",
