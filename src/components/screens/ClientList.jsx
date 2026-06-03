@@ -653,7 +653,7 @@ export default function ClientList() {
                     className={[
                       "relative inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-[12px] font-extrabold transition-all duration-200",
                       isSelected
-                        ? "bg-white shadow-sm"
+                        ? "bg-white shadow-sm " + (isInactiveTab ? "text-red-600" : "text-slate-900")
                         : "text-slate-500 hover:text-slate-700",
                     ].join(" ")}
                   >
