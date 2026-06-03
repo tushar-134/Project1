@@ -197,7 +197,14 @@ export default function ClientDrawer({ clientId, onClose, expiryFocus = null }) 
           </div>
           <div className="flex items-center gap-2">
             {client && canManage && (
-              <Button variant="ghost" size="sm" onClick={() => navigate(`/clients/edit/${client._id}`, { state: { viewMode: true } })}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  onClose?.();
+                  navigate(`/clients/edit/${client._id}`, { state: { viewMode: true } });
+                }}
+              >
                 <ExternalLink size={15} />
                 View more
               </Button>
