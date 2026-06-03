@@ -215,14 +215,14 @@ export default function ClientDrawer({ clientId, onClose, expiryFocus = null, is
                   size="sm"
                   disabled={restoring}
                   onClick={async () => {
-                    if (!confirm("Reactivate this client?")) return;
+                    if (!confirm("Restore this client?")) return;
                     setRestoring(true);
                     try {
-                      await clientService.reactivate(client._id);
+                      await clientService.restore(client._id);
                       if (onReactivate) onReactivate();
                       onClose?.();
                     } catch (_) {
-                      alert("Failed to reactivate. Please try again.");
+                      alert("Failed to restore. Please try again.");
                     } finally {
                       setRestoring(false);
                     }
