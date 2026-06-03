@@ -2,6 +2,7 @@ import { useCallback, useMemo } from "react";
 import { useApp } from "../context/AppContext";
 import { taskService } from "../services/taskService";
 import { ftaStatusToApi, mapFtaTask, mapTask, statusFromApi, statusToApi } from "../utils/adapterUtils";
+import { getCache, setCache, clearCache } from "../utils/apiCache";
 
 const categoryToApi = {
   "Corporate Tax": "CT",
@@ -19,15 +20,33 @@ function normalizeTaskParams(params = {}) {
 }
 
 export function useTasks() {
-  const { dispatch } = useApp();
+  const { state, dispatch } = useApp();
+
   const fetchTasks = useCallback(async (params) => {
-    dispatch({ type: "SET_LOADING", resource: "tasks", value: true });
+    const normalizedParams = normalizeTaskParams(params);
+    const cacheKey = `tasks_${JSON.stringify(normalizedParams)}`;
+    const cachedData = getCache(cacheKey);
+
+    const isFirstLoad = !state.tasks || state.tasks.length === 0;
+    
+    if (isFirstLoad && !cachedData) {
+      dispatch({ type: "SET_LOADING", resource: "tasks", value: true });
+    }
+
+    if (cachedData) {
+      dispatch({ type: "SET_RESOURCE", resource: "tasks", payload: cachedData.tasks });
+    }
+
     try {
-      const data = await taskService.list(normalizeTaskParams(params));
+      const data = await taskService.list(normalizedParams);
       const rawTasks = Array.isArray(data) ? data : (data.tasks || data.items || []);
       const tasks = rawTasks.map(mapTask);
+      
+      const result = Array.isArray(data) ? tasks : { ...data, tasks };
+      
+      setCache(cacheKey, { tasks, original: result });
       dispatch({ type: "SET_RESOURCE", resource: "tasks", payload: tasks });
-      return Array.isArray(data) ? tasks : { ...data, tasks };
+      return result;
     } catch (error) {
       dispatch({
         type: "SET_ERROR",
@@ -36,22 +55,27 @@ export function useTasks() {
       });
       throw error;
     }
-  }, [dispatch]);
+  }, [dispatch, state.tasks]);
   const fetchFtaTracker = useCallback(async (params) => {
     const tasks = (await taskService.ftaTracker(params)).map(mapFtaTask);
     dispatch({ type: "SET_RESOURCE", resource: "ftaItems", payload: tasks });
     return tasks;
   }, [dispatch]);
-  const updateStatus = useCallback(async (id, label) => {
-    // Status updates are optimistic because the task list is designed for quick inline changes.
+  const withCacheInvalidation = useCallback((fn) => async (...args) => {
+    const result = await fn(...args);
+    clearCache("tasks_");
+    return result;
+  }, []);
+
+  const updateStatus = useCallback(withCacheInvalidation(async (id, label) => {
     dispatch({ type: "UPDATE_TASK_STATUS", id, status: statusToApi[label], displayStatus: label });
     const task = await taskService.updateStatus(id, statusToApi[label] || label);
-    // Selecting "Submitted to FTA" auto-sets isAwaitingFta=true on the backend — sync it here.
     const mapped = mapTask(task);
     dispatch({ type: "UPDATE_TASK_STATUS", id, status: task.status, displayStatus: statusFromApi[task.status] || task.status, isAwaitingFta: mapped.isAwaitingFta, ftaStatus: mapped.ftaStatus });
     return task;
-  }, [dispatch]);
-  const updateFtaStatus = useCallback(async (id, label) => {
+  }), [dispatch, withCacheInvalidation]);
+
+  const updateFtaStatus = useCallback(withCacheInvalidation(async (id, label) => {
     dispatch({ type: "UPDATE_FTA_STATUS", id, status: ftaStatusToApi[label], displayStatus: label });
     const task = await taskService.updateFtaStatus(id, ftaStatusToApi[label] || label);
     const mappedTask = mapTask(task);
@@ -64,21 +88,22 @@ export function useTasks() {
       ftaStatus: mappedTask.ftaStatus,
     });
     return task;
-  }, [dispatch]);
-  const updateAssignee = useCallback(async (id, assignedTo, assignedName) => {
-    // Optimistic update — show new name immediately
+  }), [dispatch, withCacheInvalidation]);
+
+  const updateAssignee = useCallback(withCacheInvalidation(async (id, assignedTo, assignedName) => {
     dispatch({ type: "UPDATE_TASK_ASSIGNEE", id, assignedTo, assigned: assignedName });
     const task = await taskService.updateAssignee(id, assignedTo);
     const mapped = mapTask(task);
     dispatch({ type: "UPDATE_TASK_ASSIGNEE", id, assignedTo: mapped.assignedId, assigned: mapped.assigned });
     return task;
-  }, [dispatch]);
-  const updateRemarks = useCallback(async (id, remarks) => {
+  }), [dispatch, withCacheInvalidation]);
+
+  const updateRemarks = useCallback(withCacheInvalidation(async (id, remarks) => {
     dispatch({ type: "UPDATE_TASK_REMARKS", id, remarks });
     const task = await taskService.updateRemarks(id, remarks);
     dispatch({ type: "UPDATE_TASK_REMARKS", id, remarks: task.remarks || "" });
     return task;
-  }, [dispatch]);
+  }), [dispatch, withCacheInvalidation]);
 
   const exportTasks = useCallback((params) => taskService.export(normalizeTaskParams(params)), []);
 
@@ -86,14 +111,14 @@ export function useTasks() {
     fetchTasks,
     fetchFtaTracker,
     getTask: taskService.get,
-    createTask: taskService.create,
-    updateTask: taskService.update,
+    createTask: withCacheInvalidation(taskService.create),
+    updateTask: withCacheInvalidation(taskService.update),
     updateStatus,
     updateAssignee,
     updateRemarks,
     updateFtaStatus,
-    uploadAttachment: taskService.uploadAttachment,
-    deleteAttachment: taskService.deleteAttachment,
+    uploadAttachment: withCacheInvalidation(taskService.uploadAttachment),
+    deleteAttachment: withCacheInvalidation(taskService.deleteAttachment),
     exportTasks,
-  }), [exportTasks, fetchFtaTracker, fetchTasks, updateAssignee, updateFtaStatus, updateRemarks, updateStatus]);
+  }), [exportTasks, fetchFtaTracker, fetchTasks, updateAssignee, updateFtaStatus, updateRemarks, updateStatus, withCacheInvalidation]);
 }
