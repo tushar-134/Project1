@@ -39,11 +39,28 @@ export function mapClient(client) {
   };
   const missingFields = Array.isArray(client.missingFields) ? client.missingFields : [];
   const isDraft = Boolean(client.isDraft || client.lifecycleStatus === "draft" || missingFields.length);
+  const now = new Date();
+
+  // Compute which documents are expired
+  const expiredDocs = [];
+  (client.tradeLicences || []).forEach((lic, i) => {
+    if (lic.expiryDate && new Date(lic.expiryDate) < now) {
+      expiredDocs.push({ type: "Trade Licence", label: lic.licenceNumber || `Licence ${i + 1}`, expiryDate: lic.expiryDate });
+    }
+  });
+  (client.contactPersons || []).forEach((person) => {
+    const name = person.fullName || "Contact";
+    if (person.emiratesId?.expiryDate && new Date(person.emiratesId.expiryDate) < now) {
+      expiredDocs.push({ type: "Emirates ID", label: name, expiryDate: person.emiratesId.expiryDate });
+    }
+    if (person.passport?.expiryDate && new Date(person.passport.expiryDate) < now) {
+      expiredDocs.push({ type: "Passport", label: name, expiryDate: person.passport.expiryDate });
+    }
+  });
+
   return {
     ...client,
     id: client._id,
-    // The original UI was built against a flatter prototype shape, so these adapters keep
-    // the screens stable while the backend returns normalized Mongo documents.
     name: client.legalName,
     type: client.clientType === "natural" ? "Natural person" : "Legal person",
     jurisdiction: jurisdictionLabels[client.jurisdiction] || client.jurisdiction,
@@ -61,6 +78,7 @@ export function mapClient(client) {
     isDraft,
     lifecycleStatus: isDraft ? "draft" : "complete",
     missingFields,
+    expiredDocs,
   };
 }
 
