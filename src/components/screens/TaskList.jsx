@@ -33,10 +33,9 @@ const COLUMN_DEFS = [
   { key: "updatedAt", label: "Last Modified", defaultOn: false, description: "When task was last updated" },
 ];
 
-const ALL_STATUSES = ["Not Yet Started", "In Progress", "Submitted to FTA", "Completed"];
-const BASE_STATUSES = ["Not Yet Started", "In Progress", "Completed"]; // for non-FTA tasks
-// "Active" = all non-completed/non-approved; surfaced in scope logic
-const FILTER_STATUSES = ["Not Yet Started", "In Progress", "Submitted to FTA", "Completed", "All"];
+const ALL_STATUSES = ["Not yet started", "In progress", "Submitted to FTA", "Completed"];
+const BASE_STATUSES = ["Not yet started", "In progress", "Completed"];
+const FILTER_STATUSES = ["Not yet started", "In progress", "Submitted to FTA", "Completed", "All"];
 const SCOPE_OPTIONS = ["By Month", "Overdue", "All"];
 // Column count updated: +2 for Created Date and Last Modified
 const TASK_TABLE_COLUMNS = 10;
@@ -53,8 +52,8 @@ const CATEGORY_VALUES_BY_LABEL = Object.fromEntries(
   Object.entries(CATEGORY_LABELS).map(([value, label]) => [label.toLowerCase(), value])
 );
 const STATUS_PILL = {
-  "Not Yet Started": { bg: "bg-slate-100", text: "text-slate-600" },
-  "In Progress": { bg: "bg-blue-50", text: "text-blue-700" },
+  "Not yet started": { bg: "bg-slate-100", text: "text-slate-600" },
+  "In progress": { bg: "bg-blue-50", text: "text-blue-700" },
   Completed: { bg: "bg-green-100", text: "text-green-700" },
   "Submitted to FTA": { bg: "bg-purple-50", text: "text-purple-700" },
 };
@@ -81,7 +80,7 @@ function normalizeStatusFilterValue(value) {
   const raw = String(value).trim();
   if (!raw) return [];
   if (raw.toLowerCase() === "active") {
-    return ["Not Yet Started", "In Progress", "Submitted to FTA"];
+    return ["Not yet started", "In progress", "Submitted to FTA"];
   }
   const found = FILTER_STATUSES.find((s) => s.toLowerCase() === raw.toLowerCase());
   return found ? [found] : [];
@@ -199,7 +198,7 @@ function StatusMultiSelect({ selected, onChange, open, setOpen, dropdownRef }) {
   const label = selected.length === 0
     ? "All statuses"
     : selected.length === 1
-      ? toSentenceCase(selected[0])
+      ? selected[0]
       : `${selected.length} statuses`;
 
   return (
@@ -249,7 +248,7 @@ function StatusMultiSelect({ selected, onChange, open, setOpen, dropdownRef }) {
                     </svg>
                   )}
                 </span>
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-extrabold ${bg} ${text}`}>{toSentenceCase(status)}</span>
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-extrabold ${bg} ${text}`}>{status}</span>
               </li>
             );
           })}
@@ -415,7 +414,7 @@ export default function TaskList() {
 
   const completedCount = rows.filter((task) => task.status === "Completed").length;
   const workingCount = rows.length - completedCount;
-  const activeCount = rows.filter((task) => task.status === "Not Yet Started" || task.status === "In Progress").length;
+  const activeCount = rows.filter((task) => task.status === "Not yet started" || task.status === "In progress").length;
   const activeColumnFilters = buildActiveColumnFilterSummary(columnFilters);
   const hasColumnFilters = activeColumnFilters.length > 0;
   const hasActiveFilters = hasColumnFilters || scope !== "By Month" || month !== initialMonth;
@@ -548,7 +547,7 @@ export default function TaskList() {
                 }
               >
                 {ALL_STATUSES.map((item) => (
-                  <option key={item} value={item}>{toSentenceCase(item)}</option>
+                  <option key={item} value={item}>{item}</option>
                 ))}
               </select>
             ) : (
