@@ -395,12 +395,15 @@ exports.createTask = async (req, res, next) => {
     }
     const status = req.body.status || (req.body.isAwaitingFta ? "submitted_to_fta" : "not_started");
     const recurringFields = normalizeRecurringFields(req.body, req.body.dueDate);
+    const isAwaitingFta = req.body.isAwaitingFta || status === "submitted_to_fta";
     const task = await Task.create({
       ...req.body,
       ...recurringFields,
       status,
       taskId: await nextTaskId(new Date(req.body.dueDate).getUTCFullYear()),
-      ftaSubmittedDate: req.body.isAwaitingFta || status === "submitted_to_fta" ? new Date() : undefined,
+      isAwaitingFta,
+      ftaSubmittedDate: isAwaitingFta ? new Date() : undefined,
+      ftaStatus: isAwaitingFta ? "in_review" : undefined,
       createdBy: req.user._id,
     });
     await auditLogger({ task: task._id, user: req.user._id, action: "Created", newStatus: task.status });
@@ -446,9 +449,22 @@ exports.updateTask = async (req, res, next) => {
       if (!task.isRecurring) task.recurringGeneratedTask = undefined;
     }
 
-    if ("status" in req.body && req.body.status === "submitted_to_fta" && task.isAwaitingFta && !task.ftaSubmittedDate) {
-      task.ftaSubmittedDate = new Date();
+    if ("status" in req.body) {
+      if (req.body.status === "submitted_to_fta") {
+        task.isAwaitingFta = true;
+        if (!task.ftaSubmittedDate) {
+          task.ftaSubmittedDate = new Date();
+        }
+        if (!task.ftaStatus) {
+          task.ftaStatus = "in_review";
+        }
+      } else if (req.body.status === "wip" || req.body.status === "not_started") {
+        task.isAwaitingFta = false;
+        task.ftaStatus = undefined;
+        task.ftaSubmittedDate = undefined;
+      }
     }
+    
     if ("isAwaitingFta" in req.body && !req.body.isAwaitingFta) {
       task.ftaStatus = undefined;
       task.ftaSubmittedDate = undefined;
