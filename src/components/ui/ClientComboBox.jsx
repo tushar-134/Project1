@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { clientService } from "../../services/clientService";
 import { mapClient } from "../../utils/adapterUtils";
 
+const EMPTY_CLIENTS = [];
+
 /**
  * Searchable client combobox.
  *
@@ -15,7 +17,7 @@ import { mapClient } from "../../utils/adapterUtils";
  *   inputId        – id attribute for the <input> (for label association)
  */
 export default function ClientComboBox({
-  clients = [],
+  clients = EMPTY_CLIENTS,
   value = "",
   onChange,
   useNameAsValue = false,
@@ -32,7 +34,7 @@ export default function ClientComboBox({
 
   // Synchronize localClients with the clients prop on mount/change
   useEffect(() => {
-    setLocalClients(clients);
+    setLocalClients(Array.isArray(clients) ? clients : EMPTY_CLIENTS);
   }, [clients]);
 
   // Resolve display name for the currently selected value

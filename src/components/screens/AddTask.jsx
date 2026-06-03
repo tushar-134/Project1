@@ -33,7 +33,7 @@ export default function AddTask() {
   const [categoryId, setCategoryId] = useState(prefillTask?.categoryId || "vat");
   const [categoryName, setCategoryName] = useState(prefillTask?.categoryName || "VAT");
   const category = state.categories.find((cat) => cat.id === categoryId);
-  const [type, setType] = useState(prefillTask?.type || "VAT Return");
+  const [type, setType] = useState(prefillTask?.type || "");
   const [recurring, setRecurring] = useState(false);
 
   const [savedStatus, setSavedStatus] = useState("not_started");
@@ -258,7 +258,7 @@ export default function AddTask() {
     const next = state.categories.find((cat) => cat.id === id);
     setCategoryId(id);
     setCategoryName(next?.name || categoryName);
-    setType(next.taskTypes[0] || "");
+    setType("");
     setStep(2);
   }
 
@@ -268,6 +268,9 @@ export default function AddTask() {
     setCategoryName("");
     setType("");
     setRecurring(false);
+    setSavedStatus("not_started");
+    setSubmitting(false);
+    setIsUploadingAttachments(false);
     setDetailsRaw({
       client: "",
       assigned: "",
@@ -442,10 +445,9 @@ export default function AddTask() {
               n={i + 1}
               active={step >= i + 1}
               label={label}
+              disabled={i + 1 > step}
               onClick={() => {
                 const target = i + 1;
-                // Only allow going back (not forward skipping);
-                // forward navigation happens via category click / Continue button.
                 if (target < step) setStep(target);
               }}
             />
@@ -463,7 +465,7 @@ export default function AddTask() {
         )}
       </div>
       {step === 1 && <Card className="p-4"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{state.categories.map((cat) => <button key={cat.id} onClick={() => selectCategory(cat.id)} className="rounded-xl border border-[#e2e8f0] bg-white p-4 text-left transition hover:border-[#1e3a8a] hover:shadow"><div className="mb-3 h-2 w-10 rounded-full" style={{ background: cat.color }} /><div className="font-extrabold">{cat.name}</div><div className="mt-1 text-[12px] text-slate-500">{cat.taskTypes.length} task types</div></button>)}</div></Card>}
-      {step === 2 && <Card className="p-4"><div className="mb-3 text-[14px] font-extrabold">Task types for {category.name}</div><div className="flex flex-wrap gap-2">{chips.map((chip) => <button key={chip} onClick={() => setType(chip)} className={`rounded-full px-3 py-2 text-[12px] font-extrabold ${type === chip ? "bg-[#1e3a8a] text-white" : "bg-slate-100 text-slate-600"}`}>{chip}</button>)}</div><div className="mt-5 flex gap-2"><Button variant="ghost" onClick={() => setStep(1)}>Back</Button><Button onClick={() => setStep(3)}>Continue</Button></div></Card>}
+      {step === 2 && <Card className="p-4"><div className="mb-3 text-[14px] font-extrabold">Task types for {category.name}</div><div className="flex flex-wrap gap-2">{chips.map((chip) => <button key={chip} onClick={() => setType(chip)} className={`rounded-full px-3 py-2 text-[12px] font-extrabold ${type === chip ? "bg-[#1e3a8a] text-white" : "bg-slate-100 text-slate-600"}`}>{chip}</button>)}</div>{!type && <div className="mt-3 text-[12px] font-semibold text-amber-600">Select a task type to continue.</div>}<div className="mt-5 flex gap-2"><Button variant="ghost" onClick={() => setStep(1)}>Back</Button><Button onClick={() => { if (!type) { toast.error("Please select a task type before continuing."); return; } setStep(3); }} disabled={!type}>Continue</Button></div></Card>}
       {step === 3 && (
         <Card className="p-4">
           <div className="mb-4 rounded-xl border border-[#dbeafe] bg-blue-50 p-3">
@@ -605,12 +607,14 @@ export default function AddTask() {
     </div>
   );
 }
-function Step({ n, label, active, onClick }) { 
+function Step({ n, label, active, onClick, disabled = false }) { 
   return (
     <button 
       type="button" 
       onClick={onClick} 
-      className={`w-full text-left flex items-center gap-3 rounded-xl border p-3 transition-colors hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a8a]/30 ${active ? "border-[#1e3a8a] bg-white" : "border-[#e2e8f0] bg-white/60 hover:bg-white cursor-pointer"}`}
+      disabled={disabled}
+      className={`w-full text-left flex items-center gap-3 rounded-xl border p-3 transition-colors hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a8a]/30 ${disabled ? "cursor-not-allowed opacity-55" : "cursor-pointer"} ${active ? "border-[#1e3a8a] bg-white" : "border-[#e2e8f0] bg-white/60 hover:bg-white"}`}
+      aria-disabled={disabled}
     >
       <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[12px] font-black transition-colors ${active ? "bg-[#1e3a8a] text-white" : "bg-slate-200 text-slate-500"}`}>
         {active ? <Check size={15} /> : n}
