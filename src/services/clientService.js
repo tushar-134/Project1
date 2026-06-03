@@ -8,6 +8,7 @@ export const clientService = {
   create: (payload) => api.post("/clients", payload).then((res) => res.data),
   update: (id, payload) => api.put(`/clients/${id}`, payload).then((res) => res.data),
   remove: (id) => api.delete(`/clients/${id}`).then((res) => res.data),
+  reactivate: (id) => api.patch(`/clients/${id}/reactivate`).then((res) => res.data),
   bulkUpload: (rows) => api.post("/clients/bulk-upload", { rows }).then((res) => res.data),
   export: (params) => api.get("/clients/export", { params, responseType: "blob" }).then((res) => res.data),
   uploadAttachment: (id, formData) => api.post(`/clients/${id}/attachments`, formData).then((res) => res.data),
