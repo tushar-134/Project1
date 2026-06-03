@@ -924,14 +924,24 @@ export default function ClientList() {
                     <button
                       type="button"
                       className="task-id-link font-extrabold text-left"
-                      onClick={() => client.isDraft ? navigate(`/clients/edit/${client.id}`) : setDrawerClientId(client.id)}
-                      title={client.isDraft ? "Resume incomplete client" : "Open client details"}
+                      onClick={() => isInactiveMode
+                        ? setDrawerClientId(client.id)
+                        : client.isDraft
+                          ? navigate(`/clients/edit/${client.id}`)
+                          : setDrawerClientId(client.id)
+                      }
+                      title={isInactiveMode ? "View client details (read-only)" : client.isDraft ? "Resume incomplete client" : "Open client details"}
                     >
                       {client.name}
                     </button>
                     <div className="mt-1 flex flex-wrap gap-2">
                       <span className="text-[12px] font-semibold text-slate-500">{client.jurisdiction}</span>
-                      {client.isDraft && (
+                      {isInactiveMode && (
+                        <Badge color="bg-red-100 text-red-700">
+                          Inactive
+                        </Badge>
+                      )}
+                      {!isInactiveMode && client.isDraft && (
                         <Badge color="bg-amber-100 text-amber-700">
                           Incomplete
                         </Badge>
@@ -939,7 +949,7 @@ export default function ClientList() {
                       <Badge color={client.type === "Legal Person" ? "bg-blue-50 text-[#1e3a8a]" : "bg-emerald-50 text-[#059669]"}>
                         {client.type}
                       </Badge>
-                      {client.activeTasks > 0 && (
+                      {!isInactiveMode && client.activeTasks > 0 && (
                         <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-extrabold text-amber-700">
                           {client.activeTasks} active {client.activeTasks === 1 ? "task" : "tasks"}
                         </span>
@@ -993,7 +1003,30 @@ export default function ClientList() {
                 {canManage && (
                   <td>
                     <div className="flex gap-1">
-                      {currentUser?.role === "admin" && (
+                      {/* Inactive mode: show Restore button */}
+                      {isInactiveMode && currentUser?.role === "admin" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title="Reactivate this client"
+                          onClick={async () => {
+                            if (confirm("Reactivate this client?")) {
+                              try {
+                                await reactivateClient(client._id);
+                                refetchClients().catch(() => {});
+                              } catch (_) {
+                                alert("Failed to reactivate client. Please try again.");
+                              }
+                            }
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[12px] font-bold text-emerald-700 hover:bg-emerald-100"
+                        >
+                          <RotateCcw size={13} />
+                          Restore
+                        </Button>
+                      )}
+                      {/* Active mode: show Delete button */}
+                      {!isInactiveMode && currentUser?.role === "admin" && (
                         <Button
                           size="sm"
                           variant="danger"
@@ -1038,7 +1071,7 @@ export default function ClientList() {
         )}
       </Card>
 
-      {drawerClientId && <ClientDrawer clientId={drawerClientId} onClose={() => setDrawerClientId(null)} />}
+      {drawerClientId && <ClientDrawer clientId={drawerClientId} isInactive={isInactiveMode} onClose={() => setDrawerClientId(null)} />}
       <ExportModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
