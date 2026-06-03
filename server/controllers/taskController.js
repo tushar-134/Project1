@@ -270,7 +270,10 @@ async function taskQuery(req) {
       // Split comma-joined string and map human-readable labels → DB enum values
       const statusValues = status.split(",").map((s) => {
         const trimmed = s.trim();
-        return LABEL_TO_STATUS[trimmed] || trimmed;
+        const lower = trimmed.toLowerCase();
+        // find case-insensitive match in LABEL_TO_STATUS
+        const matchKey = Object.keys(LABEL_TO_STATUS).find(k => k.toLowerCase() === lower);
+        return matchKey ? LABEL_TO_STATUS[matchKey] : trimmed;
       }).filter(Boolean);
       query.status = { $in: statusValues };
     }
