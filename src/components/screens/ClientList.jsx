@@ -1148,24 +1148,7 @@ export default function ClientList() {
                           <Trash2 size={14} />
                         </Button>
                       )}
-                      {currentUser?.role === "admin" && client.isActive === false && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={async () => {
-                            if (confirm("Restore client?")) {
-                              try {
-                                await clientService.restore(client._id);
-                                refetchClients().catch(() => {});
-                              } catch (e) {
-                                console.error(e);
-                              }
-                            }
-                          }}
-                        >
-                          Restore
-                        </Button>
-                      )}
+
                     </div>
                   </td>
                 )}
