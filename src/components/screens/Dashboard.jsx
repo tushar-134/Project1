@@ -174,12 +174,20 @@ export default function Dashboard() {
       <div className="flex justify-end">
         <div className="relative flex items-center gap-2" ref={settingsRef}>
           <div className="flex h-9 items-center overflow-hidden rounded-lg border border-[#e2e8f0] bg-white">
-            <button onClick={() => moveMonth(-1)} className="grid h-9 w-9 place-items-center hover:bg-slate-50"><ChevronLeft size={16} /></button>
-            <div className="flex min-w-36 items-center justify-center gap-1.5 px-3 text-[12px] font-extrabold">
-              <CalendarDays size={14} className="text-slate-400" />
-              <span>{monthText}</span>
-            </div>
-            <button onClick={() => moveMonth(1)} className="grid h-9 w-9 place-items-center hover:bg-slate-50"><ChevronRight size={16} /></button>
+            <label className="relative flex h-full min-w-36 cursor-pointer items-center justify-center gap-2 px-4 text-[13px] font-extrabold transition-colors hover:bg-slate-50">
+              <CalendarDays size={15} className="text-slate-500" />
+              <span className="text-slate-800">{monthText}</span>
+              <input
+                type="month"
+                value={`${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`}
+                onChange={(e) => {
+                  if (!e.target.value) return;
+                  const [y, m] = e.target.value.split("-");
+                  setMonth(new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1));
+                }}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              />
+            </label>
           </div>
           <button
             type="button"
