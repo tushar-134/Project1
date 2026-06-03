@@ -18,22 +18,17 @@ export default function UnsavedChangesGuard({ isDirty }) {
   );
 
   // Block native browser navigation (refresh, closing tab, typing new URL)
-  useEffect(() => {
-    if (!isDirty) return;
-
-    const handleBeforeUnload = (event) => {
-      event.preventDefault();
-      // Most modern browsers will ignore the string and show a default localized message,
-      // but returning a string is still required by the spec.
-      event.returnValue = "You have unsaved changes. Are you sure you want to leave?";
-      return "You have unsaved changes. Are you sure you want to leave?";
-    };
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload);
-    };
-  }, [isDirty]);
+  // Disabled as per user request to only show the custom React modal
+  // useEffect(() => {
+  //   if (!isDirty) return;
+  //   const handleBeforeUnload = (event) => {
+  //     event.preventDefault();
+  //     event.returnValue = "You have unsaved changes. Are you sure you want to leave?";
+  //     return "You have unsaved changes. Are you sure you want to leave?";
+  //   };
+  //   window.addEventListener("beforeunload", handleBeforeUnload);
+  //   return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  // }, [isDirty]);
 
   if (blocker.state !== "blocked") {
     return null;
