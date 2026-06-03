@@ -371,6 +371,14 @@ export default function ClientList() {
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1, workingTasksTotal: 0 });
   const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
+
+  // Sync state with URL params in case they change without a full remount
+  useEffect(() => {
+    setExpired(searchParams.get("expired") === "true");
+    if (searchParams.has("search")) {
+      setQuery(searchParams.get("search") || "");
+    }
+  }, [searchParams]);
   const [drawerClientId, setDrawerClientId] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
