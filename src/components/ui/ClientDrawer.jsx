@@ -120,9 +120,9 @@ function getExpiryHighlight(dateStr, isFocused) {
   const in15Days = new Date(now.getTime() + 15 * 86400000);
   
   if (date < now) {
-    return focusRing + "border-red-300 bg-red-50 px-3 py-2";
+    return focusRing + "border-red-500 bg-red-100 px-3 py-2 [&>div:last-child]:!text-red-900 [&>div:first-child]:!text-red-700";
   } else if (date >= now && date <= in15Days) {
-    return focusRing + "border-orange-300 bg-orange-50 px-3 py-2";
+    return focusRing + "border-orange-400 bg-orange-100 px-3 py-2 [&>div:last-child]:!text-orange-900 [&>div:first-child]:!text-orange-700";
   }
   
   return focusRing;
