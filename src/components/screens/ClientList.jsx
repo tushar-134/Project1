@@ -640,22 +640,27 @@ export default function ClientList() {
               role="group"
               aria-label="Client status filter"
             >
-              {["Active", "Inactive"].map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  id={`client-status-toggle-${s.toLowerCase()}`}
-                  onClick={() => handleStatusToggle(s)}
-                  className={[
-                    "rounded-full px-5 py-1.5 text-[13px] font-extrabold transition-all duration-200",
-                    clientStatus === s
-                      ? "bg-white shadow-sm"
-                      : "text-white/90 hover:text-white",
-                  ].join(" ")}
-                >
-                  {s}
-                </button>
-              ))}
+              {["Active", "Inactive"].map((s) => {
+                const isSelected = clientStatus === s;
+                const isInactiveTab = s === "Inactive";
+                
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    id={`client-status-toggle-${s.toLowerCase()}`}
+                    onClick={() => handleStatusToggle(s)}
+                    className={[
+                      "relative inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-[12px] font-extrabold transition-all duration-200",
+                      isSelected
+                        ? "bg-white shadow-sm"
+                        : "text-slate-500 hover:text-slate-700",
+                    ].join(" ")}
+                  >
+                    {s}
+                  </button>
+                );
+              })}
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
