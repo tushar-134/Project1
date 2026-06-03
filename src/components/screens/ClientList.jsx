@@ -367,7 +367,7 @@ export default function ClientList() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { fetchClients, deleteClient, reactivateClient, exportClients } = useClients();
+  const { fetchClients, deleteClient, restoreClient, exportClients } = useClients();
   // Tracks whether the list is displaying active or inactive clients.
   // Inactive clients are read-only and must be restored to edit.
   const [clientStatus, setClientStatus] = useState("Active");
@@ -1114,12 +1114,12 @@ export default function ClientList() {
                           variant="ghost"
                           title="Reactivate this client"
                           onClick={async () => {
-                            if (confirm("Reactivate this client?")) {
+                            if (confirm("Restore this client?")) {
                               try {
-                                await reactivateClient(client._id);
+                                await restoreClient(client._id);
                                 refetchClients().catch(() => {});
                               } catch (_) {
-                                alert("Failed to reactivate client. Please try again.");
+                                alert("Failed to restore client. Please try again.");
                               }
                             }
                           }}
