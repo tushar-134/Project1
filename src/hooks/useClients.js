@@ -26,6 +26,7 @@ export function useClients() {
     createClient: clientService.create,
     updateClient: clientService.update,
     deleteClient: clientService.remove,
+    reactivateClient: clientService.reactivate,
     bulkUpload: clientService.bulkUpload,
     exportClients: clientService.export,
     uploadAttachment: clientService.uploadAttachment,
