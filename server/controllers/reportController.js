@@ -65,8 +65,11 @@ exports.dashboardStats = async (req, res, next) => {
       Task.countDocuments({ ...taskScope, isAwaitingFta: true, ftaStatus: { $ne: "approved" } }),
       Client.countDocuments({
         isActive: true,
-        "tradeLicences.0": { $exists: true },
-        "tradeLicences.expiryDate": { $lt: now },
+        $or: [
+          { "tradeLicences.expiryDate": { $lt: now, $exists: true } },
+          { "contactPersons.emiratesId.expiryDate": { $lt: now, $exists: true } },
+          { "contactPersons.passport.expiryDate": { $lt: now, $exists: true } },
+        ],
         ...(req.user.role === "task_only" ? { _id: { $in: visibleTaskClientIds } } : {}),
       }),
       ActivityLog.find({
