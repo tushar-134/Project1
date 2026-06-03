@@ -447,6 +447,11 @@ button { touch-action: manipulation; }
 @keyframes task-spin {
   to { transform: rotate(360deg); }
 }
+@keyframes highlightFade {
+  0%   { background-color: #f3e8ff; box-shadow: inset 0 0 0 2px #a855f7; }
+  60%  { background-color: #faf5ff; box-shadow: inset 0 0 0 2px #c084fc; }
+  100% { background-color: transparent; box-shadow: none; }
+}
 
 @media (max-width: 640px) {
   .task-detail-grid {

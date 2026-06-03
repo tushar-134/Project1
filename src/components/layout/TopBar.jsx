@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AlertTriangle, Bell, ChevronDown, LogOut, UserCircle2 } from "lucide-react";
 import NotificationPanel from "./NotificationPanel.jsx";
 import ProfilePanel from "./ProfilePanel.jsx";
@@ -18,6 +19,7 @@ const LEADER_TTL_MS = 75_000;
 const LEADER_HEARTBEAT_MS = 15_000;
 
 export default function TopBar({ title, navOpen = false, onMenuClick }) {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [expiryOpen, setExpiryOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -202,9 +204,9 @@ export default function TopBar({ title, navOpen = false, onMenuClick }) {
           <ExpiryAlertPanel
             open={expiryOpen}
             onClose={() => setExpiryOpen(false)}
-            onOpenClient={(clientId, item) => {
-              setDrawerExpiryFocus(item);
-              setDrawerClientId(clientId);
+            onOpenClient={(clientId) => {
+              setExpiryOpen(false);
+              setTimeout(() => navigate(`/clients/list?highlight=${clientId}`), 0);
             }}
             payload={expiryPayload}
             loading={expiryLoading}
