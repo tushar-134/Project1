@@ -625,49 +625,61 @@ export default function ClientList() {
           {/* Header row: title + summary pills */}
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-2xl">
-              <div className="flex items-center flex-wrap gap-4 text-[14px] font-extrabold text-slate-900">
-                <div className="flex items-center gap-2">
-                  <SlidersHorizontal size={16} className="text-[#1e3a8a]" />
-                  Filter and review clients
-                </div>
-                {/* Active / Inactive pill toggle (moved to left) */}
-                <div
-                  className="inline-flex items-center rounded-full p-1"
-                  style={{ background: isInactiveMode ? "#dc2626" : "#1e3a8a" }}
-                  role="group"
-                  aria-label="Client status filter"
-                >
-                  {["Active", "Inactive"].map((s) => (
-                    <button
-                      key={s}
-                      type="button"
-                      id={`client-status-toggle-${s.toLowerCase()}`}
-                      onClick={() => handleStatusToggle(s)}
-                      className={[
-                        "rounded-full px-5 py-1.5 text-[13px] font-extrabold transition-all duration-200",
-                        clientStatus === s
-                          ? "bg-white shadow-sm"
-                          : "text-white/90 hover:text-white",
-                      ].join(" ")}
-                      style={clientStatus === s ? { color: isInactiveMode ? "#dc2626" : "#1e3a8a" } : {}}
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
+              <div className="flex items-center gap-2 text-[14px] font-extrabold text-slate-900">
+                <SlidersHorizontal size={16} className="text-[#1e3a8a]" />
+                Filter and review clients
               </div>
               <p className="mt-1 text-[12px] font-medium text-slate-500">
                 Use the filters below to narrow the client list by name, type, jurisdiction, group, or contact details.
               </p>
             </div>
 
+            <div className="flex flex-col items-end gap-3">
+            {/* Active / Inactive toggle wrapper */}
+            <div
+              className="inline-flex items-center gap-0.5 rounded-xl border border-slate-200 bg-slate-100/80 p-1 shadow-sm backdrop-blur-sm"
+              role="group"
+              aria-label="Client status filter"
+            >
+              {["Active", "Inactive"].map((s) => {
+                const isSelected = clientStatus === s;
+                const isInactiveTab = s === "Inactive";
+                
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    id={`client-status-toggle-${s.toLowerCase()}`}
+                    title={`View ${s.toLowerCase()} clients`}
+                    onClick={() => handleStatusToggle(s)}
+                    className={[
+                      "relative inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-[12px] font-extrabold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-50",
+                      isSelected
+                        ? (isInactiveTab ? "bg-red-50 shadow-sm border border-red-100 text-red-600" : "bg-white shadow-sm border border-slate-200 text-slate-900")
+                        : "text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 border border-transparent",
+                    ].join(" ")}
+                  >
+                    {/* Dot indicator for tabs */}
+                    <span
+                      className={[
+                        "inline-block h-1.5 w-1.5 rounded-full transition-all duration-200",
+                        isSelected 
+                          ? (isInactiveTab ? "bg-red-500" : "bg-blue-500") 
+                          : "bg-slate-400 opacity-50",
+                      ].join(" ")}
+                    />
+                    {s}
+                  </button>
+                );
+              })}
+            </div>
 
-
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               <InfoPill tone="slate" label={`${meta.total} total`} />
               {draftCount > 0 && <InfoPill tone="amber" label={`${draftCount} incomplete`} />}
               {clientsLoading && <InfoPill tone="amber" label="Refreshing" />}
               {hasActiveFilters && <InfoPill tone="blue" label={`${activeFilterCount} active filters`} />}
+            </div>
             </div>
           </div>
 
