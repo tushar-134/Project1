@@ -28,6 +28,7 @@ export default function ClientComboBox({
   const [localClients, setLocalClients] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState("");
+  const fetchRequestId = useRef(0);
 
   // Synchronize localClients with the clients prop on mount/change
   useEffect(() => {
@@ -62,11 +63,13 @@ export default function ClientComboBox({
   useEffect(() => {
     if (!open) return;
 
+    const requestId = ++fetchRequestId.current;
     setLoading(true);
     setFetchError("");
     const delayDebounce = setTimeout(() => {
-      clientService.list({ search: inputValue.trim() || undefined, limit: 10, status: "active" })
+      clientService.list({ search: inputValue.trim() || undefined, page: 1, limit: 50, status: "all" })
         .then((data) => {
+          if (requestId !== fetchRequestId.current) return;
           const raw = Array.isArray(data)
             ? data
             : (data.clients || data.items || data.results || []);
@@ -74,13 +77,18 @@ export default function ClientComboBox({
           setLocalClients(mapped);
         })
         .catch(() => {
+          if (requestId !== fetchRequestId.current) return;
           setFetchError("Unable to load clients");
           setLocalClients([]);
         })
-        .finally(() => setLoading(false));
+        .finally(() => {
+          if (requestId === fetchRequestId.current) setLoading(false);
+        });
     }, 250);
 
-    return () => clearTimeout(delayDebounce);
+    return () => {
+      clearTimeout(delayDebounce);
+    };
   }, [inputValue, open]);
 
   // Filter clients by the current typed query
