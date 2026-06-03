@@ -657,6 +657,15 @@ export default function ClientList() {
                         : "text-slate-500 hover:text-slate-700",
                     ].join(" ")}
                   >
+                    {/* Red dot indicator for Inactive tab */}
+                    {isInactiveTab && (
+                      <span
+                        className={[
+                          "inline-block h-1.5 w-1.5 rounded-full transition-all duration-200",
+                          isSelected ? "bg-red-500" : "bg-slate-400",
+                        ].join(" ")}
+                      />
+                    )}
                     {s}
                   </button>
                 );
