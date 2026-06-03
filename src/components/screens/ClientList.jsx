@@ -632,8 +632,7 @@ export default function ClientList() {
               </p>
             </div>
 
-
-
+            <div className="flex flex-col items-end gap-3">
             {/* Active / Inactive toggle wrapper */}
             <div
               className="inline-flex items-center gap-0.5 rounded-xl border border-slate-200 bg-slate-100/80 p-1 shadow-sm backdrop-blur-sm"
@@ -672,11 +671,12 @@ export default function ClientList() {
               })}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               <InfoPill tone="slate" label={`${meta.total} total`} />
               {draftCount > 0 && <InfoPill tone="amber" label={`${draftCount} incomplete`} />}
               {clientsLoading && <InfoPill tone="amber" label="Refreshing" />}
               {hasActiveFilters && <InfoPill tone="blue" label={`${activeFilterCount} active filters`} />}
+            </div>
             </div>
           </div>
 
