@@ -564,7 +564,8 @@ export default function ClientList() {
     downloadBlob(await exportClients(params), "clients_selected.xlsx");
   };
 
-  const isInactiveMode = clientStatus === "Inactive";
+  // Derived flag used by the UI to render read-only states, badges and the Restore button
+  const isInactiveMode = clientStatus.toLowerCase() === "inactive";
 
   // Switches between active/inactive list modes, resetting filters and pagination
   const handleStatusToggle = (status) => {
