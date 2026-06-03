@@ -79,7 +79,7 @@ function buildClientSearchClause(value) {
 }
 
 async function buildClientListQuery(req) {
-  const { search, jurisdiction, type, group, assignedUser, client, compliance, contact, createdAt, createdBy, licenceExpiry, status } = req.query;
+  const { search, jurisdiction, type, group, assignedUser, client, compliance, contact, createdAt, createdBy, licenceExpiry, status, expired } = req.query;
   const query = {};
   if (status !== "all") {
     query.isActive = status === "inactive" ? false : true;
@@ -154,6 +154,16 @@ async function buildClientListQuery(req) {
   if (licenceExpiry) {
     const pattern = buildPattern(licenceExpiry);
     andClauses.push({ "tradeLicences.expiryDate": pattern });
+  }
+  if (expired === "true") {
+    const now = new Date();
+    andClauses.push({
+      $or: [
+        { "tradeLicences.expiryDate": { $lt: now, $exists: true } },
+        { "contactPersons.emiratesId.expiryDate": { $lt: now, $exists: true } },
+        { "contactPersons.passport.expiryDate": { $lt: now, $exists: true } },
+      ],
+    });
   }
   if (andClauses.length) query.$and = andClauses;
   return query;

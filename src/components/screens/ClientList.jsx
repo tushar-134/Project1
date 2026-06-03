@@ -367,6 +367,7 @@ export default function ClientList() {
   const [searchParams] = useSearchParams();
   const { fetchClients, deleteClient, exportClients } = useClients();
   const [query, setQuery] = useState(searchParams.get("search") || "");
+  const [expired, setExpired] = useState(searchParams.get("expired") === "true");
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1, workingTasksTotal: 0 });
   const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
@@ -426,7 +427,8 @@ export default function ClientList() {
     createdAt: deferredColumnFilters.createdAt || undefined,
     createdBy: deferredColumnFilters.createdBy.trim() || undefined,
     status: deferredColumnFilters.status || undefined,
-  }), [deferredColumnFilters, deferredQuery, page]);
+    expired: expired ? "true" : undefined,
+  }), [deferredColumnFilters, deferredQuery, page, expired]);
 
   const filterRef = useRef(requestParams);
   filterRef.current = requestParams;
@@ -529,7 +531,27 @@ export default function ClientList() {
   return (
     <div className="space-y-5">
 
-      {/* Filter & review toolbar — mirrors TaskList design */}
+      {/* Expired filter banner */}
+      {expired && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-purple-200 bg-purple-50 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-purple-100 text-purple-700">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </span>
+            <span className="text-[13px] font-extrabold text-purple-800">Showing clients with expired documents</span>
+            <span className="text-[12px] font-medium text-purple-600">(Trade Licence, Emirates ID, or Passport)</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => { setExpired(false); setPage(1); }}
+            className="rounded-lg px-3 py-1 text-[12px] font-extrabold text-purple-700 hover:bg-purple-100 transition-colors"
+          >
+            Clear filter
+          </button>
+        </div>
+      )}
+
+      {/* Filter & review toolbar */}
       <Card>
         <div className="task-list-toolbar border-b border-slate-200 px-4 py-4 sm:px-5">
           {/* Header row: title + summary pills */}
