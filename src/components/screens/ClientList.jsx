@@ -654,7 +654,7 @@ export default function ClientList() {
                       "relative inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-[12px] font-extrabold transition-all duration-200",
                       isSelected
                         ? (isInactiveTab ? "bg-red-50 shadow-sm border border-red-100 text-red-600" : "bg-white shadow-sm border border-slate-200 text-slate-900")
-                        : "text-slate-500 hover:text-slate-700 border border-transparent",
+                        : "text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 border border-transparent",
                     ].join(" ")}
                   >
                     {/* Dot indicator for tabs */}
