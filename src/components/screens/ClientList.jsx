@@ -366,7 +366,7 @@ export default function ClientList() {
   const { state } = useApp();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { fetchClients, deleteClient, reactivateClient, exportClients } = useClients();
   // Tracks whether the list is displaying active or inactive clients.
   // Inactive clients are read-only and must be restored to edit.
@@ -501,11 +501,12 @@ export default function ClientList() {
     setExpiring(false);
     setColumnFilters(EMPTY_COLUMN_FILTERS);
     
-    // Clear URL parameters
-    const newParams = new URLSearchParams(searchParams);
-    newParams.delete("expired");
-    newParams.delete("expiring");
-    window.history.replaceState(null, "", "?" + newParams.toString());
+    // Clear URL parameters via React Router
+    setSearchParams((prev) => {
+      prev.delete("expired");
+      prev.delete("expiring");
+      return prev;
+    }, { replace: true });
   };
 
   const resetAllFilters = () => {
@@ -884,40 +885,6 @@ export default function ClientList() {
                   onChange={(e) => updateColumnFilter("compliance", e.target.value)}
                 />
               </div>
-            </FilterField>
-
-            <FilterField label="Expiry" htmlFor="client-filter-expiry">
-              <select
-                id="client-filter-expiry"
-                className="input"
-                value={expired ? "expired" : expiring ? "expiring" : ""}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setExpired(val === "expired");
-                  setExpiring(val === "expiring");
-                  setPage(1);
-                  
-                  // Keep URL searchParams in sync
-                  const newParams = new URLSearchParams(searchParams);
-                  if (val === "expired") {
-                    newParams.set("expired", "true");
-                    newParams.delete("expiring");
-                  } else if (val === "expiring") {
-                    newParams.set("expiring", "true");
-                    newParams.delete("expired");
-                  } else {
-                    newParams.delete("expired");
-                    newParams.delete("expiring");
-                  }
-                  // We don't call setSearchParams directly here because requestParams useEffect will handle the API call
-                  // but we should update the URL so it's bookmarkable.
-                  window.history.replaceState(null, "", "?" + newParams.toString());
-                }}
-              >
-                <option value="">All</option>
-                <option value="expired">Expired</option>
-                <option value="expiring">Expiring in 15 days</option>
-              </select>
             </FilterField>
 
             <FilterField label="Contact" htmlFor="client-filter-contact">
