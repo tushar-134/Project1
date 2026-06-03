@@ -64,7 +64,7 @@ const PAGE_SIZE = 20;
 const JURISDICTION_OPTIONS = ["Mainland", "Free Zone", "Designated Zone", "Offshore"];
 const TYPE_OPTIONS = ["Legal Person", "Natural Person"];
 
-function buildActiveFilterSummary(columnFilters, query) {
+function buildActiveFilterSummary(columnFilters, query, expired, expiring) {
   const chips = [];
   if (query.trim()) chips.push(`Search: ${query.trim()}`);
   if (columnFilters.client) chips.push(`Client: ${columnFilters.client}`);
@@ -72,7 +72,8 @@ function buildActiveFilterSummary(columnFilters, query) {
   if (columnFilters.type) chips.push(`Type: ${columnFilters.type}`);
   if (columnFilters.group) chips.push(`Group: ${columnFilters.group}`);
   if (columnFilters.compliance) chips.push(`VAT TRN: ${columnFilters.compliance}`);
-  if (columnFilters.licenceExpiry) chips.push(`Licence Expiry: ${columnFilters.licenceExpiry}`);
+  if (expired) chips.push("Expiry: Expired");
+  if (expiring) chips.push("Expiry: Expiring in 15 days");
   if (columnFilters.contact) chips.push(`Contact: ${columnFilters.contact}`);
   if (columnFilters.createdAt) chips.push(`Created: ${columnFilters.createdAt}`);
   if (columnFilters.createdBy) chips.push(`Created By: ${columnFilters.createdBy}`);
@@ -470,8 +471,11 @@ export default function ClientList() {
   }, [refetchClients, requestParams]);
 
   const rows = state.clients;
-  const activeColumnFilters = buildActiveFilterSummary(columnFilters, query);
-  const activeFilterCount = query.trim() ? activeColumnFilters.length - 1 : activeColumnFilters.length;
+  const activeFilterChips = useMemo(
+    () => buildActiveFilterSummary(columnFilters, query, expired, expiring),
+    [columnFilters, query, expired, expiring]
+  );
+  const activeFilterCount = activeFilterChips.length;
   const hasColumnFilters = activeFilterCount > 0;
   const hasActiveFilters = Boolean(query.trim()) || hasColumnFilters;
   const workingCount = rows.filter((c) => (c.activeTasks || 0) > 0).length;
@@ -492,13 +496,19 @@ export default function ClientList() {
   const clearColumnFilters = () => {
     setPage(1);
     setQuery("");
+    setExpired(false);
+    setExpiring(false);
     setColumnFilters(EMPTY_COLUMN_FILTERS);
+    
+    // Clear URL parameters
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete("expired");
+    newParams.delete("expiring");
+    window.history.replaceState(null, "", "?" + newParams.toString());
   };
 
   const resetAllFilters = () => {
-    setPage(1);
-    setQuery("");
-    setColumnFilters(EMPTY_COLUMN_FILTERS);
+    clearColumnFilters();
   };
 
   const updateColVisibility = useCallback((key, value) => {
@@ -838,14 +848,38 @@ export default function ClientList() {
               </div>
             </FilterField>
 
-            <FilterField label="Licence Expiry" htmlFor="client-filter-licence-expiry">
-              <input
-                id="client-filter-licence-expiry"
+            <FilterField label="Expiry" htmlFor="client-filter-expiry">
+              <select
+                id="client-filter-expiry"
                 className="input"
-                type="date"
-                value={columnFilters.licenceExpiry}
-                onChange={(e) => updateColumnFilter("licenceExpiry", e.target.value)}
-              />
+                value={expired ? "expired" : expiring ? "expiring" : ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setExpired(val === "expired");
+                  setExpiring(val === "expiring");
+                  setPage(1);
+                  
+                  // Keep URL searchParams in sync
+                  const newParams = new URLSearchParams(searchParams);
+                  if (val === "expired") {
+                    newParams.set("expired", "true");
+                    newParams.delete("expiring");
+                  } else if (val === "expiring") {
+                    newParams.set("expiring", "true");
+                    newParams.delete("expired");
+                  } else {
+                    newParams.delete("expired");
+                    newParams.delete("expiring");
+                  }
+                  // We don't call setSearchParams directly here because requestParams useEffect will handle the API call
+                  // but we should update the URL so it's bookmarkable.
+                  window.history.replaceState(null, "", "?" + newParams.toString());
+                }}
+              >
+                <option value="">All</option>
+                <option value="expired">Expired</option>
+                <option value="expiring">Expiring in 15 days</option>
+              </select>
             </FilterField>
 
             <FilterField label="Contact" htmlFor="client-filter-contact">
