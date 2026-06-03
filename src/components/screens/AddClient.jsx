@@ -288,12 +288,12 @@ export default function AddClient() {
     return ["United Arab Emirates", ...[...new Set(base)].filter((country) => country !== "United Arab Emirates")];
   }, []);
   const [isDirty, setIsDirty] = useState(false);
-  const [form, setFormRaw] = useState({
+  const [form, setFormData] = useState({
     clientType: "", fileNo: "", legalName: "", tradeName: "", fye: "Jan - Dec", jurisdiction: "Mainland", assigned: "",
     country: "United Arab Emirates", emirate: "Dubai", street: "", poBox: "", postalCode: "", differentAddress: false, correspondence: "",
     vatTrn: "", vatStatus: "Registered", vatDate: "", vatDeregDate: "", vatFreq: "Jan-Mar", vatRegistrationTask: "", vatRegistrationTaskId: "", ctTin: "", ctStatus: "Not Registered", ctDate: "", ctDeregDate: "", ctRegistrationTask: "", ctRegistrationTaskId: "", group: "", newGroup: "",
   });
-  const setForm = (val) => { setIsDirty(true); setFormRaw(val); };
+  const setForm = (val) => { setIsDirty(true); setFormData(val); };
   const vatFilingFrequencyOptions = useMemo(() => getVatFilingFrequencyOptions(form.fye), [form.fye]);
   const shouldShowVatRegistrationFields = form.vatStatus !== "Not Registered";
   const shouldShowCtRegistrationFields = form.ctStatus !== "Not Registered";
@@ -354,7 +354,7 @@ export default function AddClient() {
   const [isSaving, setIsSaving] = useState(false);
   const [drawerTaskId, setDrawerTaskId] = useState(null);
   const handledCreatedRegistrationTaskRef = useRef("");
-  const update = (key, value) => setFormRaw((f) => {
+  const update = (key, value) => setForm((f) => {
     setIsDirty(true);
     return { ...f, [key]: value };
   });
@@ -460,7 +460,7 @@ export default function AddClient() {
   }, [groupSearch, loadGroupOptions]);
 
   useEffect(() => {
-    setFormRaw((current) => {
+    setForm((current) => {
       const normalizedVatFrequency = normalizeVatFilingFrequency(current.vatFreq, current.fye);
       return normalizedVatFrequency === current.vatFreq ? current : { ...current, vatFreq: normalizedVatFrequency };
     });
@@ -469,7 +469,7 @@ export default function AddClient() {
   // ── Pre-fill form when arriving from a "Convert to Client" visit flow ──
   useEffect(() => {
     if (isEditMode || !visitNewClient) return;
-    setFormRaw((current) => ({
+    setForm((current) => ({
       ...current,
       legalName: visitNewClient.authorityName || current.legalName,
       tradeName: visitNewClient.authorityName || current.tradeName,
@@ -512,7 +512,7 @@ export default function AddClient() {
       const nextCtStatus = apiCtStatus === "registered" ? "Registered" : apiCtStatus === "deregistered" ? "Deregistered" : "Not Registered";
       const nextCtRegistrationTask = createdRegistrationTask?.taxType === "ct" ? createdRegistrationTask.taskMongoId || "" : client.ctDetails?.registrationTask || "";
       const nextCtRegistrationTaskId = createdRegistrationTask?.taxType === "ct" ? createdRegistrationTask.taskId || "" : client.ctDetails?.registrationTaskId || "";
-      setFormRaw({
+      setFormData({
         clientType: client.clientType === "natural" ? "Natural Person" : "Legal Person",
         fileNo: client.fileNo || "",
         legalName: client.legalName || "",
