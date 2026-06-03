@@ -849,39 +849,6 @@ export default function ClientList() {
               </div>
             </FilterField>
 
-            <FilterField label="Expiry" htmlFor="client-filter-expiry">
-              <select
-                id="client-filter-expiry"
-                className="input"
-                value={expired ? "expired" : expiring ? "expiring" : ""}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setExpired(val === "expired");
-                  setExpiring(val === "expiring");
-                  setPage(1);
-                  
-                  // Keep URL searchParams in sync via React Router
-                  setSearchParams((prev) => {
-                    if (val === "expired") {
-                      prev.set("expired", "true");
-                      prev.delete("expiring");
-                    } else if (val === "expiring") {
-                      prev.set("expiring", "true");
-                      prev.delete("expired");
-                    } else {
-                      prev.delete("expired");
-                      prev.delete("expiring");
-                    }
-                    return prev;
-                  }, { replace: true });
-                }}
-              >
-                <option value="">All</option>
-                <option value="expired">Expired</option>
-                <option value="expiring">Expiring in 15 days</option>
-              </select>
-            </FilterField>
-
             <FilterField label="Contact" htmlFor="client-filter-contact">
               <div className="task-list-input-wrap">
                 <Search size={14} className="task-list-input-icon" aria-hidden="true" />
