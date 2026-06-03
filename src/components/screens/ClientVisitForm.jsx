@@ -184,7 +184,7 @@ export default function ClientVisitForm() {
     if (form.clientType !== "existing" || !form.clientId) return;
     const client = state.clients.find((entry) => String(entry._id || entry.id) === String(form.clientId));
     if (!client) return;
-    setFormRaw((current) => {
+    setForm((current) => {
       const assignedId = client.assignedUser?._id || client.assignedUser || "";
       const nextAssignedUsers = assignedId && currentUser?.role !== "task_only"
         ? current.assignedUsers.includes(assignedId) ? current.assignedUsers : [...current.assignedUsers, assignedId]
