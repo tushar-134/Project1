@@ -112,7 +112,7 @@ export default function ClientVisitForm() {
   useEffect(() => {
     if (!hasFetchedClients.current) {
       hasFetchedClients.current = true;
-      fetchClients({ limit: 10 }).catch(() => toast.error("Unable to load clients."));
+      fetchClients({ limit: 5000, status: "active" }).catch(() => toast.error("Unable to load clients."));
     }
   }, [fetchClients]);
 
