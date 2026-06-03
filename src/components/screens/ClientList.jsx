@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronLeft, ChevronRight, Columns, Download, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X, CalendarClock } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Columns, Download, RefreshCw, RotateCcw, Search, SlidersHorizontal, Trash2, Upload, X, CalendarClock } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -367,7 +367,10 @@ export default function ClientList() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { fetchClients, deleteClient, exportClients } = useClients();
+  const { fetchClients, deleteClient, reactivateClient, exportClients } = useClients();
+  // Tracks whether the list is displaying active or inactive clients.
+  // Inactive clients are read-only and must be restored to edit.
+  const [clientStatus, setClientStatus] = useState("Active");
   const [query, setQuery] = useState(searchParams.get("search") || "");
   const [expired, setExpired] = useState(searchParams.get("expired") === "true");
   const [expiring, setExpiring] = useState(searchParams.get("expiring") === "true");
@@ -431,6 +434,7 @@ export default function ClientList() {
   const requestParams = useMemo(() => ({
     page,
     limit: PAGE_SIZE,
+    status: clientStatus,
     search: deferredQuery.trim() || undefined,
     client: deferredColumnFilters.client.trim() || undefined,
     jurisdiction: deferredColumnFilters.jurisdiction || undefined,
@@ -440,10 +444,7 @@ export default function ClientList() {
     contact: deferredColumnFilters.contact.trim() || undefined,
     createdAt: deferredColumnFilters.createdAt || undefined,
     createdBy: deferredColumnFilters.createdBy.trim() || undefined,
-    status: deferredColumnFilters.status || undefined,
-    expired: expired ? "true" : undefined,
-    expiring: expiring ? "true" : undefined,
-  }), [deferredColumnFilters, deferredQuery, page, expired, expiring]);
+  }), [deferredColumnFilters, deferredQuery, page, clientStatus, expired, expiring]);
 
   const filterRef = useRef(requestParams);
   filterRef.current = requestParams;
@@ -518,6 +519,7 @@ export default function ClientList() {
 
   // Build the `columns` param for the Excel export — only server-mappable keys that are visible
   const buildExportParams = () => ({
+    status: clientStatus,
     search: deferredQuery.trim() || undefined,
     client: deferredColumnFilters.client.trim() || undefined,
     jurisdiction: deferredColumnFilters.jurisdiction || undefined,
@@ -558,6 +560,16 @@ export default function ClientList() {
     const params = { ...buildExportParams(), columns: cols || undefined };
     setIsExportModalOpen(false);
     downloadBlob(await exportClients(params), "clients_selected.xlsx");
+  };
+
+  const isInactiveMode = clientStatus === "Inactive";
+
+  // Switches between active/inactive list modes, resetting filters and pagination
+  const handleStatusToggle = (status) => {
+    setPage(1);
+    setClientStatus(status);
+    setQuery("");
+    setColumnFilters(EMPTY_COLUMN_FILTERS);
   };
 
   return (
@@ -615,6 +627,32 @@ export default function ClientList() {
               <p className="mt-1 text-[12px] font-medium text-slate-500">
                 Use the filters below to narrow the client list by name, type, jurisdiction, group, or contact details.
               </p>
+            </div>
+
+            {/* Active / Inactive pill toggle */}
+            <div
+              className="inline-flex items-center rounded-full p-1"
+              style={{ background: isInactiveMode ? "#dc2626" : "#1e3a8a" }}
+              role="group"
+              aria-label="Client status filter"
+            >
+              {["Active", "Inactive"].map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  id={`client-status-toggle-${s.toLowerCase()}`}
+                  onClick={() => handleStatusToggle(s)}
+                  className={[
+                    "rounded-full px-5 py-1.5 text-[13px] font-extrabold transition-all duration-200",
+                    clientStatus === s
+                      ? "bg-white shadow-sm"
+                      : "text-white/90 hover:text-white",
+                  ].join(" ")}
+                  style={clientStatus === s ? { color: isInactiveMode ? "#dc2626" : "#1e3a8a" } : {}}
+                >
+                  {s}
+                </button>
+              ))}
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -965,14 +1003,24 @@ export default function ClientList() {
                     <button
                       type="button"
                       className="task-id-link font-extrabold text-left"
-                      onClick={() => client.isDraft ? navigate(`/clients/edit/${client.id}`) : setDrawerClientId(client.id)}
-                      title={client.isDraft ? "Resume incomplete client" : "Open client details"}
+                      onClick={() => isInactiveMode
+                        ? setDrawerClientId(client.id)
+                        : client.isDraft
+                          ? navigate(`/clients/edit/${client.id}`)
+                          : setDrawerClientId(client.id)
+                      }
+                      title={isInactiveMode ? "View client details (read-only)" : client.isDraft ? "Resume incomplete client" : "Open client details"}
                     >
                       {client.name}
                     </button>
                     <div className="mt-1 flex flex-wrap gap-2">
                       <span className="text-[12px] font-semibold text-slate-500">{client.jurisdiction}</span>
-                      {client.isDraft && (
+                      {isInactiveMode && (
+                        <Badge color="bg-red-100 text-red-700">
+                          Inactive
+                        </Badge>
+                      )}
+                      {!isInactiveMode && client.isDraft && (
                         <Badge color="bg-amber-100 text-amber-700">
                           Incomplete
                         </Badge>
@@ -980,6 +1028,11 @@ export default function ClientList() {
                       <Badge color={client.type === "Legal Person" ? "bg-blue-50 text-[#1e3a8a]" : "bg-emerald-50 text-[#059669]"}>
                         {client.type}
                       </Badge>
+                      {!isInactiveMode && client.activeTasks > 0 && (
+                        <span className="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-extrabold text-amber-700">
+                          {client.activeTasks} active {client.activeTasks === 1 ? "task" : "tasks"}
+                        </span>
+                      )}
                       {(client.expiredDocs || []).map((doc, idx) => (
                         <span
                           key={idx}
@@ -1039,7 +1092,30 @@ export default function ClientList() {
                 {canManage && (
                   <td>
                     <div className="flex gap-1">
-                      {currentUser?.role === "admin" && client.isActive !== false && (
+                      {/* Inactive mode: show Restore button */}
+                      {isInactiveMode && currentUser?.role === "admin" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          title="Reactivate this client"
+                          onClick={async () => {
+                            if (confirm("Reactivate this client?")) {
+                              try {
+                                await reactivateClient(client._id);
+                                refetchClients().catch(() => {});
+                              } catch (_) {
+                                alert("Failed to reactivate client. Please try again.");
+                              }
+                            }
+                          }}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[12px] font-bold text-emerald-700 hover:bg-emerald-100"
+                        >
+                          <RotateCcw size={13} />
+                          Restore
+                        </Button>
+                      )}
+                      {/* Active mode: show Delete button */}
+                      {!isInactiveMode && currentUser?.role === "admin" && (
                         <Button
                           size="sm"
                           variant="danger"
@@ -1102,7 +1178,7 @@ export default function ClientList() {
         )}
       </Card>
 
-      {drawerClientId && <ClientDrawer clientId={drawerClientId} onClose={() => setDrawerClientId(null)} />}
+      {drawerClientId && <ClientDrawer clientId={drawerClientId} isInactive={isInactiveMode} onClose={() => setDrawerClientId(null)} onReactivate={() => { setDrawerClientId(null); refetchClients().catch(() => {}); }} />}
       <ExportModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}

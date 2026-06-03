@@ -1,4 +1,4 @@
-import { Building2, Clock, ExternalLink, FileText, Mail, MapPin, Phone, User, UserCheck, X, Globe, SlidersHorizontal, ShieldCheck, BadgeCheck } from "lucide-react";
+import { Building2, Clock, ExternalLink, FileText, Lock, Mail, MapPin, Phone, RotateCcw, User, UserCheck, X, Globe, SlidersHorizontal, ShieldCheck, BadgeCheck } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
@@ -108,13 +108,17 @@ function DetailRow({ label, value, className = "", rowRef }) {
   );
 }
 
-export default function ClientDrawer({ clientId, onClose, expiryFocus = null }) {
+// ClientDrawer displays client details in a slide-out panel.
+// Accepts an `isInactive` flag to enforce read-only mode, and
+// `onReactivate` callback to refresh the parent view after a client is restored.
+export default function ClientDrawer({ clientId, onClose, expiryFocus = null, isInactive = false, onReactivate = null }) {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const canManage = canManageClients(currentUser?.role);
   const [client, setClient] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [restoring, setRestoring] = useState(false);
   const expiryRefs = useRef({});
   const [highlightedExpiryKey, setHighlightedExpiryKey] = useState("");
 
@@ -196,7 +200,42 @@ export default function ClientDrawer({ clientId, onClose, expiryFocus = null }) 
             {client?.fileNo && <div className="mt-1 text-[12px] font-semibold text-slate-500">File No: {client.fileNo}</div>}
           </div>
           <div className="flex items-center gap-2">
-            {client && canManage && (
+            {/* Inactive: show locked edit + restore button */}
+            {isInactive && client && canManage && (
+              <>
+                <span
+                  title="Reactivate client to edit"
+                  className="inline-flex h-8 cursor-not-allowed items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 text-[12px] font-bold text-slate-400"
+                >
+                  <Lock size={13} />
+                  Edit locked
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={restoring}
+                  onClick={async () => {
+                    if (!confirm("Reactivate this client?")) return;
+                    setRestoring(true);
+                    try {
+                      await clientService.reactivate(client._id);
+                      if (onReactivate) onReactivate();
+                      onClose?.();
+                    } catch (_) {
+                      alert("Failed to reactivate. Please try again.");
+                    } finally {
+                      setRestoring(false);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[12px] font-bold text-emerald-700 hover:bg-emerald-100"
+                >
+                  <RotateCcw size={13} className={restoring ? "animate-spin" : ""} />
+                  {restoring ? "Restoring…" : "Restore"}
+                </Button>
+              </>
+            )}
+            {/* Active: show View more / Edit button */}
+            {!isInactive && client && canManage && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -214,6 +253,15 @@ export default function ClientDrawer({ clientId, onClose, expiryFocus = null }) 
             </button>
           </div>
         </div>
+        {/* Read-only banner for inactive clients */}
+        {isInactive && (
+          <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-5 py-2">
+            <Lock size={13} className="shrink-0 text-amber-600" />
+            <span className="text-[12px] font-bold text-amber-700">
+              This client is inactive. Restore to enable editing.
+            </span>
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto px-5 py-5">
           {loading ? (
