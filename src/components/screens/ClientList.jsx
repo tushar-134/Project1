@@ -434,7 +434,8 @@ export default function ClientList() {
   const requestParams = useMemo(() => ({
     page,
     limit: PAGE_SIZE,
-    status: clientStatus,
+    // Backend expects lowercase status: 'active' | 'inactive'
+    status: clientStatus.toLowerCase(),
     search: deferredQuery.trim() || undefined,
     client: deferredColumnFilters.client.trim() || undefined,
     jurisdiction: deferredColumnFilters.jurisdiction || undefined,
@@ -521,7 +522,8 @@ export default function ClientList() {
 
   // Build the `columns` param for the Excel export — only server-mappable keys that are visible
   const buildExportParams = () => ({
-    status: clientStatus,
+    // Backend expects lowercase status: 'active' | 'inactive'
+    status: clientStatus.toLowerCase(),
     search: deferredQuery.trim() || undefined,
     client: deferredColumnFilters.client.trim() || undefined,
     jurisdiction: deferredColumnFilters.jurisdiction || undefined,
@@ -564,7 +566,8 @@ export default function ClientList() {
     downloadBlob(await exportClients(params), "clients_selected.xlsx");
   };
 
-  const isInactiveMode = clientStatus === "Inactive";
+  // Derived flag used by the UI to render read-only states, badges and the Restore button
+  const isInactiveMode = clientStatus.toLowerCase() === "inactive";
 
   // Switches between active/inactive list modes, resetting filters and pagination
   const handleStatusToggle = (status) => {
@@ -631,30 +634,41 @@ export default function ClientList() {
               </p>
             </div>
 
-            {/* Active / Inactive pill toggle */}
+            {/* Active / Inactive segmented control */}
             <div
-              className="inline-flex items-center rounded-full p-1"
-              style={{ background: isInactiveMode ? "#dc2626" : "#1e3a8a" }}
+              className="inline-flex items-center gap-0.5 rounded-xl border border-slate-200 bg-slate-100/80 p-1 shadow-sm"
               role="group"
               aria-label="Client status filter"
             >
-              {["Active", "Inactive"].map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  id={`client-status-toggle-${s.toLowerCase()}`}
-                  onClick={() => handleStatusToggle(s)}
-                  className={[
-                    "rounded-full px-5 py-1.5 text-[13px] font-extrabold transition-all duration-200",
-                    clientStatus === s
-                      ? "bg-white shadow-sm"
-                      : "text-white/90 hover:text-white",
-                  ].join(" ")}
-                  style={clientStatus === s ? { color: isInactiveMode ? "#dc2626" : "#1e3a8a" } : {}}
-                >
-                  {s}
-                </button>
-              ))}
+              {["Active", "Inactive"].map((s) => {
+                const isSelected = clientStatus === s;
+                const isInactive = s === "Inactive";
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    id={`client-status-toggle-${s.toLowerCase()}`}
+                    onClick={() => handleStatusToggle(s)}
+                    className={[
+                      "relative inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-[12px] font-extrabold transition-all duration-200",
+                      isSelected
+                        ? "bg-white shadow-sm " + (isInactive ? "text-red-600" : "text-slate-900")
+                        : "text-slate-500 hover:text-slate-700",
+                    ].join(" ")}
+                  >
+                    {/* Red dot indicator for Inactive tab */}
+                    {isInactive && (
+                      <span
+                        className={[
+                          "inline-block h-1.5 w-1.5 rounded-full transition-all duration-200",
+                          isSelected ? "bg-red-500" : "bg-slate-400",
+                        ].join(" ")}
+                      />
+                    )}
+                    {s}
+                  </button>
+                );
+              })}
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -941,6 +955,15 @@ export default function ClientList() {
       </Card>
 
       {/* Client table */}
+      {/* Inactive mode banner — reminds the user they are viewing read-only archived clients */}
+      {isInactiveMode && (
+        <div className="flex items-center gap-2.5 rounded-xl border border-red-100 bg-red-50/70 px-4 py-2.5">
+          <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-red-400" />
+          <span className="text-[12px] font-bold text-red-700">
+            Viewing inactive clients — editing is disabled. Use the <strong>Restore</strong> button to reactivate a client.
+          </span>
+        </div>
+      )}
       <Card className="overflow-hidden">
         <Table>
           <thead>

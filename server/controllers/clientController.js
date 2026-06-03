@@ -484,7 +484,9 @@ exports.listClients = async (req, res, next) => {
 exports.getClient = async (req, res, next) => {
   try {
     const client = await Client.findById(req.params.id).populate(populateClient);
-    if (!client || !client.isActive) return res.status(404).json({ message: "Client not found" });
+    // Allow fetching inactive clients so the detail drawer can show read-only info
+    // and the Restore action can be triggered from within the drawer.
+    if (!client) return res.status(404).json({ message: "Client not found" });
     if (req.user.role === "task_only") {
       // task_only users may only access a client if they have at least one task assigned to them for that client.
       const hasTask = await Task.exists({ client: client._id, assignedTo: req.user._id });
