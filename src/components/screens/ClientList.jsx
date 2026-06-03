@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronLeft, ChevronRight, Columns, Download, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Columns, Download, RefreshCw, RotateCcw, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -362,7 +362,8 @@ export default function ClientList() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { fetchClients, deleteClient, exportClients } = useClients();
+  const { fetchClients, deleteClient, reactivateClient, exportClients } = useClients();
+  const [clientStatus, setClientStatus] = useState("Active");
   const [query, setQuery] = useState(searchParams.get("search") || "");
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1, workingTasksTotal: 0 });
@@ -413,6 +414,7 @@ export default function ClientList() {
   const requestParams = useMemo(() => ({
     page,
     limit: PAGE_SIZE,
+    status: clientStatus,
     search: deferredQuery.trim() || undefined,
     client: deferredColumnFilters.client.trim() || undefined,
     jurisdiction: deferredColumnFilters.jurisdiction || undefined,
@@ -422,7 +424,7 @@ export default function ClientList() {
     contact: deferredColumnFilters.contact.trim() || undefined,
     createdAt: deferredColumnFilters.createdAt || undefined,
     createdBy: deferredColumnFilters.createdBy.trim() || undefined,
-  }), [deferredColumnFilters, deferredQuery, page]);
+  }), [deferredColumnFilters, deferredQuery, page, clientStatus]);
 
   const filterRef = useRef(requestParams);
   filterRef.current = requestParams;
@@ -480,6 +482,7 @@ export default function ClientList() {
 
   // Build the `columns` param for the Excel export — only server-mappable keys that are visible
   const buildExportParams = () => ({
+    status: clientStatus,
     search: deferredQuery.trim() || undefined,
     client: deferredColumnFilters.client.trim() || undefined,
     jurisdiction: deferredColumnFilters.jurisdiction || undefined,
@@ -522,6 +525,15 @@ export default function ClientList() {
     downloadBlob(await exportClients(params), "clients_selected.xlsx");
   };
 
+  const isInactiveMode = clientStatus === "Inactive";
+
+  const handleStatusToggle = (status) => {
+    setPage(1);
+    setClientStatus(status);
+    setQuery("");
+    setColumnFilters(EMPTY_COLUMN_FILTERS);
+  };
+
   return (
     <div className="space-y-5">
 
@@ -538,6 +550,32 @@ export default function ClientList() {
               <p className="mt-1 text-[12px] font-medium text-slate-500">
                 Use the filters below to narrow the client list by name, type, jurisdiction, group, or contact details.
               </p>
+            </div>
+
+            {/* Active / Inactive pill toggle */}
+            <div
+              className="inline-flex items-center rounded-full p-1"
+              style={{ background: isInactiveMode ? "#dc2626" : "#1e3a8a" }}
+              role="group"
+              aria-label="Client status filter"
+            >
+              {["Active", "Inactive"].map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  id={`client-status-toggle-${s.toLowerCase()}`}
+                  onClick={() => handleStatusToggle(s)}
+                  className={[
+                    "rounded-full px-5 py-1.5 text-[13px] font-extrabold transition-all duration-200",
+                    clientStatus === s
+                      ? "bg-white shadow-sm"
+                      : "text-white/90 hover:text-white",
+                  ].join(" ")}
+                  style={clientStatus === s ? { color: isInactiveMode ? "#dc2626" : "#1e3a8a" } : {}}
+                >
+                  {s}
+                </button>
+              ))}
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
