@@ -1110,7 +1110,7 @@ export default function AddClient() {
         assignedUser: form.assigned || undefined,
         registeredAddress: { country: form.country, emirate: form.emirate, street: form.street, poBox: form.poBox, postalCode: form.postalCode },
         correspondenceAddress: form.differentAddress ? { street: form.correspondence } : undefined,
-        group: form.group || undefined,
+        group: form.group || null,
         portalLogins: portals
           .filter((p) => [p.name, p.url, p.username, p.password, p.notes].some((value) => String(value || "").trim()))
           .map((p) => ({ portalName: p.name, portalUrl: p.url, username: p.username, password: p.password, notes: p.notes })),
