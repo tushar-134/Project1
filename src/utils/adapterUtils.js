@@ -117,10 +117,11 @@ export function mapTask(task) {
 }
 
 export function mapFtaTask(task) {
+  const ftaStat = task.ftaStatus || "in_review";
   return {
     ...mapTask(task),
     submitted: task.ftaSubmittedDate?.slice?.(0, 10) || task.createdAt?.slice?.(0, 10),
-    status: ftaStatusFromApi[task.ftaStatus] || task.ftaStatus,
+    status: ftaStatusFromApi[ftaStat] || ftaStat,
   };
 }
 
