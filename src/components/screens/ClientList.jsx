@@ -652,7 +652,6 @@ export default function ClientList() {
                       ? "bg-white shadow-sm"
                       : "text-white/90 hover:text-white",
                   ].join(" ")}
-                  style={clientStatus === s ? { color: isInactiveMode ? "#dc2626" : "#1e3a8a" } : {}}
                 >
                   {s}
                 </button>
