@@ -206,7 +206,7 @@ export default function TopBar({ title, navOpen = false, onMenuClick }) {
             onClose={() => setExpiryOpen(false)}
             onOpenClient={(clientId) => {
               setExpiryOpen(false);
-              navigate(`/clients/list?highlight=${clientId}`);
+              setTimeout(() => navigate(`/clients/list?highlight=${clientId}`), 0);
             }}
             payload={expiryPayload}
             loading={expiryLoading}
