@@ -37,7 +37,7 @@ const TABS = [
   {
     id: "in_review",
     label: "In Review",
-    statusMatch: "In Review",
+    statusMatch: "In review",
     icon: Clock,
     color: "#1e3a8a",
     bg: "bg-blue-50",
@@ -49,7 +49,7 @@ const TABS = [
   {
     id: "additional_query",
     label: "Additional Query (FTA)",
-    statusMatch: "Additional Query From FTA",
+    statusMatch: "Additional query from FTA",
     icon: AlertCircle,
     color: "#d97706",
     bg: "bg-yellow-50",
@@ -115,8 +115,8 @@ export default function FtaTracker() {
     return true;
   });
 
-  const tabItems = filtered.filter((item) => item.status === currentTab.statusMatch);
-  const countFor = (tab) => filtered.filter((item) => item.status === tab.statusMatch).length;
+  const tabItems = filtered.filter((item) => item.status?.toLowerCase() === currentTab.statusMatch?.toLowerCase());
+  const countFor = (tab) => filtered.filter((item) => item.status?.toLowerCase() === tab.statusMatch?.toLowerCase()).length;
 
   const activeFilterSummary = buildFilterSummary(filters);
   const hasFilters = activeFilterSummary.length > 0;
