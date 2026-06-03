@@ -19,8 +19,8 @@ const VISIT_TYPES = [
   "Verification",
   "Onboarding Discussion",
   "Follow Up",
-  "Collection",
-  "Meeting",
+  "Monthly Visit",
+  "General Meeting",
 ];
 
 function getErrors(req, res) {

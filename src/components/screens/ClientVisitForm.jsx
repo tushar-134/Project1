@@ -16,7 +16,7 @@ import ClientComboBox from "../ui/ClientComboBox.jsx";
 import UserAvatar from "../ui/UserAvatar.jsx";
 
 
-const visitTypes = ["Requirement Gathering", "Verification", "Onboarding Discussion", "Follow Up", "Collection", "Meeting"];
+const visitTypes = ["Requirement Gathering", "Verification", "Onboarding Discussion", "Follow Up", "Monthly Visit", "General Meeting"];
 
 function todayValue() {
   const date = new Date();
