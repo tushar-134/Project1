@@ -175,7 +175,10 @@ export default function Dashboard() {
         <div className="relative flex items-center gap-2" ref={settingsRef}>
           <div className="flex h-9 items-center overflow-hidden rounded-lg border border-[#e2e8f0] bg-white">
             <button onClick={() => moveMonth(-1)} className="grid h-9 w-9 place-items-center hover:bg-slate-50"><ChevronLeft size={16} /></button>
-            <div className="min-w-36 px-3 text-center text-[12px] font-extrabold">{monthText}</div>
+            <div className="flex min-w-36 items-center justify-center gap-1.5 px-3 text-[12px] font-extrabold">
+              <CalendarDays size={14} className="text-slate-400" />
+              <span>{monthText}</span>
+            </div>
             <button onClick={() => moveMonth(1)} className="grid h-9 w-9 place-items-center hover:bg-slate-50"><ChevronRight size={16} /></button>
           </div>
           <button
