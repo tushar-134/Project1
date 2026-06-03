@@ -108,6 +108,9 @@ function DetailRow({ label, value, className = "", rowRef }) {
   );
 }
 
+// ClientDrawer displays client details in a slide-out panel.
+// Accepts an `isInactive` flag to enforce read-only mode, and
+// `onReactivate` callback to refresh the parent view after a client is restored.
 export default function ClientDrawer({ clientId, onClose, expiryFocus = null, isInactive = false, onReactivate = null }) {
   const navigate = useNavigate();
   const { currentUser } = useAuth();

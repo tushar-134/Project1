@@ -363,6 +363,8 @@ export default function ClientList() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { fetchClients, deleteClient, reactivateClient, exportClients } = useClients();
+  // Tracks whether the list is displaying active or inactive clients.
+  // Inactive clients are read-only and must be restored to edit.
   const [clientStatus, setClientStatus] = useState("Active");
   const [query, setQuery] = useState(searchParams.get("search") || "");
   const [page, setPage] = useState(1);
@@ -527,6 +529,7 @@ export default function ClientList() {
 
   const isInactiveMode = clientStatus === "Inactive";
 
+  // Switches between active/inactive list modes, resetting filters and pagination
   const handleStatusToggle = (status) => {
     setPage(1);
     setClientStatus(status);
