@@ -6,8 +6,6 @@ import UsersScreen from "./Users.jsx";
 import CustomFieldsScreen from "./CustomFields.jsx";
 import ClientGroupsScreen from "./ClientGroups.jsx";
 import CategoriesScreen from "./Categories.jsx";
-import InactiveClientsScreen from "./InactiveClients.jsx";
-import { canManageClients } from "../../utils/permissions.js";
 
 const SETTINGS_SIDEBAR_KEY = "filingBuddySettingsSidebarOpen";
 
@@ -21,8 +19,6 @@ function buildTabs(role) {
     tabs.push({ id: "groups", label: "Client Groups", description: "Organise clients into logical business groups", icon: Folders, category: "Client Organisation", component: ClientGroupsScreen });
   if (canManageCategories(role))
     tabs.push({ id: "categories", label: "Categories & Types", description: "Manage task categories and their associated task types", icon: Boxes, category: "Task Taxonomy", component: CategoriesScreen });
-  if (canManageClients(role))
-    tabs.push({ id: "inactive-clients", label: "Inactive Clients", description: "View and restore deleted clients", icon: Archive, category: "Management", component: InactiveClientsScreen });
   return tabs;
 }
 
