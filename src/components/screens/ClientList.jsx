@@ -366,7 +366,7 @@ export default function ClientList() {
   const { state } = useApp();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { fetchClients, deleteClient, exportClients } = useClients();
   const [query, setQuery] = useState(searchParams.get("search") || "");
   const [expired, setExpired] = useState(searchParams.get("expired") === "true");
@@ -500,11 +500,12 @@ export default function ClientList() {
     setExpiring(false);
     setColumnFilters(EMPTY_COLUMN_FILTERS);
     
-    // Clear URL parameters
-    const newParams = new URLSearchParams(searchParams);
-    newParams.delete("expired");
-    newParams.delete("expiring");
-    window.history.replaceState(null, "", "?" + newParams.toString());
+    // Clear URL parameters via React Router
+    setSearchParams((prev) => {
+      prev.delete("expired");
+      prev.delete("expiring");
+      return prev;
+    }, { replace: true });
   };
 
   const resetAllFilters = () => {
@@ -859,21 +860,20 @@ export default function ClientList() {
                   setExpiring(val === "expiring");
                   setPage(1);
                   
-                  // Keep URL searchParams in sync
-                  const newParams = new URLSearchParams(searchParams);
-                  if (val === "expired") {
-                    newParams.set("expired", "true");
-                    newParams.delete("expiring");
-                  } else if (val === "expiring") {
-                    newParams.set("expiring", "true");
-                    newParams.delete("expired");
-                  } else {
-                    newParams.delete("expired");
-                    newParams.delete("expiring");
-                  }
-                  // We don't call setSearchParams directly here because requestParams useEffect will handle the API call
-                  // but we should update the URL so it's bookmarkable.
-                  window.history.replaceState(null, "", "?" + newParams.toString());
+                  // Keep URL searchParams in sync via React Router
+                  setSearchParams((prev) => {
+                    if (val === "expired") {
+                      prev.set("expired", "true");
+                      prev.delete("expiring");
+                    } else if (val === "expiring") {
+                      prev.set("expiring", "true");
+                      prev.delete("expired");
+                    } else {
+                      prev.delete("expired");
+                      prev.delete("expiring");
+                    }
+                    return prev;
+                  }, { replace: true });
                 }}
               >
                 <option value="">All</option>
