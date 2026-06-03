@@ -623,51 +623,43 @@ export default function ClientList() {
           {/* Header row: title + summary pills */}
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-2xl">
-              <div className="flex items-center gap-2 text-[14px] font-extrabold text-slate-900">
-                <SlidersHorizontal size={16} className="text-[#1e3a8a]" />
-                Filter and review clients
+              <div className="flex items-center flex-wrap gap-4 text-[14px] font-extrabold text-slate-900">
+                <div className="flex items-center gap-2">
+                  <SlidersHorizontal size={16} className="text-[#1e3a8a]" />
+                  Filter and review clients
+                </div>
+                {/* Active / Inactive pill toggle (moved to left) */}
+                <div
+                  className="inline-flex items-center rounded-full p-1"
+                  style={{ background: isInactiveMode ? "#dc2626" : "#1e3a8a" }}
+                  role="group"
+                  aria-label="Client status filter"
+                >
+                  {["Active", "Inactive"].map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      id={`client-status-toggle-${s.toLowerCase()}`}
+                      onClick={() => handleStatusToggle(s)}
+                      className={[
+                        "rounded-full px-5 py-1.5 text-[13px] font-extrabold transition-all duration-200",
+                        clientStatus === s
+                          ? "bg-white shadow-sm"
+                          : "text-white/90 hover:text-white",
+                      ].join(" ")}
+                      style={clientStatus === s ? { color: isInactiveMode ? "#dc2626" : "#1e3a8a" } : {}}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
               </div>
               <p className="mt-1 text-[12px] font-medium text-slate-500">
                 Use the filters below to narrow the client list by name, type, jurisdiction, group, or contact details.
               </p>
             </div>
 
-            {/* Active / Inactive segmented control */}
-            <div
-              className="inline-flex items-center gap-0.5 rounded-xl border border-slate-200 bg-slate-100/80 p-1 shadow-sm"
-              role="group"
-              aria-label="Client status filter"
-            >
-              {["Active", "Inactive"].map((s) => {
-                const isSelected = clientStatus === s;
-                const isInactive = s === "Inactive";
-                return (
-                  <button
-                    key={s}
-                    type="button"
-                    id={`client-status-toggle-${s.toLowerCase()}`}
-                    onClick={() => handleStatusToggle(s)}
-                    className={[
-                      "relative inline-flex items-center gap-1.5 rounded-lg px-4 py-1.5 text-[12px] font-extrabold transition-all duration-200",
-                      isSelected
-                        ? "bg-white shadow-sm " + (isInactive ? "text-red-600" : "text-slate-900")
-                        : "text-slate-500 hover:text-slate-700",
-                    ].join(" ")}
-                  >
-                    {/* Red dot indicator for Inactive tab */}
-                    {isInactive && (
-                      <span
-                        className={[
-                          "inline-block h-1.5 w-1.5 rounded-full transition-all duration-200",
-                          isSelected ? "bg-red-500" : "bg-slate-400",
-                        ].join(" ")}
-                      />
-                    )}
-                    {s}
-                  </button>
-                );
-              })}
-            </div>
+
 
             <div className="flex flex-wrap items-center gap-2">
               <InfoPill tone="slate" label={`${meta.total} total`} />
