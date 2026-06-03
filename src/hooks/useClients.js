@@ -26,8 +26,8 @@ export function useClients() {
     createClient: clientService.create,
     updateClient: clientService.update,
     deleteClient: clientService.remove,
-    // Reactivates an inactive client so they can be edited again
-    reactivateClient: clientService.reactivate,
+    // Restores an inactive client so they can be edited again
+    restoreClient: clientService.restore,
     bulkUpload: clientService.bulkUpload,
     exportClients: clientService.export,
     uploadAttachment: clientService.uploadAttachment,
