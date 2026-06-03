@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronLeft, ChevronRight, Columns, Download, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Columns, Download, RefreshCw, Search, SlidersHorizontal, Trash2, Upload, X, CalendarClock } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -369,6 +369,7 @@ export default function ClientList() {
   const { fetchClients, deleteClient, exportClients } = useClients();
   const [query, setQuery] = useState(searchParams.get("search") || "");
   const [expired, setExpired] = useState(searchParams.get("expired") === "true");
+  const [expiring, setExpiring] = useState(searchParams.get("expiring") === "true");
   const [highlightClientId, setHighlightClientId] = useState(searchParams.get("highlight") || "");
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1, workingTasksTotal: 0 });
@@ -377,6 +378,7 @@ export default function ClientList() {
   // Sync state with URL params in case they change without a full remount
   useEffect(() => {
     setExpired(searchParams.get("expired") === "true");
+    setExpiring(searchParams.get("expiring") === "true");
     if (searchParams.has("search")) {
       setQuery(searchParams.get("search") || "");
     }
@@ -439,7 +441,8 @@ export default function ClientList() {
     createdBy: deferredColumnFilters.createdBy.trim() || undefined,
     status: deferredColumnFilters.status || undefined,
     expired: expired ? "true" : undefined,
-  }), [deferredColumnFilters, deferredQuery, page, expired]);
+    expiring: expiring ? "true" : undefined,
+  }), [deferredColumnFilters, deferredQuery, page, expired, expiring]);
 
   const filterRef = useRef(requestParams);
   filterRef.current = requestParams;
@@ -563,6 +566,25 @@ export default function ClientList() {
             type="button"
             onClick={() => { setExpired(false); setPage(1); }}
             className="rounded-lg px-3 py-1 text-[12px] font-extrabold text-purple-700 hover:bg-purple-100 transition-colors"
+          >
+            Clear filter
+          </button>
+        </div>
+      )}
+
+      {/* Expiring soon filter banner */}
+      {expiring && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-orange-100 text-orange-700">
+              <CalendarClock size={14} />
+            </span>
+            <span className="text-[13px] font-extrabold text-orange-800">Showing clients with documents expiring within 15 days</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => { setExpiring(false); setPage(1); }}
+            className="rounded-lg px-3 py-1 text-[12px] font-extrabold text-orange-700 hover:bg-orange-100 transition-colors"
           >
             Clear filter
           </button>
