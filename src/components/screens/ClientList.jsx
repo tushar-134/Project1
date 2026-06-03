@@ -368,6 +368,9 @@ export default function ClientList() {
   const { fetchClients, deleteClient, exportClients } = useClients();
   const [query, setQuery] = useState(searchParams.get("search") || "");
   const [expired, setExpired] = useState(searchParams.get("expired") === "true");
+  const [highlightId] = useState(searchParams.get("highlight") || null);
+  const [flashId, setFlashId] = useState(null);
+  const rowRefs = useRef({});
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1, workingTasksTotal: 0 });
   const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
@@ -454,6 +457,17 @@ export default function ClientList() {
       clearTimeout(timer);
     };
   }, [refetchClients, requestParams]);
+
+  // Scroll-to and flash-highlight the requested client row after data loads
+  useEffect(() => {
+    if (!highlightId || clientsLoading) return;
+    const el = rowRefs.current[highlightId];
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setFlashId(highlightId);
+    const timer = setTimeout(() => setFlashId(null), 2500);
+    return () => clearTimeout(timer);
+  }, [highlightId, clientsLoading, rows]);
 
   const rows = state.clients;
   const activeColumnFilters = buildActiveFilterSummary(columnFilters, query);
@@ -914,7 +928,12 @@ export default function ClientList() {
             )}
 
             {!clientsLoading && !clientError && rows.map((client) => (
-              <tr key={client.id}>
+              <tr
+                key={client.id}
+                ref={(el) => { if (el) rowRefs.current[client.id] = el; }}
+                className={flashId === client.id ? "ring-2 ring-inset ring-purple-400 bg-purple-50 transition-all duration-500" : ""}
+                style={flashId === client.id ? { animation: "highlightFade 2.5s ease-out forwards" } : {}}
+              >
                 {isVisible("client") && (
                   <td>
                     <button
