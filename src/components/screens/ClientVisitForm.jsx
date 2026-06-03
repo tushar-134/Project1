@@ -14,7 +14,7 @@ import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
 import UserAvatar from "../ui/UserAvatar.jsx";
-import UnsavedChangesGuard from "../ui/UnsavedChangesGuard.jsx";
+
 
 const visitTypes = ["Requirement Gathering", "Verification", "Onboarding Discussion", "Follow Up", "Collection", "Meeting"];
 
@@ -88,9 +88,7 @@ export default function ClientVisitForm() {
   const { state } = useApp();
   const { fetchClients } = useClients();
   const { fetchUsers } = useUsers();
-  const [isDirty, setIsDirty] = useState(false);
-  const [form, setFormRaw] = useState(() => blankForm(currentUser));
-  const setForm = (val) => { setIsDirty(true); setFormRaw(val); };
+  const [form, setForm] = useState(() => blankForm(currentUser));
   const [userSearch, setUserSearch] = useState("");
   const [loading, setLoading] = useState(isEditMode);
   const [saving, setSaving] = useState(false);
@@ -101,7 +99,7 @@ export default function ClientVisitForm() {
     if (isEditMode) return;
     const prefill = location.state?.prefillVisit;
     if (!prefill) return;
-    setFormRaw((current) => ({
+    setForm((current) => ({
       ...current,
       clientType: prefill.clientType || current.clientType,
       clientId: prefill.clientId || current.clientId,
@@ -131,7 +129,7 @@ export default function ClientVisitForm() {
     clientVisitService.get(id)
       .then((visit) => {
         if (!active) return;
-        setFormRaw({
+        setForm({
           clientType: visit.clientType || "existing",
           clientId: visit.client?._id || "",
           newClient: {
@@ -283,7 +281,6 @@ export default function ClientVisitForm() {
         await clientVisitService.create(payload);
         toast.success("Visit scheduled.");
       }
-      setIsDirty(false);
       navigate("/client-visits");
     } catch (error) {
       toast.error(normalizeError(error));
@@ -304,7 +301,6 @@ export default function ClientVisitForm() {
 
   return (
     <div className="space-y-5">
-      <UnsavedChangesGuard isDirty={isDirty} />
       <div className="flex items-center gap-4">
         <button
           type="button"
