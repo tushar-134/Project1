@@ -9,6 +9,7 @@ import { useUsers } from "../../hooks/useUsers.js";
 import { clientVisitService } from "../../services/clientVisitService.js";
 import { DIAL_CODE_OPTIONS } from "../../utils/dialCodeOptions.js";
 import { getPhoneNumberSpec, normalizeDialCode, normalizePhoneNumber } from "../../utils/phoneUtils.js";
+import { toSentenceCase } from "../../utils/textCase";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
@@ -416,7 +417,7 @@ export default function ClientVisitForm() {
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Visit Type">
                 <select className="input" value={form.visitType} onChange={(event) => updateField("visitType", event.target.value)}>
-                  {visitTypes.map((option) => <option key={option} value={option}>{option === "Requirement Gathering" ? "Requirement gathering" : option === "Onboarding Discussion" ? "Onboarding discussion" : option === "Follow Up" ? "Follow up" : option}</option>)}
+                  {visitTypes.map((option) => <option key={option} value={option}>{toSentenceCase(option)}</option>)}
                 </select>
               </Field>
               <Field label="Location">

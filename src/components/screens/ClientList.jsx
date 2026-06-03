@@ -7,6 +7,7 @@ import { useClients } from "../../hooks/useClients";
 import { customFieldService } from "../../services/customFieldService.js";
 import { clientService } from "../../services/clientService.js";
 import { downloadBlob } from "../../utils/adapterUtils";
+import { toSentenceCase } from "../../utils/textCase";
 import { canCreateClients, canManageClients } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
@@ -368,6 +369,7 @@ export default function ClientList() {
   const { fetchClients, deleteClient, exportClients } = useClients();
   const [query, setQuery] = useState(searchParams.get("search") || "");
   const [expired, setExpired] = useState(searchParams.get("expired") === "true");
+  const [highlightClientId, setHighlightClientId] = useState(searchParams.get("highlight") || "");
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1, workingTasksTotal: 0 });
   const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
@@ -378,6 +380,7 @@ export default function ClientList() {
     if (searchParams.has("search")) {
       setQuery(searchParams.get("search") || "");
     }
+    setHighlightClientId(searchParams.get("highlight") || "");
   }, [searchParams]);
   const [drawerClientId, setDrawerClientId] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -470,6 +473,13 @@ export default function ClientList() {
   const hasActiveFilters = Boolean(query.trim()) || hasColumnFilters;
   const workingCount = rows.filter((c) => (c.activeTasks || 0) > 0).length;
   const draftCount = rows.filter((client) => client.isDraft).length;
+
+  useEffect(() => {
+    if (!highlightClientId || clientsLoading) return;
+    const node = document.getElementById(`client-row-${highlightClientId}`);
+    if (!node) return;
+    node.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightClientId, clientsLoading, rows.length, page, expired]);
 
   const updateColumnFilter = (key, value) => {
     setPage(1);
@@ -747,7 +757,7 @@ export default function ClientList() {
               >
                 <option value="">All jurisdictions</option>
                 {JURISDICTION_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>{opt === "Free Zone" ? "Free zone" : opt === "Designated Zone" ? "Designated zone" : opt}</option>
+                  <option key={opt} value={opt}>{toSentenceCase(opt)}</option>
                 ))}
               </select>
             </FilterField>
@@ -761,7 +771,7 @@ export default function ClientList() {
               >
                 <option value="">All types</option>
                 {TYPE_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>{opt === "Legal Person" ? "Legal person" : opt === "Natural Person" ? "Natural person" : opt}</option>
+                  <option key={opt} value={opt}>{toSentenceCase(opt)}</option>
                 ))}
               </select>
             </FilterField>
@@ -922,7 +932,11 @@ export default function ClientList() {
             )}
 
             {!clientsLoading && !clientError && rows.map((client) => (
-              <tr key={client.id}>
+            <tr
+              key={client.id}
+              id={`client-row-${client.id}`}
+              className={client.id === highlightClientId ? "bg-orange-50 ring-2 ring-inset ring-orange-300" : ""}
+            >
                 {isVisible("client") && (
                   <td>
                     <button

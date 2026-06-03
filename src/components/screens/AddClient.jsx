@@ -15,6 +15,7 @@ import CustomFieldModal from "../ui/CustomFieldModal.jsx";
 import TaskDrawer from "../ui/TaskDrawer.jsx";
 import { DIAL_CODE_OPTIONS } from "../../utils/dialCodeOptions.js";
 import { getPhoneNumberSpec, normalizeDialCode, normalizePhoneNumber } from "../../utils/phoneUtils.js";
+import { toSentenceCase } from "../../utils/textCase";
 
 
 const tabs = ["Basic Details", "Trade Licences", "Contact Persons", "VAT / CT", "Client Group", "Portal Logins", "Custom Fields", "Attachments"];
@@ -2186,8 +2187,8 @@ function Basic({ form, update, countries, users, userSearch, setUserSearch, isUs
         <Field label="Select Type*" field="client-type">
           <select className="input" required value={form.clientType} onChange={(e) => update("clientType", e.target.value)}>
             <option value="">Select type</option>
-            <option value="Legal Person">Legal person</option>
-            <option value="Natural Person">Natural person</option>
+            <option value="Legal Person">{toSentenceCase("Legal Person")}</option>
+            <option value="Natural Person">{toSentenceCase("Natural Person")}</option>
           </select>
         </Field>
         <Field label="File No." field="client-file-no"><input className="input" value={form.fileNo} onChange={(e) => update("fileNo", e.target.value)} /></Field>
@@ -2201,8 +2202,8 @@ function Basic({ form, update, countries, users, userSearch, setUserSearch, isUs
         <Field label="Jurisdiction" field="client-jurisdiction">
           <select className="input" value={form.jurisdiction} onChange={(e) => update("jurisdiction", e.target.value)}>
             <option value="Mainland">Mainland</option>
-            <option value="Free Zone">Free zone</option>
-            <option value="Designated Zone">Designated zone</option>
+            <option value="Free Zone">{toSentenceCase("Free Zone")}</option>
+            <option value="Designated Zone">{toSentenceCase("Designated Zone")}</option>
             <option value="Offshore">Offshore</option>
           </select>
         </Field>

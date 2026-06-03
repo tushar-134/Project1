@@ -6,6 +6,7 @@ import { useAuth } from "../../context/AuthContext.jsx";
 import { useApp } from "../../context/AppContext.jsx";
 import { clientVisitService } from "../../services/clientVisitService.js";
 import { downloadBlob } from "../../utils/adapterUtils.js";
+import { toSentenceCase } from "../../utils/textCase";
 import { canManageClientVisits } from "../../utils/permissions.js";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
@@ -225,12 +226,12 @@ export default function ClientVisits() {
             <select className="input" value={filters.visitType} onChange={(event) => updateFilter("visitType", event.target.value)}>
               {visitTypeOptions.map((option) => (
                 <option key={option} value={option === "All Types" ? "all" : option}>
-                  {option === "All Types" ? "All types" : option === "Requirement Gathering" ? "Requirement gathering" : option === "Onboarding Discussion" ? "Onboarding discussion" : option === "Follow Up" ? "Follow up" : option}
+                  {toSentenceCase(option)}
                 </option>
               ))}
               {visitTypes
                 .filter((option) => !visitTypeOptions.includes(option))
-                .map((option) => <option key={option} value={option}>{option}</option>)}
+                .map((option) => <option key={option} value={option}>{toSentenceCase(option)}</option>)}
             </select>
           </FilterField>
 

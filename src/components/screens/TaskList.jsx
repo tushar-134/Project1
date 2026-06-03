@@ -10,6 +10,7 @@ import { categoryService } from "../../services/categoryService";
 import { clientService } from "../../services/clientService";
 import { downloadBlob, mapCategory, mapClient } from "../../utils/adapterUtils";
 import { compareOptionsWithOtherLast } from "../../utils/optionSort";
+import { toSentenceCase } from "../../utils/textCase";
 import { canManageTasks } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
@@ -51,17 +52,6 @@ const CATEGORY_LABELS = {
 const CATEGORY_VALUES_BY_LABEL = Object.fromEntries(
   Object.entries(CATEGORY_LABELS).map(([value, label]) => [label.toLowerCase(), value])
 );
-const OPTION_ACRONYMS = new Map([
-  ["ct", "CT"],
-  ["einv", "EInv"],
-  ["esr", "ESR"],
-  ["fta", "FTA"],
-  ["mis", "MIS"],
-  ["trn", "TRN"],
-  ["ubo", "UBO"],
-  ["vat", "VAT"],
-]);
-
 const STATUS_PILL = {
   "Not Yet Started": { bg: "bg-slate-100", text: "text-slate-600" },
   "In Progress": { bg: "bg-blue-50", text: "text-blue-700" },
@@ -119,17 +109,7 @@ function getCurrentMonthValue() {
 }
 
 function formatOptionLabel(value) {
-  return String(value || "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .split(" ")
-    .map((word) => {
-      const acronym = OPTION_ACRONYMS.get(word.toLocaleLowerCase());
-      if (acronym) return acronym;
-      if (/^[A-Z0-9&/-]{2,}$/.test(word)) return word;
-      return `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}`;
-    })
-    .join(" ");
+  return toSentenceCase(value);
 }
 
 function normalizeOptionKey(value) {
@@ -149,26 +129,11 @@ function buildNormalizedOptions(values) {
 }
 
 function displayCategoryName(category) {
-  const c = CATEGORY_LABELS[category] || category || "";
-  if (!c) return "";
-  const upperCases = ["VAT", "CT", "FTA", "ESR", "MIS", "TRN", "TIN", "ID"];
-  const words = c.split(" ");
-  return words.map((word, i) => {
-    if (upperCases.includes(word.toUpperCase())) return word.toUpperCase();
-    if (i === 0) return word;
-    return word.toLowerCase();
-  }).join(" ");
+  return toSentenceCase(CATEGORY_LABELS[category] || category);
 }
 
 function displayTypeName(type) {
-  if (!type) return "";
-  const upperCases = ["VAT", "CT", "FTA", "ESR", "MIS", "TRN", "TIN", "ID"];
-  const words = type.split(" ");
-  return words.map((word, i) => {
-    if (upperCases.includes(word.toUpperCase())) return word.toUpperCase();
-    if (i === 0) return word;
-    return word.toLowerCase();
-  }).join(" ");
+  return toSentenceCase(type);
 }
 
 
@@ -234,7 +199,7 @@ function StatusMultiSelect({ selected, onChange, open, setOpen, dropdownRef }) {
   const label = selected.length === 0
     ? "All statuses"
     : selected.length === 1
-      ? (selected[0] === "Not Yet Started" ? "Not yet started" : selected[0] === "In Progress" ? "In progress" : selected[0])
+      ? toSentenceCase(selected[0])
       : `${selected.length} statuses`;
 
   return (
@@ -284,7 +249,7 @@ function StatusMultiSelect({ selected, onChange, open, setOpen, dropdownRef }) {
                     </svg>
                   )}
                 </span>
-                <span className={`rounded-full px-2 py-0.5 text-[11px] font-extrabold ${bg} ${text}`}>{status === "Not Yet Started" ? "Not yet started" : status === "In Progress" ? "In progress" : status}</span>
+                <span className={`rounded-full px-2 py-0.5 text-[11px] font-extrabold ${bg} ${text}`}>{toSentenceCase(status)}</span>
               </li>
             );
           })}
@@ -583,7 +548,7 @@ export default function TaskList() {
                 }
               >
                 {ALL_STATUSES.map((item) => (
-                  <option key={item} value={item}>{item === "Not Yet Started" ? "Not yet started" : item === "In Progress" ? "In progress" : item}</option>
+                  <option key={item} value={item}>{toSentenceCase(item)}</option>
                 ))}
               </select>
             ) : (

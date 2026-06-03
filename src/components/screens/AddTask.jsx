@@ -10,6 +10,7 @@ import { useTasks } from "../../hooks/useTasks";
 import { categoryService } from "../../services/categoryService";
 import { mapCategory } from "../../utils/adapterUtils";
 import { getFYOptions, getQuarters, getCurrentFYAndQuarter, getQuarterFromVatFrequency } from "../../utils/periodUtils";
+import { toSentenceCase } from "../../utils/textCase";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
@@ -464,15 +465,15 @@ export default function AddTask() {
           </Button>
         )}
       </div>
-      {step === 1 && <Card className="p-4"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{state.categories.map((cat) => <button key={cat.id} onClick={() => selectCategory(cat.id)} className="rounded-xl border border-[#e2e8f0] bg-white p-4 text-left transition hover:border-[#1e3a8a] hover:shadow"><div className="mb-3 h-2 w-10 rounded-full" style={{ background: cat.color }} /><div className="font-extrabold">{cat.name}</div><div className="mt-1 text-[12px] text-slate-500">{cat.taskTypes.length} task types</div></button>)}</div></Card>}
-      {step === 2 && <Card className="p-4"><div className="mb-3 text-[14px] font-extrabold">Task types for {category.name}</div><div className="flex flex-wrap gap-2">{chips.map((chip) => <button key={chip} onClick={() => setType(chip)} className={`rounded-full px-3 py-2 text-[12px] font-extrabold ${type === chip ? "bg-[#1e3a8a] text-white" : "bg-slate-100 text-slate-600"}`}>{chip}</button>)}</div>{!type && <div className="mt-3 text-[12px] font-semibold text-amber-600">Select a task type to continue.</div>}<div className="mt-5 flex gap-2"><Button variant="ghost" onClick={() => setStep(1)}>Back</Button><Button onClick={() => { if (!type) { toast.error("Please select a task type before continuing."); return; } setStep(3); }} disabled={!type}>Continue</Button></div></Card>}
+      {step === 1 && <Card className="p-4"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{state.categories.map((cat) => <button key={cat.id} onClick={() => selectCategory(cat.id)} className="rounded-xl border border-[#e2e8f0] bg-white p-4 text-left transition hover:border-[#1e3a8a] hover:shadow"><div className="mb-3 h-2 w-10 rounded-full" style={{ background: cat.color }} /><div className="font-extrabold">{toSentenceCase(cat.name)}</div><div className="mt-1 text-[12px] text-slate-500">{cat.taskTypes.length} task types</div></button>)}</div></Card>}
+      {step === 2 && <Card className="p-4"><div className="mb-3 text-[14px] font-extrabold">Task types for {toSentenceCase(category.name)}</div><div className="flex flex-wrap gap-2">{chips.map((chip) => <button key={chip} onClick={() => setType(chip)} className={`rounded-full px-3 py-2 text-[12px] font-extrabold ${type === chip ? "bg-[#1e3a8a] text-white" : "bg-slate-100 text-slate-600"}`}>{toSentenceCase(chip)}</button>)}</div>{!type && <div className="mt-3 text-[12px] font-semibold text-amber-600">Select a task type to continue.</div>}<div className="mt-5 flex gap-2"><Button variant="ghost" onClick={() => setStep(1)}>Back</Button><Button onClick={() => { if (!type) { toast.error("Please select a task type before continuing."); return; } setStep(3); }} disabled={!type}>Continue</Button></div></Card>}
       {step === 3 && (
         <Card className="p-4">
           <div className="mb-4 rounded-xl border border-[#dbeafe] bg-blue-50 p-3">
             <div className="text-[11px] font-extrabold uppercase tracking-[.08em] text-[#1e3a8a]">Selected Task</div>
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-white px-2.5 py-1 text-[12px] font-extrabold text-[#1e3a8a]">{category?.name || "Category"}</span>
-              <span className="text-[14px] font-extrabold text-slate-900">{type || "Select a task type"}</span>
+              <span className="rounded-full bg-white px-2.5 py-1 text-[12px] font-extrabold text-[#1e3a8a]">{toSentenceCase(category?.name || "Category")}</span>
+              <span className="text-[14px] font-extrabold text-slate-900">{toSentenceCase(type || "Select a task type")}</span>
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
@@ -518,6 +519,7 @@ export default function AddTask() {
                     { value: "", label: "Select FY" },
                     ...fyOptions.map((fy) => ({ value: fy, label: fy }))
                   ]}
+                  sentenceCaseLabels={true}
                 />
               </Field>
             )}
@@ -530,6 +532,7 @@ export default function AddTask() {
                     { value: "", label: "Select Quarter" },
                     ...quarterOptions.map((q) => ({ value: q.value, label: q.value }))
                   ]}
+                  sentenceCaseLabels={true}
                 />
               </Field>
             )}

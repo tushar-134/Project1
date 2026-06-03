@@ -15,6 +15,7 @@ import { useAuth } from "../../context/AuthContext.jsx";
 import { useApp } from "../../context/AppContext.jsx";
 import { useTasks } from "../../hooks/useTasks";
 import { sortOptionsWithOtherLast } from "../../utils/optionSort";
+import { toSentenceCase } from "../../utils/textCase";
 import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
@@ -281,7 +282,7 @@ export default function FtaTracker() {
                     <option value="">All categories</option>
                     {CATEGORY_FILTERS.map((f) => (
                       <option key={f} value={f}>
-                        {f === "Corporate Tax" ? "Corporate tax" : f === "MIS Reporting" ? "MIS reporting" : f === "E-Invoicing" ? "E-invoicing" : f === "VAT Refund" ? "VAT refund" : f}
+                        {toSentenceCase(f)}
                       </option>
                     ))}
                   </select>
@@ -434,7 +435,7 @@ export default function FtaTracker() {
                         }
                       >
                         {FTA_STATUSES.map((s) => (
-                          <option key={s} value={s}>{s === "In Review" ? "In review" : s === "Additional Query From FTA" ? "Additional query from FTA" : s}</option>
+                          <option key={s} value={s}>{toSentenceCase(s)}</option>
                         ))}
                       </select>
                     )}
