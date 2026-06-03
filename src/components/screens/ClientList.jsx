@@ -953,6 +953,15 @@ export default function ClientList() {
       </Card>
 
       {/* Client table */}
+      {/* Inactive mode banner — reminds the user they are viewing read-only archived clients */}
+      {isInactiveMode && (
+        <div className="flex items-center gap-2.5 rounded-xl border border-red-100 bg-red-50/70 px-4 py-2.5">
+          <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-red-400" />
+          <span className="text-[12px] font-bold text-red-700">
+            Viewing inactive clients — editing is disabled. Use the <strong>Restore</strong> button to reactivate a client.
+          </span>
+        </div>
+      )}
       <Card className="overflow-hidden">
         <Table>
           <thead>
