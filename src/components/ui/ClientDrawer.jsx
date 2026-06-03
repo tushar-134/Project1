@@ -108,6 +108,26 @@ function DetailRow({ label, value, className = "", rowRef }) {
   );
 }
 
+function getExpiryHighlight(dateStr, isFocused) {
+  const focusRing = isFocused ? "ring-2 ring-blue-400 ring-offset-1 " : "";
+  if (!dateStr) return focusRing;
+  
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return focusRing;
+  
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const in15Days = new Date(now.getTime() + 15 * 86400000);
+  
+  if (date < now) {
+    return focusRing + "border-red-300 bg-red-50 px-3 py-2";
+  } else if (date >= now && date <= in15Days) {
+    return focusRing + "border-orange-300 bg-orange-50 px-3 py-2";
+  }
+  
+  return focusRing;
+}
+
 // ClientDrawer displays client details in a slide-out panel.
 // Accepts an `isInactive` flag to enforce read-only mode, and
 // `onReactivate` callback to refresh the parent view after a client is restored.
@@ -187,7 +207,6 @@ export default function ClientDrawer({ clientId, onClose, expiryFocus = null, is
   const portals = client?.portalLogins || [];
   const customFields = client?.customFields || {};
   const attachmentGroups = collectAttachmentGroups(client);
-  const expiryHighlightClass = "border-orange-300 bg-orange-50 px-3 py-2 shadow-[0_0_0_3px_rgba(251,146,60,0.18)]";
 
   return (
     <>
@@ -326,14 +345,14 @@ export default function ClientDrawer({ clientId, onClose, expiryFocus = null, is
                             label="EID Expiry"
                             value={formatDate(contact.emiratesId?.expiryDate)}
                             rowRef={setExpiryRef(`emirates_id-${idx}`)}
-                            className={highlightedExpiryKey === `emirates_id-${idx}` ? expiryHighlightClass : ""}
+                            className={getExpiryHighlight(contact.emiratesId?.expiryDate, highlightedExpiryKey === `emirates_id-${idx}`)}
                           />
                           <DetailRow label="Passport No" value={contact.passport?.number} />
                           <DetailRow
                             label="Passport Expiry"
                             value={formatDate(contact.passport?.expiryDate)}
                             rowRef={setExpiryRef(`passport-${idx}`)}
-                            className={highlightedExpiryKey === `passport-${idx}` ? expiryHighlightClass : ""}
+                            className={getExpiryHighlight(contact.passport?.expiryDate, highlightedExpiryKey === `passport-${idx}`)}
                           />
                         </div>
                       </div>
@@ -375,7 +394,7 @@ export default function ClientDrawer({ clientId, onClose, expiryFocus = null, is
                             label="Expiry Date"
                             value={formatDate(licence.expiryDate)}
                             rowRef={setExpiryRef(`licence-${idx}`)}
-                            className={highlightedExpiryKey === `licence-${idx}` ? expiryHighlightClass : ""}
+                            className={getExpiryHighlight(licence.expiryDate, highlightedExpiryKey === `licence-${idx}`)}
                           />
                           <DetailRow label="Official Email" value={licence.officialEmail} />
                         </div>
