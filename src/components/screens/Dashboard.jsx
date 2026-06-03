@@ -186,6 +186,13 @@ export default function Dashboard() {
                   setMonth(new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1));
                 }}
                 className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                onClick={(e) => {
+                  try {
+                    e.target.showPicker();
+                  } catch (err) {
+                    // Ignore if showPicker is not supported
+                  }
+                }}
               />
             </label>
           </div>
