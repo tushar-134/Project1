@@ -61,7 +61,7 @@ const TABS = [
   },
 ];
 
-const FTA_STATUSES = ["In Review", "Additional Query From FTA", "Approved"];
+const FTA_STATUSES = ["In review", "Additional query from FTA", "Approved"];
 
 function createEmptyFilters() {
   return { client: "", category: "", assigned: "", dueDate: "" };
@@ -435,7 +435,7 @@ export default function FtaTracker() {
                         }
                       >
                         {FTA_STATUSES.map((s) => (
-                          <option key={s} value={s}>{toSentenceCase(s)}</option>
+                          <option key={s} value={s}>{s}</option>
                         ))}
                       </select>
                     )}
@@ -525,7 +525,7 @@ function FtaStatusBadge({ status }) {
       </span>
     );
   }
-  if (status === "Additional Query From FTA") {
+  if (status === "Additional query from FTA") {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-3 py-1 text-[11px] font-extrabold text-yellow-700">
         <AlertCircle size={11} /> Additional Query
