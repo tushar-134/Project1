@@ -434,7 +434,8 @@ export default function ClientList() {
   const requestParams = useMemo(() => ({
     page,
     limit: PAGE_SIZE,
-    status: clientStatus,
+    // Backend expects lowercase status: 'active' | 'inactive'
+    status: clientStatus.toLowerCase(),
     search: deferredQuery.trim() || undefined,
     client: deferredColumnFilters.client.trim() || undefined,
     jurisdiction: deferredColumnFilters.jurisdiction || undefined,
@@ -519,7 +520,8 @@ export default function ClientList() {
 
   // Build the `columns` param for the Excel export — only server-mappable keys that are visible
   const buildExportParams = () => ({
-    status: clientStatus,
+    // Backend expects lowercase status: 'active' | 'inactive'
+    status: clientStatus.toLowerCase(),
     search: deferredQuery.trim() || undefined,
     client: deferredColumnFilters.client.trim() || undefined,
     jurisdiction: deferredColumnFilters.jurisdiction || undefined,
