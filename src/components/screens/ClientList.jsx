@@ -636,8 +636,7 @@ export default function ClientList() {
 
             {/* Active / Inactive toggle wrapper */}
             <div
-              className="inline-flex items-center rounded-full p-1"
-              style={{ background: isInactiveMode ? "#dc2626" : "#1e3a8a" }}
+              className="inline-flex items-center gap-0.5 rounded-xl border border-slate-200 bg-slate-100/80 p-1 shadow-sm backdrop-blur-sm"
               role="group"
               aria-label="Client status filter"
             >
