@@ -99,6 +99,9 @@ export default function ClientComboBox({
     return !inputValue.trim() || name.toLowerCase().includes(inputValue.toLowerCase());
   });
 
+  const [focusedIndex, setFocusedIndex] = useState(-1);
+  const listRef = useRef(null);
+
   // When closed and a client is selected, show its name; while open keep typed query
   const displayValue = open ? inputValue : (selected ? (selected.name || selected.legalName) : inputValue);
 
@@ -115,16 +118,25 @@ export default function ClientComboBox({
     return () => document.removeEventListener("mousedown", onOutside);
   }, [selected]);
 
+  useEffect(() => {
+    if (open && listRef.current && focusedIndex >= 0) {
+      const li = listRef.current.querySelector(`[data-index="${focusedIndex}"]`);
+      if (li) li.scrollIntoView({ block: "nearest" });
+    }
+  }, [focusedIndex, open]);
+
   function handleFocus() {
     setInputValue(""); // clear so user can type a fresh search
     setFetchError("");
     setOpen(true);
+    setFocusedIndex(-1);
   }
 
   function handleChange(e) {
     setInputValue(e.target.value);
     setFetchError("");
     setOpen(true);
+    setFocusedIndex(-1);
   }
 
   function handleSelect(client) {
@@ -141,6 +153,37 @@ export default function ClientComboBox({
     onChange("");
     setInputValue("");
     setOpen(false);
+    setFocusedIndex(-1);
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === "Escape") {
+      setOpen(false);
+      setInputValue(selected ? (selected.name || selected.legalName) : "");
+      return;
+    }
+    if (!open && (e.key === "ArrowDown" || e.key === "Enter")) {
+      e.preventDefault();
+      handleFocus();
+      return;
+    }
+    if (open) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setFocusedIndex((prev) => (prev < filtered.length - 1 ? prev + 1 : prev));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setFocusedIndex((prev) => (prev > 0 ? prev - 1 : prev));
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (focusedIndex >= 0 && focusedIndex < filtered.length) {
+          handleSelect(filtered[focusedIndex]);
+        }
+      } else if (e.key === "Tab") {
+        setOpen(false);
+        setInputValue(selected ? (selected.name || selected.legalName) : "");
+      }
+    }
   }
 
   return (
@@ -149,19 +192,23 @@ export default function ClientComboBox({
         <input
           id={inputId}
           name={inputId}
-          className="input pr-14"
+          className="input pr-14 outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-1"
           type="text"
           autoComplete="off"
           placeholder={placeholder}
           value={displayValue}
           onFocus={handleFocus}
           onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          role="combobox"
+          aria-expanded={open}
+          aria-haspopup="listbox"
         />
         <span className="pointer-events-none absolute right-2 flex items-center gap-1">
           {value && (
             <button
               type="button"
-              className="pointer-events-auto text-slate-400 transition hover:text-slate-600"
+              className="pointer-events-auto text-slate-400 transition hover:text-slate-600 outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded-sm"
               onMouseDown={handleClear}
               aria-label="Clear client"
             >
@@ -176,7 +223,7 @@ export default function ClientComboBox({
       </div>
       {open && (
         <div className="absolute top-full left-0 z-50 mt-1 w-full overflow-hidden rounded-xl border border-[#e2e8f0] bg-white shadow-lg">
-          <ul className="client-dropdown-scrollbar max-h-60 overflow-y-scroll pr-1">
+          <ul ref={listRef} className="client-dropdown-scrollbar max-h-60 overflow-y-scroll pr-1" role="listbox">
             {loading ? (
               <li className="flex items-center gap-2 px-4 py-3 text-[12px] text-slate-400">
                 <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-[#1e3a8a]" />
@@ -187,18 +234,24 @@ export default function ClientComboBox({
             ) : filtered.length === 0 ? (
               <li className="px-4 py-3 text-[12px] text-slate-400">No clients found</li>
             ) : (
-              filtered.map((c) => {
+              filtered.map((c, idx) => {
                 const name = c.name || c.legalName;
                 const id = c._id || c.id;
                 const isSelected = useNameAsValue ? name === value : id === value;
+                const isFocused = idx === focusedIndex;
                 return (
                   <li
                     key={id}
-                    onMouseDown={() => handleSelect(c)}
-                    className={`cursor-pointer px-4 py-2.5 text-[13px] transition-colors hover:bg-blue-50 hover:text-[#1e3a8a] ${
-                      isSelected
-                        ? "bg-blue-50/70 font-extrabold text-[#1e3a8a]"
-                        : "font-semibold text-slate-700"
+                    data-index={idx}
+                    role="option"
+                    aria-selected={isSelected}
+                    onMouseDown={(e) => {
+                      e.preventDefault(); // Prevent input blur
+                      handleSelect(c);
+                    }}
+                    onMouseEnter={() => setFocusedIndex(idx)}
+                    className={`cursor-pointer px-4 py-2.5 text-[13px] transition-colors ${
+                      isFocused ? "bg-blue-100/80 text-[#1e3a8a]" : isSelected ? "bg-blue-50/70 font-extrabold text-[#1e3a8a]" : "font-semibold text-slate-700 hover:bg-blue-50 hover:text-[#1e3a8a]"
                     }`}
                   >
                     {name}
