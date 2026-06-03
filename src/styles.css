@@ -134,6 +134,27 @@ button { touch-action: manipulation; }
   background: rgba(255, 255, 255, 0.2);
 }
 
+.client-dropdown-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #f8fafc;
+  scrollbar-gutter: stable;
+}
+.client-dropdown-scrollbar::-webkit-scrollbar {
+  width: 9px;
+}
+.client-dropdown-scrollbar::-webkit-scrollbar-track {
+  background: #f8fafc;
+  border-radius: 10px;
+}
+.client-dropdown-scrollbar::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border: 2px solid #f8fafc;
+  border-radius: 999px;
+}
+.client-dropdown-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
 .field-label { @apply mb-1.5 block text-[12px] font-semibold text-slate-600; }
 .input {
   @apply h-9 w-full rounded-lg border bg-white px-3 text-[13px] outline-none transition;
