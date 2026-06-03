@@ -76,7 +76,14 @@ exports.listGroups = async (req, res, next) => {
 };
 exports.createGroup = async (req, res, next) => {
   try {
-    const group = await ClientGroup.create({ name: req.body.name, clients: req.body.clients || [], createdBy: req.user._id });
+    const clients = [...new Set((req.body.clients || []).map(String))];
+    if (clients.length) {
+      const existingGroup = await ClientGroup.findOne({ clients: { $in: clients } }).select("name");
+      if (existingGroup) return res.status(409).json({ message: `One or more clients already belong to ${existingGroup.name}.` });
+      const existingClient = await Client.findOne({ _id: { $in: clients }, group: { $exists: true, $ne: null } }).populate("group", "name");
+      if (existingClient?.group) return res.status(409).json({ message: `${existingClient.legalName} already belongs to ${existingClient.group.name}.` });
+    }
+    const group = await ClientGroup.create({ name: req.body.name, clients, createdBy: req.user._id });
     if (group.clients.length) await Client.updateMany({ _id: { $in: group.clients } }, { group: group._id });
     res.status(201).json(await group.populate("clients", "legalName fileNo"));
   } catch (error) { next(error); }
@@ -89,9 +96,20 @@ exports.updateGroupClients = async (req, res, next) => {
     // Group edits must update both the group document and the client.group back-reference.
     const group = await ClientGroup.findById(req.params.id);
     if (!group) return res.status(404).json({ message: "Group not found" });
-    const add = req.body.add || [];
-    const remove = req.body.remove || [];
-    group.clients = [...new Set([...group.clients.map(String), ...add.map(String)])].filter((id) => !remove.map(String).includes(id));
+    const add = [...new Set((req.body.add || []).map(String))];
+    const remove = [...new Set((req.body.remove || []).map(String))];
+    const clientsToAdd = add.filter((id) => !group.clients.map(String).includes(id));
+    if (clientsToAdd.length) {
+      const existingGroup = await ClientGroup.findOne({ _id: { $ne: group._id }, clients: { $in: clientsToAdd } }).select("name");
+      if (existingGroup) return res.status(409).json({ message: `One or more clients already belong to ${existingGroup.name}.` });
+      const existingClient = await Client.findOne({
+        _id: { $in: clientsToAdd },
+        group: { $exists: true, $ne: null },
+        $expr: { $ne: ["$group", group._id] },
+      }).populate("group", "name");
+      if (existingClient?.group) return res.status(409).json({ message: `${existingClient.legalName} already belongs to ${existingClient.group.name}.` });
+    }
+    group.clients = [...new Set([...group.clients.map(String), ...add])].filter((id) => !remove.includes(id));
     await group.save();
     if (add.length) await Client.updateMany({ _id: { $in: add } }, { group: group._id });
     if (remove.length) await Client.updateMany({ _id: { $in: remove } }, { $unset: { group: "" } });

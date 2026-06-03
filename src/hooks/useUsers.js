@@ -1,8 +1,8 @@
 import { useApp } from "../context/AppContext";
 import { userService } from "../services/userService";
 
-const roleLabel = { admin: "Admin", manager: "Manager", task_only: "Task Only" };
-const roleApi = { Admin: "admin", Manager: "manager", "Task Only": "task_only" };
+const roleLabel = { admin: "Admin", manager: "Manager", task_only: "Associate" };
+const roleApi = { Admin: "admin", Manager: "manager", Associate: "task_only" };
 
 export function mapUser(user) {
   const dial = String(user.mobileCountryCode || "").trim();

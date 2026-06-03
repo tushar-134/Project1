@@ -9,11 +9,12 @@ import { useUsers } from "../../hooks/useUsers.js";
 import { clientVisitService } from "../../services/clientVisitService.js";
 import { DIAL_CODE_OPTIONS } from "../../utils/dialCodeOptions.js";
 import { getPhoneNumberSpec, normalizeDialCode, normalizePhoneNumber } from "../../utils/phoneUtils.js";
+import { toSentenceCase } from "../../utils/textCase";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
 import UserAvatar from "../ui/UserAvatar.jsx";
-import UnsavedChangesGuard from "../ui/UnsavedChangesGuard.jsx";
+
 
 const visitTypes = ["Requirement Gathering", "Verification", "Onboarding Discussion", "Follow Up", "Collection", "Meeting"];
 
@@ -87,9 +88,7 @@ export default function ClientVisitForm() {
   const { state } = useApp();
   const { fetchClients } = useClients();
   const { fetchUsers } = useUsers();
-  const [isDirty, setIsDirty] = useState(false);
-  const [form, setFormRaw] = useState(() => blankForm(currentUser));
-  const setForm = (val) => { setIsDirty(true); setFormRaw(val); };
+  const [form, setForm] = useState(() => blankForm(currentUser));
   const [userSearch, setUserSearch] = useState("");
   const [loading, setLoading] = useState(isEditMode);
   const [saving, setSaving] = useState(false);
@@ -100,7 +99,7 @@ export default function ClientVisitForm() {
     if (isEditMode) return;
     const prefill = location.state?.prefillVisit;
     if (!prefill) return;
-    setFormRaw((current) => ({
+    setForm((current) => ({
       ...current,
       clientType: prefill.clientType || current.clientType,
       clientId: prefill.clientId || current.clientId,
@@ -113,7 +112,7 @@ export default function ClientVisitForm() {
   useEffect(() => {
     if (!hasFetchedClients.current) {
       hasFetchedClients.current = true;
-      fetchClients({ limit: 10 }).catch(() => toast.error("Unable to load clients."));
+      fetchClients({ limit: 5000, status: "all" }).catch(() => toast.error("Unable to load clients."));
     }
   }, [fetchClients]);
 
@@ -130,7 +129,7 @@ export default function ClientVisitForm() {
     clientVisitService.get(id)
       .then((visit) => {
         if (!active) return;
-        setFormRaw({
+        setForm({
           clientType: visit.clientType || "existing",
           clientId: visit.client?._id || "",
           newClient: {
@@ -168,7 +167,7 @@ export default function ClientVisitForm() {
         _id: currentUser._id || currentUser.id,
         id: currentUser._id || currentUser.id,
         name: currentUser.name,
-        role: "Task Only",
+        role: "Associate",
       }];
     }
     const term = userSearch.trim().toLowerCase();
@@ -185,7 +184,7 @@ export default function ClientVisitForm() {
     if (form.clientType !== "existing" || !form.clientId) return;
     const client = state.clients.find((entry) => String(entry._id || entry.id) === String(form.clientId));
     if (!client) return;
-    setFormRaw((current) => {
+    setForm((current) => {
       const assignedId = client.assignedUser?._id || client.assignedUser || "";
       const nextAssignedUsers = assignedId && currentUser?.role !== "task_only"
         ? current.assignedUsers.includes(assignedId) ? current.assignedUsers : [...current.assignedUsers, assignedId]
@@ -282,7 +281,6 @@ export default function ClientVisitForm() {
         await clientVisitService.create(payload);
         toast.success("Visit scheduled.");
       }
-      setIsDirty(false);
       navigate("/client-visits");
     } catch (error) {
       toast.error(normalizeError(error));
@@ -303,7 +301,6 @@ export default function ClientVisitForm() {
 
   return (
     <div className="space-y-5">
-      <UnsavedChangesGuard isDirty={isDirty} />
       <div className="flex items-center gap-4">
         <button
           type="button"
@@ -416,7 +413,7 @@ export default function ClientVisitForm() {
             <div className="grid gap-4 md:grid-cols-2">
               <Field label="Visit Type">
                 <select className="input" value={form.visitType} onChange={(event) => updateField("visitType", event.target.value)}>
-                  {visitTypes.map((option) => <option key={option} value={option}>{option === "Requirement Gathering" ? "Requirement gathering" : option === "Onboarding Discussion" ? "Onboarding discussion" : option === "Follow Up" ? "Follow up" : option}</option>)}
+                  {visitTypes.map((option) => <option key={option} value={option}>{toSentenceCase(option)}</option>)}
                 </select>
               </Field>
               <Field label="Location">

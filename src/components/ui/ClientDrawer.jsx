@@ -220,7 +220,7 @@ export default function ClientDrawer({ clientId, onClose, expiryFocus = null, is
                     try {
                       await clientService.reactivate(client._id);
                       if (onReactivate) onReactivate();
-                      onClose();
+                      onClose?.();
                     } catch (_) {
                       alert("Failed to reactivate. Please try again.");
                     } finally {
@@ -236,7 +236,14 @@ export default function ClientDrawer({ clientId, onClose, expiryFocus = null, is
             )}
             {/* Active: show View more / Edit button */}
             {!isInactive && client && canManage && (
-              <Button variant="ghost" size="sm" onClick={() => navigate(`/clients/edit/${client._id}`, { state: { viewMode: true } })}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  onClose?.();
+                  navigate(`/clients/edit/${client._id}`, { state: { viewMode: true } });
+                }}
+              >
                 <ExternalLink size={15} />
                 View more
               </Button>

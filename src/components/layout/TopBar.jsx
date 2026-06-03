@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AlertTriangle, Bell, ChevronDown, LogOut, UserCircle2 } from "lucide-react";
 import NotificationPanel from "./NotificationPanel.jsx";
 import ProfilePanel from "./ProfilePanel.jsx";
@@ -8,7 +9,6 @@ import { useApp } from "../../context/AppContext";
 import { useNotifications } from "../../hooks/useNotifications";
 import { clientService } from "../../services/clientService";
 import { ROLE_LABELS } from "../../utils/permissions.js";
-import ClientDrawer from "../ui/ClientDrawer.jsx";
 import UserAvatar from "../ui/UserAvatar.jsx";
 
 const POLL_INTERVAL_MS = 60_000;
@@ -23,11 +23,10 @@ export default function TopBar({ title, navOpen = false, onMenuClick }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [profileTab, setProfileTab] = useState("profile");
-  const [drawerClientId, setDrawerClientId] = useState(null);
-  const [drawerExpiryFocus, setDrawerExpiryFocus] = useState(null);
   const wrapRef = useRef(null);
   const expiryRef = useRef(null);
   const menuRef = useRef(null);
+  const navigate = useNavigate();
   const { currentUser, logout } = useAuth();
   const { state } = useApp();
   const { fetchNotifications } = useNotifications();
@@ -203,8 +202,11 @@ export default function TopBar({ title, navOpen = false, onMenuClick }) {
             open={expiryOpen}
             onClose={() => setExpiryOpen(false)}
             onOpenClient={(clientId, item) => {
-              setDrawerExpiryFocus(item);
-              setDrawerClientId(clientId);
+              const search = new URLSearchParams({
+                expired: "true",
+                highlight: clientId,
+              });
+              navigate(`/clients/list?${search.toString()}`);
             }}
             payload={expiryPayload}
             loading={expiryLoading}
@@ -261,16 +263,6 @@ export default function TopBar({ title, navOpen = false, onMenuClick }) {
         <NotificationPanel open={open} onClose={() => setOpen(false)} />
       </div>
       <ProfilePanel open={profileOpen} initialTab={profileTab} onClose={() => setProfileOpen(false)} />
-      {drawerClientId && (
-        <ClientDrawer
-          clientId={drawerClientId}
-          expiryFocus={drawerExpiryFocus}
-          onClose={() => {
-            setDrawerClientId(null);
-            setDrawerExpiryFocus(null);
-          }}
-        />
-      )}
     </header>
   );
 }

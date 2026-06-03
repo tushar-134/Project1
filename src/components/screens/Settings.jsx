@@ -1,11 +1,13 @@
-import { Boxes, Folders, Settings2, Users, LayoutGrid, ChevronLeft, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { Boxes, Folders, Settings2, Users, LayoutGrid, ChevronLeft, ChevronRight, Archive } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { canManageCategories, canManageGroups, canViewUsers } from "../../utils/permissions.js";
 import UsersScreen from "./Users.jsx";
 import CustomFieldsScreen from "./CustomFields.jsx";
 import ClientGroupsScreen from "./ClientGroups.jsx";
 import CategoriesScreen from "./Categories.jsx";
+
+const SETTINGS_SIDEBAR_KEY = "filingBuddySettingsSidebarOpen";
 
 function buildTabs(role) {
   const tabs = [];
@@ -24,9 +26,24 @@ export default function Settings() {
   const { currentUser } = useAuth();
   const role = currentUser?.role;
   const tabs = buildTabs(role);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    try {
+      const stored = window.localStorage.getItem(SETTINGS_SIDEBAR_KEY);
+      return stored === null ? true : stored === "true";
+    } catch {
+      return true;
+    }
+  });
   const [activeId, setActiveId] = useState(tabs[0]?.id ?? "");
   const [headerAction, setHeaderAction] = useState(null);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SETTINGS_SIDEBAR_KEY, String(sidebarOpen));
+    } catch {
+      // Ignore storage failures and keep the settings page usable.
+    }
+  }, [sidebarOpen]);
 
   const activeTab = tabs.find((t) => t.id === activeId);
   const ActiveComponent = activeTab?.component ?? null;

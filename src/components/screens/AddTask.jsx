@@ -1,4 +1,5 @@
-import { cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
+import { cloneElement, isValidElement, useEffect, useMemo, useState, useRef } from "react";
+import { flushSync } from "react-dom";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { Check, Send, UploadCloud } from "lucide-react";
 import toast from "react-hot-toast";
@@ -9,6 +10,7 @@ import { useTasks } from "../../hooks/useTasks";
 import { categoryService } from "../../services/categoryService";
 import { mapCategory } from "../../utils/adapterUtils";
 import { getFYOptions, getQuarters, getCurrentFYAndQuarter, getQuarterFromVatFrequency } from "../../utils/periodUtils";
+import { toSentenceCase } from "../../utils/textCase";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
@@ -32,7 +34,7 @@ export default function AddTask() {
   const [categoryId, setCategoryId] = useState(prefillTask?.categoryId || "vat");
   const [categoryName, setCategoryName] = useState(prefillTask?.categoryName || "VAT");
   const category = state.categories.find((cat) => cat.id === categoryId);
-  const [type, setType] = useState(prefillTask?.type || "VAT Return");
+  const [type, setType] = useState(prefillTask?.type || "");
   const [recurring, setRecurring] = useState(false);
 
   const [savedStatus, setSavedStatus] = useState("not_started");
@@ -44,13 +46,13 @@ export default function AddTask() {
   const [details, setDetailsRaw] = useState({
     client: prefillTask?.clientId || "",
     assigned: "",
-    dueDate: "2026-05-31",
+    dueDate: "",
     periodFY: "",
     periodQuarter: "",
     description: prefillTask?.description || "",
     frequency: "monthly",
     daysBeforeDue: 15,
-    nextDue: "2026-06-30",
+    nextDue: "",
     endDate: ""
   });
   const chips = useMemo(() => category?.taskTypes || [], [category]);
@@ -208,29 +210,37 @@ export default function AddTask() {
     }));
   }, [isEditMode, prefillTask]);
 
+  const initialLocationKey = useRef(location.key);
   useEffect(() => {
+    if (location.key === initialLocationKey.current) return;
+    
     if (!isEditMode && !prefillTask) {
-      setStep(1);
-      setCategoryId("vat");
-      setCategoryName("VAT");
-      setDetailsRaw({
-        client: "",
-        assigned: "",
-        dueDate: "2026-05-31",
-        periodFY: "",
-        periodQuarter: "",
-        description: "",
-        frequency: "monthly",
-        daysBeforeDue: 15,
-        nextDue: "2026-06-30",
-        endDate: ""
-      });
-      setRecurring(false);
-      setAttachments([]);
-      setAttachmentDescription("");
-      setIsDirty(false);
+      if (isDirty) {
+        toast.error("Task not saved, please save first.");
+      } else {
+        setStep(1);
+        setCategoryId("vat");
+        setCategoryName("VAT");
+        setDetailsRaw({
+          client: "",
+          assigned: "",
+          dueDate: "",
+          periodFY: "",
+          periodQuarter: "",
+          description: "",
+          frequency: "monthly",
+          daysBeforeDue: 15,
+          nextDue: "",
+          endDate: ""
+        });
+        setRecurring(false);
+        setAttachments([]);
+        setAttachmentDescription("");
+        setIsDirty(false);
+      }
     }
-  }, [location.key, isEditMode, prefillTask]);
+    initialLocationKey.current = location.key;
+  }, [location.key, isEditMode, prefillTask, isDirty]);
 
   useEffect(() => {
     if (!state.categories.length || !categoryName) return;
@@ -249,7 +259,7 @@ export default function AddTask() {
     const next = state.categories.find((cat) => cat.id === id);
     setCategoryId(id);
     setCategoryName(next?.name || categoryName);
-    setType(next.taskTypes[0] || "");
+    setType("");
     setStep(2);
   }
 
@@ -259,6 +269,9 @@ export default function AddTask() {
     setCategoryName("");
     setType("");
     setRecurring(false);
+    setSavedStatus("not_started");
+    setSubmitting(false);
+    setIsUploadingAttachments(false);
     setDetailsRaw({
       client: "",
       assigned: "",
@@ -394,7 +407,11 @@ export default function AddTask() {
         setAttachments(mapAttachmentRows(savedTask?.attachments || []));
       }
       toast.success(isEditMode ? "Task updated successfully." : "Task created successfully.");
-      setIsDirty(false); // Reset dirty state before navigation
+      
+      flushSync(() => {
+        setIsDirty(false); // Reset dirty state synchronously before navigation
+      });
+
       if (!isEditMode && returnToClient?.clientId && savedTask?._id) {
         navigate(`/clients/edit/${returnToClient.clientId}`, {
           state: {
@@ -429,10 +446,9 @@ export default function AddTask() {
               n={i + 1}
               active={step >= i + 1}
               label={label}
+              disabled={i + 1 > step}
               onClick={() => {
                 const target = i + 1;
-                // Only allow going back (not forward skipping);
-                // forward navigation happens via category click / Continue button.
                 if (target < step) setStep(target);
               }}
             />
@@ -449,15 +465,15 @@ export default function AddTask() {
           </Button>
         )}
       </div>
-      {step === 1 && <Card className="p-4"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{state.categories.map((cat) => <button key={cat.id} onClick={() => selectCategory(cat.id)} className="rounded-xl border border-[#e2e8f0] bg-white p-4 text-left transition hover:border-[#1e3a8a] hover:shadow"><div className="mb-3 h-2 w-10 rounded-full" style={{ background: cat.color }} /><div className="font-extrabold">{cat.name}</div><div className="mt-1 text-[12px] text-slate-500">{cat.taskTypes.length} task types</div></button>)}</div></Card>}
-      {step === 2 && <Card className="p-4"><div className="mb-3 text-[14px] font-extrabold">Task types for {category.name}</div><div className="flex flex-wrap gap-2">{chips.map((chip) => <button key={chip} onClick={() => setType(chip)} className={`rounded-full px-3 py-2 text-[12px] font-extrabold ${type === chip ? "bg-[#1e3a8a] text-white" : "bg-slate-100 text-slate-600"}`}>{chip}</button>)}</div><div className="mt-5 flex gap-2"><Button variant="ghost" onClick={() => setStep(1)}>Back</Button><Button onClick={() => setStep(3)}>Continue</Button></div></Card>}
+      {step === 1 && <Card className="p-4"><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{state.categories.map((cat) => <button key={cat.id} onClick={() => selectCategory(cat.id)} className="rounded-xl border border-[#e2e8f0] bg-white p-4 text-left transition hover:border-[#1e3a8a] hover:shadow"><div className="mb-3 h-2 w-10 rounded-full" style={{ background: cat.color }} /><div className="font-extrabold">{toSentenceCase(cat.name)}</div><div className="mt-1 text-[12px] text-slate-500">{cat.taskTypes.length} task types</div></button>)}</div></Card>}
+      {step === 2 && <Card className="p-4"><div className="mb-3 text-[14px] font-extrabold">Task types for {toSentenceCase(category.name)}</div><div className="flex flex-wrap gap-2">{chips.map((chip) => <button key={chip} onClick={() => setType(chip)} className={`rounded-full px-3 py-2 text-[12px] font-extrabold ${type === chip ? "bg-[#1e3a8a] text-white" : "bg-slate-100 text-slate-600"}`}>{toSentenceCase(chip)}</button>)}</div>{!type && <div className="mt-3 text-[12px] font-semibold text-amber-600">Select a task type to continue.</div>}<div className="mt-5 flex gap-2"><Button variant="ghost" onClick={() => setStep(1)}>Back</Button><Button onClick={() => { if (!type) { toast.error("Please select a task type before continuing."); return; } setStep(3); }} disabled={!type}>Continue</Button></div></Card>}
       {step === 3 && (
         <Card className="p-4">
           <div className="mb-4 rounded-xl border border-[#dbeafe] bg-blue-50 p-3">
             <div className="text-[11px] font-extrabold uppercase tracking-[.08em] text-[#1e3a8a]">Selected Task</div>
             <div className="mt-1 flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-white px-2.5 py-1 text-[12px] font-extrabold text-[#1e3a8a]">{category?.name || "Category"}</span>
-              <span className="text-[14px] font-extrabold text-slate-900">{type || "Select a task type"}</span>
+              <span className="rounded-full bg-white px-2.5 py-1 text-[12px] font-extrabold text-[#1e3a8a]">{toSentenceCase(category?.name || "Category")}</span>
+              <span className="text-[14px] font-extrabold text-slate-900">{toSentenceCase(type || "Select a task type")}</span>
             </div>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
@@ -503,6 +519,7 @@ export default function AddTask() {
                     { value: "", label: "Select FY" },
                     ...fyOptions.map((fy) => ({ value: fy, label: fy }))
                   ]}
+                  sentenceCaseLabels={true}
                 />
               </Field>
             )}
@@ -515,6 +532,7 @@ export default function AddTask() {
                     { value: "", label: "Select Quarter" },
                     ...quarterOptions.map((q) => ({ value: q.value, label: q.value }))
                   ]}
+                  sentenceCaseLabels={true}
                 />
               </Field>
             )}
@@ -592,12 +610,14 @@ export default function AddTask() {
     </div>
   );
 }
-function Step({ n, label, active, onClick }) { 
+function Step({ n, label, active, onClick, disabled = false }) { 
   return (
     <button 
       type="button" 
       onClick={onClick} 
-      className={`w-full text-left flex items-center gap-3 rounded-xl border p-3 transition-colors hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a8a]/30 ${active ? "border-[#1e3a8a] bg-white" : "border-[#e2e8f0] bg-white/60 hover:bg-white cursor-pointer"}`}
+      disabled={disabled}
+      className={`w-full text-left flex items-center gap-3 rounded-xl border p-3 transition-colors hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[#1e3a8a]/30 ${disabled ? "cursor-not-allowed opacity-55" : "cursor-pointer"} ${active ? "border-[#1e3a8a] bg-white" : "border-[#e2e8f0] bg-white/60 hover:bg-white"}`}
+      aria-disabled={disabled}
     >
       <div className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-[12px] font-black transition-colors ${active ? "bg-[#1e3a8a] text-white" : "bg-slate-200 text-slate-500"}`}>
         {active ? <Check size={15} /> : n}

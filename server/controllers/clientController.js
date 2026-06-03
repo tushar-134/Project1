@@ -51,7 +51,7 @@ function escapeRegex(value) {
 
 function parsePagination(query = {}, defaultLimit = 20) {
   const page = Math.max(1, Number(query.page) || 1);
-  const limit = Math.max(1, Math.min(100, Number(query.limit) || defaultLimit));
+  const limit = Math.max(1, Math.min(5000, Number(query.limit) || defaultLimit));
   return { page, limit };
 }
 
@@ -79,8 +79,11 @@ function buildClientSearchClause(value) {
 }
 
 async function buildClientListQuery(req) {
-  const { search, jurisdiction, type, group, assignedUser, client, compliance, contact, createdAt, createdBy, licenceExpiry } = req.query;
-  const query = { isActive: true };
+  const { search, jurisdiction, type, group, assignedUser, client, compliance, contact, createdAt, createdBy, licenceExpiry, status, expired, expiring } = req.query;
+  const query = {};
+  if (status !== "all") {
+    query.isActive = status === "inactive" ? false : true;
+  }
   const andClauses = [];
 
   if (jurisdiction) andClauses.push({ jurisdiction: buildPattern(jurisdiction) });
@@ -151,6 +154,27 @@ async function buildClientListQuery(req) {
   if (licenceExpiry) {
     const pattern = buildPattern(licenceExpiry);
     andClauses.push({ "tradeLicences.expiryDate": pattern });
+  }
+  if (expired === "true") {
+    const now = new Date();
+    andClauses.push({
+      $or: [
+        { "tradeLicences.expiryDate": { $lt: now, $exists: true } },
+        { "contactPersons.emiratesId.expiryDate": { $lt: now, $exists: true } },
+        { "contactPersons.passport.expiryDate": { $lt: now, $exists: true } },
+      ],
+    });
+  }
+  if (expiring === "true") {
+    const now = new Date();
+    const in15Days = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
+    andClauses.push({
+      $or: [
+        { "tradeLicences.expiryDate": { $gte: now, $lte: in15Days } },
+        { "contactPersons.emiratesId.expiryDate": { $gte: now, $lte: in15Days } },
+        { "contactPersons.passport.expiryDate": { $gte: now, $lte: in15Days } },
+      ],
+    });
   }
   if (andClauses.length) query.$and = andClauses;
   return query;
@@ -699,25 +723,23 @@ exports.deleteClient = async (req, res, next) => {
     const client = await Client.findById(req.params.id);
     if (!client) return res.status(404).json({ message: "Client not found" });
 
-    const taskIds = await Task.find({ client: client._id }).distinct("_id");
-    if (taskIds.length) {
-      await ActivityLog.deleteMany({ task: { $in: taskIds } });
-      await Notification.deleteMany({
-        $or: [
-          { relatedTask: { $in: taskIds } },
-          { relatedClient: client._id },
-        ],
-      });
-      await Task.deleteMany({ client: client._id });
-    } else {
-      await Notification.deleteMany({ relatedClient: client._id });
-    }
+    // Soft delete: keep the client and tasks, just mark inactive
+    client.isActive = false;
+    await client.save();
 
-    await Contact.deleteMany({ client: client._id });
-    await ClientGroup.updateMany({ clients: client._id }, { $pull: { clients: client._id } });
-    await client.deleteOne();
+    res.json({ message: "Client moved to inactive list" });
+  } catch (error) { next(error); }
+};
 
-    res.json({ message: "Client deleted permanently" });
+exports.restoreClient = async (req, res, next) => {
+  try {
+    const client = await Client.findById(req.params.id);
+    if (!client) return res.status(404).json({ message: "Client not found" });
+
+    client.isActive = true;
+    await client.save();
+
+    res.json(await client.populate(populateClient));
   } catch (error) { next(error); }
 };
 

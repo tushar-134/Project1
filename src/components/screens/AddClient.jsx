@@ -15,6 +15,7 @@ import CustomFieldModal from "../ui/CustomFieldModal.jsx";
 import TaskDrawer from "../ui/TaskDrawer.jsx";
 import { DIAL_CODE_OPTIONS } from "../../utils/dialCodeOptions.js";
 import { getPhoneNumberSpec, normalizeDialCode, normalizePhoneNumber } from "../../utils/phoneUtils.js";
+import { toSentenceCase } from "../../utils/textCase";
 
 
 const tabs = ["Basic Details", "Trade Licences", "Contact Persons", "VAT / CT", "Client Group", "Portal Logins", "Custom Fields", "Attachments"];
@@ -176,8 +177,33 @@ const LICENCE_TYPE_OPTIONS = [
   "Industrial License",
   "Agricultural License",
   "Crafts License",
-  "Tourism License"
+  "Tourism License",
 ];
+const LEGACY_LICENCE_TYPE_LABELS = {
+  commercial: "Commercial License",
+  professional: "Professional License",
+  industrial: "Industrial License",
+  agricultural: "Agricultural License",
+  crafts: "Crafts License",
+  tourism: "Tourism License",
+};
+
+function normalizeLicenceTypeLabel(value) {
+  const normalized = String(value || "").trim();
+  if (!normalized) return "";
+
+  const legacyMatch = LEGACY_LICENCE_TYPE_LABELS[normalized.toLowerCase()];
+  if (legacyMatch) return legacyMatch;
+
+  if (normalized.toLowerCase().includes("license")) {
+    return normalized
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(" ");
+  }
+
+  return `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)} License`;
+}
 
 function normalizeFinancialYearEnd(value) {
   if (!value) return "Jan - Dec";
@@ -262,12 +288,12 @@ export default function AddClient() {
     return ["United Arab Emirates", ...[...new Set(base)].filter((country) => country !== "United Arab Emirates")];
   }, []);
   const [isDirty, setIsDirty] = useState(false);
-  const [form, setFormRaw] = useState({
+  const [form, setFormData] = useState({
     clientType: "", fileNo: "", legalName: "", tradeName: "", fye: "Jan - Dec", jurisdiction: "Mainland", assigned: "",
     country: "United Arab Emirates", emirate: "Dubai", street: "", poBox: "", postalCode: "", differentAddress: false, correspondence: "",
     vatTrn: "", vatStatus: "Registered", vatDate: "", vatDeregDate: "", vatFreq: "Jan-Mar", vatRegistrationTask: "", vatRegistrationTaskId: "", ctTin: "", ctStatus: "Not Registered", ctDate: "", ctDeregDate: "", ctRegistrationTask: "", ctRegistrationTaskId: "", group: "", newGroup: "",
   });
-  const setForm = (val) => { setIsDirty(true); setFormRaw(val); };
+  const setForm = (val) => { setIsDirty(true); setFormData(val); };
   const vatFilingFrequencyOptions = useMemo(() => getVatFilingFrequencyOptions(form.fye), [form.fye]);
   const shouldShowVatRegistrationFields = form.vatStatus !== "Not Registered";
   const shouldShowCtRegistrationFields = form.ctStatus !== "Not Registered";
@@ -275,7 +301,7 @@ export default function AddClient() {
   const isCtDeregistered = form.ctStatus === "Deregistered";
   const [vatHistory, setVatHistory] = useState([]);
   const [ctHistory, setCtHistory] = useState([]);
-  const [licences, setLicencesRaw] = useState([{ number: "", issue: "", expiry: "", authority: "", type: "Commercial License", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
+  const [licences, setLicencesRaw] = useState([{ number: "", issue: "", expiry: "", authority: "", type: "", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
   const setLicences = (val) => { setIsDirty(true); setLicencesRaw(val); };
 
   const [contacts, setContactsRaw] = useState([{
@@ -328,7 +354,7 @@ export default function AddClient() {
   const [isSaving, setIsSaving] = useState(false);
   const [drawerTaskId, setDrawerTaskId] = useState(null);
   const handledCreatedRegistrationTaskRef = useRef("");
-  const update = (key, value) => setFormRaw((f) => {
+  const update = (key, value) => setForm((f) => {
     setIsDirty(true);
     return { ...f, [key]: value };
   });
@@ -434,7 +460,7 @@ export default function AddClient() {
   }, [groupSearch, loadGroupOptions]);
 
   useEffect(() => {
-    setFormRaw((current) => {
+    setForm((current) => {
       const normalizedVatFrequency = normalizeVatFilingFrequency(current.vatFreq, current.fye);
       return normalizedVatFrequency === current.vatFreq ? current : { ...current, vatFreq: normalizedVatFrequency };
     });
@@ -443,7 +469,7 @@ export default function AddClient() {
   // ── Pre-fill form when arriving from a "Convert to Client" visit flow ──
   useEffect(() => {
     if (isEditMode || !visitNewClient) return;
-    setFormRaw((current) => ({
+    setForm((current) => ({
       ...current,
       legalName: visitNewClient.authorityName || current.legalName,
       tradeName: visitNewClient.authorityName || current.tradeName,
@@ -486,7 +512,7 @@ export default function AddClient() {
       const nextCtStatus = apiCtStatus === "registered" ? "Registered" : apiCtStatus === "deregistered" ? "Deregistered" : "Not Registered";
       const nextCtRegistrationTask = createdRegistrationTask?.taxType === "ct" ? createdRegistrationTask.taskMongoId || "" : client.ctDetails?.registrationTask || "";
       const nextCtRegistrationTaskId = createdRegistrationTask?.taxType === "ct" ? createdRegistrationTask.taskId || "" : client.ctDetails?.registrationTaskId || "";
-      setFormRaw({
+      setFormData({
         clientType: client.clientType === "natural" ? "Natural Person" : "Legal Person",
         fileNo: client.fileNo || "",
         legalName: client.legalName || "",
@@ -571,14 +597,14 @@ export default function AddClient() {
         issue: licence.issueDate?.slice?.(0, 10) || "",
         expiry: licence.expiryDate?.slice?.(0, 10) || "",
         authority: licence.issuingAuthority || "",
-        type: licence.licenceType ? (licence.licenceType.toLowerCase().includes("license") ? licence.licenceType.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") : `${licence.licenceType.charAt(0).toUpperCase()}${licence.licenceType.slice(1)} License`) : "Commercial License",
+        type: normalizeLicenceTypeLabel(licence.licenceType),
         email: licence.officialEmail || "",
         documentUrl: licence.documentUrl || "",
         documentName: licence.documentUrl ? licence.documentUrl.split("/").pop() : "",
         documentFile: null,
         documents: mapExistingDocuments(licence.documents, licence.documentUrl),
         persisted: true,
-      })) : [{ number: "", issue: "", expiry: "", authority: "", type: "Commercial License", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
+      })) : [{ number: "", issue: "", expiry: "", authority: "", type: "", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }]);
       const loadedPersons = client.contactPersons || [];
       const primaryIdx = loadedPersons.findIndex((person) => person.isPrimary);
       setPrimaryContactIndex(primaryIdx >= 0 ? primaryIdx : 0);
@@ -1084,7 +1110,7 @@ export default function AddClient() {
         assignedUser: form.assigned || undefined,
         registeredAddress: { country: form.country, emirate: form.emirate, street: form.street, poBox: form.poBox, postalCode: form.postalCode },
         correspondenceAddress: form.differentAddress ? { street: form.correspondence } : undefined,
-        group: form.group || undefined,
+        group: form.group || null,
         portalLogins: portals
           .filter((p) => [p.name, p.url, p.username, p.password, p.notes].some((value) => String(value || "").trim()))
           .map((p) => ({ portalName: p.name, portalUrl: p.url, username: p.username, password: p.password, notes: p.notes })),
@@ -1117,7 +1143,7 @@ export default function AddClient() {
             issueDate: licence.issue,
             expiryDate: licence.expiry,
             issuingAuthority: licence.authority,
-            licenceType: licence.type?.toLowerCase() || "commercial",
+            licenceType: licence.type?.toLowerCase() || "",
             officialEmail: licence.email,
             documentUrl: licence.documentUrl || undefined,
           }));
@@ -2161,8 +2187,8 @@ function Basic({ form, update, countries, users, userSearch, setUserSearch, isUs
         <Field label="Select Type*" field="client-type">
           <select className="input" required value={form.clientType} onChange={(e) => update("clientType", e.target.value)}>
             <option value="">Select type</option>
-            <option value="Legal Person">Legal person</option>
-            <option value="Natural Person">Natural person</option>
+            <option value="Legal Person">{toSentenceCase("Legal Person")}</option>
+            <option value="Natural Person">{toSentenceCase("Natural Person")}</option>
           </select>
         </Field>
         <Field label="File No." field="client-file-no"><input className="input" value={form.fileNo} onChange={(e) => update("fileNo", e.target.value)} /></Field>
@@ -2176,8 +2202,8 @@ function Basic({ form, update, countries, users, userSearch, setUserSearch, isUs
         <Field label="Jurisdiction" field="client-jurisdiction">
           <select className="input" value={form.jurisdiction} onChange={(e) => update("jurisdiction", e.target.value)}>
             <option value="Mainland">Mainland</option>
-            <option value="Free Zone">Free zone</option>
-            <option value="Designated Zone">Designated zone</option>
+            <option value="Free Zone">{toSentenceCase("Free Zone")}</option>
+            <option value="Designated Zone">{toSentenceCase("Designated Zone")}</option>
             <option value="Offshore">Offshore</option>
           </select>
         </Field>

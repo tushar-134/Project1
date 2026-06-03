@@ -1,13 +1,29 @@
 import { Outlet, useLocation } from "react-router-dom";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Sidebar, { navItems } from "./Sidebar.jsx";
 import TopBar from "./TopBar.jsx";
 
+const SIDEBAR_COLLAPSED_KEY = "filingBuddySidebarCollapsed";
+
 export default function Layout() {
   const { pathname } = useLocation();
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const [desktopCollapsed, setDesktopCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(true);
+  const [desktopCollapsed, setDesktopCollapsed] = useState(() => {
+    try {
+      return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
   const title = navItems.flatMap((s) => s.links).find((link) => link.to === pathname)?.label || "Dashboard";
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(desktopCollapsed));
+    } catch {
+      // Ignore storage failures and keep the UI functional.
+    }
+  }, [desktopCollapsed]);
 
   return (
     <div className="h-dvh overflow-hidden bg-[#f1f5f9]">

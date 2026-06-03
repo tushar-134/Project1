@@ -1,4 +1,4 @@
-import { AlertTriangle, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Clock, FileText, Briefcase, Landmark, PieChart, Files, ClipboardList, Boxes, GripVertical, RotateCcw, Settings2, X } from "lucide-react";
+import { AlertTriangle, CalendarDays, CalendarClock, CheckCircle2, ChevronLeft, ChevronRight, Clock, FileText, Briefcase, Landmark, PieChart, Files, ClipboardList, Boxes, GripVertical, RotateCcw, Settings2, X, ShieldAlert } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -174,9 +174,27 @@ export default function Dashboard() {
       <div className="flex justify-end">
         <div className="relative flex items-center gap-2" ref={settingsRef}>
           <div className="flex h-9 items-center overflow-hidden rounded-lg border border-[#e2e8f0] bg-white">
-            <button onClick={() => moveMonth(-1)} className="grid h-9 w-9 place-items-center hover:bg-slate-50"><ChevronLeft size={16} /></button>
-            <div className="min-w-36 px-3 text-center text-[12px] font-extrabold">{monthText}</div>
-            <button onClick={() => moveMonth(1)} className="grid h-9 w-9 place-items-center hover:bg-slate-50"><ChevronRight size={16} /></button>
+            <label className="relative flex h-full min-w-36 cursor-pointer items-center justify-center gap-2 px-4 text-[13px] font-extrabold transition-colors hover:bg-slate-50">
+              <CalendarDays size={15} className="text-slate-500" />
+              <span className="text-slate-800">{monthText}</span>
+              <input
+                type="month"
+                value={`${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`}
+                onChange={(e) => {
+                  if (!e.target.value) return;
+                  const [y, m] = e.target.value.split("-");
+                  setMonth(new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1));
+                }}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                onClick={(e) => {
+                  try {
+                    e.target.showPicker();
+                  } catch (err) {
+                    // Ignore if showPicker is not supported
+                  }
+                }}
+              />
+            </label>
           </div>
           <button
             type="button"
@@ -249,10 +267,12 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-5">
         <Stat icon={<FileText size={18} />} label="Total Clients" value={stats.totalClients || 0} color="text-[#1e3a8a]" onClick={() => navigate("/clients/list")} />
         <Stat icon={<Clock size={18} />} label="Pending Tasks" value={stats.pendingTasks || 0} color="text-[#eab308]" onClick={() => navigate(`/tasks/list?status=Active&month=${selectedMonth}`)} />
         <Stat icon={<AlertTriangle size={18} />} label="Overdue" value={stats.overdueTasks || 0} color="text-[#dc2626]" onClick={() => navigate(`/tasks/list?status=Active&scope=Overdue&overdue=true&month=${selectedMonth}`)} />
+        <Stat icon={<ShieldAlert size={18} />} label="Expired Licences" value={stats.expiredLicences || 0} color="text-[#9333ea]" onClick={() => navigate("/clients/list?expired=true")} />
+        <Stat icon={<CalendarClock size={18} />} label="Expiring in 15 Days" value={stats.expiringSoonLicences || 0} color="text-[#ea580c]" onClick={() => navigate("/clients/list?expiring=true")} />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

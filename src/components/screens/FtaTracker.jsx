@@ -15,6 +15,7 @@ import { useAuth } from "../../context/AuthContext.jsx";
 import { useApp } from "../../context/AppContext.jsx";
 import { useTasks } from "../../hooks/useTasks";
 import { sortOptionsWithOtherLast } from "../../utils/optionSort";
+import { toSentenceCase } from "../../utils/textCase";
 import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
@@ -37,7 +38,7 @@ const TABS = [
   {
     id: "in_review",
     label: "In Review",
-    statusMatch: "In Review",
+    statusMatch: "In review",
     icon: Clock,
     color: "#1e3a8a",
     bg: "bg-blue-50",
@@ -49,7 +50,7 @@ const TABS = [
   {
     id: "additional_query",
     label: "Additional Query (FTA)",
-    statusMatch: "Additional Query From FTA",
+    statusMatch: "Additional query from FTA",
     icon: AlertCircle,
     color: "#d97706",
     bg: "bg-yellow-50",
@@ -60,7 +61,7 @@ const TABS = [
   },
 ];
 
-const FTA_STATUSES = ["In Review", "Additional Query From FTA", "Approved"];
+const FTA_STATUSES = ["In review", "Additional query from FTA", "Approved"];
 
 function createEmptyFilters() {
   return { client: "", category: "", assigned: "", dueDate: "" };
@@ -115,8 +116,8 @@ export default function FtaTracker() {
     return true;
   });
 
-  const tabItems = filtered.filter((item) => item.status === currentTab.statusMatch);
-  const countFor = (tab) => filtered.filter((item) => item.status === tab.statusMatch).length;
+  const tabItems = filtered.filter((item) => item.status?.toLowerCase() === currentTab.statusMatch?.toLowerCase());
+  const countFor = (tab) => filtered.filter((item) => item.status?.toLowerCase() === tab.statusMatch?.toLowerCase()).length;
 
   const activeFilterSummary = buildFilterSummary(filters);
   const hasFilters = activeFilterSummary.length > 0;
@@ -281,7 +282,7 @@ export default function FtaTracker() {
                     <option value="">All categories</option>
                     {CATEGORY_FILTERS.map((f) => (
                       <option key={f} value={f}>
-                        {f === "Corporate Tax" ? "Corporate tax" : f === "MIS Reporting" ? "MIS reporting" : f === "E-Invoicing" ? "E-invoicing" : f === "VAT Refund" ? "VAT refund" : f}
+                        {toSentenceCase(f)}
                       </option>
                     ))}
                   </select>
@@ -434,7 +435,7 @@ export default function FtaTracker() {
                         }
                       >
                         {FTA_STATUSES.map((s) => (
-                          <option key={s} value={s}>{s === "In Review" ? "In review" : s === "Additional Query From FTA" ? "Additional query from FTA" : s}</option>
+                          <option key={s} value={s}>{s}</option>
                         ))}
                       </select>
                     )}
@@ -524,7 +525,7 @@ function FtaStatusBadge({ status }) {
       </span>
     );
   }
-  if (status === "Additional Query From FTA") {
+  if (status === "Additional query from FTA") {
     return (
       <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-3 py-1 text-[11px] font-extrabold text-yellow-700">
         <AlertCircle size={11} /> Additional Query

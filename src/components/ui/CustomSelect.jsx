@@ -1,5 +1,6 @@
 import { ChevronDown, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { toSentenceCase } from "../../utils/textCase";
 
 export default function CustomSelect({
   value,
@@ -8,6 +9,7 @@ export default function CustomSelect({
   placeholder = "Select...",
   className = "",
   allowClear = false,
+  sentenceCaseLabels = false,
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -23,7 +25,11 @@ export default function CustomSelect({
   }, []);
 
   const selectedOption = options.find((o) => o.value === value);
-  const display = selectedOption ? selectedOption.label : "";
+  const display = selectedOption
+    ? sentenceCaseLabels
+      ? toSentenceCase(selectedOption.label)
+      : selectedOption.label
+    : "";
 
   return (
     <div ref={ref} className={`relative ${className}`}>
@@ -68,7 +74,7 @@ export default function CustomSelect({
                   setOpen(false);
                 }}
               >
-                {opt.label}
+                {sentenceCaseLabels ? toSentenceCase(opt.label) : opt.label}
               </li>
             ))}
           </ul>

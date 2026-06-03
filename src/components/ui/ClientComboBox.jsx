@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import { clientService } from "../../services/clientService";
 import { mapClient } from "../../utils/adapterUtils";
 
+const EMPTY_CLIENTS = [];
+
 /**
  * Searchable client combobox.
  *
@@ -15,7 +17,7 @@ import { mapClient } from "../../utils/adapterUtils";
  *   inputId        – id attribute for the <input> (for label association)
  */
 export default function ClientComboBox({
-  clients = [],
+  clients = EMPTY_CLIENTS,
   value = "",
   onChange,
   useNameAsValue = false,
@@ -27,10 +29,12 @@ export default function ClientComboBox({
   const ref = useRef(null);
   const [localClients, setLocalClients] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState("");
+  const fetchRequestId = useRef(0);
 
   // Synchronize localClients with the clients prop on mount/change
   useEffect(() => {
-    setLocalClients(clients);
+    setLocalClients(Array.isArray(clients) ? clients : EMPTY_CLIENTS);
   }, [clients]);
 
   // Resolve display name for the currently selected value
@@ -61,19 +65,32 @@ export default function ClientComboBox({
   useEffect(() => {
     if (!open) return;
 
+    const requestId = ++fetchRequestId.current;
+    setLoading(true);
+    setFetchError("");
     const delayDebounce = setTimeout(() => {
-      setLoading(true);
-      clientService.list({ search: inputValue.trim() || undefined, limit: 10 })
+      clientService.list({ search: inputValue.trim() || undefined, page: 1, limit: 5000, status: "all" })
         .then((data) => {
-          const raw = Array.isArray(data) ? data : (data.clients || data.items || []);
+          if (requestId !== fetchRequestId.current) return;
+          const raw = Array.isArray(data)
+            ? data
+            : (data.clients || data.items || data.results || []);
           const mapped = raw.map(mapClient);
           setLocalClients(mapped);
         })
-        .catch(() => {})
-        .finally(() => setLoading(false));
+        .catch(() => {
+          if (requestId !== fetchRequestId.current) return;
+          setFetchError("Unable to load clients");
+          setLocalClients([]);
+        })
+        .finally(() => {
+          if (requestId === fetchRequestId.current) setLoading(false);
+        });
     }, 250);
 
-    return () => clearTimeout(delayDebounce);
+    return () => {
+      clearTimeout(delayDebounce);
+    };
   }, [inputValue, open]);
 
   // Filter clients by the current typed query
@@ -100,11 +117,13 @@ export default function ClientComboBox({
 
   function handleFocus() {
     setInputValue(""); // clear so user can type a fresh search
+    setFetchError("");
     setOpen(true);
   }
 
   function handleChange(e) {
     setInputValue(e.target.value);
+    setFetchError("");
     setOpen(true);
   }
 
@@ -156,35 +175,42 @@ export default function ClientComboBox({
         </span>
       </div>
       {open && (
-        <ul className="absolute top-full left-0 z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-xl border border-[#e2e8f0] bg-white shadow-lg custom-scrollbar">
-          {loading ? (
-            <li className="flex items-center gap-2 px-4 py-3 text-[12px] text-slate-400">
-              <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-[#1e3a8a]" />
-              Searching...
-            </li>
-          ) : filtered.length === 0 ? (
-            <li className="px-4 py-3 text-[12px] text-slate-400">No clients found</li>
-          ) : (
-            filtered.map((c) => {
-              const name = c.name || c.legalName;
-              const id = c._id || c.id;
-              const isSelected = useNameAsValue ? name === value : id === value;
-              return (
-                <li
-                  key={id}
-                  onMouseDown={() => handleSelect(c)}
-                  className={`cursor-pointer px-4 py-2.5 text-[13px] transition-colors hover:bg-blue-50 hover:text-[#1e3a8a] ${
-                    isSelected
-                      ? "bg-blue-50/70 font-extrabold text-[#1e3a8a]"
-                      : "font-semibold text-slate-700"
-                  }`}
-                >
-                  {name}
-                </li>
-              );
-            })
+        <div className="absolute top-full left-0 z-50 mt-1 w-full overflow-hidden rounded-xl border border-[#e2e8f0] bg-white shadow-lg">
+          <ul className="client-dropdown-scrollbar max-h-60 overflow-y-scroll pr-1">
+            {loading ? (
+              <li className="flex items-center gap-2 px-4 py-3 text-[12px] text-slate-400">
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-slate-300 border-t-[#1e3a8a]" />
+                Searching...
+              </li>
+            ) : fetchError ? (
+              <li className="px-4 py-3 text-[12px] font-semibold text-red-500">{fetchError}</li>
+            ) : filtered.length === 0 ? (
+              <li className="px-4 py-3 text-[12px] text-slate-400">No clients found</li>
+            ) : (
+              filtered.map((c) => {
+                const name = c.name || c.legalName;
+                const id = c._id || c.id;
+                const isSelected = useNameAsValue ? name === value : id === value;
+                return (
+                  <li
+                    key={id}
+                    onMouseDown={() => handleSelect(c)}
+                    className={`cursor-pointer px-4 py-2.5 text-[13px] transition-colors hover:bg-blue-50 hover:text-[#1e3a8a] ${
+                      isSelected
+                        ? "bg-blue-50/70 font-extrabold text-[#1e3a8a]"
+                        : "font-semibold text-slate-700"
+                    }`}
+                  >
+                    {name}
+                  </li>
+                );
+              })
+            )}
+          </ul>
+          {filtered.length > 5 && !loading && !fetchError && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-white to-white/0" />
           )}
-        </ul>
+        </div>
       )}
     </div>
   );

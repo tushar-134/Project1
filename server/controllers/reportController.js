@@ -58,11 +58,30 @@ exports.dashboardStats = async (req, res, next) => {
       ...roleScope,
     };
 
-    const [totalClients, pendingTasks, overdueTasks, ftaPending, recentActivity, catAgg, overdueAgg] = await Promise.all([
+    const in15Days = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
+    const [totalClients, pendingTasks, overdueTasks, ftaPending, expiredLicences, expiringSoonLicences, recentActivity, catAgg, overdueAgg] = await Promise.all([
       Client.countDocuments(clientScope),
       Task.countDocuments({ ...taskScope, status: { $ne: "completed" } }),
       Task.countDocuments(overdueScope),
       Task.countDocuments({ ...taskScope, isAwaitingFta: true, ftaStatus: { $ne: "approved" } }),
+      Client.countDocuments({
+        isActive: true,
+        $or: [
+          { "tradeLicences.expiryDate": { $lt: now, $exists: true } },
+          { "contactPersons.emiratesId.expiryDate": { $lt: now, $exists: true } },
+          { "contactPersons.passport.expiryDate": { $lt: now, $exists: true } },
+        ],
+        ...(req.user.role === "task_only" ? { _id: { $in: visibleTaskClientIds } } : {}),
+      }),
+      Client.countDocuments({
+        isActive: true,
+        $or: [
+          { "tradeLicences.expiryDate": { $gte: now, $lte: in15Days } },
+          { "contactPersons.emiratesId.expiryDate": { $gte: now, $lte: in15Days } },
+          { "contactPersons.passport.expiryDate": { $gte: now, $lte: in15Days } },
+        ],
+        ...(req.user.role === "task_only" ? { _id: { $in: visibleTaskClientIds } } : {}),
+      }),
       ActivityLog.find({
         ...(req.user.role === "task_only" ? { task: { $in: activityTaskIds } } : {}),
         ...activityDateScope,
@@ -98,7 +117,7 @@ exports.dashboardStats = async (req, res, next) => {
       pending: c.pending,
       overdue: overdueByCat.get(c._id) || 0,
     }));
-    res.json({ totalClients, pendingTasks, overdueTasks, ftaPending, categoryBreakdown, recentActivity });
+    res.json({ totalClients, pendingTasks, overdueTasks, ftaPending, expiredLicences, expiringSoonLicences, categoryBreakdown, recentActivity });
   } catch (error) { next(error); }
 };
 

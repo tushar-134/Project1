@@ -1,11 +1,13 @@
-import { ChevronDown, ChevronLeft, ChevronRight, Columns, Download, RefreshCw, RotateCcw, Search, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Columns, Download, RefreshCw, RotateCcw, Search, SlidersHorizontal, Trash2, Upload, X, CalendarClock } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useClients } from "../../hooks/useClients";
 import { customFieldService } from "../../services/customFieldService.js";
+import { clientService } from "../../services/clientService.js";
 import { downloadBlob } from "../../utils/adapterUtils";
+import { toSentenceCase } from "../../utils/textCase";
 import { canCreateClients, canManageClients } from "../../utils/permissions.js";
 import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
@@ -55,13 +57,14 @@ const EMPTY_COLUMN_FILTERS = {
   contact: "",
   createdAt: "",
   createdBy: "",
+  status: "active",
 };
 const PAGE_SIZE = 20;
 
 const JURISDICTION_OPTIONS = ["Mainland", "Free Zone", "Designated Zone", "Offshore"];
 const TYPE_OPTIONS = ["Legal Person", "Natural Person"];
 
-function buildActiveFilterSummary(columnFilters, query) {
+function buildActiveFilterSummary(columnFilters, query, expired, expiring) {
   const chips = [];
   if (query.trim()) chips.push(`Search: ${query.trim()}`);
   if (columnFilters.client) chips.push(`Client: ${columnFilters.client}`);
@@ -69,10 +72,12 @@ function buildActiveFilterSummary(columnFilters, query) {
   if (columnFilters.type) chips.push(`Type: ${columnFilters.type}`);
   if (columnFilters.group) chips.push(`Group: ${columnFilters.group}`);
   if (columnFilters.compliance) chips.push(`VAT TRN: ${columnFilters.compliance}`);
-  if (columnFilters.licenceExpiry) chips.push(`Licence Expiry: ${columnFilters.licenceExpiry}`);
+  if (expired) chips.push("Expiry: Expired");
+  if (expiring) chips.push("Expiry: Expiring in 15 days");
   if (columnFilters.contact) chips.push(`Contact: ${columnFilters.contact}`);
   if (columnFilters.createdAt) chips.push(`Created: ${columnFilters.createdAt}`);
   if (columnFilters.createdBy) chips.push(`Created By: ${columnFilters.createdBy}`);
+  if (columnFilters.status && columnFilters.status !== "active") chips.push(`Contact Type: ${columnFilters.status.charAt(0).toUpperCase() + columnFilters.status.slice(1)}`);
   return chips;
 }
 
@@ -367,9 +372,22 @@ export default function ClientList() {
   // Inactive clients are read-only and must be restored to edit.
   const [clientStatus, setClientStatus] = useState("Active");
   const [query, setQuery] = useState(searchParams.get("search") || "");
+  const [expired, setExpired] = useState(searchParams.get("expired") === "true");
+  const [expiring, setExpiring] = useState(searchParams.get("expiring") === "true");
+  const [highlightClientId, setHighlightClientId] = useState(searchParams.get("highlight") || "");
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1, workingTasksTotal: 0 });
   const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
+
+  // Sync state with URL params in case they change without a full remount
+  useEffect(() => {
+    setExpired(searchParams.get("expired") === "true");
+    setExpiring(searchParams.get("expiring") === "true");
+    if (searchParams.has("search")) {
+      setQuery(searchParams.get("search") || "");
+    }
+    setHighlightClientId(searchParams.get("highlight") || "");
+  }, [searchParams]);
   const [drawerClientId, setDrawerClientId] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -426,7 +444,7 @@ export default function ClientList() {
     contact: deferredColumnFilters.contact.trim() || undefined,
     createdAt: deferredColumnFilters.createdAt || undefined,
     createdBy: deferredColumnFilters.createdBy.trim() || undefined,
-  }), [deferredColumnFilters, deferredQuery, page, clientStatus]);
+  }), [deferredColumnFilters, deferredQuery, page, clientStatus, expired, expiring]);
 
   const filterRef = useRef(requestParams);
   filterRef.current = requestParams;
@@ -454,12 +472,22 @@ export default function ClientList() {
   }, [refetchClients, requestParams]);
 
   const rows = state.clients;
-  const activeColumnFilters = buildActiveFilterSummary(columnFilters, query);
-  const hasColumnFilters = Object.values(columnFilters).some(Boolean);
+  const activeFilterChips = useMemo(
+    () => buildActiveFilterSummary(columnFilters, query, expired, expiring),
+    [columnFilters, query, expired, expiring]
+  );
+  const activeFilterCount = activeFilterChips.length;
+  const hasColumnFilters = activeFilterCount > 0;
   const hasActiveFilters = Boolean(query.trim()) || hasColumnFilters;
-  const activeFilterCount = activeColumnFilters.length;
   const workingCount = rows.filter((c) => (c.activeTasks || 0) > 0).length;
   const draftCount = rows.filter((client) => client.isDraft).length;
+
+  useEffect(() => {
+    if (!highlightClientId || clientsLoading) return;
+    const node = document.getElementById(`client-row-${highlightClientId}`);
+    if (!node) return;
+    node.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightClientId, clientsLoading, rows.length, page, expired]);
 
   const updateColumnFilter = (key, value) => {
     setPage(1);
@@ -469,13 +497,19 @@ export default function ClientList() {
   const clearColumnFilters = () => {
     setPage(1);
     setQuery("");
+    setExpired(false);
+    setExpiring(false);
     setColumnFilters(EMPTY_COLUMN_FILTERS);
+    
+    // Clear URL parameters
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete("expired");
+    newParams.delete("expiring");
+    window.history.replaceState(null, "", "?" + newParams.toString());
   };
 
   const resetAllFilters = () => {
-    setPage(1);
-    setQuery("");
-    setColumnFilters(EMPTY_COLUMN_FILTERS);
+    clearColumnFilters();
   };
 
   const updateColVisibility = useCallback((key, value) => {
@@ -540,7 +574,46 @@ export default function ClientList() {
   return (
     <div className="space-y-5">
 
-      {/* Filter & review toolbar — mirrors TaskList design */}
+      {/* Expired filter banner */}
+      {expired && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-purple-200 bg-purple-50 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-purple-100 text-purple-700">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </span>
+            <span className="text-[13px] font-extrabold text-purple-800">Showing clients with expired documents</span>
+            <span className="text-[12px] font-medium text-purple-600">(Trade Licence, Emirates ID, or Passport)</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => { setExpired(false); setPage(1); }}
+            className="rounded-lg px-3 py-1 text-[12px] font-extrabold text-purple-700 hover:bg-purple-100 transition-colors"
+          >
+            Clear filter
+          </button>
+        </div>
+      )}
+
+      {/* Expiring soon filter banner */}
+      {expiring && (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-orange-100 text-orange-700">
+              <CalendarClock size={14} />
+            </span>
+            <span className="text-[13px] font-extrabold text-orange-800">Showing clients with documents expiring within 15 days</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => { setExpiring(false); setPage(1); }}
+            className="rounded-lg px-3 py-1 text-[12px] font-extrabold text-orange-700 hover:bg-orange-100 transition-colors"
+          >
+            Clear filter
+          </button>
+        </div>
+      )}
+
+      {/* Filter & review toolbar */}
       <Card>
         <div className="task-list-toolbar border-b border-slate-200 px-4 py-4 sm:px-5">
           {/* Header row: title + summary pills */}
@@ -582,12 +655,8 @@ export default function ClientList() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <InfoPill tone="navy" label={`${workingCount} with active tasks`} />
               <InfoPill tone="slate" label={`${meta.total} total`} />
               {draftCount > 0 && <InfoPill tone="amber" label={`${draftCount} incomplete`} />}
-              {meta.workingTasksTotal > 0 && (
-                <InfoPill tone="green" label={`${meta.workingTasksTotal} active tasks`} />
-              )}
               {clientsLoading && <InfoPill tone="amber" label="Refreshing" />}
               {hasActiveFilters && <InfoPill tone="blue" label={`${activeFilterCount} active filters`} />}
             </div>
@@ -758,7 +827,7 @@ export default function ClientList() {
               >
                 <option value="">All jurisdictions</option>
                 {JURISDICTION_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>{opt === "Free Zone" ? "Free zone" : opt === "Designated Zone" ? "Designated zone" : opt}</option>
+                  <option key={opt} value={opt}>{toSentenceCase(opt)}</option>
                 ))}
               </select>
             </FilterField>
@@ -772,8 +841,20 @@ export default function ClientList() {
               >
                 <option value="">All types</option>
                 {TYPE_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>{opt === "Legal Person" ? "Legal person" : opt === "Natural Person" ? "Natural person" : opt}</option>
+                  <option key={opt} value={opt}>{toSentenceCase(opt)}</option>
                 ))}
+              </select>
+            </FilterField>
+
+            <FilterField label="Contact Type" htmlFor="client-filter-status">
+              <select
+                id="client-filter-status"
+                className="input"
+                value={columnFilters.status || "active"}
+                onChange={(e) => updateColumnFilter("status", e.target.value)}
+              >
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
               </select>
             </FilterField>
 
@@ -805,14 +886,38 @@ export default function ClientList() {
               </div>
             </FilterField>
 
-            <FilterField label="Licence Expiry" htmlFor="client-filter-licence-expiry">
-              <input
-                id="client-filter-licence-expiry"
+            <FilterField label="Expiry" htmlFor="client-filter-expiry">
+              <select
+                id="client-filter-expiry"
                 className="input"
-                type="date"
-                value={columnFilters.licenceExpiry}
-                onChange={(e) => updateColumnFilter("licenceExpiry", e.target.value)}
-              />
+                value={expired ? "expired" : expiring ? "expiring" : ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setExpired(val === "expired");
+                  setExpiring(val === "expiring");
+                  setPage(1);
+                  
+                  // Keep URL searchParams in sync
+                  const newParams = new URLSearchParams(searchParams);
+                  if (val === "expired") {
+                    newParams.set("expired", "true");
+                    newParams.delete("expiring");
+                  } else if (val === "expiring") {
+                    newParams.set("expiring", "true");
+                    newParams.delete("expired");
+                  } else {
+                    newParams.delete("expired");
+                    newParams.delete("expiring");
+                  }
+                  // We don't call setSearchParams directly here because requestParams useEffect will handle the API call
+                  // but we should update the URL so it's bookmarkable.
+                  window.history.replaceState(null, "", "?" + newParams.toString());
+                }}
+              >
+                <option value="">All</option>
+                <option value="expired">Expired</option>
+                <option value="expiring">Expiring in 15 days</option>
+              </select>
             </FilterField>
 
             <FilterField label="Contact" htmlFor="client-filter-contact">
@@ -921,7 +1026,11 @@ export default function ClientList() {
             )}
 
             {!clientsLoading && !clientError && rows.map((client) => (
-              <tr key={client.id}>
+            <tr
+              key={client.id}
+              id={`client-row-${client.id}`}
+              className={client.id === highlightClientId ? "bg-orange-50 ring-2 ring-inset ring-orange-300" : ""}
+            >
                 {isVisible("client") && (
                   <td>
                     <button
@@ -957,6 +1066,16 @@ export default function ClientList() {
                           {client.activeTasks} active {client.activeTasks === 1 ? "task" : "tasks"}
                         </span>
                       )}
+                      {(client.expiredDocs || []).map((doc, idx) => (
+                        <span
+                          key={idx}
+                          title={`${doc.type} expired: ${doc.label} — ${doc.expiryDate ? new Date(doc.expiryDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""}`}
+                          className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-extrabold text-red-700"
+                        >
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                          {doc.type} Expired
+                        </span>
+                      ))}
                     </div>
                   </td>
                 )}
@@ -973,7 +1092,7 @@ export default function ClientList() {
                 {isVisible("compliance") && (
                   <td>
                     <div className="space-y-1">
-                      <div><span className="font-semibold text-slate-500">TRN:</span> {client.vatTrn || "—"}</div>
+                      <div>{client.vatTrn || "—"}</div>
                     </div>
                   </td>
                 )}
@@ -1045,6 +1164,24 @@ export default function ClientList() {
                           }}
                         >
                           <Trash2 size={14} />
+                        </Button>
+                      )}
+                      {currentUser?.role === "admin" && client.isActive === false && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            if (confirm("Restore client?")) {
+                              try {
+                                await clientService.restore(client._id);
+                                refetchClients().catch(() => {});
+                              } catch (e) {
+                                console.error(e);
+                              }
+                            }
+                          }}
+                        >
+                          Restore
                         </Button>
                       )}
                     </div>
