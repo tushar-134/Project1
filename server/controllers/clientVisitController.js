@@ -15,12 +15,8 @@ const populateVisit = [
 ];
 
 const VISIT_TYPES = [
-  "Requirement Gathering",
-  "Verification",
-  "Onboarding Discussion",
-  "Follow Up",
-  "Collection",
-  "Meeting",
+  "Monthly Visit",
+  "General Meeting",
 ];
 
 function getErrors(req, res) {
@@ -187,7 +183,7 @@ async function backfillVisit(visit) {
   }
 
   if (!visit.visitType) {
-    visit.visitType = "Requirement Gathering";
+    visit.visitType = "Monthly Visit";
     changed = true;
   }
 
@@ -495,7 +491,7 @@ exports.createVisit = async (req, res, next) => {
       newClient = {},
       visitDate,
       visitTime,
-      visitType = "Requirement Gathering",
+      visitType = "Monthly Visit",
       location,
       remarks,
       assignedUsers = [],
@@ -553,7 +549,7 @@ exports.createVisit = async (req, res, next) => {
       } : undefined,
       visitDate,
       visitTime: String(visitTime || "").trim(),
-      visitType: VISIT_TYPES.includes(visitType) ? visitType : "Requirement Gathering",
+      visitType: VISIT_TYPES.includes(visitType) ? visitType : "Monthly Visit",
       location: String(location || "").trim(),
       remarks: String(remarks || "").trim(),
       status: "planned",
@@ -640,7 +636,7 @@ exports.updateVisit = async (req, res, next) => {
     } : undefined;
     visit.visitDate = visitDate;
     visit.visitTime = String(visitTime || "").trim();
-    visit.visitType = VISIT_TYPES.includes(visitType) ? visitType : "Requirement Gathering";
+    visit.visitType = VISIT_TYPES.includes(visitType) ? visitType : "Monthly Visit";
     visit.location = String(location || "").trim();
     if (remarks !== undefined) {
       visit.remarks = String(remarks).trim();

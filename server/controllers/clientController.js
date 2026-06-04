@@ -446,6 +446,20 @@ exports.listClients = async (req, res, next) => {
     const { page: requestedPage, limit } = parsePagination(req.query, 20);
     const query = await buildClientListQuery(req);
     const skip = (requestedPage - 1) * limit;
+
+    if (req.query.mode === "options") {
+      const [total, clients] = await Promise.all([
+        Client.countDocuments(query),
+        Client.find(query)
+          .select("legalName tradeName fileNo group")
+          .sort({ legalName: 1 })
+          .skip(skip)
+          .limit(limit)
+          .lean(),
+      ]);
+      const pages = Math.max(1, Math.ceil(total / limit));
+      return res.json({ clients, total, page: Math.min(requestedPage, pages), pages, limit });
+    }
     
     const [total, clients] = await Promise.all([
       Client.countDocuments(query),

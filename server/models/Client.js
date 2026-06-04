@@ -112,11 +112,22 @@ const clientSchema = new mongoose.Schema({
 
 clientSchema.index({ isActive: 1, createdAt: -1 });
 clientSchema.index({ isActive: 1, jurisdiction: 1, createdAt: -1 });
+clientSchema.index({ isActive: 1, clientType: 1, createdAt: -1 });
 clientSchema.index({ isActive: 1, group: 1, createdAt: -1 });
 clientSchema.index({ isActive: 1, assignedUser: 1, createdAt: -1 });
 clientSchema.index({ legalName: 1 });
 clientSchema.index({ "vatDetails.trn": 1 });
 clientSchema.index({ "tradeLicences.licenceNumber": 1 }, { unique: true, sparse: true });
+clientSchema.index(
+  {
+    legalName: "text",
+    tradeName: "text",
+    fileNo: "text",
+    "vatDetails.trn": "text",
+    "tradeLicences.licenceNumber": "text",
+  },
+  { name: "client_search_text_idx" }
+);
 clientSchema.index({ group: 1 });
 
 module.exports = mongoose.model("Client", clientSchema);

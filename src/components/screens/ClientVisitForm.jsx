@@ -16,7 +16,7 @@ import ClientComboBox from "../ui/ClientComboBox.jsx";
 import UserAvatar from "../ui/UserAvatar.jsx";
 
 
-const visitTypes = ["Requirement Gathering", "Verification", "Onboarding Discussion", "Follow Up", "Collection", "Meeting"];
+const visitTypes = ["Monthly Visit", "General Meeting"];
 
 function todayValue() {
   const date = new Date();
@@ -36,7 +36,7 @@ function blankForm(currentUser) {
     },
     visitDate: todayValue(),
     visitTime24: "10:00",
-    visitType: "Requirement Gathering",
+    visitType: "Monthly Visit",
     location: "",
     remarks: "",
     assignedUsers: currentUser?.role === "task_only" ? [currentUser._id || currentUser.id] : [],
@@ -141,7 +141,7 @@ export default function ClientVisitForm() {
           },
           visitDate: visit.visitDate ? visit.visitDate.slice(0, 10) : todayValue(),
           visitTime24: parseVisitTime(visit.visitTime),
-          visitType: visit.visitType || "Requirement Gathering",
+          visitType: visit.visitType || "Monthly Visit",
           location: visit.location || "",
           remarks: visit.remarks || "",
           assignedUsers: (visit.assignedUsers || []).map((entry) => entry.user?._id || entry.user).filter(Boolean),

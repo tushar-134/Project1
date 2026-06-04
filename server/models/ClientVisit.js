@@ -41,7 +41,7 @@ const clientVisitSchema = new mongoose.Schema({
   newClient: newClientSchema,
   visitDate: { type: Date, required: true },
   visitTime: { type: String, trim: true },
-  visitType: { type: String, trim: true, default: "Requirement Gathering" },
+  visitType: { type: String, trim: true, default: "Monthly Visit" },
   location: { type: String, trim: true },
   remarks: { type: String, trim: true },
   status: {

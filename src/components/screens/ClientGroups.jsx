@@ -116,7 +116,7 @@ export default function ClientGroups({ setSettingsHeaderAction }) {
   }
   async function loadClients() {
     try {
-      const response = await clientService.list({ page: 1, limit: 500 });
+      const response = await clientService.list({ page: 1, limit: 500, mode: "options" });
       setAllClients(listItems(response));
     } catch (error) {
       toast.error(error?.response?.data?.message || "Unable to load clients.");

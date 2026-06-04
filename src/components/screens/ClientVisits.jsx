@@ -25,7 +25,7 @@ const statusOptions = [
   { value: "cancelled", label: "Cancelled" },
 ];
 
-const visitTypeOptions = ["All Types", "Requirement Gathering", "Verification", "Onboarding Discussion", "Follow Up", "Collection", "Meeting"];
+const visitTypeOptions = ["All Types", "Monthly Visit", "General Meeting"];
 
 const clientTypeOptions = [
   { value: "all", label: "All clients" },
