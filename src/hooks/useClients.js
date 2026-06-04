@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { clientService } from "../services/clientService";
 import { useApp } from "../context/AppContext";
 import { mapClient } from "../utils/adapterUtils";
@@ -6,17 +6,17 @@ import { getCache, setCache, clearCache } from "../utils/apiCache";
 
 export function useClients() {
   const { state, dispatch } = useApp();
+  const hasLoadedInitial = useRef(false);
 
   const fetchClients = useCallback(async (params) => {
     const cacheKey = `clients_${JSON.stringify(params || {})}`;
     const cachedData = getCache(cacheKey);
 
-    const isFirstLoad = !state.clients || state.clients.length === 0;
-    
-    // Only show loading spinner if it's the first load and we don't have cached data
-    if (isFirstLoad && !cachedData) {
+    // Only show loading spinner if it's the first load for this component instance and no cache
+    if (!hasLoadedInitial.current && !cachedData) {
       dispatch({ type: "SET_LOADING", resource: "clients", value: true });
     }
+    hasLoadedInitial.current = true;
 
     if (cachedData) {
       dispatch({ type: "SET_RESOURCE", resource: "clients", payload: cachedData.clients });
@@ -37,7 +37,7 @@ export function useClients() {
       dispatch({ type: "SET_ERROR", resource: "clients", error });
       throw error;
     }
-  }, [dispatch, state.clients]);
+  }, [dispatch]);
 
   // Wrap mutations to invalidate cache
   const withCacheInvalidation = useCallback((fn) => async (...args) => {

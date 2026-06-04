@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { useApp } from "../context/AppContext";
 import { taskService } from "../services/taskService";
 import { ftaStatusToApi, mapFtaTask, mapTask, statusFromApi, statusToApi } from "../utils/adapterUtils";
@@ -21,17 +21,17 @@ function normalizeTaskParams(params = {}) {
 
 export function useTasks() {
   const { state, dispatch } = useApp();
+  const hasLoadedInitial = useRef(false);
 
   const fetchTasks = useCallback(async (params) => {
     const normalizedParams = normalizeTaskParams(params);
     const cacheKey = `tasks_${JSON.stringify(normalizedParams)}`;
     const cachedData = getCache(cacheKey);
 
-    const isFirstLoad = !state.tasks || state.tasks.length === 0;
-    
-    if (isFirstLoad && !cachedData) {
+    if (!hasLoadedInitial.current && !cachedData) {
       dispatch({ type: "SET_LOADING", resource: "tasks", value: true });
     }
+    hasLoadedInitial.current = true;
 
     if (cachedData) {
       dispatch({ type: "SET_RESOURCE", resource: "tasks", payload: cachedData.tasks });
@@ -55,7 +55,7 @@ export function useTasks() {
       });
       throw error;
     }
-  }, [dispatch, state.tasks]);
+  }, [dispatch]);
   const fetchFtaTracker = useCallback(async (params) => {
     const tasks = (await taskService.ftaTracker(params)).map(mapFtaTask);
     dispatch({ type: "SET_RESOURCE", resource: "ftaItems", payload: tasks });
