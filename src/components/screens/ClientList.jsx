@@ -1025,7 +1025,11 @@ export default function ClientList() {
             <tr
               key={client.id}
               id={`client-row-${client.id}`}
-              className={client.id === highlightClientId ? "bg-orange-50 ring-2 ring-inset ring-orange-300" : ""}
+              className={client.id === highlightClientId
+                ? expiring
+                  ? "bg-amber-50 ring-2 ring-inset ring-amber-400"
+                  : "bg-purple-50 ring-2 ring-inset ring-purple-400"
+                : ""}
             >
                 {isVisible("client") && (
                   <td>
