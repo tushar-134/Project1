@@ -57,7 +57,6 @@ const EMPTY_COLUMN_FILTERS = {
   contact: "",
   createdAt: "",
   createdBy: "",
-  status: "active",
 };
 const PAGE_SIZE = 20;
 
@@ -77,7 +76,6 @@ function buildActiveFilterSummary(columnFilters, query, expired, expiring) {
   if (columnFilters.contact) chips.push(`Contact: ${columnFilters.contact}`);
   if (columnFilters.createdAt) chips.push(`Created: ${columnFilters.createdAt}`);
   if (columnFilters.createdBy) chips.push(`Created By: ${columnFilters.createdBy}`);
-  if (columnFilters.status && columnFilters.status !== "active") chips.push(`Contact Type: ${columnFilters.status.charAt(0).toUpperCase() + columnFilters.status.slice(1)}`);
   return chips;
 }
 
@@ -867,17 +865,7 @@ export default function ClientList() {
               </select>
             </FilterField>
 
-            <FilterField label="Contact Type" htmlFor="client-filter-status">
-              <select
-                id="client-filter-status"
-                className="input"
-                value={columnFilters.status || "active"}
-                onChange={(e) => updateColumnFilter("status", e.target.value)}
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </FilterField>
+
 
             <FilterField label="Group" htmlFor="client-filter-group">
               <div className="task-list-input-wrap">
