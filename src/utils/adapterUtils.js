@@ -58,6 +58,33 @@ export function mapClient(client) {
     }
   });
 
+  // Compute which documents are expiring within the next 15 days
+  const in15Days = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
+  const expiringSoonDocs = [];
+  (client.tradeLicences || []).forEach((lic, i) => {
+    if (lic.expiryDate) {
+      const exp = new Date(lic.expiryDate);
+      if (exp >= now && exp <= in15Days) {
+        expiringSoonDocs.push({ type: "Trade Licence", label: lic.licenceNumber || `Licence ${i + 1}`, expiryDate: lic.expiryDate });
+      }
+    }
+  });
+  (client.contactPersons || []).forEach((person) => {
+    const name = person.fullName || "Contact";
+    if (person.emiratesId?.expiryDate) {
+      const exp = new Date(person.emiratesId.expiryDate);
+      if (exp >= now && exp <= in15Days) {
+        expiringSoonDocs.push({ type: "Emirates ID", label: name, expiryDate: person.emiratesId.expiryDate });
+      }
+    }
+    if (person.passport?.expiryDate) {
+      const exp = new Date(person.passport.expiryDate);
+      if (exp >= now && exp <= in15Days) {
+        expiringSoonDocs.push({ type: "Passport", label: name, expiryDate: person.passport.expiryDate });
+      }
+    }
+  });
+
   return {
     ...client,
     id: client._id,
@@ -79,6 +106,7 @@ export function mapClient(client) {
     lifecycleStatus: isDraft ? "draft" : "complete",
     missingFields,
     expiredDocs,
+    expiringSoonDocs,
   };
 }
 
