@@ -967,7 +967,7 @@ export default function ClientList() {
           {/* Active filter chips */}
           {hasActiveFilters && (
             <div className="mt-3 flex flex-wrap gap-2">
-              {activeColumnFilters.map((item) => (
+              {activeFilterChips.map((item) => (
                 <span key={item} className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-600">
                   {item}
                 </span>
