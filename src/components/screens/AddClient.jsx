@@ -1318,213 +1318,222 @@ export default function AddClient() {
         </div>
         <div className="p-4">
 
-          <fieldset disabled={isViewMode} className={isViewMode ? "opacity-80" : ""}>
+          <div className={isViewMode ? "opacity-80" : ""}>
           {tab === 0 && (
-            <Basic
-              form={form}
-              update={update}
-              countries={countries}
-              users={userOptions}
-              userSearch={userSearch}
-              setUserSearch={setUserSearch}
-              isUserSearchLoading={isUserSearchLoading}
-            />
+            <fieldset disabled={isViewMode} className={isViewMode ? "opacity-80" : ""}>
+              <Basic
+                form={form}
+                update={update}
+                countries={countries}
+                users={userOptions}
+                userSearch={userSearch}
+                setUserSearch={setUserSearch}
+                isUserSearchLoading={isUserSearchLoading}
+              />
+            </fieldset>
           )}
-          {tab === 1 && <Repeat title="Trade Licence" items={licences} setItems={setLicences} blank={{ number: "", issue: "", expiry: "", authority: "", type: "", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }} render={(lic, i, patch) => {
-            const authoritySearch = authoritySearches[i] || "";
-            const authorityOptions = lic.authority && !ISSUING_AUTHORITY_OPTIONS.some((option) => option.id === lic.authority)
-              ? [{ id: lic.authority, label: lic.authority }, ...ISSUING_AUTHORITY_OPTIONS]
-              : ISSUING_AUTHORITY_OPTIONS;
-            const filteredAuthorityOptions = authorityOptions.filter((option) => option.label.toLowerCase().includes(authoritySearch.trim().toLowerCase()));
+          {tab === 1 && (
+            <fieldset disabled={isViewMode} className={isViewMode ? "opacity-80" : ""}>
+              <Repeat title="Trade Licence" items={licences} setItems={setLicences} blank={{ number: "", issue: "", expiry: "", authority: "", type: "", email: "", documentUrl: "", documentName: "", documentFile: null, documents: [], persisted: false }} render={(lic, i, patch) => {
+                const authoritySearch = authoritySearches[i] || "";
+                const authorityOptions = lic.authority && !ISSUING_AUTHORITY_OPTIONS.some((option) => option.id === lic.authority)
+                  ? [{ id: lic.authority, label: lic.authority }, ...ISSUING_AUTHORITY_OPTIONS]
+                  : ISSUING_AUTHORITY_OPTIONS;
+                const filteredAuthorityOptions = authorityOptions.filter((option) => option.label.toLowerCase().includes(authoritySearch.trim().toLowerCase()));
 
-            const licenceTypeOptions = lic.type && !LICENCE_TYPE_OPTIONS.includes(lic.type)
-              ? [lic.type, ...LICENCE_TYPE_OPTIONS]
-              : LICENCE_TYPE_OPTIONS;
+                const licenceTypeOptions = lic.type && !LICENCE_TYPE_OPTIONS.includes(lic.type)
+                  ? [lic.type, ...LICENCE_TYPE_OPTIONS]
+                  : LICENCE_TYPE_OPTIONS;
 
-            return <div className="grid gap-3 md:grid-cols-3"><Field label="Licence Number*" field={`licence-number-${i}`}><input className="input" value={lic.number} onChange={(e) => patch(i, { number: e.target.value })} /></Field><Field label="Issue Date" field={`licence-issue-${i}`}><input className="input" type="date" value={lic.issue} onChange={(e) => patch(i, { issue: e.target.value })} /></Field><Field label="Expiry Date" field={`licence-expiry-${i}`}><input className="input" type="date" value={lic.expiry} onChange={(e) => patch(i, { expiry: e.target.value })} /></Field><Field label="Issuing Authority" field={`licence-authority-${i}`}><SearchableSelect id={`licence-authority-${i}`} value={lic.authority} options={filteredAuthorityOptions} searchValue={authoritySearch} onSearchChange={(value) => setAuthoritySearch(i, value)} onChange={(value) => patch(i, { authority: value })} getLabel={(option) => option.label} placeholder="Select Issuing Authority" searchPlaceholder="Search authority..." loading={false} emptyLabel="No matching authority" /></Field><Field label="Licence Type" field={`licence-type-${i}`}><select className="input" value={lic.type} onChange={(e) => patch(i, { type: e.target.value })}><option value="">Select Licence Type</option>{licenceTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select></Field><Field label="Official Email" field={`licence-email-${i}`}><input className="input" value={lic.email} onChange={(e) => patch(i, { email: e.target.value })} /></Field><div className="md:col-span-3"><DocumentUploadZone id={`trade-licence-upload-${i}`} title="Upload trade licence documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={lic.documents || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleTradeLicenceFile(i, files)} onDeleteDocument={(document) => removeTradeLicenceDocument(i, document)} /></div></div>;
-          }} />}
+                return <div className="grid gap-3 md:grid-cols-3"><Field label="Licence Number*" field={`licence-number-${i}`}><input className="input" value={lic.number} onChange={(e) => patch(i, { number: e.target.value })} /></Field><Field label="Issue Date" field={`licence-issue-${i}`}><input className="input" type="date" value={lic.issue} onChange={(e) => patch(i, { issue: e.target.value })} /></Field><Field label="Expiry Date" field={`licence-expiry-${i}`}><input className="input" type="date" value={lic.expiry} onChange={(e) => patch(i, { expiry: e.target.value })} /></Field><Field label="Issuing Authority" field={`licence-authority-${i}`}><SearchableSelect id={`licence-authority-${i}`} value={lic.authority} options={filteredAuthorityOptions} searchValue={authoritySearch} onSearchChange={(value) => setAuthoritySearch(i, value)} onChange={(value) => patch(i, { authority: value })} getLabel={(option) => option.label} placeholder="Select Issuing Authority" searchPlaceholder="Search authority..." loading={false} emptyLabel="No matching authority" /></Field><Field label="Licence Type" field={`licence-type-${i}`}><select className="input" value={lic.type} onChange={(e) => patch(i, { type: e.target.value })}><option value="">Select Licence Type</option>{licenceTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select></Field><Field label="Official Email" field={`licence-email-${i}`}><input className="input" value={lic.email} onChange={(e) => patch(i, { email: e.target.value })} /></Field><div className="md:col-span-3"><DocumentUploadZone id={`trade-licence-upload-${i}`} title="Upload trade licence documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={lic.documents || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleTradeLicenceFile(i, files)} onDeleteDocument={(document) => removeTradeLicenceDocument(i, document)} /></div></div>;              }} />
+            </fieldset>
+          )}
           {tab === 2 && (
-            <Repeat
-              title="Contact Person"
-              items={contacts}
-              setItems={setContacts}
-              blank={{ name: "", designation: "", email: "", code: "", mobile: "", whatsapp: "", alternate: "", primary: false, eid: "", eidIssue: "", eidExpiry: "", passport: "", passportIssue: "", passportExpiry: "", issuingCountry: "United Arab Emirates", eidDocumentUrl: "", eidDocumentName: "", eidDocumentFile: null, eidDocuments: [], passportDocumentUrl: "", passportDocumentName: "", passportDocumentFile: null, passportDocuments: [], persisted: false }}
-              render={(c, i, patch) => (
-                <div className="grid gap-3 md:grid-cols-3">
-                  <Field label="Full Name*" field={`contact-name-${i}`}><input className="input" value={c.name} onChange={(e) => patch(i, { name: e.target.value })} /></Field>
-                  <Field label="Designation" field={`contact-designation-${i}`}><input className="input" value={c.designation} onChange={(e) => patch(i, { designation: e.target.value })} /></Field>
-                  <Field label="Email*" field={`contact-email-${i}`}><input className="input" type="email" inputMode="email" value={c.email} onChange={(e) => patch(i, { email: e.target.value })} /></Field>
-                  <Field label="Mobile*">
-                    <div className="flex gap-2">
-                      <select id={`contact-code-${i}`} name={`contactCode${i}`} className="input w-44" value={c.code} onChange={(e) => patch(i, { code: e.target.value })}>
-                        <option value="">Code</option>
-                        {DIAL_CODE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </select>
-                    <input
-                      id={`contact-mobile-${i}`}
-                      name={`contactMobile${i}`}
-                      className="input"
-                      value={c.mobile}
-                      onChange={(e) => patch(i, { mobile: normalizePhoneNumber(e.target.value) })}
-                      placeholder={getPhoneNumberSpec(c.code).placeholder}
-                      inputMode="numeric"
-                    />
-                  </div>
-                </Field>
-                  <Field label="WhatsApp Number" field={`contact-whatsapp-${i}`}><input className="input" value={c.whatsapp} onChange={(e) => patch(i, { whatsapp: e.target.value })} /></Field>
-                  <Field label="Alternate Email" field={`contact-alternate-${i}`}><input className="input" value={c.alternate} onChange={(e) => patch(i, { alternate: e.target.value })} /></Field>
-                  <div className="flex flex-wrap items-center gap-4">
-                    <label className="flex items-center gap-2 font-bold" htmlFor={`contact-primary-${i}`}>
+            <fieldset disabled={isViewMode} className={isViewMode ? "opacity-80" : ""}>
+              <Repeat
+                title="Contact Person"
+                items={contacts}
+                setItems={setContacts}
+                blank={{ name: "", designation: "", email: "", code: "", mobile: "", whatsapp: "", alternate: "", primary: false, eid: "", eidIssue: "", eidExpiry: "", passport: "", passportIssue: "", passportExpiry: "", issuingCountry: "United Arab Emirates", eidDocumentUrl: "", eidDocumentName: "", eidDocumentFile: null, eidDocuments: [], passportDocumentUrl: "", passportDocumentName: "", passportDocumentFile: null, passportDocuments: [], persisted: false }}
+                render={(c, i, patch) => (
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <Field label="Full Name*" field={`contact-name-${i}`}><input className="input" value={c.name} onChange={(e) => patch(i, { name: e.target.value })} /></Field>
+                    <Field label="Designation" field={`contact-designation-${i}`}><input className="input" value={c.designation} onChange={(e) => patch(i, { designation: e.target.value })} /></Field>
+                    <Field label="Email*" field={`contact-email-${i}`}><input className="input" type="email" inputMode="email" value={c.email} onChange={(e) => patch(i, { email: e.target.value })} /></Field>
+                    <Field label="Mobile*">
+                      <div className="flex gap-2">
+                        <select id={`contact-code-${i}`} name={`contactCode${i}`} className="input w-44" value={c.code} onChange={(e) => patch(i, { code: e.target.value })}>
+                          <option value="">Code</option>
+                          {DIAL_CODE_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
                       <input
-                        id={`contact-primary-${i}`}
-                        name={`contactPrimary${i}`}
-                        type="checkbox"
-                        checked={c.primary}
-                        onChange={(e) => patch(i, { primary: e.target.checked })}
+                        id={`contact-mobile-${i}`}
+                        name={`contactMobile${i}`}
+                        className="input"
+                        value={c.mobile}
+                        onChange={(e) => patch(i, { mobile: normalizePhoneNumber(e.target.value) })}
+                        placeholder={getPhoneNumberSpec(c.code).placeholder}
+                        inputMode="numeric"
                       />
-                      Official Contact
-                    </label>
-                    <label className="flex items-center gap-2 font-bold text-[#1e3a8a]" htmlFor={`contact-is-primary-${i}`}>
-                      <input
-                        id={`contact-is-primary-${i}`}
-                        name="primaryContact"
-                        type="radio"
-                        checked={primaryContactIndex === i}
-                        onChange={() => setPrimaryContactIndex(i)}
-                        className="accent-[#1e3a8a]"
-                      />
-                      Primary Contact
-                    </label>
+                    </div>
+                  </Field>
+                    <Field label="WhatsApp Number" field={`contact-whatsapp-${i}`}><input className="input" value={c.whatsapp} onChange={(e) => patch(i, { whatsapp: e.target.value })} /></Field>
+                    <Field label="Alternate Email" field={`contact-alternate-${i}`}><input className="input" value={c.alternate} onChange={(e) => patch(i, { alternate: e.target.value })} /></Field>
+                    <div className="flex flex-wrap items-center gap-4">
+                      <label className="flex items-center gap-2 font-bold" htmlFor={`contact-primary-${i}`}>
+                        <input
+                          id={`contact-primary-${i}`}
+                          name={`contactPrimary${i}`}
+                          type="checkbox"
+                          checked={c.primary}
+                          onChange={(e) => patch(i, { primary: e.target.checked })}
+                        />
+                        Official Contact
+                      </label>
+                      <label className="flex items-center gap-2 font-bold text-[#1e3a8a]" htmlFor={`contact-is-primary-${i}`}>
+                        <input
+                          id={`contact-is-primary-${i}`}
+                          name="primaryContact"
+                          type="radio"
+                          checked={primaryContactIndex === i}
+                          onChange={() => setPrimaryContactIndex(i)}
+                          className="accent-[#1e3a8a]"
+                        />
+                        Primary Contact
+                      </label>
+                    </div>
+                    {c.primary && (
+                      <>
+                        <Field label="Emirates ID Number" field={`contact-eid-${i}`}><input className="input" placeholder="784-XXXX-XXXXXXX-X" value={c.eid} onChange={(e) => patch(i, { eid: formatEmiratesIdInput(e.target.value) })} /></Field>
+                        <Field label="Emirates ID Issue Date" field={`contact-eid-issue-${i}`}><input className="input" type="date" value={c.eidIssue} onChange={(e) => patch(i, { eidIssue: e.target.value })} /></Field>
+                        <Field label="Emirates ID Expiry" field={`contact-eid-expiry-${i}`}><input className="input" type="date" value={c.eidExpiry} onChange={(e) => patch(i, { eidExpiry: e.target.value })} /></Field>
+                        <Field label="Passport Number" field={`contact-passport-${i}`}><input className="input" value={c.passport} onChange={(e) => patch(i, { passport: e.target.value })} /></Field>
+                        <Field label="Passport Issue Date" field={`contact-passport-issue-${i}`}><input className="input" type="date" value={c.passportIssue} onChange={(e) => patch(i, { passportIssue: e.target.value })} /></Field>
+                        <Field label="Passport Expiry" field={`contact-passport-expiry-${i}`}><input className="input" type="date" value={c.passportExpiry} onChange={(e) => patch(i, { passportExpiry: e.target.value })} /></Field>
+                        <Field label="Passport Issuing Country" field={`contact-passport-country-${i}`}><><input className="input" list="passport-issuing-countries" value={c.issuingCountry} onChange={(e) => patch(i, { issuingCountry: e.target.value })} /><datalist id="passport-issuing-countries">{countries.map((country) => <option key={country} value={country} />)}</datalist></></Field>
+                        <div className="md:col-span-3 grid gap-3 md:grid-cols-2">
+                          <DocumentUploadZone id={`contact-eid-upload-${i}`} title="Upload Emirates ID documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.eidDocuments || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "emiratesId")} onDeleteDocument={(document) => removeContactDocument(i, "emiratesId", document)} />
+                          <DocumentUploadZone id={`contact-passport-upload-${i}`} title="Upload passport documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.passportDocuments || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "passport")} onDeleteDocument={(document) => removeContactDocument(i, "passport", document)} />
+                        </div>
+                      </>
+                    )}
                   </div>
-                  {c.primary && (
-                    <>
-                      <Field label="Emirates ID Number" field={`contact-eid-${i}`}><input className="input" placeholder="784-XXXX-XXXXXXX-X" value={c.eid} onChange={(e) => patch(i, { eid: formatEmiratesIdInput(e.target.value) })} /></Field>
-                      <Field label="Emirates ID Issue Date" field={`contact-eid-issue-${i}`}><input className="input" type="date" value={c.eidIssue} onChange={(e) => patch(i, { eidIssue: e.target.value })} /></Field>
-                      <Field label="Emirates ID Expiry" field={`contact-eid-expiry-${i}`}><input className="input" type="date" value={c.eidExpiry} onChange={(e) => patch(i, { eidExpiry: e.target.value })} /></Field>
-                      <Field label="Passport Number" field={`contact-passport-${i}`}><input className="input" value={c.passport} onChange={(e) => patch(i, { passport: e.target.value })} /></Field>
-                      <Field label="Passport Issue Date" field={`contact-passport-issue-${i}`}><input className="input" type="date" value={c.passportIssue} onChange={(e) => patch(i, { passportIssue: e.target.value })} /></Field>
-                      <Field label="Passport Expiry" field={`contact-passport-expiry-${i}`}><input className="input" type="date" value={c.passportExpiry} onChange={(e) => patch(i, { passportExpiry: e.target.value })} /></Field>
-                      <Field label="Passport Issuing Country" field={`contact-passport-country-${i}`}><><input className="input" list="passport-issuing-countries" value={c.issuingCountry} onChange={(e) => patch(i, { issuingCountry: e.target.value })} /><datalist id="passport-issuing-countries">{countries.map((country) => <option key={country} value={country} />)}</datalist></></Field>
-                      <div className="md:col-span-3 grid gap-3 md:grid-cols-2">
-                        <DocumentUploadZone id={`contact-eid-upload-${i}`} title="Upload Emirates ID documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.eidDocuments || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "emiratesId")} onDeleteDocument={(document) => removeContactDocument(i, "emiratesId", document)} />
-                        <DocumentUploadZone id={`contact-passport-upload-${i}`} title="Upload passport documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.passportDocuments || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "passport")} onDeleteDocument={(document) => removeContactDocument(i, "passport", document)} />
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            />
+                )}
+              />
+            </fieldset>
           )}
           {tab === 3 && (
             <div className="grid gap-3 md:grid-cols-2">
-              {isVatDeregistered && (
-                <div className="md:col-span-2 rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-semibold text-amber-800 flex items-center gap-2">
-                  <span className="flex h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" />
-                  This client's VAT registration has been deregistered.
-                </div>
-              )}
-              <div className="space-y-2">
-                <label className="text-[14px] font-bold text-slate-700" htmlFor="client-vat-status">VAT Registration Status</label>
-                <div className="flex flex-wrap items-center gap-3">
-                  <select
-                    id="client-vat-status"
-                    className="input min-w-[240px] flex-1"
-                    value={form.vatStatus}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setForm((f) => ({
-                        ...f,
-                        vatStatus: val,
-                        ...(val !== "Registered" ? { vatRegistrationTask: "", vatRegistrationTaskId: "" } : {})
-                      }));
-                    }}
-                  >
-                    <option value="Registered">Registered</option>
-                    <option value="Not Registered">Not registered</option>
-                    <option value="Deregistered">Deregistered</option>
-                  </select>
-                  {form.vatRegistrationTaskId && form.vatStatus !== "Registered" && (
-                    <button
-                      type="button"
-                      className="rounded-full border border-[#bfdbfe] bg-white px-3 py-2 text-xs font-extrabold text-[#1e3a8a] transition hover:bg-blue-50"
-                      onClick={() => {
-                        if (!form.vatRegistrationTask) return;
-                        if (canManageTaskDrawer) {
-                          setDrawerTaskId(form.vatRegistrationTask);
-                          return;
-                        }
-                        navigate(`/tasks/${form.vatRegistrationTask}`);
+              <fieldset disabled={isViewMode} className={`md:col-span-2 grid gap-3 md:grid-cols-2 ${isViewMode ? "opacity-80" : ""}`}>
+                {isVatDeregistered && (
+                  <div className="md:col-span-2 rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-semibold text-amber-800 flex items-center gap-2">
+                    <span className="flex h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" />
+                    This client's VAT registration has been deregistered.
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <label className="text-[14px] font-bold text-slate-700" htmlFor="client-vat-status">VAT Registration Status</label>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <select
+                      id="client-vat-status"
+                      className="input min-w-[240px] flex-1"
+                      value={form.vatStatus}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setForm((f) => ({
+                          ...f,
+                          vatStatus: val,
+                          ...(val !== "Registered" ? { vatRegistrationTask: "", vatRegistrationTaskId: "" } : {})
+                        }));
                       }}
                     >
-                      Task ID: {form.vatRegistrationTaskId}
-                    </button>
-                  )}
-                </div>
-              </div>
-              {isVatDeregistered ? (
-                <>
-                  <Field label="VAT TRN" field="client-vat-trn">
-                    <input className="input bg-slate-100 text-slate-500 cursor-not-allowed" inputMode="numeric" maxLength={15} placeholder="15 digits starting with 1" value={form.vatTrn} readOnly={true} />
-                  </Field>
-                  <Field label="VAT Registration Date" field="client-vat-date">
-                    <input className="input bg-slate-100 text-slate-500 cursor-not-allowed" type="date" value={form.vatDate} readOnly={true} />
-                  </Field>
-                  <Field label="VAT Filing Frequency" field="client-vat-frequency">
-                    <select className="input bg-slate-100 text-slate-500 cursor-not-allowed" value={form.vatFreq} disabled={true}>
-                      {vatFilingFrequencyOptions.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
+                      <option value="Registered">Registered</option>
+                      <option value="Not Registered">Not registered</option>
+                      <option value="Deregistered">Deregistered</option>
                     </select>
-                  </Field>
-                  <Field label="VAT De-Registration Date" field="client-vat-dereg-date">
-                    <input className="input" type="date" value={form.vatDeregDate} onChange={(e) => update("vatDeregDate", e.target.value)} />
-                  </Field>
-
-                  {!form.vatRegistrationTaskId ? (
-                    <div className="md:col-span-2 rounded-2xl border border-dashed border-[#cbd5e1] bg-slate-50 p-4">
-                      <div className="text-sm font-bold text-slate-900">VAT registration task required</div>
-                      <p className="mt-1 text-sm text-slate-600">
-                        This client's VAT registration is deregistered. Create a VAT registration task to start the process of re-registering them.
-                      </p>
-                      <div className="mt-3 flex flex-wrap items-center gap-3">
-                        <button type="button" className="text-sm font-bold text-[#1e3a8a] underline underline-offset-4 cursor-pointer hover:text-[#1d4ed8] transition-colors" onClick={openVatRegistrationTask}>
-                          Create VAT registration task
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-                </>
-              ) : shouldShowVatRegistrationFields ? (
-                <>
-                  <Field label="VAT TRN" field="client-vat-trn">
-                    <input className="input" inputMode="numeric" maxLength={15} placeholder="15 digits starting with 1" value={form.vatTrn} onChange={(e) => update("vatTrn", String(e.target.value || "").replace(/\D+/g, "").slice(0, 15))} />
-                  </Field>
-                  <Field label="VAT Registration Date" field="client-vat-date">
-                    <input className="input" type="date" value={form.vatDate} onChange={(e) => update("vatDate", e.target.value)} />
-                  </Field>
-                  <Field label="VAT Filing Frequency" field="client-vat-frequency">
-                    <select className="input" value={form.vatFreq} onChange={(e) => update("vatFreq", e.target.value)}>
-                      {vatFilingFrequencyOptions.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </select>
-                  </Field>
-                </>
-              ) : !form.vatRegistrationTaskId ? (
-                <div className="md:col-span-2 rounded-2xl border border-dashed border-[#cbd5e1] bg-slate-50 p-4">
-                  <div className="text-sm font-bold text-slate-900">VAT registration task required</div>
-                  <p className="mt-1 text-sm text-slate-600">
-                    This client is marked as not registered for VAT. Create a VAT registration task first, then come back here and update the status to registered when the registration is complete.
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-3">
-                    <button type="button" className="text-sm font-bold text-[#1e3a8a] underline underline-offset-4 cursor-pointer hover:text-[#1d4ed8] transition-colors" onClick={openVatRegistrationTask}>
-                      Open VAT registration task
-                    </button>
+                    {form.vatRegistrationTaskId && form.vatStatus !== "Registered" && (
+                      <button
+                        type="button"
+                        className="rounded-full border border-[#bfdbfe] bg-white px-3 py-2 text-xs font-extrabold text-[#1e3a8a] transition hover:bg-blue-50"
+                        onClick={() => {
+                          if (!form.vatRegistrationTask) return;
+                          if (canManageTaskDrawer) {
+                            setDrawerTaskId(form.vatRegistrationTask);
+                            return;
+                          }
+                          navigate(`/tasks/${form.vatRegistrationTask}`);
+                        }}
+                      >
+                        Task ID: {form.vatRegistrationTaskId}
+                      </button>
+                    )}
                   </div>
                 </div>
-              ) : null}
+                {isVatDeregistered ? (
+                  <>
+                    <Field label="VAT TRN" field="client-vat-trn">
+                      <input className="input bg-slate-100 text-slate-500 cursor-not-allowed" inputMode="numeric" maxLength={15} placeholder="15 digits starting with 1" value={form.vatTrn} readOnly={true} />
+                    </Field>
+                    <Field label="VAT Registration Date" field="client-vat-date">
+                      <input className="input bg-slate-100 text-slate-500 cursor-not-allowed" type="date" value={form.vatDate} readOnly={true} />
+                    </Field>
+                    <Field label="VAT Filing Frequency" field="client-vat-frequency">
+                      <select className="input bg-slate-100 text-slate-500 cursor-not-allowed" value={form.vatFreq} disabled={true}>
+                        {vatFilingFrequencyOptions.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="VAT De-Registration Date" field="client-vat-dereg-date">
+                      <input className="input" type="date" value={form.vatDeregDate} onChange={(e) => update("vatDeregDate", e.target.value)} />
+                    </Field>
+
+                    {!form.vatRegistrationTaskId ? (
+                      <div className="md:col-span-2 rounded-2xl border border-dashed border-[#cbd5e1] bg-slate-50 p-4">
+                        <div className="text-sm font-bold text-slate-900">VAT registration task required</div>
+                        <p className="mt-1 text-sm text-slate-600">
+                          This client's VAT registration is deregistered. Create a VAT registration task to start the process of re-registering them.
+                        </p>
+                        <div className="mt-3 flex flex-wrap items-center gap-3">
+                          <button type="button" className="text-sm font-bold text-[#1e3a8a] underline underline-offset-4 cursor-pointer hover:text-[#1d4ed8] transition-colors" onClick={openVatRegistrationTask}>
+                            Create VAT registration task
+                          </button>
+                        </div>
+                      </div>
+                    ) : null}
+                  </>
+                ) : shouldShowVatRegistrationFields ? (
+                  <>
+                    <Field label="VAT TRN" field="client-vat-trn">
+                      <input className="input" inputMode="numeric" maxLength={15} placeholder="15 digits starting with 1" value={form.vatTrn} onChange={(e) => update("vatTrn", String(e.target.value || "").replace(/\D+/g, "").slice(0, 15))} />
+                    </Field>
+                    <Field label="VAT Registration Date" field="client-vat-date">
+                      <input className="input" type="date" value={form.vatDate} onChange={(e) => update("vatDate", e.target.value)} />
+                    </Field>
+                    <Field label="VAT Filing Frequency" field="client-vat-frequency">
+                      <select className="input" value={form.vatFreq} onChange={(e) => update("vatFreq", e.target.value)}>
+                        {vatFilingFrequencyOptions.map((option) => (
+                          <option key={option.value} value={option.value}>{option.label}</option>
+                        ))}
+                      </select>
+                    </Field>
+                  </>
+                ) : !form.vatRegistrationTaskId ? (
+                  <div className="md:col-span-2 rounded-2xl border border-dashed border-[#cbd5e1] bg-slate-50 p-4">
+                    <div className="text-sm font-bold text-slate-900">VAT registration task required</div>
+                    <p className="mt-1 text-sm text-slate-600">
+                      This client is marked as not registered for VAT. Create a VAT registration task first, then come back here and update the status to registered when the registration is complete.
+                    </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                      <button type="button" className="text-sm font-bold text-[#1e3a8a] underline underline-offset-4 cursor-pointer hover:text-[#1d4ed8] transition-colors" onClick={openVatRegistrationTask}>
+                        Open VAT registration task
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </fieldset>
 
               <RegistrationHistory
                 history={vatHistory}
@@ -1533,7 +1542,7 @@ export default function AddClient() {
                 setDrawerTaskId={setDrawerTaskId}
               />
 
-              <div className="md:col-span-2 grid gap-3 md:grid-cols-2 pt-4 border-t border-slate-100 mt-4">
+              <fieldset disabled={isViewMode} className={`md:col-span-2 grid gap-3 md:grid-cols-2 pt-4 border-t border-slate-100 mt-4 ${isViewMode ? "opacity-80" : ""}`}>
                 {isCtDeregistered && (
                   <div className="md:col-span-2 rounded-xl bg-amber-50 border border-amber-200 p-3 text-sm font-semibold text-amber-800 flex items-center gap-2">
                     <span className="flex h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse" />
@@ -1640,151 +1649,192 @@ export default function AddClient() {
                     </div>
                   </div>
                 ) : null}
+              </fieldset>
 
-                <RegistrationHistory
-                  history={ctHistory}
-                  taxType="CT"
-                  canManageTaskDrawer={canManageTaskDrawer}
-                  setDrawerTaskId={setDrawerTaskId}
-                />
-              </div>
+              <RegistrationHistory
+                history={ctHistory}
+                taxType="CT"
+                canManageTaskDrawer={canManageTaskDrawer}
+                setDrawerTaskId={setDrawerTaskId}
+              />
             </div>
           )}
           {tab === 4 && (
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label="Select existing group" field="client-group">
-                <SearchableSelect
-                  id="client-group"
-                  value={form.group}
-                  options={groupOptions}
-                  searchValue={groupSearch}
-                  onSearchChange={setGroupSearch}
-                  onChange={(value) => update("group", value)}
-                  getLabel={(group) => group.name}
-                  placeholder="No group"
-                  searchPlaceholder="Search groups..."
-                  loading={isGroupSearchLoading}
-                  emptyLabel="No matching groups"
-                />
-              </Field>
-              <Field label="Create new group">
-                <div className="flex gap-2">
-                  <input id="client-new-group" name="clientNewGroup" className="input" value={form.newGroup} onChange={(e) => update("newGroup", e.target.value)} />
-                  <Button onClick={async () => {
-                    if (form.newGroup) {
-                      const g = await groupService.create({ name: form.newGroup });
-                      dispatch({
-                        type: "SET_RESOURCE",
-                        resource: "groups",
-                        payload: [...state.groups, mapGroup(g)]
-                      });
-                      setGroupOptions((current) => mergeOptions([mapGroup(g)], current));
-                      update("group", g._id);
-                    }
-                  }}>Create</Button>
+            <fieldset disabled={isViewMode} className={isViewMode ? "opacity-80" : ""}>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label="Select existing group" field="client-group">
+                  <SearchableSelect
+                    id="client-group"
+                    value={form.group}
+                    options={groupOptions}
+                    searchValue={groupSearch}
+                    onSearchChange={setGroupSearch}
+                    onChange={(value) => update("group", value)}
+                    getLabel={(group) => group.name}
+                    placeholder="No group"
+                    searchPlaceholder="Search groups..."
+                    loading={isGroupSearchLoading}
+                    emptyLabel="No matching groups"
+                  />
+                </Field>
+                <Field label="Create new group">
+                  <div className="flex gap-2">
+                    <input id="client-new-group" name="clientNewGroup" className="input" value={form.newGroup} onChange={(e) => update("newGroup", e.target.value)} />
+                    <Button onClick={async () => {
+                      if (form.newGroup) {
+                        const g = await groupService.create({ name: form.newGroup });
+                        dispatch({
+                          type: "SET_RESOURCE",
+                          resource: "groups",
+                          payload: [...state.groups, mapGroup(g)]
+                        });
+                        setGroupOptions((current) => mergeOptions([mapGroup(g)], current));
+                        update("group", g._id);
+                      }
+                    }}>Create</Button>
+                  </div>
+                </Field>
+                <div className="rounded-xl bg-purple-50 p-4 font-bold text-[#7c3aed] md:col-span-2">
+                  Current group: {groupOptions.find((g) => optionId(g) === form.group)?.name || "Ungrouped"} {form.group && <button onClick={() => update("group", "")} className="ml-3 text-[#dc2626]">Ungroup</button>}
                 </div>
-              </Field>
-              <div className="rounded-xl bg-purple-50 p-4 font-bold text-[#7c3aed] md:col-span-2">
-                Current group: {groupOptions.find((g) => optionId(g) === form.group)?.name || "Ungrouped"} {form.group && <button onClick={() => update("group", "")} className="ml-3 text-[#dc2626]">Ungroup</button>}
               </div>
-            </div>
+            </fieldset>
           )}
           {tab === 5 && (
-            <Repeat
-              title="Portal"
-              items={portals}
-              setItems={setPortals}
-              blank={blankPortal}
-              render={(p, i, patch) => (
-                <div className="grid gap-3 md:grid-cols-2">
-                  <Field label="Portal Name" field={`portal-name-${i}`}><input className="input" value={p.name} autoComplete="off" onChange={(e) => patch(i, { name: e.target.value })} /></Field>
-                  <Field label="URL" field={`portal-url-${i}`}><input className="input" value={p.url} autoComplete="off" onChange={(e) => patch(i, { url: e.target.value })} /></Field>
-                  <Field label="Username/TRN" field={`portal-username-${i}`}>
-                    <input
-                      className="input"
-                      name={`clientPortalLogin${i}`}
-                      value={p.username}
-                      autoComplete="off"
-                      onChange={(e) => patch(i, { username: e.target.value })}
-                    />
-                  </Field>
-                  <Field label="Password" field={`portal-password-${i}`}>
-                    <div className="flex gap-2">
+            <fieldset disabled={isViewMode} className={isViewMode ? "opacity-80" : ""}>
+              <Repeat
+                title="Portal"
+                items={portals}
+                setItems={setPortals}
+                blank={blankPortal}
+                render={(p, i, patch) => (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <Field label="Portal Name" field={`portal-name-${i}`}><input className="input" value={p.name} autoComplete="off" onChange={(e) => patch(i, { name: e.target.value })} /></Field>
+                    <Field label="URL" field={`portal-url-${i}`}><input className="input" value={p.url} autoComplete="off" onChange={(e) => patch(i, { url: e.target.value })} /></Field>
+                    <Field label="Username/TRN" field={`portal-username-${i}`}>
                       <input
-                        id={`portal-password-${i}`}
-                        name={`clientPortalSecret${i}`}
                         className="input"
-                        type={visiblePortalPasswords[i] ? "text" : "password"}
-                        value={p.password}
-                        autoComplete="new-password"
-                        onChange={(e) => patch(i, { password: e.target.value })}
+                        name={`clientPortalLogin${i}`}
+                        value={p.username}
+                        autoComplete="off"
+                        onChange={(e) => patch(i, { username: e.target.value })}
                       />
-                      <button
-                        type="button"
-                        className="grid h-9 w-9 flex-none place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-600 transition hover:bg-slate-50"
-                        title={visiblePortalPasswords[i] ? "Hide password" : "Show password"}
-                        aria-label={visiblePortalPasswords[i] ? "Hide password" : "Show password"}
-                        onClick={() => togglePortalPassword(i)}
-                      >
-                        {visiblePortalPasswords[i] ? <EyeOff size={16} /> : <Eye size={16} />}
-                      </button>
-                      <button
-                        type="button"
-                        className="grid h-9 w-9 flex-none place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
-                        title="Copy password"
-                        aria-label="Copy password"
-                        disabled={!p.password}
-                        onClick={() => copyPortalPassword(p.password)}
-                      >
-                        <Copy size={16} />
-                      </button>
-                    </div>
-                  </Field>
-                  <Field label="Notes" field={`portal-notes-${i}`}><textarea className="input textarea" value={p.notes} autoComplete="off" onChange={(e) => patch(i, { notes: e.target.value })} /></Field>
-                </div>
-              )}
-            />
+                    </Field>
+                    <Field label="Password" field={`portal-password-${i}`}>
+                      <div className="flex gap-2">
+                        <input
+                          id={`portal-password-${i}`}
+                          name={`clientPortalSecret${i}`}
+                          className="input"
+                          type={visiblePortalPasswords[i] ? "text" : "password"}
+                          value={p.password}
+                          autoComplete="new-password"
+                          onChange={(e) => patch(i, { password: e.target.value })}
+                        />
+                        <button
+                          type="button"
+                          className="grid h-9 w-9 flex-none place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-600 transition hover:bg-slate-50"
+                          title={visiblePortalPasswords[i] ? "Hide password" : "Show password"}
+                          aria-label={visiblePortalPasswords[i] ? "Hide password" : "Show password"}
+                          onClick={() => togglePortalPassword(i)}
+                        >
+                          {visiblePortalPasswords[i] ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                        <button
+                          type="button"
+                          className="grid h-9 w-9 flex-none place-items-center rounded-lg border border-[#e2e8f0] bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
+                          title="Copy password"
+                          aria-label="Copy password"
+                          disabled={!p.password}
+                          onClick={() => copyPortalPassword(p.password)}
+                        >
+                          <Copy size={16} />
+                        </button>
+                      </div>
+                    </Field>
+                    <Field label="Notes" field={`portal-notes-${i}`}><textarea className="input textarea" value={p.notes} autoComplete="off" onChange={(e) => patch(i, { notes: e.target.value })} /></Field>
+                  </div>
+                )}
+              />
+            </fieldset>
           )}
           {tab === 6 && (
-            <div className="space-y-6">
-              <div>
-                <div className="mb-6 flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-extrabold text-slate-900">Custom Fields</h3>
-                    <p className="text-[11px] font-bold text-slate-400">Configure custom data points for this client</p>
+            <fieldset disabled={isViewMode} className={isViewMode ? "opacity-80" : ""}>
+              <div className="space-y-6">
+                <div>
+                  <div className="mb-6 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-extrabold text-slate-900">Custom Fields</h3>
+                      <p className="text-[11px] font-bold text-slate-400">Configure custom data points for this client</p>
+                    </div>
+                    <Button variant="ghost" className="h-9 gap-2 border-slate-200 text-blue-600 hover:bg-blue-50" onClick={() => setCustomFieldModal(true)}>
+                      <Plus size={14} /> Create New Field
+                    </Button>
                   </div>
-                  <Button variant="ghost" className="h-9 gap-2 border-slate-200 text-blue-600 hover:bg-blue-50" onClick={() => setCustomFieldModal(true)}>
-                    <Plus size={14} /> Create New Field
-                  </Button>
-                </div>
 
-                <div className="relative mb-6">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400">
-                    <Settings2 size={16} />
+                  <div className="relative mb-6">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400">
+                      <Settings2 size={16} />
+                    </div>
+                    <input
+                      type="search"
+                      className="input"
+                      style={{ paddingLeft: "3.25rem" }}
+                      placeholder="Search available fields to add..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                    {searchQuery && (
+                      <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl ring-1 ring-slate-900/5">
+                        {(state.customFields || [])
+                          .filter(f => !selectedFieldKeys.includes(f.key))
+                          .filter(f => f.label.toLowerCase().includes(searchQuery.toLowerCase()) || f.key.toLowerCase().includes(searchQuery.toLowerCase()))
+                          .map(f => (
+                            <button
+                              key={f._id}
+                              className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left transition hover:bg-slate-50"
+                              onClick={() => {
+                                setSelectedFieldKeys([...selectedFieldKeys, f.key]);
+                                setSearchQuery("");
+                              }}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="grid h-8 w-8 place-items-center rounded-lg bg-blue-50 text-blue-600">
+                                  <Settings2 size={16} />
+                                </div>
+                                <div>
+                                  <div className="text-[13px] font-extrabold text-slate-900">{f.label}</div>
+                                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{f.type}</div>
+                                </div>
+                              </div>
+                              <Plus size={16} className="text-slate-300" />
+                            </button>
+                          ))}
+                        {(state.customFields || [])
+                          .filter(f => !selectedFieldKeys.includes(f.key))
+                          .filter(f => f.label.toLowerCase().includes(searchQuery.toLowerCase()) || f.key.toLowerCase().includes(searchQuery.toLowerCase()))
+                          .length === 0 && (
+                            <div className="py-4 text-center text-[12px] font-bold text-slate-400">
+                              No matching fields found
+                            </div>
+                          )}
+                      </div>
+                    )}
                   </div>
-                  <input
-                    type="search"
-                    className="input"
-                    style={{ paddingLeft: "3.25rem" }}
-                    placeholder="Search available fields to add..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                  {searchQuery && (
-                    <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl ring-1 ring-slate-900/5">
-                      {(state.customFields || [])
-                        .filter(f => !selectedFieldKeys.includes(f.key))
-                        .filter(f => f.label.toLowerCase().includes(searchQuery.toLowerCase()) || f.key.toLowerCase().includes(searchQuery.toLowerCase()))
-                        .map(f => (
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {(state.customFields || [])
+                      .filter(f => selectedFieldKeys.includes(f.key))
+                      .map((f) => (
+                        <div key={f._id} className="rounded-xl border border-slate-200 p-4 transition-all hover:border-blue-200 hover:bg-slate-50/50 relative group">
                           <button
-                            key={f._id}
-                            className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left transition hover:bg-slate-50"
-                            onClick={() => {
-                              setSelectedFieldKeys([...selectedFieldKeys, f.key]);
-                              setSearchQuery("");
-                            }}
+                            className="absolute right-3 top-3 p-1 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => setSelectedFieldKeys(selectedFieldKeys.filter(k => k !== f.key))}
                           >
-                            <div className="flex items-center gap-3">
+                            <X size={14} />
+                          </button>
+                          <div className="mb-3 flex items-center justify-between pr-6">
+                            <div className="flex items-center gap-2.5">
                               <div className="grid h-8 w-8 place-items-center rounded-lg bg-blue-50 text-blue-600">
                                 <Settings2 size={16} />
                               </div>
@@ -1793,149 +1843,118 @@ export default function AddClient() {
                                 <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{f.type}</div>
                               </div>
                             </div>
-                            <Plus size={16} className="text-slate-300" />
-                          </button>
-                        ))}
-                      {(state.customFields || [])
-                        .filter(f => !selectedFieldKeys.includes(f.key))
-                        .filter(f => f.label.toLowerCase().includes(searchQuery.toLowerCase()) || f.key.toLowerCase().includes(searchQuery.toLowerCase()))
-                        .length === 0 && (
-                          <div className="py-4 text-center text-[12px] font-bold text-slate-400">
-                            No matching fields found
+                            {f.required && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-600 border border-amber-100 uppercase">Required</span>}
                           </div>
-                        )}
+
+                          {f.type === "select" ? (
+                            <select
+                              className="input"
+                              value={customFieldValues[f.key] || ""}
+                              onChange={(e) => setCustomFieldValues({ ...customFieldValues, [f.key]: e.target.value })}
+                            >
+                              <option value="">Select option</option>
+                              {f.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                            </select>
+                          ) : f.type === "number" ? (
+                            <input
+                              type="number"
+                              className="input"
+                              value={customFieldValues[f.key] || ""}
+                              onChange={(e) => setCustomFieldValues({ ...customFieldValues, [f.key]: e.target.value })}
+                            />
+                          ) : f.type === "date" ? (
+                            <input
+                              type="date"
+                              className="input"
+                              value={customFieldValues[f.key] || ""}
+                              onChange={(e) => setCustomFieldValues({ ...customFieldValues, [f.key]: e.target.value })}
+                            />
+                          ) : f.type === "currency" ? (() => {
+                            const CURRENCIES = [
+                              { code: "AED", symbol: "د.إ", label: "AED - د.إ (UAE Dirham)" },
+                              { code: "USD", symbol: "$",   label: "USD - $ (US Dollar)" },
+                              { code: "EUR", symbol: "€",   label: "EUR - € (Euro)" },
+                              { code: "GBP", symbol: "£",   label: "GBP - £ (British Pound)" },
+                              { code: "INR", symbol: "₹",   label: "INR - ₹ (Indian Rupee)" },
+                              { code: "SAR", symbol: "﷼",   label: "SAR - ﷼ (Saudi Riyal)" },
+                              { code: "QAR", symbol: "﷼",   label: "QAR - ﷼ (Qatari Riyal)" },
+                              { code: "KWD", symbol: "د.ك", label: "KWD - د.ك (Kuwaiti Dinar)" },
+                              { code: "BHD", symbol: ".د.ب",label: "BHD - .د.ب (Bahraini Dinar)" },
+                              { code: "OMR", symbol: "﷼",   label: "OMR - ﷼ (Omani Rial)" },
+                              { code: "JPY", symbol: "¥",   label: "JPY - ¥ (Japanese Yen)" },
+                              { code: "CNY", symbol: "¥",   label: "CNY - ¥ (Chinese Yuan)" },
+                              { code: "CHF", symbol: "Fr",  label: "CHF - Fr (Swiss Franc)" },
+                              { code: "CAD", symbol: "C$",  label: "CAD - C$ (Canadian Dollar)" },
+                              { code: "AUD", symbol: "A$",  label: "AUD - A$ (Australian Dollar)" },
+                              { code: "SGD", symbol: "S$",  label: "SGD - S$ (Singapore Dollar)" },
+                              { code: "HKD", symbol: "HK$", label: "HKD - HK$ (Hong Kong Dollar)" },
+                              { code: "PKR", symbol: "₨",   label: "PKR - ₨ (Pakistani Rupee)" },
+                              { code: "BDT", symbol: "৳",   label: "BDT - ৳ (Bangladeshi Taka)" },
+                              { code: "ZAR", symbol: "R",   label: "ZAR - R (South African Rand)" },
+                            ];
+                            const raw = customFieldValues[f.key] || "";
+                            const colonIdx = raw.indexOf(":");
+                            const selectedCode = colonIdx !== -1 ? raw.slice(0, colonIdx) : (raw ? "USD" : "AED");
+                            const amountVal = colonIdx !== -1 ? raw.slice(colonIdx + 1) : "";
+                            const handleCurrencyChange = (code, amount) => {
+                              setCustomFieldValues({ ...customFieldValues, [f.key]: `${code}:${amount}` });
+                            };
+                            return (
+                              <div className="flex w-full overflow-hidden rounded-lg shadow-sm ring-1 ring-slate-200 focus-within:ring-2 focus-within:ring-blue-500 bg-white transition-shadow">
+                                <select
+                                  className="flex-none border-0 bg-slate-50 py-2 pl-3 pr-7 text-xs font-bold text-slate-700 outline-none focus:ring-0 cursor-pointer appearance-auto"
+                                  value={selectedCode}
+                                  onChange={(e) => handleCurrencyChange(e.target.value, amountVal)}
+                                >
+                                  {CURRENCIES.map(c => (
+                                    <option key={c.code} value={c.code}>{c.code}</option>
+                                  ))}
+                                </select>
+                                <div className="w-px bg-slate-200 flex-none" />
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  className="block w-full min-w-0 border-0 py-2 px-3 text-sm font-medium text-slate-900 outline-none focus:ring-0 bg-transparent placeholder:text-slate-400"
+                                  value={amountVal}
+                                  placeholder="0.00"
+                                  onChange={(e) => handleCurrencyChange(selectedCode, e.target.value)}
+                                />
+                              </div>
+                            );
+                          })() : (
+                            <input
+                              type="text"
+                              className="input"
+                              value={customFieldValues[f.key] || ""}
+                              onChange={(e) => setCustomFieldValues({ ...customFieldValues, [f.key]: e.target.value })}
+                            />
+                          )}
+                        </div>
+                      ))}
+                  </div>
+
+                  {(state.customFields || []).length === 0 ? (
+                    <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 py-8 text-slate-400">
+                      <Settings2 size={32} strokeWidth={1.5} className="mb-2 opacity-20" />
+                      <div className="text-xs font-bold">No additional custom fields found in settings</div>
+                    </div>
+                  ) : selectedFieldKeys.length === 0 && (
+                    <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 py-8 text-slate-400">
+                      <Settings2 size={32} strokeWidth={1.5} className="mb-2 opacity-20" />
+                      <div className="text-xs font-bold">Search and select fields to add to this client</div>
                     </div>
                   )}
                 </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  {(state.customFields || [])
-                    .filter(f => selectedFieldKeys.includes(f.key))
-                    .map((f) => (
-                      <div key={f._id} className="rounded-xl border border-slate-200 p-4 transition-all hover:border-blue-200 hover:bg-slate-50/50 relative group">
-                        <button
-                          className="absolute right-3 top-3 p-1 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() => setSelectedFieldKeys(selectedFieldKeys.filter(k => k !== f.key))}
-                        >
-                          <X size={14} />
-                        </button>
-                        <div className="mb-3 flex items-center justify-between pr-6">
-                          <div className="flex items-center gap-2.5">
-                            <div className="grid h-8 w-8 place-items-center rounded-lg bg-blue-50 text-blue-600">
-                              <Settings2 size={16} />
-                            </div>
-                            <div>
-                              <div className="text-[13px] font-extrabold text-slate-900">{f.label}</div>
-                              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{f.type}</div>
-                            </div>
-                          </div>
-                          {f.required && <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-600 border border-amber-100 uppercase">Required</span>}
-                        </div>
-
-                        {f.type === "select" ? (
-                          <select
-                            className="input"
-                            value={customFieldValues[f.key] || ""}
-                            onChange={(e) => setCustomFieldValues({ ...customFieldValues, [f.key]: e.target.value })}
-                          >
-                            <option value="">Select option</option>
-                            {f.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                          </select>
-                        ) : f.type === "number" ? (
-                          <input
-                            type="number"
-                            className="input"
-                            value={customFieldValues[f.key] || ""}
-                            onChange={(e) => setCustomFieldValues({ ...customFieldValues, [f.key]: e.target.value })}
-                          />
-                        ) : f.type === "date" ? (
-                          <input
-                            type="date"
-                            className="input"
-                            value={customFieldValues[f.key] || ""}
-                            onChange={(e) => setCustomFieldValues({ ...customFieldValues, [f.key]: e.target.value })}
-                          />
-                        ) : f.type === "currency" ? (() => {
-                          const CURRENCIES = [
-                            { code: "AED", symbol: "د.إ", label: "AED - د.إ (UAE Dirham)" },
-                            { code: "USD", symbol: "$",   label: "USD - $ (US Dollar)" },
-                            { code: "EUR", symbol: "€",   label: "EUR - € (Euro)" },
-                            { code: "GBP", symbol: "£",   label: "GBP - £ (British Pound)" },
-                            { code: "INR", symbol: "₹",   label: "INR - ₹ (Indian Rupee)" },
-                            { code: "SAR", symbol: "﷼",   label: "SAR - ﷼ (Saudi Riyal)" },
-                            { code: "QAR", symbol: "﷼",   label: "QAR - ﷼ (Qatari Riyal)" },
-                            { code: "KWD", symbol: "د.ك", label: "KWD - د.ك (Kuwaiti Dinar)" },
-                            { code: "BHD", symbol: ".د.ب",label: "BHD - .د.ب (Bahraini Dinar)" },
-                            { code: "OMR", symbol: "﷼",   label: "OMR - ﷼ (Omani Rial)" },
-                            { code: "JPY", symbol: "¥",   label: "JPY - ¥ (Japanese Yen)" },
-                            { code: "CNY", symbol: "¥",   label: "CNY - ¥ (Chinese Yuan)" },
-                            { code: "CHF", symbol: "Fr",  label: "CHF - Fr (Swiss Franc)" },
-                            { code: "CAD", symbol: "C$",  label: "CAD - C$ (Canadian Dollar)" },
-                            { code: "AUD", symbol: "A$",  label: "AUD - A$ (Australian Dollar)" },
-                            { code: "SGD", symbol: "S$",  label: "SGD - S$ (Singapore Dollar)" },
-                            { code: "HKD", symbol: "HK$", label: "HKD - HK$ (Hong Kong Dollar)" },
-                            { code: "PKR", symbol: "₨",   label: "PKR - ₨ (Pakistani Rupee)" },
-                            { code: "BDT", symbol: "৳",   label: "BDT - ৳ (Bangladeshi Taka)" },
-                            { code: "ZAR", symbol: "R",   label: "ZAR - R (South African Rand)" },
-                          ];
-                          const raw = customFieldValues[f.key] || "";
-                          const colonIdx = raw.indexOf(":");
-                          const selectedCode = colonIdx !== -1 ? raw.slice(0, colonIdx) : (raw ? "USD" : "AED");
-                          const amountVal = colonIdx !== -1 ? raw.slice(colonIdx + 1) : "";
-                          const handleCurrencyChange = (code, amount) => {
-                            setCustomFieldValues({ ...customFieldValues, [f.key]: `${code}:${amount}` });
-                          };
-                          return (
-                            <div className="flex w-full overflow-hidden rounded-lg shadow-sm ring-1 ring-slate-200 focus-within:ring-2 focus-within:ring-blue-500 bg-white transition-shadow">
-                              <select
-                                className="flex-none border-0 bg-slate-50 py-2 pl-3 pr-7 text-xs font-bold text-slate-700 outline-none focus:ring-0 cursor-pointer appearance-auto"
-                                value={selectedCode}
-                                onChange={(e) => handleCurrencyChange(e.target.value, amountVal)}
-                              >
-                                {CURRENCIES.map(c => (
-                                  <option key={c.code} value={c.code}>{c.code}</option>
-                                ))}
-                              </select>
-                              <div className="w-px bg-slate-200 flex-none" />
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                className="block w-full min-w-0 border-0 py-2 px-3 text-sm font-medium text-slate-900 outline-none focus:ring-0 bg-transparent placeholder:text-slate-400"
-                                value={amountVal}
-                                placeholder="0.00"
-                                onChange={(e) => handleCurrencyChange(selectedCode, e.target.value)}
-                              />
-                            </div>
-                          );
-                        })() : (
-                          <input
-                            type="text"
-                            className="input"
-                            value={customFieldValues[f.key] || ""}
-                            onChange={(e) => setCustomFieldValues({ ...customFieldValues, [f.key]: e.target.value })}
-                          />
-                        )}
-                      </div>
-                    ))}
-                </div>
-
-                {(state.customFields || []).length === 0 ? (
-                  <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 py-8 text-slate-400">
-                    <Settings2 size={32} strokeWidth={1.5} className="mb-2 opacity-20" />
-                    <div className="text-xs font-bold">No additional custom fields found in settings</div>
-                  </div>
-                ) : selectedFieldKeys.length === 0 && (
-                  <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 py-8 text-slate-400">
-                    <Settings2 size={32} strokeWidth={1.5} className="mb-2 opacity-20" />
-                    <div className="text-xs font-bold">Search and select fields to add to this client</div>
-                  </div>
-                )}
               </div>
-            </div>
+            </fieldset>
           )}
-          {tab === 7 && <div className="space-y-3"><AttachmentUploadZone description={attachmentDescription} onDescriptionChange={setAttachmentDescription} onFiles={uploadFiles} isUploading={isUploading} /><div className="overflow-x-auto"><table className="table min-w-max"><thead><tr><th>Name</th><th>Size</th><th>Type</th><th>Description</th><th>Uploaded On</th><th>Uploaded By</th><th>Actions</th></tr></thead><tbody>{attachments.length === 0 && <tr><td colSpan={7} className="text-center text-slate-500">No attachments uploaded yet.</td></tr>}{attachments.map((a) => <tr key={a.id || a.name}><td>{a.name}</td><td>{a.size}</td><td>{a.type}</td><td>{a.description || "-"}</td><td>{a.uploadedOn}</td><td>{a.uploadedBy}</td><td><Button size="sm" variant="ghost" disabled={!a.url && !a.file} onClick={() => openDocumentFile(a)}>Open</Button> {(currentUser?.role === "admin" || !a.saved) && <Button size="sm" variant="danger" onClick={() => removeAttachment(a)}>Delete</Button>}</td></tr>)}</tbody></table></div></div>}
-          </fieldset>
+          {tab === 7 && (
+            <fieldset disabled={isViewMode} className={isViewMode ? "opacity-80" : ""}>
+              <div className="space-y-3"><AttachmentUploadZone description={attachmentDescription} onDescriptionChange={setAttachmentDescription} onFiles={uploadFiles} isUploading={isUploading} /><div className="overflow-x-auto"><table className="table min-w-max"><thead><tr><th>Name</th><th>Size</th><th>Type</th><th>Description</th><th>Uploaded On</th><th>Uploaded By</th><th>Actions</th></tr></thead><tbody>{attachments.length === 0 && <tr><td colSpan={7} className="text-center text-slate-500">No attachments uploaded yet.</td></tr>}{attachments.map((a) => <tr key={a.id || a.name}><td>{a.name}</td><td>{a.size}</td><td>{a.type}</td><td>{a.description || "-"}</td><td>{a.uploadedOn}</td><td>{a.uploadedBy}</td><td><Button size="sm" variant="ghost" disabled={!a.url && !a.file} onClick={() => openDocumentFile(a)}>Open</Button> {(currentUser?.role === "admin" || !a.saved) && <Button size="sm" variant="danger" onClick={() => removeAttachment(a)}>Delete</Button>}</td></tr>)}</tbody></table></div></div>
+            </fieldset>
+          )}
+          </div>
         </div>
         <div className="flex flex-col gap-3 border-t border-[#e2e8f0] bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
           <Button variant="ghost" onClick={goPrevious} disabled={isFirstTab || isSaving}>Previous</Button>
