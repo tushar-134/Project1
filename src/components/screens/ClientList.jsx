@@ -445,6 +445,8 @@ export default function ClientList() {
     contact: deferredColumnFilters.contact.trim() || undefined,
     createdAt: deferredColumnFilters.createdAt || undefined,
     createdBy: deferredColumnFilters.createdBy.trim() || undefined,
+    expired: expired || undefined,
+    expiring: expiring || undefined,
   }), [deferredColumnFilters, deferredQuery, page, clientStatus, expired, expiring]);
 
   const filterRef = useRef(requestParams);
