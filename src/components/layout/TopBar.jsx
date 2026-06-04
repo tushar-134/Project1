@@ -202,12 +202,15 @@ export default function TopBar({ title, navOpen = false, onMenuClick }) {
             open={expiryOpen}
             onClose={() => setExpiryOpen(false)}
             onOpenClient={(clientId, item) => {
+              // Route to the correct filtered view depending on whether the
+              // clicked item is already expired or just expiring within 15 days.
               const isExpiringSoon = item?.status === "expiring_soon";
               const search = new URLSearchParams(
                 isExpiringSoon
                   ? { expiring: "true", highlight: clientId }
                   : { expired: "true", highlight: clientId }
               );
+              setExpiryOpen(false);
               navigate(`/clients/list?${search.toString()}`);
             }}
             payload={expiryPayload}
