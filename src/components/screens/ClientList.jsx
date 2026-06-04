@@ -490,6 +490,14 @@ export default function ClientList() {
     const node = document.getElementById(`client-row-${highlightClientId}`);
     if (!node) return;
     node.scrollIntoView({ behavior: "smooth", block: "center" });
+    // Clean up the highlight param from the URL after a short delay
+    const timer = setTimeout(() => {
+      setSearchParams((prev) => {
+        prev.delete("highlight");
+        return prev;
+      }, { replace: true });
+    }, 2000);
+    return () => clearTimeout(timer);
   }, [highlightClientId, clientsLoading, rows.length, page, expired, expiring]);
 
   const updateColumnFilter = (key, value) => {
