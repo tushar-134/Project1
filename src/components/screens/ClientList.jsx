@@ -488,7 +488,7 @@ export default function ClientList() {
     const node = document.getElementById(`client-row-${highlightClientId}`);
     if (!node) return;
     node.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [highlightClientId, clientsLoading, rows.length, page, expired]);
+  }, [highlightClientId, clientsLoading, rows.length, page, expired, expiring]);
 
   const updateColumnFilter = (key, value) => {
     setPage(1);
