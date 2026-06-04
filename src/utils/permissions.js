@@ -13,7 +13,7 @@ export function canManageClients(role) {
 }
 
 export function canCreateClients(role) {
-  return hasAnyRole(role, ["admin"]);
+  return hasAnyRole(role, ["admin", "manager"]);
 }
 
 export function canManageTasks(role) {
