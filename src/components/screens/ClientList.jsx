@@ -377,14 +377,18 @@ export default function ClientList() {
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1, workingTasksTotal: 0 });
   const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
 
-  // Sync state with URL params in case they change without a full remount
+  // Sync state with URL params in case they change without a full remount.
+  // Also resets page to 1 so notification-driven navigations always start at the first page.
   useEffect(() => {
     setExpired(searchParams.get("expired") === "true");
     setExpiring(searchParams.get("expiring") === "true");
     if (searchParams.has("search")) {
       setQuery(searchParams.get("search") || "");
     }
-    setHighlightClientId(searchParams.get("highlight") || "");
+    const newHighlight = searchParams.get("highlight") || "";
+    setHighlightClientId(newHighlight);
+    // If a highlight was injected via URL (notification click), go back to page 1
+    if (newHighlight) setPage(1);
   }, [searchParams]);
   const [drawerClientId, setDrawerClientId] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -488,7 +492,16 @@ export default function ClientList() {
     const node = document.getElementById(`client-row-${highlightClientId}`);
     if (!node) return;
     node.scrollIntoView({ behavior: "smooth", block: "center" });
-  }, [highlightClientId, clientsLoading, rows.length, page, expired]);
+    // Clean up the highlight param from the URL and clear the ring after a short delay
+    const timer = setTimeout(() => {
+      setSearchParams((prev) => {
+        prev.delete("highlight");
+        return prev;
+      }, { replace: true });
+      setHighlightClientId("");
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [highlightClientId, clientsLoading, rows.length, page, expired, expiring]);
 
   const updateColumnFilter = (key, value) => {
     setPage(1);
@@ -500,12 +513,14 @@ export default function ClientList() {
     setQuery("");
     setExpired(false);
     setExpiring(false);
+    setHighlightClientId("");
     setColumnFilters(EMPTY_COLUMN_FILTERS);
-    
+
     // Clear URL parameters via React Router
     setSearchParams((prev) => {
       prev.delete("expired");
       prev.delete("expiring");
+      prev.delete("highlight");
       return prev;
     }, { replace: true });
   };
@@ -590,7 +605,12 @@ export default function ClientList() {
           </div>
           <button
             type="button"
-            onClick={() => { setExpired(false); setPage(1); }}
+            onClick={() => {
+              setExpired(false);
+              setHighlightClientId("");
+              setPage(1);
+              setSearchParams((prev) => { prev.delete("expired"); prev.delete("highlight"); return prev; }, { replace: true });
+            }}
             className="rounded-lg px-3 py-1 text-[12px] font-extrabold text-purple-700 hover:bg-purple-100 transition-colors"
           >
             Clear filter
@@ -606,10 +626,16 @@ export default function ClientList() {
               <CalendarClock size={14} />
             </span>
             <span className="text-[13px] font-extrabold text-orange-800">Showing clients with documents expiring within 15 days</span>
+            <span className="text-[12px] font-medium text-orange-600">(Trade Licence, Emirates ID, or Passport)</span>
           </div>
           <button
             type="button"
-            onClick={() => { setExpiring(false); setPage(1); }}
+            onClick={() => {
+              setExpiring(false);
+              setHighlightClientId("");
+              setPage(1);
+              setSearchParams((prev) => { prev.delete("expiring"); prev.delete("highlight"); return prev; }, { replace: true });
+            }}
             className="rounded-lg px-3 py-1 text-[12px] font-extrabold text-orange-700 hover:bg-orange-100 transition-colors"
           >
             Clear filter
@@ -1013,7 +1039,11 @@ export default function ClientList() {
             <tr
               key={client.id}
               id={`client-row-${client.id}`}
-              className={client.id === highlightClientId ? "bg-orange-50 ring-2 ring-inset ring-orange-300" : ""}
+              className={client.id === highlightClientId
+                ? expiring
+                  ? "bg-amber-50 ring-2 ring-inset ring-amber-400 transition-all duration-500"
+                  : "bg-purple-50 ring-2 ring-inset ring-purple-400 transition-all duration-500"
+                : "transition-all duration-500"}
             >
                 {isVisible("client") && (
                   <td>
@@ -1052,12 +1082,22 @@ export default function ClientList() {
                       )}
                       {(client.expiredDocs || []).map((doc, idx) => (
                         <span
-                          key={idx}
+                          key={`expired-${idx}`}
                           title={`${doc.type} expired: ${doc.label} — ${doc.expiryDate ? new Date(doc.expiryDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""}`}
                           className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-extrabold text-red-700"
                         >
                           <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                           {doc.type} Expired
+                        </span>
+                      ))}
+                      {(client.expiringSoonDocs || []).map((doc, idx) => (
+                        <span
+                          key={`expiring-${idx}`}
+                          title={`${doc.type} due soon: ${doc.label} — expires ${doc.expiryDate ? new Date(doc.expiryDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""}`}
+                          className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-700"
+                        >
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                          {doc.type} Due Soon
                         </span>
                       ))}
                     </div>
