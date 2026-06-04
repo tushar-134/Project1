@@ -125,6 +125,9 @@ export default function ExpiryAlertPanel({ open, onClose, onOpenClient, payload,
                           </div>
                           <ExternalLink size={13} className="mt-0.5 shrink-0 text-slate-300 transition group-hover:text-orange-500" />
                         </div>
+                        <p className="mt-2 text-right text-[9px] font-semibold uppercase tracking-wider text-orange-400 opacity-0 transition group-hover:opacity-100">
+                          {item.status === "expired" ? "View in Expired →" : "View in Due Soon →"}
+                        </p>
                       </button>
                     );
                   })}
