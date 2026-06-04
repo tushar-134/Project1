@@ -510,12 +510,14 @@ export default function ClientList() {
     setQuery("");
     setExpired(false);
     setExpiring(false);
+    setHighlightClientId("");
     setColumnFilters(EMPTY_COLUMN_FILTERS);
-    
+
     // Clear URL parameters via React Router
     setSearchParams((prev) => {
       prev.delete("expired");
       prev.delete("expiring");
+      prev.delete("highlight");
       return prev;
     }, { replace: true });
   };
