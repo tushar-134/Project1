@@ -602,7 +602,12 @@ export default function ClientList() {
           </div>
           <button
             type="button"
-            onClick={() => { setExpired(false); setPage(1); }}
+            onClick={() => {
+              setExpired(false);
+              setHighlightClientId("");
+              setPage(1);
+              setSearchParams((prev) => { prev.delete("expired"); prev.delete("highlight"); return prev; }, { replace: true });
+            }}
             className="rounded-lg px-3 py-1 text-[12px] font-extrabold text-purple-700 hover:bg-purple-100 transition-colors"
           >
             Clear filter
@@ -621,7 +626,12 @@ export default function ClientList() {
           </div>
           <button
             type="button"
-            onClick={() => { setExpiring(false); setPage(1); }}
+            onClick={() => {
+              setExpiring(false);
+              setHighlightClientId("");
+              setPage(1);
+              setSearchParams((prev) => { prev.delete("expiring"); prev.delete("highlight"); return prev; }, { replace: true });
+            }}
             className="rounded-lg px-3 py-1 text-[12px] font-extrabold text-orange-700 hover:bg-orange-100 transition-colors"
           >
             Clear filter
