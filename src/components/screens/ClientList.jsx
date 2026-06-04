@@ -623,6 +623,7 @@ export default function ClientList() {
               <CalendarClock size={14} />
             </span>
             <span className="text-[13px] font-extrabold text-orange-800">Showing clients with documents expiring within 15 days</span>
+            <span className="text-[12px] font-medium text-orange-600">(Trade Licence, Emirates ID, or Passport)</span>
           </div>
           <button
             type="button"
