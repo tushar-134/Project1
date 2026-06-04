@@ -127,7 +127,9 @@ export default function ExpiryAlertPanel({ open, onClose, onOpenClient, payload,
                             item.status === "expired" ? "group-hover:text-red-500" : "group-hover:text-amber-500"
                           }`} />
                         </div>
-                        <p className="mt-2 text-right text-[9px] font-semibold uppercase tracking-wider text-orange-400 opacity-0 transition group-hover:opacity-100">
+                        <p className={`mt-2 text-right text-[9px] font-semibold uppercase tracking-wider opacity-0 transition group-hover:opacity-100 ${
+                          item.status === "expired" ? "text-red-400" : "text-amber-500"
+                        }`}>
                           {item.status === "expired" ? "View in Expired →" : "View in Due Soon →"}
                         </p>
                       </button>
