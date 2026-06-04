@@ -123,7 +123,9 @@ export default function ExpiryAlertPanel({ open, onClose, onOpenClient, payload,
                               Expiry Date: {formatExpiryDate(item.expiryDate)}
                             </p>
                           </div>
-                          <ExternalLink size={13} className="mt-0.5 shrink-0 text-slate-300 transition group-hover:text-orange-500" />
+                          <ExternalLink size={13} className={`mt-0.5 shrink-0 text-slate-300 transition ${
+                            item.status === "expired" ? "group-hover:text-red-500" : "group-hover:text-amber-500"
+                          }`} />
                         </div>
                         <p className="mt-2 text-right text-[9px] font-semibold uppercase tracking-wider text-orange-400 opacity-0 transition group-hover:opacity-100">
                           {item.status === "expired" ? "View in Expired →" : "View in Due Soon →"}
