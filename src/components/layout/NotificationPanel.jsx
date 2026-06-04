@@ -13,7 +13,13 @@ const TYPE_META = {
   task_update:  { label: "Task Update",   color: "bg-sky-100 text-sky-700",       dot: "bg-sky-400"   },
 };
 
-// ─── Decide where a notification should navigate to ──────────────────────────
+/**
+ * Determine the navigation target URL for a notification.
+ * - fta_query without a relatedTask → FTA tracker page
+ * - Any notification with a relatedTask → task drawer via query param
+ * - client_added → client list (no highlight; user can search)
+ * - Fallback → dashboard
+ */
 function getNavTarget(notification) {
   const { type, relatedTask, relatedClient } = notification;
   if (type === "fta_query" && !relatedTask) return "/tasks/fta-tracker";
