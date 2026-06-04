@@ -1035,9 +1035,9 @@ export default function ClientList() {
               id={`client-row-${client.id}`}
               className={client.id === highlightClientId
                 ? expiring
-                  ? "bg-amber-50 ring-2 ring-inset ring-amber-400"
-                  : "bg-purple-50 ring-2 ring-inset ring-purple-400"
-                : ""}
+                  ? "bg-amber-50 ring-2 ring-inset ring-amber-400 transition-all duration-500"
+                  : "bg-purple-50 ring-2 ring-inset ring-purple-400 transition-all duration-500"
+                : "transition-all duration-500"}
             >
                 {isVisible("client") && (
                   <td>
