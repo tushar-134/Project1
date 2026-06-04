@@ -379,14 +379,18 @@ export default function ClientList() {
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1, workingTasksTotal: 0 });
   const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS);
 
-  // Sync state with URL params in case they change without a full remount
+  // Sync state with URL params in case they change without a full remount.
+  // Also resets page to 1 so notification-driven navigations always start at the first page.
   useEffect(() => {
     setExpired(searchParams.get("expired") === "true");
     setExpiring(searchParams.get("expiring") === "true");
     if (searchParams.has("search")) {
       setQuery(searchParams.get("search") || "");
     }
-    setHighlightClientId(searchParams.get("highlight") || "");
+    const newHighlight = searchParams.get("highlight") || "";
+    setHighlightClientId(newHighlight);
+    // If a highlight was injected via URL (notification click), go back to page 1
+    if (newHighlight) setPage(1);
   }, [searchParams]);
   const [drawerClientId, setDrawerClientId] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
