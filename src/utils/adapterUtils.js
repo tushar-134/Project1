@@ -58,7 +58,9 @@ export function mapClient(client) {
     }
   });
 
-  // Compute which documents are expiring within the next 15 days
+  // Compute which documents are expiring within the next 15 days.
+  // The 15-day window intentionally mirrors the server-side expiryAlerts endpoint
+  // so badge data shown in the list is consistent with the alert panel.
   const in15Days = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
   const expiringSoonDocs = [];
   (client.tradeLicences || []).forEach((lic, i) => {
