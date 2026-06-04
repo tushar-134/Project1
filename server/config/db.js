@@ -13,16 +13,19 @@ async function connectDB() {
     uri.includes("<user>") ||
     uri.includes("<pass>");
 
+  let isMemory = false;
   if (isLocalPlaceholder) {
     const { MongoMemoryServer } = require("mongodb-memory-server");
     console.log("⚡ No real MONGO_URI found — starting in-memory MongoDB for local dev...");
     const mongod = await MongoMemoryServer.create();
     uri = mongod.getUri();
+    isMemory = true;
     console.log(`✅ In-memory MongoDB started at: ${uri}`);
   }
 
   const conn = await mongoose.connect(uri);
   console.log(`MongoDB connected: ${conn.connection.host}`);
+  return { connection: conn.connection, isMemory };
 }
 
 module.exports = connectDB;
