@@ -1076,12 +1076,22 @@ export default function ClientList() {
                       )}
                       {(client.expiredDocs || []).map((doc, idx) => (
                         <span
-                          key={idx}
+                          key={`expired-${idx}`}
                           title={`${doc.type} expired: ${doc.label} — ${doc.expiryDate ? new Date(doc.expiryDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""}`}
                           className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-extrabold text-red-700"
                         >
                           <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                           {doc.type} Expired
+                        </span>
+                      ))}
+                      {(client.expiringSoonDocs || []).map((doc, idx) => (
+                        <span
+                          key={`expiring-${idx}`}
+                          title={`${doc.type} due soon: ${doc.label} — expires ${doc.expiryDate ? new Date(doc.expiryDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""}`}
+                          className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-700"
+                        >
+                          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                          {doc.type} Due Soon
                         </span>
                       ))}
                     </div>
