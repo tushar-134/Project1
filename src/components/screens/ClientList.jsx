@@ -976,7 +976,7 @@ export default function ClientList() {
 
       {/* Client table */}
       {/* Inactive mode banner — reminds the user they are viewing read-only archived clients */}
-      {isInactiveMode && (
+      {isInactiveMode && currentUser?.role !== "manager" && (
         <div className="flex items-center gap-2.5 rounded-xl border border-red-100 bg-red-50/70 px-4 py-2.5">
           <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-red-400" />
           <span className="text-[12px] font-bold text-red-700">
