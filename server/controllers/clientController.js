@@ -1155,11 +1155,19 @@ exports.expiryAlerts = async (req, res, next) => {
       query._id = { $in: assignedClientIds };
     }
 
-    const clients = await Client.find(query).select("legalName fileNo tradeLicences contactPersons");
     const today = new Date();
     const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
     const soonEnd = new Date(start);
     soonEnd.setUTCDate(soonEnd.getUTCDate() + 15);
+
+    query.$or = [
+      { "tradeLicences.expiryDate": { $lte: soonEnd } },
+      { "contactPersons.emiratesId.expiryDate": { $lte: soonEnd } },
+      { "contactPersons.passport.expiryDate": { $lte: soonEnd } },
+    ];
+
+    const clients = await Client.find(query).select("legalName fileNo tradeLicences contactPersons");
+
     const alerts = [];
 
     function pushAlert({ client, type, label, holderName, expiryDate }) {

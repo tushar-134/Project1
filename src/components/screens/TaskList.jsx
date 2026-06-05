@@ -385,9 +385,11 @@ export default function TaskList() {
     return data;
   }, [fetchTasks]);
 
+  const requestParamsString = JSON.stringify(requestParams);
+  
   useEffect(() => {
     refetchTasks().catch(() => {});
-  }, [refetchTasks, requestParams]);
+  }, [refetchTasks, requestParamsString]);
 
   const categoryOptions = useMemo(
     () => buildNormalizedOptions(state.categories.map((category) => category.name)),

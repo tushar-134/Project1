@@ -465,6 +465,8 @@ export default function ClientList() {
     return data;
   }, [fetchClients]);
 
+  const requestParamsString = JSON.stringify(requestParams);
+
   useEffect(() => {
     let active = true;
     const timer = setTimeout(() => {
@@ -474,7 +476,7 @@ export default function ClientList() {
       active = false;
       clearTimeout(timer);
     };
-  }, [refetchClients, requestParams]);
+  }, [refetchClients, requestParamsString]);
 
   const rows = state.clients;
   const activeFilterChips = useMemo(

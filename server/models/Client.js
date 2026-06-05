@@ -130,4 +130,8 @@ clientSchema.index(
 );
 clientSchema.index({ group: 1 });
 
+clientSchema.index({ "tradeLicences.expiryDate": 1 }, { sparse: true });
+clientSchema.index({ "contactPersons.emiratesId.expiryDate": 1 }, { sparse: true });
+clientSchema.index({ "contactPersons.passport.expiryDate": 1 }, { sparse: true });
+
 module.exports = mongoose.model("Client", clientSchema);
