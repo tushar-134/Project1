@@ -464,24 +464,16 @@ function SortableHeader({ label, sortKey, currentSort, onClick }) {
         onMouseLeave={(e) => { e.currentTarget.style.background = isActive ? "#eff6ff" : "none"; }}
       >
         <span style={{ fontWeight: isActive ? 700 : "inherit" }}>{label}</span>
-        <span
-          style={{
-            display: "inline-flex",
-            flexDirection: "column",
-            gap: "0px",
-            alignItems: "center",
-            lineHeight: 0,
-          }}
-          aria-hidden="true"
-        >
-          <ChevronUp
-            size={12}
-            style={{ opacity: isAsc ? 1 : 0.4, color: isAsc ? "#2563eb" : "#94a3b8", display: "block" }}
-          />
-          <ChevronDown
-            size={12}
-            style={{ opacity: isDesc ? 1 : 0.4, color: isDesc ? "#2563eb" : "#94a3b8", display: "block" }}
-          />
+        <span aria-hidden="true" style={{ display: "inline-flex", alignItems: "center", lineHeight: 0 }}>
+          {!isActive && (
+            <ChevronsUpDown size={13} style={{ color: "#94a3b8", opacity: 0.6 }} />
+          )}
+          {isAsc && (
+            <ChevronUp size={13} style={{ color: "#2563eb" }} />
+          )}
+          {isDesc && (
+            <ChevronDown size={13} style={{ color: "#2563eb" }} />
+          )}
         </span>
       </button>
     </th>
