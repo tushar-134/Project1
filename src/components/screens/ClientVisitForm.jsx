@@ -422,7 +422,7 @@ export default function ClientVisitForm() {
             </div>
 
             {!isEditMode && (
-              <Field label="Remark">
+              <Field label="Comment">
                 <textarea
                   className="input textarea"
                   value={form.remarks}
