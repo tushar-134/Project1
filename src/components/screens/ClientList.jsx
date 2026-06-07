@@ -1155,8 +1155,10 @@ export default function ClientList() {
                               }
                             }
                           }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 text-[12px] font-bold"
                         >
                           <Trash2 size={14} />
+                          Delete
                         </Button>
                       )}
 
