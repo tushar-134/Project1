@@ -449,7 +449,7 @@ function SortableHeader({ label, sortKey, currentSort, onClick }) {
           display: "inline-flex",
           alignItems: "center",
           gap: "6px",
-          background: "none",
+          background: isActive ? "#eff6ff" : "none",
           border: "none",
           cursor: "pointer",
           padding: "4px 6px",
@@ -460,8 +460,8 @@ function SortableHeader({ label, sortKey, currentSort, onClick }) {
           transition: "color 0.15s, background 0.15s",
           userSelect: "none",
         }}
-        onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "#f1f5f9"; }}
-        onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "none"; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = isActive ? "#dbeafe" : "#f1f5f9"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = isActive ? "#eff6ff" : "none"; }}
       >
         <span>{label}</span>
         <span
