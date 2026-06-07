@@ -51,6 +51,7 @@ function titleStatus(value) {
 const SORT_KEYS = {
   VISIT_ID: "visitId",
   SCHEDULE: "visitDate",
+  CREATED_AT: "createdAt",
 };
 
 function sortParam(sort) {
