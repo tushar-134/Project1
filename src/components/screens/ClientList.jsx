@@ -1049,7 +1049,7 @@ export default function ClientList() {
                           {client.activeTasks} active {client.activeTasks === 1 ? "task" : "tasks"}
                         </span>
                       )}
-                      {(client.expiredDocs || []).map((doc, idx) => (
+                      {licenceAlerts && (client.expiredDocs || []).map((doc, idx) => (
                         <span
                           key={`expired-${idx}`}
                           title={`${doc.type} expired: ${doc.label} — ${doc.expiryDate ? new Date(doc.expiryDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""}`}
@@ -1059,7 +1059,7 @@ export default function ClientList() {
                           {doc.type} Expired
                         </span>
                       ))}
-                      {(client.expiringSoonDocs || []).map((doc, idx) => (
+                      {licenceAlerts && (client.expiringSoonDocs || []).map((doc, idx) => (
                         <span
                           key={`expiring-${idx}`}
                           title={`${doc.type} due soon: ${doc.label} — expires ${doc.expiryDate ? new Date(doc.expiryDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : ""}`}
