@@ -303,7 +303,7 @@ export default function ClientVisits() {
               <SortableHeader label="Visit ID" sortKey="visitId" currentSort={sort} onClick={() => toggleSort("visitId")} />
               <th>Client</th>
               <SortableHeader label="Schedule" sortKey="visitDate" currentSort={sort} onClick={() => toggleSort("visitDate")} />
-              <SortableHeader label="Type" onClick={() => toggleSort("type")} />
+              <th>Type</th>
               <th>Visited By</th>
               <SortableHeader label="Status" onClick={() => toggleSort("status")} />
               <th>Actions</th>
