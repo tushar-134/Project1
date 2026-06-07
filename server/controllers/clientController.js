@@ -160,9 +160,9 @@ async function buildClientListQuery(req) {
     const in15Days = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
     andClauses.push({
       $or: [
-        { "tradeLicences.expiryDate": { $lt: in15Days, $exists: true } },
-        { "contactPersons.emiratesId.expiryDate": { $lt: in15Days, $exists: true } },
-        { "contactPersons.passport.expiryDate": { $lt: in15Days, $exists: true } },
+        { "tradeLicences.expiryDate": { $lt: in15Days, $type: "date" } },
+        { "contactPersons.emiratesId.expiryDate": { $lt: in15Days, $type: "date" } },
+        { "contactPersons.passport.expiryDate": { $lt: in15Days, $type: "date" } },
       ],
     });
   }

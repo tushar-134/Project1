@@ -271,7 +271,7 @@ export default function Dashboard() {
         <Stat icon={<FileText size={18} />} label="Total Clients" value={stats.totalClients || 0} color="text-[#1e3a8a]" onClick={() => navigate("/clients/list")} />
         <Stat icon={<Clock size={18} />} label="Pending Tasks" value={stats.pendingTasks || 0} color="text-[#eab308]" onClick={() => navigate(`/tasks/list?status=Active&month=${selectedMonth}`)} />
         <Stat icon={<AlertTriangle size={18} />} label="Overdue" value={stats.overdueTasks || 0} color="text-[#dc2626]" onClick={() => navigate(`/tasks/list?status=Active&scope=Overdue&overdue=true`)} />
-        <Stat icon={<ShieldAlert size={18} />} label="Licence Alerts" value={(stats.expiredLicences || 0) + (stats.expiringSoonLicences || 0)} color="text-[#ea580c]" onClick={() => navigate("/clients/list?licence_alerts=true")} />
+        <Stat icon={<ShieldAlert size={18} />} label="Licence Alerts" value={(stats.expiredLicences || 0) + (stats.expiringSoonLicences || 0)} color="text-[#dc2626]" onClick={() => navigate("/clients/list?licence_alerts=true")} />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

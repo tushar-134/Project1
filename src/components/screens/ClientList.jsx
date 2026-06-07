@@ -591,13 +591,13 @@ export default function ClientList() {
 
       {/* Licence Alerts filter banner */}
       {licenceAlerts && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
           <div className="flex items-center gap-2">
-            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-orange-100 text-orange-700">
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-red-100 text-red-700">
               <ShieldAlert size={14} />
             </span>
-            <span className="text-[13px] font-extrabold text-orange-800">Showing clients with expired or expiring documents</span>
-            <span className="text-[12px] font-medium text-orange-600">(Trade Licence, Emirates ID, or Passport expiring within 15 days)</span>
+            <span className="text-[13px] font-extrabold text-red-800">Showing clients with expired or expiring documents</span>
+            <span className="text-[12px] font-medium text-red-600">(Trade Licence, Emirates ID, or Passport expiring within 15 days)</span>
           </div>
           <button
             type="button"
@@ -607,7 +607,7 @@ export default function ClientList() {
               setPage(1);
               setSearchParams((prev) => { prev.delete("licence_alerts"); prev.delete("highlight"); return prev; }, { replace: true });
             }}
-            className="rounded-lg px-3 py-1 text-[12px] font-extrabold text-orange-700 hover:bg-orange-100 transition-colors"
+            className="rounded-lg px-3 py-1 text-[12px] font-extrabold text-red-700 hover:bg-red-100 transition-colors"
           >
             Clear filter
           </button>
@@ -1011,9 +1011,7 @@ export default function ClientList() {
               key={client.id}
               id={`client-row-${client.id}`}
               className={client.id === highlightClientId
-                ? expiring
-                  ? "bg-amber-50 ring-2 ring-inset ring-amber-400 transition-all duration-500"
-                  : "bg-purple-50 ring-2 ring-inset ring-purple-400 transition-all duration-500"
+                ? "bg-red-50 ring-2 ring-inset ring-red-400 transition-all duration-500"
                 : "transition-all duration-500"}
             >
                 {isVisible("client") && (
