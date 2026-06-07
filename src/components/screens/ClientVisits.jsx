@@ -310,12 +310,12 @@ export default function ClientVisits() {
           <thead>
             <tr>
               <SortableHeader label="Visit ID" sortKey={SORT_KEYS.VISIT_ID} currentSort={sort} onClick={() => toggleSort(SORT_KEYS.VISIT_ID)} />
-              <th>Client</th>
+              <th scope="col">Client</th>
               <SortableHeader label="Schedule" sortKey={SORT_KEYS.SCHEDULE} currentSort={sort} onClick={() => toggleSort(SORT_KEYS.SCHEDULE)} />
-              <th>Type</th>
-              <th>Visited By</th>
-              <th>Status</th>
-              <th>Actions</th>
+              <th scope="col">Type</th>
+              <th scope="col">Visited By</th>
+              <th scope="col">Status</th>
+              <th scope="col">Actions</th>
             </tr>
           </thead>
           <tbody>
