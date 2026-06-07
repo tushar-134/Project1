@@ -51,6 +51,7 @@ function titleStatus(value) {
 const SORT_KEYS = {
   VISIT_ID: "visitId",
   SCHEDULE: "visitDate",
+  CREATED_AT: "createdAt",
 };
 
 function sortParam(sort) {
@@ -81,7 +82,7 @@ export default function ClientVisits() {
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1 });
   const [visitTypes, setVisitTypes] = useState([]);
   const [page, setPage] = useState(1);
-  const [sort, setSort] = useState({ key: SORT_KEYS.SCHEDULE, direction: "asc" });
+  const [sort, setSort] = useState({ key: SORT_KEYS.CREATED_AT, direction: "desc" });
   const [drawerVisitId, setDrawerVisitId] = useState(null);
   const [historyClient, setHistoryClient] = useState(null);
   const exportRef = useRef(null);
