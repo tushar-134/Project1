@@ -448,7 +448,7 @@ function SortableHeader({ label, sortKey, currentSort, onClick }) {
   const ariaSort = isAsc ? "ascending" : isDesc ? "descending" : "none";
 
   return (
-    <th aria-sort={ariaSort}>
+    <th scope="col" aria-sort={ariaSort}>
       <button
         type="button"
         onClick={onClick}
