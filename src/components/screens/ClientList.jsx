@@ -965,7 +965,7 @@ export default function ClientList() {
               {isVisible("contact")    && <th>Contact Details</th>}
               {isVisible("createdAt")  && <th>Created Date</th>}
               {isVisible("createdBy")  && <th>Created By</th>}
-              {canManage               && <th>Actions</th>}
+              {currentUser?.role === "admin" && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -1115,7 +1115,7 @@ export default function ClientList() {
                       : <span className="text-[12px] text-slate-400">—</span>}
                   </td>
                 )}
-                {canManage && (
+                {currentUser?.role === "admin" && (
                   <td>
                     <div className="flex gap-1">
                       {/* Inactive mode: show Restore button */}
