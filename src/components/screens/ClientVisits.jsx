@@ -154,9 +154,11 @@ export default function ClientVisits() {
   }
 
   function toggleSort(key) {
-    setSort((current) => current.key === key
-      ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
-      : { key, direction: "asc" });
+    setSort((current) =>
+      current.key === key
+        ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
+        : { key, direction: "asc" }
+    );
   }
 
   async function exportVisits(format) {
