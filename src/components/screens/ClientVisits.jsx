@@ -451,14 +451,10 @@ function SortableHeader({ label, sortKey, currentSort, onClick }) {
           gap: "6px",
           background: isActive ? "#eff6ff" : "none",
           border: "none",
-          cursor: "pointer",
           padding: "4px 6px",
           borderRadius: "6px",
-          fontWeight: "inherit",
-          fontSize: "inherit",
           color: isActive ? "#2563eb" : "inherit",
           transition: "color 0.15s, background 0.15s",
-          userSelect: "none",
         }}
         onMouseEnter={(e) => { e.currentTarget.style.background = isActive ? "#dbeafe" : "#f1f5f9"; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = isActive ? "#eff6ff" : "none"; }}
