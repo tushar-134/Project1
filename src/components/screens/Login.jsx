@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { CheckCircle2, ShieldCheck, Zap, ArrowRight } from "lucide-react";
+import { CheckCircle2, ShieldCheck, Zap, ArrowRight, Eye, EyeOff } from "lucide-react";
 import Button from "../ui/Button";
 import { useAuth } from "../../context/AuthContext";
 
@@ -10,6 +10,7 @@ export default function Login() {
   const { login } = useAuth();
   const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Logo Brand Colors
   const brandBlue = "#191D7C";
@@ -187,14 +188,22 @@ export default function Login() {
                   <input 
                     id="login-password" 
                     name="password" 
-                    className="h-11 w-full px-5 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder-slate-600 focus:bg-white/[0.08] transition-all outline-none text-xs font-medium" 
-                    type="password" 
+                    className="h-11 w-full px-5 pr-12 rounded-xl bg-white/[0.03] border border-white/10 text-white placeholder-slate-600 focus:bg-white/[0.08] transition-all outline-none text-xs font-medium" 
+                    type={showPassword ? "text" : "password"} 
                     autoComplete="current-password" 
                     placeholder="••••••••"
                     required 
                     value={form.password} 
                     onChange={(e) => setForm({ ...form, password: e.target.value })} 
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
                   <div className="absolute inset-x-0 bottom-0 h-0.5 bg-gradient-to-r from-transparent via-transparent to-transparent group-focus-within/input:via-yellow-500 transition-all duration-500 rounded-full" />
                 </div>
               </div>

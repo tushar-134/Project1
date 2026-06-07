@@ -420,6 +420,17 @@ export default function ClientVisitForm() {
                 <input className="input" value={form.location} onChange={(event) => updateField("location", event.target.value)} placeholder="Physical address or location name" />
               </Field>
             </div>
+
+            {!isEditMode && (
+              <Field label="Remark">
+                <textarea
+                  className="input textarea"
+                  value={form.remarks}
+                  onChange={(event) => updateField("remarks", event.target.value)}
+                  placeholder="Add an initial comment for this visit"
+                />
+              </Field>
+            )}
           </div>
         </Card>
 

@@ -1,6 +1,5 @@
 import { Pencil, Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useApp } from "../../context/AppContext.jsx";
 import { categoryService } from "../../services/categoryService";
 import { mapCategory } from "../../utils/adapterUtils";
 import Button from "../ui/Button.jsx";
@@ -11,10 +10,10 @@ import Toggle from "../ui/Toggle.jsx";
 const EMPTY_TASK_TYPE = { name: "", showFY: false, showQuarter: false, showRecurring: false };
 
 export default function Categories({ setSettingsHeaderAction }) {
-  const { state, dispatch } = useApp();
+  const [categories, setCategories] = useState([]);
   const [modal, setModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [cat, setCat] = useState({ name: "", icon: "Folder", color: "#1e3a8a", description: "" });
+  const [cat, setCat] = useState({ name: "", icon: "Folder", color: "#1e3a8a", description: "", isActive: true });
 
   // Task-type modal state
   const [ttModal, setTtModal] = useState(false);
@@ -24,8 +23,8 @@ export default function Categories({ setSettingsHeaderAction }) {
 
   const load = () =>
     categoryService
-      .list()
-      .then((data) => dispatch({ type: "SET_RESOURCE", resource: "categories", payload: data.map(mapCategory) }))
+      .list({ includeInactive: true })
+      .then((data) => setCategories(data.map(mapCategory)))
       .catch(() => {});
 
   useEffect(() => { load(); }, []);
@@ -33,7 +32,7 @@ export default function Categories({ setSettingsHeaderAction }) {
   // ── Category modal ──────────────────────────────────────────────────────────
   function openCreateModal() {
     setEditingId(null);
-    setCat({ name: "", icon: "Folder", color: "#1e3a8a", description: "" });
+    setCat({ name: "", icon: "Folder", color: "#1e3a8a", description: "", isActive: true });
     setModal(true);
   }
 
@@ -44,6 +43,7 @@ export default function Categories({ setSettingsHeaderAction }) {
       icon: category.icon || "Folder",
       color: category.color || "#1e3a8a",
       description: category.description || "",
+      isActive: category.isActive !== false,
     });
     setModal(true);
   }
@@ -117,7 +117,8 @@ export default function Categories({ setSettingsHeaderAction }) {
   return (
     <div className="space-y-5">
       <div className="grid gap-4 lg:grid-cols-2">
-        {state.categories.filter((category) => category.id !== "refund").map((category) => {
+        {categories.filter((category) => category.id !== "refund").map((category) => {
+          const activeCategory = category.isActive !== false;
           const taskTypes = category.rawTaskTypes?.length
             ? category.rawTaskTypes
             : category.taskTypes.map((name) => ({ name, isActive: true }));
@@ -129,7 +130,9 @@ export default function Categories({ setSettingsHeaderAction }) {
                   <span className="h-3 w-3 rounded-full" style={{ background: category.color }} />
                   <div>
                     <div className="font-extrabold">{category.name}</div>
-                    <div className="text-[11px] font-bold text-[#059669]">Active</div>
+                    <div className={`text-[11px] font-bold ${activeCategory ? "text-[#059669]" : "text-slate-500"}`}>
+                      {activeCategory ? "Active" : "Inactive"}
+                    </div>
                   </div>
                 </div>
                 <Button variant="ghost" size="sm" onClick={() => openEditModal(category)}>Edit</Button>
@@ -216,6 +219,20 @@ export default function Categories({ setSettingsHeaderAction }) {
               <Field label="Icon"><input id="category-icon" name="categoryIcon" className="input" value={cat.icon} onChange={(e) => setCat({ ...cat, icon: e.target.value })} /></Field>
               <Field label="Color"><input id="category-color" name="categoryColor" className="h-10 w-24 rounded-lg border border-[#e2e8f0]" type="color" value={cat.color} onChange={(e) => setCat({ ...cat, color: e.target.value })} /></Field>
               <Field label="Description"><textarea id="category-description" name="categoryDescription" className="input textarea" value={cat.description} onChange={(e) => setCat({ ...cat, description: e.target.value })} /></Field>
+              {editingId && (
+                <div className="flex items-center justify-between rounded-lg border border-[#e2e8f0] px-3 py-2.5">
+                  <div>
+                    <div className="text-[13px] font-extrabold text-slate-800">Category Status</div>
+                    <div className="text-[11px] text-slate-400">{cat.isActive ? "Active categories are available in task forms." : "Inactive categories are hidden from task forms."}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-[11px] font-extrabold ${cat.isActive ? "text-[#059669]" : "text-slate-500"}`}>
+                      {cat.isActive ? "Active" : "Inactive"}
+                    </span>
+                    <Toggle checked={cat.isActive} onChange={(next) => setCat({ ...cat, isActive: next })} />
+                  </div>
+                </div>
+              )}
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <Button variant="ghost" onClick={() => { setModal(false); setEditingId(null); }}>Cancel</Button>

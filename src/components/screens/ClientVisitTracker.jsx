@@ -20,6 +20,7 @@ const blankForm = () => ({
   clientId: "",
   visitorIds: [],
   visitorToAdd: "",
+  remarks: "",
 });
 
 function getApiErrorMessage(error) {
@@ -236,6 +237,8 @@ export default function ClientVisitTracker() {
         visitDate: form.visitDate,
         client: form.clientId,
         visitors: form.visitorIds.map((user) => ({ user })),
+        assignedUsers: form.visitorIds.map((user) => ({ user })),
+        remarks: form.remarks,
       });
       setVisits((current) => [created, ...current]);
       toast.success("Client visit saved.");
@@ -515,6 +518,17 @@ export default function ClientVisitTracker() {
                   )}
                 </div>
               </div>
+            </div>
+
+            <div className="mt-4">
+              <Field label="Remark" field="visit-remark">
+                <textarea
+                  className="input textarea"
+                  value={form.remarks}
+                  onChange={(e) => setForm((current) => ({ ...current, remarks: e.target.value }))}
+                  placeholder="Add an initial comment for this visit"
+                />
+              </Field>
             </div>
 
             <div className="mt-4 flex justify-end gap-2">
