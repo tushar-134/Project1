@@ -1146,7 +1146,7 @@ export default function ClientList() {
                           size="sm"
                           variant="danger"
                           onClick={async () => {
-                            if (confirm("Delete client?")) {
+                            if (confirm("Mark client as inactive?")) {
                               await deleteClient(client._id);
                               if (rows.length === 1 && page > 1) {
                                 setPage((current) => Math.max(1, current - 1));
@@ -1158,7 +1158,7 @@ export default function ClientList() {
                           className="inline-flex items-center gap-1.5 px-3 py-1 text-[12px] font-bold"
                         >
                           <Trash2 size={14} />
-                          Delete
+                          Inactive
                         </Button>
                       )}
 
