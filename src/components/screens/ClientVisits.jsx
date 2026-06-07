@@ -75,7 +75,7 @@ export default function ClientVisits() {
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1 });
   const [visitTypes, setVisitTypes] = useState([]);
   const [page, setPage] = useState(1);
-  const [sort, setSort] = useState({ key: "visitDate", direction: "desc" });
+  const [sort, setSort] = useState({ key: "visitDate", direction: "asc" });
   const [drawerVisitId, setDrawerVisitId] = useState(null);
   const [historyClient, setHistoryClient] = useState(null);
   const exportRef = useRef(null);
