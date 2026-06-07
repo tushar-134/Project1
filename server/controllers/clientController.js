@@ -79,7 +79,7 @@ function buildClientSearchClause(value) {
 }
 
 async function buildClientListQuery(req) {
-  const { search, jurisdiction, type, group, assignedUser, client, compliance, contact, createdAt, createdBy, licenceExpiry, status, expired, expiring } = req.query;
+  const { search, jurisdiction, type, group, assignedUser, client, compliance, contact, createdAt, createdBy, licenceExpiry, status, licenceAlerts } = req.query;
   const query = {};
   if (status !== "all") {
     query.isActive = status === "inactive" ? false : true;
@@ -155,24 +155,14 @@ async function buildClientListQuery(req) {
     const pattern = buildPattern(licenceExpiry);
     andClauses.push({ "tradeLicences.expiryDate": pattern });
   }
-  if (expired === "true") {
-    const now = new Date();
-    andClauses.push({
-      $or: [
-        { "tradeLicences.expiryDate": { $lt: now, $exists: true } },
-        { "contactPersons.emiratesId.expiryDate": { $lt: now, $exists: true } },
-        { "contactPersons.passport.expiryDate": { $lt: now, $exists: true } },
-      ],
-    });
-  }
-  if (expiring === "true") {
+  if (licenceAlerts === "true") {
     const now = new Date();
     const in15Days = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
     andClauses.push({
       $or: [
-        { "tradeLicences.expiryDate": { $gte: now, $lte: in15Days } },
-        { "contactPersons.emiratesId.expiryDate": { $gte: now, $lte: in15Days } },
-        { "contactPersons.passport.expiryDate": { $gte: now, $lte: in15Days } },
+        { "tradeLicences.expiryDate": { $lt: in15Days, $exists: true } },
+        { "contactPersons.emiratesId.expiryDate": { $lt: in15Days, $exists: true } },
+        { "contactPersons.passport.expiryDate": { $lt: in15Days, $exists: true } },
       ],
     });
   }

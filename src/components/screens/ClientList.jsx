@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronLeft, ChevronRight, Columns, Download, RefreshCw, RotateCcw, Search, SlidersHorizontal, Trash2, Upload, X, CalendarClock } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Columns, Download, RefreshCw, RotateCcw, Search, SlidersHorizontal, Trash2, Upload, X, CalendarClock, ShieldAlert } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -63,7 +63,7 @@ const PAGE_SIZE = 20;
 const JURISDICTION_OPTIONS = ["Mainland", "Free Zone", "Designated Zone", "Offshore"];
 const TYPE_OPTIONS = ["Legal Person", "Natural Person"];
 
-function buildActiveFilterSummary(columnFilters, query, expired, expiring) {
+function buildActiveFilterSummary(columnFilters, query, licenceAlerts) {
   const chips = [];
   if (query.trim()) chips.push(`Search: ${query.trim()}`);
   if (columnFilters.client) chips.push(`Client: ${columnFilters.client}`);
@@ -71,8 +71,7 @@ function buildActiveFilterSummary(columnFilters, query, expired, expiring) {
   if (columnFilters.type) chips.push(`Type: ${columnFilters.type}`);
   if (columnFilters.group) chips.push(`Group: ${columnFilters.group}`);
   if (columnFilters.compliance) chips.push(`VAT TRN: ${columnFilters.compliance}`);
-  if (expired) chips.push("Expiry: Expired");
-  if (expiring) chips.push("Expiry: Expiring in 15 days");
+  if (licenceAlerts) chips.push("Expiry: Licence Alerts");
   if (columnFilters.contact) chips.push(`Contact: ${columnFilters.contact}`);
   if (columnFilters.createdAt) chips.push(`Created: ${columnFilters.createdAt}`);
   if (columnFilters.createdBy) chips.push(`Created By: ${columnFilters.createdBy}`);
@@ -370,8 +369,7 @@ export default function ClientList() {
   // Inactive clients are read-only and must be restored to edit.
   const [clientStatus, setClientStatus] = useState("Active");
   const [query, setQuery] = useState(searchParams.get("search") || "");
-  const [expired, setExpired] = useState(searchParams.get("expired") === "true");
-  const [expiring, setExpiring] = useState(searchParams.get("expiring") === "true");
+  const [licenceAlerts, setLicenceAlerts] = useState(searchParams.get("licence_alerts") === "true");
   const [highlightClientId, setHighlightClientId] = useState(searchParams.get("highlight") || "");
   const [page, setPage] = useState(1);
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1, workingTasksTotal: 0 });
@@ -380,8 +378,7 @@ export default function ClientList() {
   // Sync state with URL params in case they change without a full remount.
   // Also resets page to 1 so notification-driven navigations always start at the first page.
   useEffect(() => {
-    setExpired(searchParams.get("expired") === "true");
-    setExpiring(searchParams.get("expiring") === "true");
+    setLicenceAlerts(searchParams.get("licence_alerts") === "true");
     if (searchParams.has("search")) {
       setQuery(searchParams.get("search") || "");
     }
@@ -447,9 +444,8 @@ export default function ClientList() {
     contact: deferredColumnFilters.contact.trim() || undefined,
     createdAt: deferredColumnFilters.createdAt || undefined,
     createdBy: deferredColumnFilters.createdBy.trim() || undefined,
-    expired: expired ? "true" : undefined,
-    expiring: expiring ? "true" : undefined,
-  }), [deferredColumnFilters, deferredQuery, page, clientStatus, expired, expiring]);
+    licenceAlerts: licenceAlerts ? "true" : undefined,
+  }), [deferredColumnFilters, deferredQuery, page, clientStatus, licenceAlerts]);
 
   const filterRef = useRef(requestParams);
   filterRef.current = requestParams;
@@ -480,8 +476,8 @@ export default function ClientList() {
 
   const rows = state.clients;
   const activeFilterChips = useMemo(
-    () => buildActiveFilterSummary(columnFilters, query, expired, expiring),
-    [columnFilters, query, expired, expiring]
+    () => buildActiveFilterSummary(columnFilters, query, licenceAlerts),
+    [columnFilters, query, licenceAlerts]
   );
   const activeFilterCount = activeFilterChips.length;
   const hasColumnFilters = activeFilterCount > 0;
@@ -503,7 +499,7 @@ export default function ClientList() {
       setHighlightClientId("");
     }, 2000);
     return () => clearTimeout(timer);
-  }, [highlightClientId, clientsLoading, rows.length, page, expired, expiring]);
+  }, [highlightClientId, clientsLoading, rows.length, page, licenceAlerts]);
 
   const updateColumnFilter = (key, value) => {
     setPage(1);
@@ -513,15 +509,13 @@ export default function ClientList() {
   const clearColumnFilters = () => {
     setPage(1);
     setQuery("");
-    setExpired(false);
-    setExpiring(false);
+    setLicenceAlerts(false);
     setHighlightClientId("");
     setColumnFilters(EMPTY_COLUMN_FILTERS);
 
     // Clear URL parameters via React Router
     setSearchParams((prev) => {
-      prev.delete("expired");
-      prev.delete("expiring");
+      prev.delete("licence_alerts");
       prev.delete("highlight");
       return prev;
     }, { replace: true });
@@ -595,48 +589,23 @@ export default function ClientList() {
   return (
     <div className="space-y-5">
 
-      {/* Expired filter banner */}
-      {expired && (
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-purple-200 bg-purple-50 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-purple-100 text-purple-700">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            </span>
-            <span className="text-[13px] font-extrabold text-purple-800">Showing clients with expired documents</span>
-            <span className="text-[12px] font-medium text-purple-600">(Trade Licence, Emirates ID, or Passport)</span>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setExpired(false);
-              setHighlightClientId("");
-              setPage(1);
-              setSearchParams((prev) => { prev.delete("expired"); prev.delete("highlight"); return prev; }, { replace: true });
-            }}
-            className="rounded-lg px-3 py-1 text-[12px] font-extrabold text-purple-700 hover:bg-purple-100 transition-colors"
-          >
-            Clear filter
-          </button>
-        </div>
-      )}
-
-      {/* Expiring soon filter banner */}
-      {expiring && (
+      {/* Licence Alerts filter banner */}
+      {licenceAlerts && (
         <div className="flex items-center justify-between gap-3 rounded-xl border border-orange-200 bg-orange-50 px-4 py-3">
           <div className="flex items-center gap-2">
             <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-orange-100 text-orange-700">
-              <CalendarClock size={14} />
+              <ShieldAlert size={14} />
             </span>
-            <span className="text-[13px] font-extrabold text-orange-800">Showing clients with documents expiring within 15 days</span>
-            <span className="text-[12px] font-medium text-orange-600">(Trade Licence, Emirates ID, or Passport)</span>
+            <span className="text-[13px] font-extrabold text-orange-800">Showing clients with expired or expiring documents</span>
+            <span className="text-[12px] font-medium text-orange-600">(Trade Licence, Emirates ID, or Passport expiring within 15 days)</span>
           </div>
           <button
             type="button"
             onClick={() => {
-              setExpiring(false);
+              setLicenceAlerts(false);
               setHighlightClientId("");
               setPage(1);
-              setSearchParams((prev) => { prev.delete("expiring"); prev.delete("highlight"); return prev; }, { replace: true });
+              setSearchParams((prev) => { prev.delete("licence_alerts"); prev.delete("highlight"); return prev; }, { replace: true });
             }}
             className="rounded-lg px-3 py-1 text-[12px] font-extrabold text-orange-700 hover:bg-orange-100 transition-colors"
           >
