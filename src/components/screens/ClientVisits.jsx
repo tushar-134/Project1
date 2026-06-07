@@ -320,7 +320,7 @@ export default function ClientVisits() {
           <tbody>
             {visits.map((visit) => (
               <tr key={visit._id}>
-                <td>
+                <td style={sort.key === SORT_KEYS.VISIT_ID ? { background: "rgba(239,246,255,0.6)" } : {}}>
                   <button
                     type="button"
                     className="task-id-link"
@@ -346,7 +346,7 @@ export default function ClientVisits() {
                   )}
                   <div className="mt-1 text-[12px] font-semibold text-slate-500">{visit.clientLocation || "-"}</div>
                 </td>
-                <td>
+                <td style={sort.key === SORT_KEYS.SCHEDULE ? { background: "rgba(239,246,255,0.6)" } : {}}>
                   <div className="font-black text-slate-900">{formatDate(visit.visitDate)}</div>
                   <div className="mt-1 text-[12px] font-semibold text-slate-500">{visit.visitTime || "-"}</div>
                 </td>
