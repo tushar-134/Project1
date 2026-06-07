@@ -165,6 +165,7 @@ export default function ClientVisits() {
         ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
         : { key, direction: "asc" }
     );
+    setPage(1);
   }
 
   async function exportVisits(format) {
