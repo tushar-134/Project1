@@ -478,7 +478,7 @@ function SortableHeader({ label, sortKey, currentSort, onClick }) {
             height="6"
             viewBox="0 0 8 6"
             fill="none"
-            style={{ display: "block", opacity: isAsc ? 1 : 0.3 }}
+            style={{ display: "block", opacity: isAsc ? 1 : 0.4 }}
           >
             <path d="M4 0L8 6H0L4 0Z" fill={isAsc ? "#2563eb" : "#94a3b8"} />
           </svg>
@@ -487,7 +487,7 @@ function SortableHeader({ label, sortKey, currentSort, onClick }) {
             height="6"
             viewBox="0 0 8 6"
             fill="none"
-            style={{ display: "block", opacity: isDesc ? 1 : 0.3 }}
+            style={{ display: "block", opacity: isDesc ? 1 : 0.4 }}
           >
             <path d="M4 6L0 0H8L4 6Z" fill={isDesc ? "#2563eb" : "#94a3b8"} />
           </svg>
