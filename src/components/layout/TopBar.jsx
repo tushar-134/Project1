@@ -201,17 +201,12 @@ export default function TopBar({ title, navOpen = false, onMenuClick }) {
           <ExpiryAlertPanel
             open={expiryOpen}
             onClose={() => setExpiryOpen(false)}
-            onOpenClient={(clientId, item) => {
-              // Route to the correct filtered view depending on whether the
-              // clicked item is already expired or just expiring within 15 days.
-              const isExpiringSoon = item?.status === "expiring_soon";
-              const search = new URLSearchParams(
-                isExpiringSoon
-                  ? { expiring: "true", highlight: clientId }
-                  : { expired: "true", highlight: clientId }
-              );
+            onOpenClient={(clientId) => {
+              // Navigate to the licence alerts filtered view and highlight the specific client.
+              // ClientList reads licence_alerts=true to show the expiry filter
+              // and highlight=<id> to scroll to and ring that specific row.
               setExpiryOpen(false);
-              navigate(`/clients/list?${search.toString()}`);
+              navigate(`/clients/list?licence_alerts=true&highlight=${clientId}`);
             }}
             payload={expiryPayload}
             loading={expiryLoading}
