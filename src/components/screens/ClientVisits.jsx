@@ -47,6 +47,12 @@ function titleStatus(value) {
     .join(" ");
 }
 
+// Only these two columns are sortable in the client visits table.
+const SORT_KEYS = {
+  VISIT_ID: "visitId",
+  SCHEDULE: "visitDate",
+};
+
 function sortParam(sort) {
   return {
     sortBy: sort.key,
