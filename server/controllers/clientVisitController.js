@@ -145,6 +145,16 @@ function appendActivity(visit, userId, action, message) {
   visit.activityLogs.unshift({ action, message, user: userId, createdAt: new Date() });
 }
 
+function buildInitialComment(remarks, user) {
+  const text = String(remarks || "").trim();
+  if (!text) return "";
+  return JSON.stringify([{
+    text,
+    author: user?.name || "User",
+    at: new Date().toISOString(),
+  }]);
+}
+
 function normalizeAssignedUsers(assignedUsers = []) {
   const byUser = new Map();
   assignedUsers.forEach((entry) => {
@@ -551,7 +561,7 @@ exports.createVisit = async (req, res, next) => {
       visitTime: String(visitTime || "").trim(),
       visitType: VISIT_TYPES.includes(visitType) ? visitType : "Monthly Visit",
       location: String(location || "").trim(),
-      remarks: String(remarks || "").trim(),
+      remarks: buildInitialComment(remarks, req.user),
       status: "planned",
       assignedUsers: normalizedAssignedUsers,
       createdBy: req.user._id,
@@ -564,6 +574,9 @@ exports.createVisit = async (req, res, next) => {
       "Users Assigned",
       `${normalizedAssignedUsers.length} user${normalizedAssignedUsers.length === 1 ? "" : "s"} assigned`
     );
+    if (String(remarks || "").trim()) {
+      appendActivity(visit, req.user._id, "Remarks Added", "Initial visit remark added");
+    }
     await visit.save();
     res.status(201).json(serializeVisit(await visit.populate(populateVisit)));
   } catch (error) {
