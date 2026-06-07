@@ -437,8 +437,10 @@ function SortableHeader({ label, sortKey, currentSort, onClick }) {
   const isAsc = isActive && currentSort?.direction === "asc";
   const isDesc = isActive && currentSort?.direction === "desc";
 
+  const ariaSort = isAsc ? "ascending" : isDesc ? "descending" : "none";
+
   return (
-    <th>
+    <th aria-sort={ariaSort}>
       <button
         type="button"
         onClick={onClick}
