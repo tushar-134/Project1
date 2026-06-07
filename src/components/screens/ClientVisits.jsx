@@ -1,4 +1,4 @@
-import { Briefcase, ChevronDown, CircleChevronRight, Download, Upload, Plus, Search, SquarePen } from "lucide-react";
+import { Briefcase, ChevronDown, ChevronUp, CircleChevronRight, Download, Upload, Plus, Search, SquarePen } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
