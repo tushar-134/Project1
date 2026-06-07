@@ -444,7 +444,7 @@ function SortableHeader({ label, sortKey, currentSort, onClick }) {
       <button
         type="button"
         onClick={onClick}
-        title={`Sort by ${label}`}
+        title={isActive ? (isAsc ? `Sort ${label} descending` : `Sort ${label} ascending`) : `Sort by ${label}`}
         style={{
           display: "inline-flex",
           alignItems: "center",
