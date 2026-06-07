@@ -468,29 +468,20 @@ function SortableHeader({ label, sortKey, currentSort, onClick }) {
           style={{
             display: "inline-flex",
             flexDirection: "column",
-            gap: "1px",
+            gap: "0px",
             alignItems: "center",
+            lineHeight: 0,
           }}
           aria-hidden="true"
         >
-          <svg
-            width="8"
-            height="6"
-            viewBox="0 0 8 6"
-            fill="none"
-            style={{ display: "block", opacity: isAsc ? 1 : 0.4 }}
-          >
-            <path d="M4 0L8 6H0L4 0Z" fill={isAsc ? "#2563eb" : "#94a3b8"} />
-          </svg>
-          <svg
-            width="8"
-            height="6"
-            viewBox="0 0 8 6"
-            fill="none"
-            style={{ display: "block", opacity: isDesc ? 1 : 0.4 }}
-          >
-            <path d="M4 6L0 0H8L4 6Z" fill={isDesc ? "#2563eb" : "#94a3b8"} />
-          </svg>
+          <ChevronUp
+            size={12}
+            style={{ opacity: isAsc ? 1 : 0.4, color: isAsc ? "#2563eb" : "#94a3b8", display: "block" }}
+          />
+          <ChevronDown
+            size={12}
+            style={{ opacity: isDesc ? 1 : 0.4, color: isDesc ? "#2563eb" : "#94a3b8", display: "block" }}
+          />
         </span>
       </button>
     </th>
