@@ -15,6 +15,7 @@ import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
 import ClientDrawer from "../ui/ClientDrawer.jsx";
 import ExportModal from "../ui/ExportModal.jsx";
+import ConfirmModal from "../ui/ConfirmModal.jsx";
 import Table from "../ui/Table.jsx";
 
 // ─── Column definitions ────────────────────────────────────────────────────
@@ -390,6 +391,7 @@ export default function ClientList() {
   const [drawerClientId, setDrawerClientId] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
   const [customFieldsForExport, setCustomFieldsForExport] = useState([]);
   const BASE_EXPORT_FIELDS = [
     { key: "fileNo",        label: "File No" },
@@ -1125,14 +1127,7 @@ export default function ClientList() {
                           variant="ghost"
                           title="Reactivate this client"
                           onClick={async () => {
-                            if (confirm("Restore this client?")) {
-                              try {
-                                await restoreClient(client._id);
-                                refetchClients().catch(() => {});
-                              } catch (_) {
-                                alert("Failed to restore client. Please try again.");
-                              }
-                            }
+                            setConfirmAction({ type: "restore", client });
                           }}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[12px] font-bold text-emerald-700 hover:bg-emerald-100"
                         >
@@ -1146,14 +1141,7 @@ export default function ClientList() {
                           size="sm"
                           variant="danger"
                           onClick={async () => {
-                            if (confirm("Mark client as inactive?")) {
-                              await deleteClient(client._id);
-                              if (rows.length === 1 && page > 1) {
-                                setPage((current) => Math.max(1, current - 1));
-                              } else {
-                                refetchClients().catch(() => {});
-                              }
-                            }
+                            setConfirmAction({ type: "inactive", client });
                           }}
                           className="inline-flex items-center gap-1.5 px-3 py-1 text-[12px] font-bold"
                         >
@@ -1200,6 +1188,38 @@ export default function ClientList() {
         onExportVisible={exportVisible}
         onExportAll={exportAll}
         onExportSelected={exportSelected}
+      />
+      {/* ── Confirm Modal ──────────────────────────────────────────────────────── */}
+      <ConfirmModal
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={async () => {
+          if (confirmAction?.type === "inactive") {
+            try {
+              await deleteClient(confirmAction.client._id);
+              if (rows.length === 1 && page > 1) {
+                setPage((current) => Math.max(1, current - 1));
+              } else {
+                refetchClients().catch(() => {});
+              }
+            } catch (err) {
+              console.error("Failed to mark client as inactive", err);
+            }
+          } else if (confirmAction?.type === "restore") {
+            try {
+              await restoreClient(confirmAction.client._id);
+              refetchClients().catch(() => {});
+            } catch (_) {
+              alert("Failed to restore client. Please try again.");
+            }
+          }
+        }}
+        title={confirmAction?.type === "inactive" ? "Mark Client as Inactive" : "Restore Client"}
+        message={confirmAction?.type === "inactive" 
+          ? `Are you sure you want to mark ${confirmAction?.client?.legalName || "this client"} as inactive?` 
+          : `Are you sure you want to restore ${confirmAction?.client?.legalName || "this client"}?`}
+        confirmText={confirmAction?.type === "inactive" ? "Make Inactive" : "Restore"}
+        isDanger={confirmAction?.type === "inactive"}
       />
     </div>
   );
