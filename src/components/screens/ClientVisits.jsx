@@ -1,4 +1,4 @@
-import { Briefcase, ChevronDown, CircleChevronRight, Download, Upload, Plus, Search, SquarePen, ArrowUp, ArrowDown } from "lucide-react";
+import { Briefcase, ChevronDown, ChevronUp, ChevronsUpDown, CircleChevronRight, Upload, Plus, SquarePen } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -47,6 +47,12 @@ function titleStatus(value) {
     .join(" ");
 }
 
+// Only these two columns are sortable in the client visits table.
+const SORT_KEYS = {
+  VISIT_ID: "visitId",
+  SCHEDULE: "visitDate",
+};
+
 function sortParam(sort) {
   return {
     sortBy: sort.key,
@@ -75,7 +81,7 @@ export default function ClientVisits() {
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1 });
   const [visitTypes, setVisitTypes] = useState([]);
   const [page, setPage] = useState(1);
-  const [sort, setSort] = useState({ key: "visitDate", direction: "desc" });
+  const [sort, setSort] = useState({ key: SORT_KEYS.SCHEDULE, direction: "asc" });
   const [drawerVisitId, setDrawerVisitId] = useState(null);
   const [historyClient, setHistoryClient] = useState(null);
   const exportRef = useRef(null);
@@ -154,9 +160,12 @@ export default function ClientVisits() {
   }
 
   function toggleSort(key) {
-    setSort((current) => current.key === key
-      ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
-      : { key, direction: "asc" });
+    setSort((current) =>
+      current.key === key
+        ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
+        : { key, direction: "asc" }
+    );
+    setPage(1);
   }
 
   async function exportVisits(format) {
@@ -300,23 +309,24 @@ export default function ClientVisits() {
         <Table>
           <thead>
             <tr>
-              <SortableHeader label="Visit ID" onClick={() => toggleSort("visitId")} sortKey="visitId" currentSort={sort} />
-              <SortableHeader label="Client" onClick={() => toggleSort("client")} sortKey="client" currentSort={sort} />
-              <SortableHeader label="Schedule" onClick={() => toggleSort("visitDate")} sortKey="visitDate" currentSort={sort} />
-              <SortableHeader label="Type" onClick={() => toggleSort("type")} sortKey="type" currentSort={sort} />
-              <th>Visited By</th>
-              <SortableHeader label="Status" onClick={() => toggleSort("status")} sortKey="status" currentSort={sort} />
-              <th>Actions</th>
+              <SortableHeader label="Visit ID" sortKey={SORT_KEYS.VISIT_ID} currentSort={sort} onClick={() => toggleSort(SORT_KEYS.VISIT_ID)} />
+              <th scope="col">Client</th>
+              <SortableHeader label="Schedule" sortKey={SORT_KEYS.SCHEDULE} currentSort={sort} onClick={() => toggleSort(SORT_KEYS.SCHEDULE)} />
+              <th scope="col">Type</th>
+              <th scope="col">Visited By</th>
+              <th scope="col">Status</th>
+              <th scope="col">Actions</th>
             </tr>
           </thead>
           <tbody>
             {visits.map((visit) => (
               <tr key={visit._id}>
-                <td>
+                <td style={sort.key === SORT_KEYS.VISIT_ID ? { background: "rgba(239,246,255,0.6)", transition: "background 0.2s" } : { transition: "background 0.2s" }}>
                   <button
                     type="button"
                     className="task-id-link"
                     onClick={() => setDrawerVisitId(visit._id)}
+                    title="View visit details"
                   >
                     {visit.visitId}
                   </button>
@@ -338,7 +348,7 @@ export default function ClientVisits() {
                   )}
                   <div className="mt-1 text-[12px] font-semibold text-slate-500">{visit.clientLocation || "-"}</div>
                 </td>
-                <td>
+                <td style={sort.key === SORT_KEYS.SCHEDULE ? { background: "rgba(239,246,255,0.6)", transition: "background 0.2s" } : { transition: "background 0.2s" }}>
                   <div className="font-black text-slate-900">{formatDate(visit.visitDate)}</div>
                   <div className="mt-1 text-[12px] font-semibold text-slate-500">{visit.visitTime || "-"}</div>
                 </td>
@@ -431,13 +441,43 @@ function FilterField({ label, children, className = "" }) {
 }
 
 function SortableHeader({ label, sortKey, currentSort, onClick }) {
-  const isSorted = currentSort?.key === sortKey;
+  const isActive = currentSort?.key === sortKey;
+  const isAsc = isActive && currentSort?.direction === "asc";
+  const isDesc = isActive && currentSort?.direction === "desc";
+
+  const ariaSort = isAsc ? "ascending" : isDesc ? "descending" : "none";
+
   return (
-    <th>
-      <button type="button" className="font-inherit group inline-flex items-center gap-1.5 text-left hover:text-slate-900" onClick={onClick}>
-        {label}
-        <span className={`text-slate-400 transition-opacity ${isSorted ? "opacity-100" : "opacity-0 group-hover:opacity-50"}`}>
-          {isSorted && currentSort?.direction === "desc" ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
+    <th scope="col" aria-sort={ariaSort}>
+      <button
+        type="button"
+        onClick={onClick}
+        title={isActive ? (isAsc ? `Sort ${label} descending` : `Sort ${label} ascending`) : `Sort by ${label}`}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "6px",
+          background: isActive ? "#eff6ff" : "none",
+          border: "none",
+          padding: "4px 6px",
+          borderRadius: "6px",
+          color: isActive ? "#2563eb" : "inherit",
+          transition: "color 0.15s, background 0.15s",
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = isActive ? "#dbeafe" : "#f1f5f9"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = isActive ? "#eff6ff" : "none"; }}
+      >
+        <span style={{ fontWeight: isActive ? 700 : "inherit" }}>{label}</span>
+        <span aria-hidden="true" style={{ display: "inline-flex", alignItems: "center", lineHeight: 0 }}>
+          {!isActive && (
+            <ChevronsUpDown size={13} style={{ color: "#94a3b8", opacity: 0.6 }} />
+          )}
+          {isAsc && (
+            <ChevronUp size={13} style={{ color: "#2563eb" }} />
+          )}
+          {isDesc && (
+            <ChevronDown size={13} style={{ color: "#2563eb" }} />
+          )}
         </span>
       </button>
     </th>

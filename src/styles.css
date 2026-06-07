@@ -169,6 +169,8 @@ button { touch-action: manipulation; }
 .page-kicker { @apply text-[11px] font-bold uppercase tracking-[.08em] text-slate-500; }
 .table { @apply w-full border-collapse text-left; }
 .table th { @apply whitespace-nowrap border-b bg-slate-50 px-3 py-3 text-[11px] font-extrabold uppercase tracking-[.04em] text-slate-500 sm:px-4; border-color: var(--border); }
+.table th[aria-sort] button { font-size: inherit; font-weight: inherit; letter-spacing: inherit; text-transform: inherit; user-select: none; cursor: pointer; }
+.table th[aria-sort] button:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; border-radius: 4px; }
 .table td { @apply border-b px-3 py-3 align-middle text-[13px] sm:px-4; border-color: var(--border); }
 .table tr:hover td { @apply bg-slate-50/70; }
 .upload-zone { @apply flex min-h-32 flex-col items-center justify-center rounded-xl border-2 border-dashed bg-slate-50 px-5 py-7 text-center text-slate-500; border-color: var(--border); }
