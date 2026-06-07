@@ -1,4 +1,4 @@
-import { Briefcase, ChevronDown, CircleChevronRight, Download, Upload, Plus, Search, SquarePen } from "lucide-react";
+import { Briefcase, ChevronDown, CircleChevronRight, Download, Upload, Plus, Search, SquarePen, ArrowUp, ArrowDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -300,12 +300,12 @@ export default function ClientVisits() {
         <Table>
           <thead>
             <tr>
-              <SortableHeader label="Visit ID" onClick={() => toggleSort("visitId")} />
-              <SortableHeader label="Client" onClick={() => toggleSort("client")} />
-              <SortableHeader label="Schedule" onClick={() => toggleSort("visitDate")} />
-              <SortableHeader label="Type" onClick={() => toggleSort("type")} />
+              <SortableHeader label="Visit ID" onClick={() => toggleSort("visitId")} sortKey="visitId" currentSort={sort} />
+              <SortableHeader label="Client" onClick={() => toggleSort("client")} sortKey="client" currentSort={sort} />
+              <SortableHeader label="Schedule" onClick={() => toggleSort("visitDate")} sortKey="visitDate" currentSort={sort} />
+              <SortableHeader label="Type" onClick={() => toggleSort("type")} sortKey="type" currentSort={sort} />
               <th>Visited By</th>
-              <SortableHeader label="Status" onClick={() => toggleSort("status")} />
+              <SortableHeader label="Status" onClick={() => toggleSort("status")} sortKey="status" currentSort={sort} />
               <th>Actions</th>
             </tr>
           </thead>
@@ -430,11 +430,15 @@ function FilterField({ label, children, className = "" }) {
   );
 }
 
-function SortableHeader({ label, onClick }) {
+function SortableHeader({ label, sortKey, currentSort, onClick }) {
+  const isSorted = currentSort?.key === sortKey;
   return (
     <th>
-      <button type="button" className="font-inherit inline-flex items-center gap-1 text-left" onClick={onClick}>
+      <button type="button" className="font-inherit group inline-flex items-center gap-1.5 text-left hover:text-slate-900" onClick={onClick}>
         {label}
+        <span className={`text-slate-400 transition-opacity ${isSorted ? "opacity-100" : "opacity-0 group-hover:opacity-50"}`}>
+          {isSorted && currentSort?.direction === "desc" ? <ArrowDown size={14} /> : <ArrowUp size={14} />}
+        </span>
       </button>
     </th>
   );
