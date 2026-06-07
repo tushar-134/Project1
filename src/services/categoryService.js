@@ -2,7 +2,9 @@ import api from "./api";
 
 // Categories expose task-type subdocument mutations that do not fit the normal CRUD shape.
 export const categoryService = {
-  list: () => api.get("/categories").then((res) => res.data),
+  list: (options = {}) => api.get("/categories", {
+    params: options.includeInactive ? { includeInactive: true } : undefined,
+  }).then((res) => res.data),
   create: (payload) => api.post("/categories", payload).then((res) => res.data),
   update: (id, payload) => api.put(`/categories/${id}`, payload).then((res) => res.data),
   remove: (id) => api.delete(`/categories/${id}`).then((res) => res.data),

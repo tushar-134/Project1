@@ -1,7 +1,11 @@
 const Category = require("../models/Category");
 
 exports.listCategories = async (req, res, next) => {
-  try { res.json(await Category.find({ isActive: true }).sort({ createdAt: 1 })); } catch (error) { next(error); }
+  try {
+    const includeInactive = req.query.includeInactive === "true" && req.user?.role === "admin";
+    const query = includeInactive ? {} : { isActive: true };
+    res.json(await Category.find(query).sort({ createdAt: 1 }));
+  } catch (error) { next(error); }
 };
 exports.createCategory = async (req, res, next) => {
   try { res.status(201).json(await Category.create(req.body)); } catch (error) { next(error); }
