@@ -6,25 +6,31 @@ import { CheckCheck, Bell, ExternalLink } from "lucide-react";
 
 // ─── Type metadata ────────────────────────────────────────────────────────────
 const TYPE_META = {
-  task_due:     { label: "Task Due",      color: "bg-amber-100 text-amber-700",   dot: "bg-amber-400" },
-  task_overdue: { label: "Task Overdue",  color: "bg-red-100 text-red-700",       dot: "bg-red-500"   },
-  client_added: { label: "Client Added",  color: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-400" },
-  fta_query:    { label: "FTA Query",     color: "bg-purple-100 text-purple-700", dot: "bg-purple-500" },
-  task_update:  { label: "Task Update",   color: "bg-sky-100 text-sky-700",       dot: "bg-sky-400"   },
+  task_due:       { label: "Task Due",        color: "bg-amber-100 text-amber-700",   dot: "bg-amber-400"   },
+  task_overdue:   { label: "Task Overdue",    color: "bg-red-100 text-red-700",       dot: "bg-red-500"     },
+  client_added:   { label: "Client Added",    color: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-400" },
+  fta_query:      { label: "FTA Query",       color: "bg-purple-100 text-purple-700", dot: "bg-purple-500"  },
+  task_update:    { label: "Task Update",     color: "bg-sky-100 text-sky-700",       dot: "bg-sky-400"     },
+  licence_expiry: { label: "Licence Expiry",  color: "bg-red-100 text-red-700",       dot: "bg-red-500"     },
 };
 
-/**
- * Determine the navigation target URL for a notification.
- * - fta_query without a relatedTask → FTA tracker page
- * - Any notification with a relatedTask → task drawer via query param
- * - client_added → client list (no highlight; user can search)
- * - Fallback → dashboard
- */
+// ─── Decide where a notification should navigate to ──────────────────────────
 function getNavTarget(notification) {
   const { type, relatedTask, relatedClient } = notification;
-  if (type === "fta_query" && !relatedTask) return "/tasks/fta-tracker";
-  if (relatedTask) return `/tasks/list?drawer=${relatedTask}`;
-  if (type === "client_added" && relatedClient) return `/clients/list`;
+  if (type === "fta_query") return "/tasks/fta-tracker";
+  if ((type === "task_due" || type === "task_overdue" || type === "task_update") && relatedTask)
+    return `/tasks/${relatedTask}`;
+  // Licence expiry → client list with licence_alerts filter + highlight for that specific client
+  if (type === "licence_expiry" && relatedClient)
+    return `/clients/list?licence_alerts=true&highlight=${relatedClient}`;
+  if (type === "licence_expiry")
+    return "/clients/list?licence_alerts=true";
+  // Client added → go to client list and highlight that specific client
+  if (type === "client_added" && relatedClient)
+    return `/clients/list?highlight=${relatedClient}`;
+  // Fallback
+  if (relatedTask) return `/tasks/${relatedTask}`;
+  if (relatedClient) return `/clients/list?highlight=${relatedClient}`;
   return "/dashboard";
 }
 

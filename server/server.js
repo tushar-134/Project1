@@ -154,6 +154,48 @@ async function taskScheduler() {
 
 cron.schedule("0 4 * * *", dailyTaskNotifications, { timezone: "UTC" });
 
+// ── Licence-expiry notifications (runs daily at 04:15 UTC) ──────────────────
+async function dailyLicenceExpiryNotifications() {
+  try {
+    const Client = require("./models/Client");
+    const now = new Date();
+    const soon = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 15));
+    // Find clients whose primary trade licence expires within 15 days (or already expired)
+    const expiringClients = await Client.find({
+      isActive: true,
+      "tradeLicences.0.expiryDate": { $lte: soon },
+    }).select("_id legalName fileNo tradeLicences");
+
+    if (!expiringClients.length) return;
+
+    const admins = await User.find({ role: "admin", isActive: true }).select("_id");
+    const recipientIds = admins.map((a) => String(a._id));
+    if (!recipientIds.length) return;
+
+    const entries = [];
+    expiringClients.forEach((client) => {
+      const licence = (client.tradeLicences || [])[0];
+      if (!licence?.expiryDate) return;
+      const expiry = new Date(licence.expiryDate);
+      const isExpired = expiry < now;
+      const daysLeft = Math.ceil((expiry - now) / 86_400_000);
+      const title = isExpired
+        ? "Trade licence expired"
+        : `Trade licence expiring in ${daysLeft} day${daysLeft === 1 ? "" : "s"}`;
+      const message = `${client.legalName || client.fileNo} — ${isExpired ? "expired" : "expires"} ${expiry.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}`;
+      recipientIds.forEach((recipient) =>
+        entries.push({ recipient, title, message, type: "licence_expiry", relatedClient: client._id })
+      );
+    });
+
+    await insertMissingNotifications(entries);
+  } catch (err) {
+    console.error("[Licence Expiry Cron] Error:", err.message);
+  }
+}
+
+cron.schedule("15 4 * * *", dailyLicenceExpiryNotifications, { timezone: "UTC" });
+
 cron.schedule("0 4 * * *", taskScheduler, { timezone: "UTC" });
 
 const port = process.env.PORT || 5000;
