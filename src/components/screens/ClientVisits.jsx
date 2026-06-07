@@ -82,6 +82,7 @@ export default function ClientVisits() {
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1 });
   const [visitTypes, setVisitTypes] = useState([]);
   const [page, setPage] = useState(1);
+  // Default: show newest added visits first (Visit ID descending).
   const [sort, setSort] = useState({ key: SORT_KEYS.VISIT_ID, direction: "desc" });
   const [drawerVisitId, setDrawerVisitId] = useState(null);
   const [historyClient, setHistoryClient] = useState(null);
