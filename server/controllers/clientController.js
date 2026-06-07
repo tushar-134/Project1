@@ -451,11 +451,13 @@ exports.listClients = async (req, res, next) => {
       return res.json({ clients, total, page: Math.min(requestedPage, pages), pages, limit });
     }
     
+    const sortCriteria = req.query.status === "inactive" ? { updatedAt: -1 } : { createdAt: -1 };
+    
     const [total, clients] = await Promise.all([
       Client.countDocuments(query),
       Client.find(query)
         .populate(populateClientList)
-        .sort({ createdAt: -1 })
+        .sort(sortCriteria)
         .skip(skip)
         .limit(limit)
     ]);
