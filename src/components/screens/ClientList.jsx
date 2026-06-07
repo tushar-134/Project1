@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronLeft, ChevronRight, Columns, Download, RefreshCw, RotateCcw, Search, SlidersHorizontal, Trash2, Upload, X, CalendarClock, ShieldAlert } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Columns, Download, RefreshCw, RotateCcw, Search, SlidersHorizontal, Archive, Upload, X, CalendarClock, ShieldAlert } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -1157,7 +1157,7 @@ export default function ClientList() {
                           }}
                           className="inline-flex items-center gap-1.5 px-3 py-1 text-[12px] font-bold"
                         >
-                          <Trash2 size={14} />
+                          <Archive size={14} />
                           Inactive
                         </Button>
                       )}
