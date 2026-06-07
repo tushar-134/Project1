@@ -463,7 +463,7 @@ function SortableHeader({ label, sortKey, currentSort, onClick }) {
         onMouseEnter={(e) => { e.currentTarget.style.background = isActive ? "#dbeafe" : "#f1f5f9"; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = isActive ? "#eff6ff" : "none"; }}
       >
-        <span>{label}</span>
+        <span style={{ fontWeight: isActive ? 700 : "inherit" }}>{label}</span>
         <span
           style={{
             display: "inline-flex",
