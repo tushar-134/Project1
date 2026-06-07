@@ -325,6 +325,7 @@ export default function ClientVisits() {
                     type="button"
                     className="task-id-link"
                     onClick={() => setDrawerVisitId(visit._id)}
+                    title="View visit details"
                   >
                     {visit.visitId}
                   </button>
