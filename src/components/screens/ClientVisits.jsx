@@ -430,11 +430,64 @@ function FilterField({ label, children, className = "" }) {
   );
 }
 
-function SortableHeader({ label, onClick }) {
+function SortableHeader({ label, sortKey, currentSort, onClick }) {
+  const isActive = currentSort?.key === sortKey;
+  const isAsc = isActive && currentSort?.direction === "asc";
+  const isDesc = isActive && currentSort?.direction === "desc";
+
   return (
     <th>
-      <button type="button" className="font-inherit inline-flex items-center gap-1 text-left" onClick={onClick}>
-        {label}
+      <button
+        type="button"
+        onClick={onClick}
+        title={`Sort by ${label}`}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "6px",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          padding: "4px 6px",
+          borderRadius: "6px",
+          fontWeight: "inherit",
+          fontSize: "inherit",
+          color: isActive ? "#2563eb" : "inherit",
+          transition: "color 0.15s, background 0.15s",
+          userSelect: "none",
+        }}
+        onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = "#f1f5f9"; }}
+        onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.background = "none"; }}
+      >
+        <span>{label}</span>
+        <span
+          style={{
+            display: "inline-flex",
+            flexDirection: "column",
+            gap: "1px",
+            alignItems: "center",
+          }}
+          aria-hidden="true"
+        >
+          <svg
+            width="8"
+            height="6"
+            viewBox="0 0 8 6"
+            fill="none"
+            style={{ display: "block", opacity: isAsc ? 1 : 0.3 }}
+          >
+            <path d="M4 0L8 6H0L4 0Z" fill={isAsc ? "#2563eb" : "#94a3b8"} />
+          </svg>
+          <svg
+            width="8"
+            height="6"
+            viewBox="0 0 8 6"
+            fill="none"
+            style={{ display: "block", opacity: isDesc ? 1 : 0.3 }}
+          >
+            <path d="M4 6L0 0H8L4 6Z" fill={isDesc ? "#2563eb" : "#94a3b8"} />
+          </svg>
+        </span>
       </button>
     </th>
   );
