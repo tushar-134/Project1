@@ -81,7 +81,7 @@ export default function ClientVisits() {
   const [meta, setMeta] = useState({ total: 0, page: 1, pages: 1 });
   const [visitTypes, setVisitTypes] = useState([]);
   const [page, setPage] = useState(1);
-  const [sort, setSort] = useState({ key: "visitDate", direction: "asc" });
+  const [sort, setSort] = useState({ key: SORT_KEYS.SCHEDULE, direction: "asc" });
   const [drawerVisitId, setDrawerVisitId] = useState(null);
   const [historyClient, setHistoryClient] = useState(null);
   const exportRef = useRef(null);
@@ -308,9 +308,9 @@ export default function ClientVisits() {
         <Table>
           <thead>
             <tr>
-              <SortableHeader label="Visit ID" sortKey="visitId" currentSort={sort} onClick={() => toggleSort("visitId")} />
+              <SortableHeader label="Visit ID" sortKey={SORT_KEYS.VISIT_ID} currentSort={sort} onClick={() => toggleSort(SORT_KEYS.VISIT_ID)} />
               <th>Client</th>
-              <SortableHeader label="Schedule" sortKey="visitDate" currentSort={sort} onClick={() => toggleSort("visitDate")} />
+              <SortableHeader label="Schedule" sortKey={SORT_KEYS.SCHEDULE} currentSort={sort} onClick={() => toggleSort(SORT_KEYS.SCHEDULE)} />
               <th>Type</th>
               <th>Visited By</th>
               <th>Status</th>
