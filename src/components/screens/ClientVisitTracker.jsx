@@ -521,7 +521,7 @@ export default function ClientVisitTracker() {
             </div>
 
             <div className="mt-4">
-              <Field label="Remark" field="visit-remark">
+              <Field label="Comment" field="visit-remark">
                 <textarea
                   className="input textarea"
                   value={form.remarks}
