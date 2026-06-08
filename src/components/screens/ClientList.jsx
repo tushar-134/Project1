@@ -1026,17 +1026,13 @@ export default function ClientList() {
                           setDrawerClientId(client.id);
                         } else if (client.isDraft) {
                           navigate(`/clients/edit/${client.id}`);
-                        } else if (licenceAlerts) {
-                          // In licence alerts mode — navigate directly to edit page
-                          // so the user can update the expired/expiring document
-                          navigate(`/clients/edit/${client.id}`);
                         } else {
                           setDrawerClientId(client.id);
                         }
                       }}
                       title={
                         licenceAlerts
-                          ? "Open client to update expired document"
+                          ? "Open client details"
                           : isInactiveMode
                           ? "View client details (read-only)"
                           : client.isDraft
