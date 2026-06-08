@@ -3,11 +3,6 @@ export const DATE_RANGE_OPTIONS = [
   { value: "today", label: "Today" },
   { value: "this_week", label: "This Week" },
   { value: "this_month", label: "This Month" },
-  { value: "month_to_date", label: "Month To Date" },
-  { value: "this_quarter", label: "This Quarter" },
-  { value: "quarter_to_date", label: "Quarter To Date" },
-  { value: "this_year", label: "This Year" },
-  { value: "year_to_date", label: "Year To Date" },
   { value: "previous_day", label: "Previous Day" },
   { value: "previous_week", label: "Previous Week" },
   { value: "previous_month", label: "Previous Month" },
@@ -42,31 +37,6 @@ export function getDateRangeBounds(rangeType) {
     case "this_month":
       fromDate.setDate(1);
       toDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of month
-      break;
-
-    case "month_to_date":
-      fromDate.setDate(1);
-      // toDate is now
-      break;
-
-    case "this_quarter":
-      fromDate = new Date(now.getFullYear(), currentQuarterStartMonth, 1);
-      toDate = new Date(now.getFullYear(), currentQuarterStartMonth + 3, 0);
-      break;
-
-    case "quarter_to_date":
-      fromDate = new Date(now.getFullYear(), currentQuarterStartMonth, 1);
-      // toDate is now
-      break;
-
-    case "this_year":
-      fromDate = new Date(now.getFullYear(), 0, 1);
-      toDate = new Date(now.getFullYear(), 11, 31);
-      break;
-
-    case "year_to_date":
-      fromDate = new Date(now.getFullYear(), 0, 1);
-      // toDate is now
       break;
 
     case "previous_day":
