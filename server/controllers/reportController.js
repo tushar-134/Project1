@@ -28,7 +28,7 @@ exports.dashboardStats = async (req, res, next) => {
 
     // For activity logs, scope to the selected month's date range
     const activityDateScope = dueDate ? { createdAt: dueDate } : {};
-    
+
     let activityTaskIds = null;
     let visibleTaskClientIds = null;
 
@@ -62,32 +62,26 @@ exports.dashboardStats = async (req, res, next) => {
     const expirySoonEnd = new Date(expiryStart);
     expirySoonEnd.setUTCDate(expirySoonEnd.getUTCDate() + 15);
 
-    const [totalClients, pendingTasks, overdueTasks, ftaPending, expiredLicences, expiringSoonLicences, recentActivity, catAgg, overdueAgg] = await Promise.all([
+    const [totalClients, pendingTasks, overdueTasks, ftaPending, licenceAlerts, recentActivity, catAgg, overdueAgg] = await Promise.all([
       Client.countDocuments(clientScope),
       Task.countDocuments({ ...taskScope, status: { $ne: "completed" } }),
       Task.countDocuments(overdueScope),
       Task.countDocuments({ ...taskScope, isAwaitingFta: true, ftaStatus: { $ne: "approved" } }),
+      // Single query matching the client list's licenceAlerts filter so counts are
+      // always consistent — a client is counted once regardless of how many of its
+      // documents are expired or expiring.
       Client.countDocuments({
         ...clientScope,
         $or: [
           { "tradeLicences.expiryDate": { $lt: expiryStart } },
           { "contactPersons.emiratesId.expiryDate": { $lt: expiryStart } },
           { "contactPersons.passport.expiryDate": { $lt: expiryStart } },
-        ],
-      }),
-      Client.countDocuments({
-        ...clientScope,
-        $or: [
           { "tradeLicences.expiryDate": { $gte: expiryStart, $lte: expirySoonEnd } },
           { "contactPersons.emiratesId.expiryDate": { $gte: expiryStart, $lte: expirySoonEnd } },
           { "contactPersons.passport.expiryDate": { $gte: expiryStart, $lte: expirySoonEnd } },
         ],
-        $nor: [
-          { "tradeLicences.expiryDate": { $lt: expiryStart } },
-          { "contactPersons.emiratesId.expiryDate": { $lt: expiryStart } },
-          { "contactPersons.passport.expiryDate": { $lt: expiryStart } },
-        ],
       }),
+
       ActivityLog.find({
         ...(req.user.role === "task_only" ? { task: { $in: activityTaskIds } } : {}),
         ...activityDateScope,
@@ -98,12 +92,14 @@ exports.dashboardStats = async (req, res, next) => {
         .limit(10),
       Task.aggregate([
         { $match: catMatchStage },
-        { $group: {
-          _id: "$category",
-          active: { $sum: { $cond: [{ $ne: ["$status", "completed"] }, 1, 0] } },
-          closed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
-          pending: { $sum: { $cond: [{ $ne: ["$status", "completed"] }, 1, 0] } },
-        }},
+        {
+          $group: {
+            _id: "$category",
+            active: { $sum: { $cond: [{ $ne: ["$status", "completed"] }, 1, 0] } },
+            closed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
+            pending: { $sum: { $cond: [{ $ne: ["$status", "completed"] }, 1, 0] } },
+          }
+        },
       ]),
       Task.aggregate([
         { $match: { ...roleScope, status: { $ne: "completed" }, dueDate: { $lt: now } } },
@@ -123,7 +119,7 @@ exports.dashboardStats = async (req, res, next) => {
       pending: c.pending,
       overdue: overdueByCat.get(c._id) || 0,
     }));
-    res.json({ totalClients, pendingTasks, overdueTasks, ftaPending, expiredLicences, expiringSoonLicences, categoryBreakdown, recentActivity });
+    res.json({ totalClients, pendingTasks, overdueTasks, ftaPending, licenceAlerts, categoryBreakdown, recentActivity });
   } catch (error) { next(error); }
 };
 
@@ -139,14 +135,16 @@ exports.clientWise = async (req, res, next) => {
   try {
     // Bug #10 Fix: single aggregation instead of one query per client.
     const agg = await Task.aggregate([
-      { $group: {
-        _id: "$client",
-        total: { $sum: 1 },
-        not_started: { $sum: { $cond: [{ $eq: ["$status", "not_started"] }, 1, 0] } },
-        wip: { $sum: { $cond: [{ $eq: ["$status", "wip"] }, 1, 0] } },
-        completed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
-        submitted_to_fta: { $sum: { $cond: [{ $eq: ["$status", "submitted_to_fta"] }, 1, 0] } },
-      }},
+      {
+        $group: {
+          _id: "$client",
+          total: { $sum: 1 },
+          not_started: { $sum: { $cond: [{ $eq: ["$status", "not_started"] }, 1, 0] } },
+          wip: { $sum: { $cond: [{ $eq: ["$status", "wip"] }, 1, 0] } },
+          completed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
+          submitted_to_fta: { $sum: { $cond: [{ $eq: ["$status", "submitted_to_fta"] }, 1, 0] } },
+        }
+      },
       { $lookup: { from: "clients", localField: "_id", foreignField: "_id", as: "client" } },
       { $unwind: { path: "$client", preserveNullAndEmptyArrays: true } },
       { $match: { "client.isActive": true } },
@@ -160,14 +158,16 @@ exports.userWise = async (req, res, next) => {
   try {
     // Bug #10 Fix: single aggregation instead of one query per user.
     const agg = await Task.aggregate([
-      { $group: {
-        _id: "$assignedTo",
-        total: { $sum: 1 },
-        not_started: { $sum: { $cond: [{ $eq: ["$status", "not_started"] }, 1, 0] } },
-        wip: { $sum: { $cond: [{ $eq: ["$status", "wip"] }, 1, 0] } },
-        completed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
-        submitted_to_fta: { $sum: { $cond: [{ $eq: ["$status", "submitted_to_fta"] }, 1, 0] } },
-      }},
+      {
+        $group: {
+          _id: "$assignedTo",
+          total: { $sum: 1 },
+          not_started: { $sum: { $cond: [{ $eq: ["$status", "not_started"] }, 1, 0] } },
+          wip: { $sum: { $cond: [{ $eq: ["$status", "wip"] }, 1, 0] } },
+          completed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
+          submitted_to_fta: { $sum: { $cond: [{ $eq: ["$status", "submitted_to_fta"] }, 1, 0] } },
+        }
+      },
       { $lookup: { from: "users", localField: "_id", foreignField: "_id", as: "user" } },
       { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
       { $project: { user: { _id: "$user._id", name: "$user.name", email: "$user.email", role: "$user.role" }, total: 1, not_started: 1, wip: 1, completed: 1, submitted_to_fta: 1 } },

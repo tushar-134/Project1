@@ -281,7 +281,12 @@ export default function TaskList() {
   const [scope, setScope] = useState(searchParams.get("scope") || (initialMonthScopedOverdue ? "Overdue" : "By Month"));
   const [month, setMonth] = useState(initialMonth);
   const [monthScopedOverdue, setMonthScopedOverdue] = useState(initialMonthScopedOverdue);
-  const [dateRange, setDateRange] = useState("this_month");
+  const [dateRange, setDateRange] = useState(() => {
+    const fromUrl = searchParams.get("dateRange");
+    if (fromUrl) return fromUrl;
+    if (searchParams.get("scope") === "Overdue" || searchParams.has("month")) return "all";
+    return "this_month";
+  });
   const [reportBasedOn, setReportBasedOn] = useState("dueDate");
   const [drawerTaskId, setDrawerTaskId] = useState(searchParams.get("drawer") || null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -444,6 +449,9 @@ export default function TaskList() {
     setPage(1);
     setScope(value);
     setMonthScopedOverdue(false);
+    if (value === "Overdue") {
+      setDateRange("all");
+    }
   };
 
   const clearColumnFilters = () => {

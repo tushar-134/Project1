@@ -188,7 +188,7 @@ function getPeriodFromDateServer(date, fyeString) {
 }
 // ---------------------------------------------------------------------------
 
- async function maybeGenerateNextRecurringTask(task, userId) {
+async function maybeGenerateNextRecurringTask(task, userId) {
   if (!task?.isRecurring || task.recurringGeneratedTask) return null;
   const rc = task.recurringConfig || {};
   const frequency = rc.frequency;
@@ -205,7 +205,7 @@ function getPeriodFromDateServer(date, fyeString) {
   // The client may or may not be populated at this point, so we guard carefully.
   const clientFYE =
     (task.client && typeof task.client === "object" ? task.client.financialYearEnd : null) || "Jan - Dec";
-  
+
   // Note: For VAT and CT specific period resolution we ideally need the full client object,
   // but if it's missing, getPeriodFromDateServer handles standard FY/Quarter logic based on FYE.
   const nextPeriod = getPeriodFromDateServer(nextDueDate, clientFYE);
@@ -293,18 +293,7 @@ async function taskQuery(req) {
       }
     }
   }
-  if (overdue === "true") {
-    if (query.dueDate) {
-      // Month window is already set — just tighten the upper boundary to today
-      // if today is earlier than the month's end.
-      const today = new Date();
-      if (today < query.dueDate.$lt) query.dueDate.$lt = today;
-    } else {
-      query.dueDate = { $lt: new Date() };
-    }
-    // Bug #7 Fix: use a dedicated guard so we don't overwrite an earlier status filter.
-    if (!query.status) query.status = { $ne: "completed" };
-  }
+
 
   if (taskId) {
     query.taskId = new RegExp(escapeRegex(taskId.trim()), "i");
@@ -373,6 +362,23 @@ async function taskQuery(req) {
     if (Object.keys(rangeQuery).length > 0) {
       query[targetField] = { ...(query[targetField] || {}), ...rangeQuery };
     }
+  }
+  if (overdue === "true") {
+    if (query.dueDate) {
+      const today = new Date();
+      if (query.dueDate.$lt === undefined && query.dueDate.$lte === undefined) {
+        query.dueDate.$lt = today;
+      } else {
+        const currentUpper = query.dueDate.$lt !== undefined ? query.dueDate.$lt : query.dueDate.$lte;
+        if (today < currentUpper) {
+          delete query.dueDate.$lte;
+          query.dueDate.$lt = today;
+        }
+      }
+    } else {
+      query.dueDate = { $lt: new Date() };
+    }
+    if (!query.status) query.status = { $ne: "completed" };
   }
   if (andClauses.length) query.$and = andClauses;
   return query;
@@ -498,7 +504,7 @@ exports.updateTask = async (req, res, next) => {
         task.ftaSubmittedDate = undefined;
       }
     }
-    
+
     if ("isAwaitingFta" in req.body && !req.body.isAwaitingFta) {
       task.ftaStatus = undefined;
       task.ftaSubmittedDate = undefined;
@@ -756,8 +762,8 @@ exports.exportTasks = async (req, res, next) => {
 
     const BASE_COLUMNS = ["taskId", "client", "category", "type", "dueDate", "assigned", "status", "recurring", "createdAt", "updatedAt"];
     const ALL_COLUMNS = BASE_COLUMNS;
-    const requestedColumns = isExportAll 
-      ? ALL_COLUMNS 
+    const requestedColumns = isExportAll
+      ? ALL_COLUMNS
       : (req.query.columns ? String(req.query.columns).split(",").map(c => c.trim()).filter(Boolean) : ALL_COLUMNS);
 
     const activeBaseColumns = requestedColumns.filter(k => BASE_COLUMNS.includes(k));
@@ -815,7 +821,7 @@ exports.exportTasks = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-exports.maybeGenerateNextRecurringTask =  maybeGenerateNextRecurringTask ;
+exports.maybeGenerateNextRecurringTask = maybeGenerateNextRecurringTask;
 // Export helper functions for testing
 exports._test = {
   calculateNextOccurrence
