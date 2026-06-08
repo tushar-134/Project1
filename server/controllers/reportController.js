@@ -58,29 +58,35 @@ exports.dashboardStats = async (req, res, next) => {
       ...roleScope,
     };
 
-    const in15Days = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
+    const expiryStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const expirySoonEnd = new Date(expiryStart);
+    expirySoonEnd.setUTCDate(expirySoonEnd.getUTCDate() + 15);
+
     const [totalClients, pendingTasks, overdueTasks, ftaPending, expiredLicences, expiringSoonLicences, recentActivity, catAgg, overdueAgg] = await Promise.all([
       Client.countDocuments(clientScope),
       Task.countDocuments({ ...taskScope, status: { $ne: "completed" } }),
       Task.countDocuments(overdueScope),
       Task.countDocuments({ ...taskScope, isAwaitingFta: true, ftaStatus: { $ne: "approved" } }),
       Client.countDocuments({
-        isActive: true,
+        ...clientScope,
         $or: [
-          { "tradeLicences.expiryDate": { $lt: now, $exists: true } },
-          { "contactPersons.emiratesId.expiryDate": { $lt: now, $exists: true } },
-          { "contactPersons.passport.expiryDate": { $lt: now, $exists: true } },
+          { "tradeLicences.expiryDate": { $lt: expiryStart } },
+          { "contactPersons.emiratesId.expiryDate": { $lt: expiryStart } },
+          { "contactPersons.passport.expiryDate": { $lt: expiryStart } },
         ],
-        ...(req.user.role === "task_only" ? { _id: { $in: visibleTaskClientIds } } : {}),
       }),
       Client.countDocuments({
-        isActive: true,
+        ...clientScope,
         $or: [
-          { "tradeLicences.expiryDate": { $gte: now, $lte: in15Days } },
-          { "contactPersons.emiratesId.expiryDate": { $gte: now, $lte: in15Days } },
-          { "contactPersons.passport.expiryDate": { $gte: now, $lte: in15Days } },
+          { "tradeLicences.expiryDate": { $gte: expiryStart, $lte: expirySoonEnd } },
+          { "contactPersons.emiratesId.expiryDate": { $gte: expiryStart, $lte: expirySoonEnd } },
+          { "contactPersons.passport.expiryDate": { $gte: expiryStart, $lte: expirySoonEnd } },
         ],
-        ...(req.user.role === "task_only" ? { _id: { $in: visibleTaskClientIds } } : {}),
+        $nor: [
+          { "tradeLicences.expiryDate": { $lt: expiryStart } },
+          { "contactPersons.emiratesId.expiryDate": { $lt: expiryStart } },
+          { "contactPersons.passport.expiryDate": { $lt: expiryStart } },
+        ],
       }),
       ActivityLog.find({
         ...(req.user.role === "task_only" ? { task: { $in: activityTaskIds } } : {}),

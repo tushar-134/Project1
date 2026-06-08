@@ -123,54 +123,6 @@ function LoadingRows({ columns }) {
   ));
 }
 
-function DeleteClientAlert({ client, isDeleting, onCancel, onConfirm }) {
-  if (!client) return null;
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 px-4 py-6 backdrop-blur-sm">
-      <div
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="delete-client-alert-title"
-        aria-describedby="delete-client-alert-description"
-        className="w-full max-w-md rounded-xl border border-red-100 bg-white shadow-2xl"
-      >
-        <div className="flex items-start gap-3 border-b border-slate-100 px-5 py-4">
-          <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-700">
-            <ShieldAlert size={19} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <h2 id="delete-client-alert-title" className="text-[15px] font-extrabold text-slate-950">
-              Delete client?
-            </h2>
-            <p id="delete-client-alert-description" className="mt-1 text-[12px] font-medium leading-5 text-slate-500">
-              This will permanently delete <span className="font-extrabold text-slate-800">{client.name || "this client"}</span> and related records.
-            </p>
-          </div>
-          <button
-            type="button"
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-            onClick={onCancel}
-            disabled={isDeleting}
-            aria-label="Close delete client alert"
-          >
-            <X size={16} />
-          </button>
-        </div>
-        <div className="flex flex-wrap justify-end gap-2 px-5 py-4">
-          <Button variant="ghost" size="sm" onClick={onCancel} disabled={isDeleting}>
-            Cancel
-          </Button>
-          <Button variant="danger" size="sm" onClick={onConfirm} disabled={isDeleting}>
-            <Trash2 size={14} />
-            {isDeleting ? "Deleting..." : "Delete client"}
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Column Customizer Popover ─────────────────────────────────────────────
 function ColumnCustomizer({ visibility, onChange }) {
   const [open, setOpen] = useState(false);
