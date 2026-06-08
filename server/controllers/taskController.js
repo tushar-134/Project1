@@ -258,7 +258,7 @@ function getPeriodFromDateServer(date, fyeString) {
 
 async function taskQuery(req) {
   // Query shaping happens once here so list and export stay aligned with the same role and filter logic.
-  const { category, status, assignedTo, month, overdue, taskId, client, type, dueDate, assigned, remarks, recurring, createdAt, updatedAt } = req.query;
+  const { category, status, assignedTo, month, overdue, taskId, client, type, dueDate, assigned, remarks, recurring, createdAt, updatedAt, fromDate, toDate, reportBasedOn } = req.query;
   const query = {};
   const andClauses = [];
 
@@ -357,6 +357,21 @@ async function taskQuery(req) {
       const end = new Date(start);
       end.setUTCDate(end.getUTCDate() + 1);
       query.updatedAt = { ...(query.updatedAt || {}), $gte: start, $lt: end };
+    }
+  }
+  if (fromDate || toDate) {
+    const targetField = reportBasedOn || "dueDate";
+    const rangeQuery = {};
+    if (fromDate) {
+      const start = new Date(`${fromDate}T00:00:00.000Z`);
+      if (!Number.isNaN(start.getTime())) rangeQuery.$gte = start;
+    }
+    if (toDate) {
+      const end = new Date(`${toDate}T23:59:59.999Z`);
+      if (!Number.isNaN(end.getTime())) rangeQuery.$lte = end;
+    }
+    if (Object.keys(rangeQuery).length > 0) {
+      query[targetField] = { ...(query[targetField] || {}), ...rangeQuery };
     }
   }
   if (andClauses.length) query.$and = andClauses;

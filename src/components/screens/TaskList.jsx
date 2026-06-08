@@ -19,6 +19,7 @@ import ClientComboBox from "../ui/ClientComboBox.jsx";
 import ExportModal from "../ui/ExportModal.jsx";
 import Table from "../ui/Table.jsx";
 import TaskDrawer from "../ui/TaskDrawer.jsx";
+import { DATE_RANGE_OPTIONS, getDateRangeBounds } from "../../utils/dateRanges.js";
 
 const COLUMN_DEFS = [
   { key: "taskId", label: "Task ID", defaultOn: true, description: "Unique task identifier" },
@@ -280,6 +281,8 @@ export default function TaskList() {
   const [scope, setScope] = useState(searchParams.get("scope") || (initialMonthScopedOverdue ? "Overdue" : "By Month"));
   const [month, setMonth] = useState(initialMonth);
   const [monthScopedOverdue, setMonthScopedOverdue] = useState(initialMonthScopedOverdue);
+  const [dateRange, setDateRange] = useState("this_month");
+  const [reportBasedOn, setReportBasedOn] = useState("dueDate");
   const [drawerTaskId, setDrawerTaskId] = useState(searchParams.get("drawer") || null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
@@ -355,21 +358,27 @@ export default function TaskList() {
       .catch(() => {});
   }, [dispatch]);
 
-  const serverFilters = useMemo(() => ({
-    category: deferredColumnFilters.category || undefined,
-    status: deferredColumnFilters.status?.length > 0 ? deferredColumnFilters.status.join(",") : undefined,
-    month: scope === "By Month" || monthScopedOverdue ? month : undefined,
-    overdue: scope === "Overdue" ? "true" : undefined,
-    taskId: deferredColumnFilters.taskId || undefined,
-    client: deferredColumnFilters.client || undefined,
-    type: deferredColumnFilters.type || undefined,
-    dueDate: deferredColumnFilters.dueDate || undefined,
-    assigned: deferredColumnFilters.assigned || undefined,
-    remarks: deferredColumnFilters.remarks || undefined,
-    recurring: deferredColumnFilters.recurring || undefined,
-    createdAt: deferredColumnFilters.createdAt || undefined,
-    updatedAt: deferredColumnFilters.updatedAt || undefined,
-  }), [deferredColumnFilters, month, monthScopedOverdue, scope]);
+  const serverFilters = useMemo(() => {
+    const { fromDate, toDate } = getDateRangeBounds(dateRange);
+    return {
+      category: deferredColumnFilters.category || undefined,
+      status: deferredColumnFilters.status?.length > 0 ? deferredColumnFilters.status.join(",") : undefined,
+      month: (dateRange === "all" && (scope === "By Month" || monthScopedOverdue)) ? month : undefined,
+      overdue: scope === "Overdue" ? "true" : undefined,
+      taskId: deferredColumnFilters.taskId || undefined,
+      client: deferredColumnFilters.client || undefined,
+      type: deferredColumnFilters.type || undefined,
+      dueDate: deferredColumnFilters.dueDate || undefined,
+      assigned: deferredColumnFilters.assigned || undefined,
+      remarks: deferredColumnFilters.remarks || undefined,
+      recurring: deferredColumnFilters.recurring || undefined,
+      createdAt: deferredColumnFilters.createdAt || undefined,
+      updatedAt: deferredColumnFilters.updatedAt || undefined,
+      fromDate,
+      toDate,
+      reportBasedOn: dateRange !== "all" ? reportBasedOn : undefined,
+    };
+  }, [deferredColumnFilters, month, monthScopedOverdue, scope, dateRange, reportBasedOn]);
 
   const requestParams = useMemo(() => ({ ...serverFilters, page, limit: PAGE_SIZE }), [page, serverFilters]);
   const filterRef = useRef(requestParams);
@@ -447,6 +456,8 @@ export default function TaskList() {
     setScope("By Month");
     setMonth(initialMonth);
     setMonthScopedOverdue(false);
+    setDateRange("this_month");
+    setReportBasedOn("dueDate");
     setColumnFilters(createEmptyColumnFilters());
   };
 
@@ -612,21 +623,59 @@ export default function TaskList() {
 
           {/* Month selector + action buttons */}
           <div className="flex flex-wrap items-center gap-2">
-            <label htmlFor="task-list-month" className={`flex items-center gap-1.5 ${isMonthControlDisabled ? "opacity-50" : ""}`}>
-              <span className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Month</span>
-              <input
-                id="task-list-month"
-                name="taskListMonth"
-                className="input h-8 w-[130px] text-[13px]"
-                type="month"
-                value={month}
-                disabled={isMonthControlDisabled}
-                onChange={(event) => {
+            <label htmlFor="task-list-date-range" className="flex items-center gap-1.5">
+              <span className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Date Range</span>
+              <select
+                id="task-list-date-range"
+                className="input h-8 text-[13px] min-w-[130px]"
+                value={dateRange}
+                onChange={(e) => {
                   setPage(1);
-                  setMonth(event.target.value);
+                  setDateRange(e.target.value);
                 }}
-              />
+              >
+                {DATE_RANGE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
             </label>
+
+            {dateRange !== "all" && (
+              <label htmlFor="task-list-report-based-on" className="flex items-center gap-1.5">
+                <span className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Report Based On</span>
+                <select
+                  id="task-list-report-based-on"
+                  className="input h-8 text-[13px] min-w-[130px]"
+                  value={reportBasedOn}
+                  onChange={(e) => {
+                    setPage(1);
+                    setReportBasedOn(e.target.value);
+                  }}
+                >
+                  <option value="dueDate">Due Date</option>
+                  <option value="createdAt">Created Date</option>
+                  <option value="updatedAt">Last Modified</option>
+                </select>
+              </label>
+            )}
+
+            {dateRange === "all" && (
+              <label htmlFor="task-list-month" className={`flex items-center gap-1.5 ${isMonthControlDisabled ? "opacity-50" : ""}`}>
+                <span className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Month</span>
+                <input
+                  id="task-list-month"
+                  name="taskListMonth"
+                  className="input h-8 w-[130px] text-[13px]"
+                  type="month"
+                  value={month}
+                  disabled={isMonthControlDisabled}
+                  onChange={(event) => {
+                    setPage(1);
+                    setMonth(event.target.value);
+                  }}
+                />
+              </label>
+            )}
 
             <ColumnCustomizer visibility={colVisibility} onChange={updateColVisibility} />
 
