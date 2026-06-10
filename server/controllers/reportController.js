@@ -141,7 +141,6 @@ exports.dashboardStats = async (req, res, next) => {
             _id: "$category",
             active: { $sum: { $cond: [{ $ne: ["$status", "completed"] }, 1, 0] } },
             closed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
-            pending: { $sum: { $cond: [{ $ne: ["$status", "completed"] }, 1, 0] } },
           }
         },
       ]),
@@ -154,13 +153,12 @@ exports.dashboardStats = async (req, res, next) => {
     const overdueByCat = new Map(overdueAgg.map((c) => [c._id, c.overdue]));
     const catMap = new Map(catAgg.map((c) => [c._id, c]));
     for (const [cat] of overdueByCat) {
-      if (!catMap.has(cat)) catMap.set(cat, { _id: cat, active: 0, closed: 0, pending: 0 });
+      if (!catMap.has(cat)) catMap.set(cat, { _id: cat, active: 0, closed: 0 });
     }
     const categoryBreakdown = [...catMap.values()].map((c) => ({
       category: c._id,
       active: c.active,
       closed: c.closed,
-      pending: c.pending,
       overdue: overdueByCat.get(c._id) || 0,
     }));
     res.json({ totalClients, pendingTasks, overdueTasks, ftaPending, licenceAlerts, categoryBreakdown, recentActivity });

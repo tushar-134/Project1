@@ -188,11 +188,10 @@ export default function Dashboard() {
     setTileOrder(nextOrder);
     setVisibleTileNames(nextVisible);
   };
-  const openTasks = (category) => {
-    const params = new URLSearchParams({
-      category: getCategoryFilterValue(state.categories, category),
-      status: "Active",
-    });
+  // Builds a URLSearchParams object that mirrors the dashboard's current date
+  // range selection so the task list opens with the exact same date filter.
+  const buildTaskListParams = (extra = {}) => {
+    const params = new URLSearchParams(extra);
     if (dateRange === "specific_month") {
       params.append("month", month);
     } else if (dateRange === "custom") {
@@ -201,7 +200,18 @@ export default function Dashboard() {
       if (customToDate) params.append("toDate", customToDate);
     } else {
       params.append("dateRange", dateRange);
+      // When "All time" is selected, tell the task list scope so it doesn't
+      // misleadingly show "By Month" with no active month constraint.
+      if (dateRange === "all") params.append("scope", "All");
     }
+    return params;
+  };
+
+  const openTasks = (category) => {
+    const params = buildTaskListParams({
+      category: getCategoryFilterValue(state.categories, category),
+      status: "Active",
+    });
     navigate(`/tasks/list?${params.toString()}`);
   };
 
@@ -350,16 +360,7 @@ export default function Dashboard() {
           value={stats.pendingTasks || 0}
           color="text-[#eab308]"
           onClick={() => {
-            const params = new URLSearchParams({ status: "Active" });
-            if (dateRange === "specific_month") {
-              params.append("month", month);
-            } else if (dateRange === "custom") {
-              params.append("dateRange", "custom");
-              if (customFromDate) params.append("fromDate", customFromDate);
-              if (customToDate) params.append("toDate", customToDate);
-            } else {
-              params.append("dateRange", dateRange);
-            }
+            const params = buildTaskListParams({ status: "Active" });
             navigate(`/tasks/list?${params.toString()}`);
           }}
         />
