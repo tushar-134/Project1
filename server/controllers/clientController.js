@@ -157,12 +157,14 @@ async function buildClientListQuery(req) {
   }
   if (licenceAlerts === "true") {
     const now = new Date();
-    const in15Days = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
+    const expiryStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const expirySoonEnd = new Date(expiryStart);
+    expirySoonEnd.setUTCDate(expirySoonEnd.getUTCDate() + 15);
     andClauses.push({
       $or: [
-        { "tradeLicences.expiryDate": { $lt: in15Days, $type: "date" } },
-        { "contactPersons.emiratesId.expiryDate": { $lt: in15Days, $type: "date" } },
-        { "contactPersons.passport.expiryDate": { $lt: in15Days, $type: "date" } },
+        { "tradeLicences.expiryDate": { $lte: expirySoonEnd, $type: "date" } },
+        { "contactPersons.emiratesId.expiryDate": { $lte: expirySoonEnd, $type: "date" } },
+        { "contactPersons.passport.expiryDate": { $lte: expirySoonEnd, $type: "date" } },
       ],
     });
   }

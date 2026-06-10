@@ -22,13 +22,65 @@ function daysOverdue(date) {
 // Report endpoints mostly reshape operational data for the existing dashboard and admin tables.
 exports.dashboardStats = async (req, res, next) => {
   try {
-    const dueDate = monthRange(req.query.month);
+    const { month, fromDate, toDate, reportBasedOn } = req.query;
     const roleScope = req.user.role === "task_only" ? { assignedTo: req.user._id } : {};
-    const taskScope = { ...(dueDate ? { dueDate } : {}), ...roleScope };
 
-    // For activity logs, scope to the selected month's date range
-    const activityDateScope = dueDate ? { createdAt: dueDate } : {};
-    
+    // Build the date/report filter
+    const dateFilter = {};
+    if (month) {
+      const match = String(month).match(/^(\d{4})-(\d{2})$/);
+      if (match) {
+        const y = Number(match[1]);
+        const m = Number(match[2]);
+        if (Number.isInteger(y) && Number.isInteger(m) && m >= 1 && m <= 12) {
+          dateFilter.dueDate = { $gte: new Date(Date.UTC(y, m - 1, 1)), $lt: new Date(Date.UTC(y, m, 1)) };
+        }
+      }
+    }
+    if (fromDate || toDate) {
+      const targetField = reportBasedOn || "dueDate";
+      const rangeQuery = {};
+      if (fromDate) {
+        const start = new Date(`${fromDate}T00:00:00.000Z`);
+        if (!Number.isNaN(start.getTime())) rangeQuery.$gte = start;
+      }
+      if (toDate) {
+        const end = new Date(`${toDate}T23:59:59.999Z`);
+        if (!Number.isNaN(end.getTime())) rangeQuery.$lte = end;
+      }
+      if (Object.keys(rangeQuery).length > 0) {
+        dateFilter[targetField] = { ...(dateFilter[targetField] || {}), ...rangeQuery };
+      }
+    }
+
+    const taskScope = { ...dateFilter, ...roleScope };
+
+    // For activity logs, scope to the selected date range on createdAt field
+    const activityDateScope = {};
+    if (month) {
+      const match = String(month).match(/^(\d{4})-(\d{2})$/);
+      if (match) {
+        const y = Number(match[1]);
+        const m = Number(match[2]);
+        if (Number.isInteger(y) && Number.isInteger(m) && m >= 1 && m <= 12) {
+          activityDateScope.createdAt = { $gte: new Date(Date.UTC(y, m - 1, 1)), $lt: new Date(Date.UTC(y, m, 1)) };
+        }
+      }
+    } else if (fromDate || toDate) {
+      const rangeQuery = {};
+      if (fromDate) {
+        const start = new Date(`${fromDate}T00:00:00.000Z`);
+        if (!Number.isNaN(start.getTime())) rangeQuery.$gte = start;
+      }
+      if (toDate) {
+        const end = new Date(`${toDate}T23:59:59.999Z`);
+        if (!Number.isNaN(end.getTime())) rangeQuery.$lte = end;
+      }
+      if (Object.keys(rangeQuery).length > 0) {
+        activityDateScope.createdAt = rangeQuery;
+      }
+    }
+
     let activityTaskIds = null;
     let visibleTaskClientIds = null;
 
@@ -38,7 +90,7 @@ exports.dashboardStats = async (req, res, next) => {
       visibleTaskClientIds = tasks.map((t) => t.client).filter(Boolean);
     }
 
-    // Overdue = ALL uncompleted tasks past their due date, regardless of selected month
+    // Overdue = ALL uncompleted tasks past their due date, regardless of selected date range
     const now = new Date();
     const overdueScope = {
       ...roleScope,
@@ -53,16 +105,14 @@ exports.dashboardStats = async (req, res, next) => {
         : {}),
     };
 
-    const catMatchStage = {
-      ...(dueDate ? { dueDate } : {}),
-      ...roleScope,
-    };
+    const catMatchStage = taskScope;
 
+    // Licence alerts reference date: expiring within 15 days from now (all-time/absolute)
     const expiryStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     const expirySoonEnd = new Date(expiryStart);
     expirySoonEnd.setUTCDate(expirySoonEnd.getUTCDate() + 15);
 
-    const [totalClients, pendingTasks, overdueTasks, ftaPending, expiredLicences, expiringSoonLicences, recentActivity, catAgg, overdueAgg] = await Promise.all([
+    const [totalClients, pendingTasks, overdueTasks, ftaPending, licenceAlerts, recentActivity, catAgg, overdueAgg] = await Promise.all([
       Client.countDocuments(clientScope),
       Task.countDocuments({ ...taskScope, status: { $ne: "completed" } }),
       Task.countDocuments(overdueScope),
@@ -70,24 +120,12 @@ exports.dashboardStats = async (req, res, next) => {
       Client.countDocuments({
         ...clientScope,
         $or: [
-          { "tradeLicences.expiryDate": { $lt: expiryStart } },
-          { "contactPersons.emiratesId.expiryDate": { $lt: expiryStart } },
-          { "contactPersons.passport.expiryDate": { $lt: expiryStart } },
+          { "tradeLicences.expiryDate": { $lte: expirySoonEnd, $type: "date" } },
+          { "contactPersons.emiratesId.expiryDate": { $lte: expirySoonEnd, $type: "date" } },
+          { "contactPersons.passport.expiryDate": { $lte: expirySoonEnd, $type: "date" } },
         ],
       }),
-      Client.countDocuments({
-        ...clientScope,
-        $or: [
-          { "tradeLicences.expiryDate": { $gte: expiryStart, $lte: expirySoonEnd } },
-          { "contactPersons.emiratesId.expiryDate": { $gte: expiryStart, $lte: expirySoonEnd } },
-          { "contactPersons.passport.expiryDate": { $gte: expiryStart, $lte: expirySoonEnd } },
-        ],
-        $nor: [
-          { "tradeLicences.expiryDate": { $lt: expiryStart } },
-          { "contactPersons.emiratesId.expiryDate": { $lt: expiryStart } },
-          { "contactPersons.passport.expiryDate": { $lt: expiryStart } },
-        ],
-      }),
+
       ActivityLog.find({
         ...(req.user.role === "task_only" ? { task: { $in: activityTaskIds } } : {}),
         ...activityDateScope,
@@ -98,15 +136,16 @@ exports.dashboardStats = async (req, res, next) => {
         .limit(10),
       Task.aggregate([
         { $match: catMatchStage },
-        { $group: {
-          _id: "$category",
-          active: { $sum: { $cond: [{ $ne: ["$status", "completed"] }, 1, 0] } },
-          closed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
-          pending: { $sum: { $cond: [{ $ne: ["$status", "completed"] }, 1, 0] } },
-        }},
+        {
+          $group: {
+            _id: "$category",
+            active: { $sum: { $cond: [{ $ne: ["$status", "completed"] }, 1, 0] } },
+            closed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
+          }
+        },
       ]),
       Task.aggregate([
-        { $match: { ...roleScope, status: { $ne: "completed" }, dueDate: { $lt: now } } },
+        { $match: overdueScope },
         { $group: { _id: "$category", overdue: { $sum: 1 } } },
       ]),
     ]);
@@ -114,16 +153,15 @@ exports.dashboardStats = async (req, res, next) => {
     const overdueByCat = new Map(overdueAgg.map((c) => [c._id, c.overdue]));
     const catMap = new Map(catAgg.map((c) => [c._id, c]));
     for (const [cat] of overdueByCat) {
-      if (!catMap.has(cat)) catMap.set(cat, { _id: cat, active: 0, closed: 0, pending: 0 });
+      if (!catMap.has(cat)) catMap.set(cat, { _id: cat, active: 0, closed: 0 });
     }
     const categoryBreakdown = [...catMap.values()].map((c) => ({
       category: c._id,
       active: c.active,
       closed: c.closed,
-      pending: c.pending,
       overdue: overdueByCat.get(c._id) || 0,
     }));
-    res.json({ totalClients, pendingTasks, overdueTasks, ftaPending, expiredLicences, expiringSoonLicences, categoryBreakdown, recentActivity });
+    res.json({ totalClients, pendingTasks, overdueTasks, ftaPending, licenceAlerts, categoryBreakdown, recentActivity });
   } catch (error) { next(error); }
 };
 
@@ -139,14 +177,16 @@ exports.clientWise = async (req, res, next) => {
   try {
     // Bug #10 Fix: single aggregation instead of one query per client.
     const agg = await Task.aggregate([
-      { $group: {
-        _id: "$client",
-        total: { $sum: 1 },
-        not_started: { $sum: { $cond: [{ $eq: ["$status", "not_started"] }, 1, 0] } },
-        wip: { $sum: { $cond: [{ $eq: ["$status", "wip"] }, 1, 0] } },
-        completed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
-        submitted_to_fta: { $sum: { $cond: [{ $eq: ["$status", "submitted_to_fta"] }, 1, 0] } },
-      }},
+      {
+        $group: {
+          _id: "$client",
+          total: { $sum: 1 },
+          not_started: { $sum: { $cond: [{ $eq: ["$status", "not_started"] }, 1, 0] } },
+          wip: { $sum: { $cond: [{ $eq: ["$status", "wip"] }, 1, 0] } },
+          completed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
+          submitted_to_fta: { $sum: { $cond: [{ $eq: ["$status", "submitted_to_fta"] }, 1, 0] } },
+        }
+      },
       { $lookup: { from: "clients", localField: "_id", foreignField: "_id", as: "client" } },
       { $unwind: { path: "$client", preserveNullAndEmptyArrays: true } },
       { $match: { "client.isActive": true } },
@@ -160,14 +200,16 @@ exports.userWise = async (req, res, next) => {
   try {
     // Bug #10 Fix: single aggregation instead of one query per user.
     const agg = await Task.aggregate([
-      { $group: {
-        _id: "$assignedTo",
-        total: { $sum: 1 },
-        not_started: { $sum: { $cond: [{ $eq: ["$status", "not_started"] }, 1, 0] } },
-        wip: { $sum: { $cond: [{ $eq: ["$status", "wip"] }, 1, 0] } },
-        completed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
-        submitted_to_fta: { $sum: { $cond: [{ $eq: ["$status", "submitted_to_fta"] }, 1, 0] } },
-      }},
+      {
+        $group: {
+          _id: "$assignedTo",
+          total: { $sum: 1 },
+          not_started: { $sum: { $cond: [{ $eq: ["$status", "not_started"] }, 1, 0] } },
+          wip: { $sum: { $cond: [{ $eq: ["$status", "wip"] }, 1, 0] } },
+          completed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
+          submitted_to_fta: { $sum: { $cond: [{ $eq: ["$status", "submitted_to_fta"] }, 1, 0] } },
+        }
+      },
       { $lookup: { from: "users", localField: "_id", foreignField: "_id", as: "user" } },
       { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
       { $project: { user: { _id: "$user._id", name: "$user.name", email: "$user.email", role: "$user.role" }, total: 1, not_started: 1, wip: 1, completed: 1, submitted_to_fta: 1 } },
