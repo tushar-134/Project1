@@ -22,12 +22,64 @@ function daysOverdue(date) {
 // Report endpoints mostly reshape operational data for the existing dashboard and admin tables.
 exports.dashboardStats = async (req, res, next) => {
   try {
-    const dueDate = monthRange(req.query.month);
+    const { month, fromDate, toDate, reportBasedOn } = req.query;
     const roleScope = req.user.role === "task_only" ? { assignedTo: req.user._id } : {};
-    const taskScope = { ...(dueDate ? { dueDate } : {}), ...roleScope };
 
-    // For activity logs, scope to the selected month's date range
-    const activityDateScope = dueDate ? { createdAt: dueDate } : {};
+    // Build the date/report filter
+    const dateFilter = {};
+    if (month) {
+      const match = String(month).match(/^(\d{4})-(\d{2})$/);
+      if (match) {
+        const y = Number(match[1]);
+        const m = Number(match[2]);
+        if (Number.isInteger(y) && Number.isInteger(m) && m >= 1 && m <= 12) {
+          dateFilter.dueDate = { $gte: new Date(Date.UTC(y, m - 1, 1)), $lt: new Date(Date.UTC(y, m, 1)) };
+        }
+      }
+    }
+    if (fromDate || toDate) {
+      const targetField = reportBasedOn || "dueDate";
+      const rangeQuery = {};
+      if (fromDate) {
+        const start = new Date(`${fromDate}T00:00:00.000Z`);
+        if (!Number.isNaN(start.getTime())) rangeQuery.$gte = start;
+      }
+      if (toDate) {
+        const end = new Date(`${toDate}T23:59:59.999Z`);
+        if (!Number.isNaN(end.getTime())) rangeQuery.$lte = end;
+      }
+      if (Object.keys(rangeQuery).length > 0) {
+        dateFilter[targetField] = { ...(dateFilter[targetField] || {}), ...rangeQuery };
+      }
+    }
+
+    const taskScope = { ...dateFilter, ...roleScope };
+
+    // For activity logs, scope to the selected date range on createdAt field
+    const activityDateScope = {};
+    if (month) {
+      const match = String(month).match(/^(\d{4})-(\d{2})$/);
+      if (match) {
+        const y = Number(match[1]);
+        const m = Number(match[2]);
+        if (Number.isInteger(y) && Number.isInteger(m) && m >= 1 && m <= 12) {
+          activityDateScope.createdAt = { $gte: new Date(Date.UTC(y, m - 1, 1)), $lt: new Date(Date.UTC(y, m, 1)) };
+        }
+      }
+    } else if (fromDate || toDate) {
+      const rangeQuery = {};
+      if (fromDate) {
+        const start = new Date(`${fromDate}T00:00:00.000Z`);
+        if (!Number.isNaN(start.getTime())) rangeQuery.$gte = start;
+      }
+      if (toDate) {
+        const end = new Date(`${toDate}T23:59:59.999Z`);
+        if (!Number.isNaN(end.getTime())) rangeQuery.$lte = end;
+      }
+      if (Object.keys(rangeQuery).length > 0) {
+        activityDateScope.createdAt = rangeQuery;
+      }
+    }
 
     let activityTaskIds = null;
     let visibleTaskClientIds = null;
@@ -38,13 +90,24 @@ exports.dashboardStats = async (req, res, next) => {
       visibleTaskClientIds = tasks.map((t) => t.client).filter(Boolean);
     }
 
-    // Overdue = ALL uncompleted tasks past their due date, regardless of selected month
+    // Overdue = ALL uncompleted tasks past their due date under the current date range constraints
     const now = new Date();
-    const overdueScope = {
-      ...roleScope,
-      status: { $ne: "completed" },
-      dueDate: { $lt: now },
-    };
+    const overdueScope = { ...taskScope, status: { $ne: "completed" } };
+    if (overdueScope.dueDate) {
+      if (overdueScope.dueDate.$lt === undefined && overdueScope.dueDate.$lte === undefined) {
+        overdueScope.dueDate = { ...overdueScope.dueDate, $lt: now };
+      } else {
+        const currentUpper = overdueScope.dueDate.$lt !== undefined ? overdueScope.dueDate.$lt : overdueScope.dueDate.$lte;
+        if (now < currentUpper) {
+          const newDueDateFilter = { ...overdueScope.dueDate };
+          delete newDueDateFilter.$lte;
+          newDueDateFilter.$lt = now;
+          overdueScope.dueDate = newDueDateFilter;
+        }
+      }
+    } else {
+      overdueScope.dueDate = { $lt: now };
+    }
 
     const clientScope = {
       isActive: true,
@@ -53,32 +116,39 @@ exports.dashboardStats = async (req, res, next) => {
         : {}),
     };
 
-    const catMatchStage = {
-      ...(dueDate ? { dueDate } : {}),
-      ...roleScope,
-    };
+    const catMatchStage = taskScope;
 
-    const expiryStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-    const expirySoonEnd = new Date(expiryStart);
-    expirySoonEnd.setUTCDate(expirySoonEnd.getUTCDate() + 15);
+    // Licence alerts reference date: up to end of selected range/month, or now + 15 days
+    let expiryLimit = new Date();
+    expiryLimit.setDate(expiryLimit.getDate() + 15);
+    
+    if (toDate) {
+      const parsedToDate = new Date(`${toDate}T23:59:59.999Z`);
+      if (!Number.isNaN(parsedToDate.getTime())) {
+        expiryLimit = parsedToDate;
+      }
+    } else if (month) {
+      const match = String(month).match(/^(\d{4})-(\d{2})$/);
+      if (match) {
+        const y = Number(match[1]);
+        const m = Number(match[2]);
+        if (Number.isInteger(y) && Number.isInteger(m) && m >= 1 && m <= 12) {
+          expiryLimit = new Date(Date.UTC(y, m, 1));
+        }
+      }
+    }
 
     const [totalClients, pendingTasks, overdueTasks, ftaPending, licenceAlerts, recentActivity, catAgg, overdueAgg] = await Promise.all([
       Client.countDocuments(clientScope),
       Task.countDocuments({ ...taskScope, status: { $ne: "completed" } }),
       Task.countDocuments(overdueScope),
       Task.countDocuments({ ...taskScope, isAwaitingFta: true, ftaStatus: { $ne: "approved" } }),
-      // Single query matching the client list's licenceAlerts filter so counts are
-      // always consistent — a client is counted once regardless of how many of its
-      // documents are expired or expiring.
       Client.countDocuments({
         ...clientScope,
         $or: [
-          { "tradeLicences.expiryDate": { $lt: expiryStart } },
-          { "contactPersons.emiratesId.expiryDate": { $lt: expiryStart } },
-          { "contactPersons.passport.expiryDate": { $lt: expiryStart } },
-          { "tradeLicences.expiryDate": { $gte: expiryStart, $lte: expirySoonEnd } },
-          { "contactPersons.emiratesId.expiryDate": { $gte: expiryStart, $lte: expirySoonEnd } },
-          { "contactPersons.passport.expiryDate": { $gte: expiryStart, $lte: expirySoonEnd } },
+          { "tradeLicences.expiryDate": { $lt: expiryLimit, $type: "date" } },
+          { "contactPersons.emiratesId.expiryDate": { $lt: expiryLimit, $type: "date" } },
+          { "contactPersons.passport.expiryDate": { $lt: expiryLimit, $type: "date" } },
         ],
       }),
 
@@ -102,7 +172,7 @@ exports.dashboardStats = async (req, res, next) => {
         },
       ]),
       Task.aggregate([
-        { $match: { ...roleScope, status: { $ne: "completed" }, dueDate: { $lt: now } } },
+        { $match: overdueScope },
         { $group: { _id: "$category", overdue: { $sum: 1 } } },
       ]),
     ]);

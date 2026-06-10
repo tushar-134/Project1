@@ -13,6 +13,7 @@ import Card from "../ui/Card.jsx";
 import StatusPill from "../ui/StatusPill.jsx";
 import Table from "../ui/Table.jsx";
 import TaskDrawer from "../ui/TaskDrawer.jsx";
+import { DATE_RANGE_OPTIONS, getDateRangeBounds } from "../../utils/dateRanges.js";
 
 const categoryLabels = {
   CT: "Corporate Tax",
@@ -58,10 +59,13 @@ export default function Dashboard() {
   const { state, dispatch } = useApp();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
+  const [dateRange, setDateRange] = useState("this_month");
   const [month, setMonth] = useState(() => {
     const today = new Date();
-    return new Date(today.getFullYear(), today.getMonth(), 1);
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
   });
+  const [customFromDate, setCustomFromDate] = useState("");
+  const [customToDate, setCustomToDate] = useState("");
   const [drawerTaskId, setDrawerTaskId] = useState(null);
   const [tileOrder, setTileOrder] = useState(DEFAULT_DASHBOARD_TILE_ORDER);
   const [visibleTileNames, setVisibleTileNames] = useState(DEFAULT_DASHBOARD_TILE_ORDER);
@@ -70,20 +74,44 @@ export default function Dashboard() {
   const [draftVisibleTileNames, setDraftVisibleTileNames] = useState(DEFAULT_DASHBOARD_TILE_ORDER);
   const [draggingTile, setDraggingTile] = useState("");
   const settingsRef = useRef(null);
-  const monthText = month.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+
+  const monthDate = useMemo(() => {
+    if (!month) return new Date();
+    const [y, m] = month.split("-");
+    return new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1);
+  }, [month]);
+  const monthText = monthDate.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+
   const canManage = canManageTasks(currentUser?.role);
-  const moveMonth = (delta) => setMonth((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
+  const moveMonth = (delta) => {
+    const [y, m] = month.split("-");
+    const nextDate = new Date(parseInt(y, 10), parseInt(m, 10) - 1 + delta, 1);
+    setMonth(`${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2, "0")}`);
+  };
+
   useEffect(() => {
-    // Dashboard stats are month-sensitive, so the page refetches whenever the picker changes.
     let isCurrentRequest = true;
-    const selected = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
-    reportService.dashboardStats({ month: selected }).then((data) => {
+    let fromDate, toDate;
+    if (dateRange === "custom") {
+      fromDate = customFromDate || undefined;
+      toDate = customToDate || undefined;
+    } else {
+      const bounds = getDateRangeBounds(dateRange);
+      fromDate = bounds.fromDate;
+      toDate = bounds.toDate;
+    }
+    const params = {
+      month: dateRange === "specific_month" ? month : undefined,
+      fromDate,
+      toDate,
+    };
+    reportService.dashboardStats(params).then((data) => {
       if (isCurrentRequest) dispatch({ type: "SET_DASHBOARD", payload: data });
     }).catch(() => { });
     return () => {
       isCurrentRequest = false;
     };
-  }, [month, dispatch]);
+  }, [month, dateRange, customFromDate, customToDate, dispatch]);
   useEffect(() => {
     categoryService.list()
       .then((data) => dispatch({ type: "SET_RESOURCE", resource: "categories", payload: data.map(mapCategory) }))
@@ -117,7 +145,7 @@ export default function Dashboard() {
     return () => document.removeEventListener("mousedown", closeOnOutsideClick);
   }, [settingsOpen]);
   const stats = state.dashboardStats || {};
-  const selectedMonth = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
+  const selectedMonth = month;
   const tileMetrics = new Map(
     (stats.categoryBreakdown || []).map((item) => [categoryLabels[item.category] || item.category, item])
   );
@@ -164,38 +192,85 @@ export default function Dashboard() {
     const params = new URLSearchParams({
       category: getCategoryFilterValue(state.categories, category),
       status: "Active",
-      month: selectedMonth,
     });
+    if (dateRange === "specific_month") {
+      params.append("month", month);
+    } else if (dateRange === "custom") {
+      params.append("dateRange", "custom");
+      if (customFromDate) params.append("fromDate", customFromDate);
+      if (customToDate) params.append("toDate", customToDate);
+    } else {
+      params.append("dateRange", dateRange);
+    }
     navigate(`/tasks/list?${params.toString()}`);
   };
 
   return (
     <div className="space-y-5">
       <div className="flex justify-end">
-        <div className="relative flex items-center gap-2" ref={settingsRef}>
-          <div className="flex h-9 items-center overflow-hidden rounded-lg border border-[#e2e8f0] bg-white">
-            <label className="relative flex h-full min-w-36 cursor-pointer items-center justify-center gap-2 px-4 text-[13px] font-extrabold transition-colors hover:bg-slate-50">
-              <CalendarDays size={15} className="text-slate-500" />
-              <span className="text-slate-800">{monthText}</span>
-              <input
-                type="month"
-                value={`${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`}
-                onChange={(e) => {
-                  if (!e.target.value) return;
-                  const [y, m] = e.target.value.split("-");
-                  setMonth(new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1));
-                }}
-                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                onClick={(e) => {
-                  try {
-                    e.target.showPicker();
-                  } catch (err) {
-                    // Ignore if showPicker is not supported
-                  }
-                }}
-              />
-            </label>
+        <div className="relative flex flex-wrap items-center gap-3" ref={settingsRef}>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Date Range</span>
+            <select
+              id="dashboard-date-range"
+              className="input h-9 text-[13px] min-w-[130px] border border-[#e2e8f0] bg-white rounded-lg px-2 font-semibold"
+              value={dateRange}
+              onChange={(e) => setDateRange(e.target.value)}
+            >
+              {DATE_RANGE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
           </div>
+
+          {dateRange === "custom" && (
+            <>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">From</span>
+                <input
+                  id="dashboard-from-date"
+                  className="input h-9 text-[13px] w-[130px] border border-[#e2e8f0] bg-white rounded-lg px-2"
+                  type="date"
+                  value={customFromDate}
+                  onChange={(e) => setCustomFromDate(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">To</span>
+                <input
+                  id="dashboard-to-date"
+                  className="input h-9 text-[13px] w-[130px] border border-[#e2e8f0] bg-white rounded-lg px-2"
+                  type="date"
+                  value={customToDate}
+                  onChange={(e) => setCustomToDate(e.target.value)}
+                />
+              </div>
+            </>
+          )}
+
+          {dateRange === "specific_month" && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Month</span>
+              <div className="relative flex h-9 items-center overflow-hidden rounded-lg border border-[#e2e8f0] bg-white px-4 min-w-[130px] cursor-pointer hover:bg-slate-50 transition-colors">
+                <CalendarDays size={15} className="text-slate-500 mr-2" />
+                <span className="text-slate-800 text-[13px] font-extrabold">{monthText}</span>
+                <input
+                  type="month"
+                  value={month}
+                  onChange={(e) => {
+                    if (e.target.value) setMonth(e.target.value);
+                  }}
+                  className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  onClick={(e) => {
+                    try {
+                      e.target.showPicker();
+                    } catch (err) {}
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           <button
             type="button"
             onClick={() => setSettingsOpen((open) => !open)}
@@ -269,9 +344,64 @@ export default function Dashboard() {
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Stat icon={<FileText size={18} />} label="Total Clients" value={stats.totalClients || 0} color="text-[#1e3a8a]" onClick={() => navigate("/clients/list")} />
-        <Stat icon={<Clock size={18} />} label="Pending Tasks" value={stats.pendingTasks || 0} color="text-[#eab308]" onClick={() => navigate(`/tasks/list?status=Active&month=${selectedMonth}`)} />
-        <Stat icon={<AlertTriangle size={18} />} label="Overdue" value={stats.overdueTasks || 0} color="text-[#dc2626]" onClick={() => navigate(`/tasks/list?status=Active&scope=Overdue`)} />
-        <Stat icon={<ShieldAlert size={18} />} label="Licence Alerts" value={stats.licenceAlerts || 0} color="text-[#dc2626]" onClick={() => navigate("/clients/list?licence_alerts=true")} />
+        <Stat
+          icon={<Clock size={18} />}
+          label="Pending Tasks"
+          value={stats.pendingTasks || 0}
+          color="text-[#eab308]"
+          onClick={() => {
+            const params = new URLSearchParams({ status: "Active" });
+            if (dateRange === "specific_month") {
+              params.append("month", month);
+            } else if (dateRange === "custom") {
+              params.append("dateRange", "custom");
+              if (customFromDate) params.append("fromDate", customFromDate);
+              if (customToDate) params.append("toDate", customToDate);
+            } else {
+              params.append("dateRange", dateRange);
+            }
+            navigate(`/tasks/list?${params.toString()}`);
+          }}
+        />
+        <Stat
+          icon={<AlertTriangle size={18} />}
+          label="Overdue"
+          value={stats.overdueTasks || 0}
+          color="text-[#dc2626]"
+          onClick={() => {
+            const params = new URLSearchParams({ status: "Active", scope: "Overdue" });
+            if (dateRange === "specific_month") {
+              params.append("month", month);
+            } else if (dateRange === "custom") {
+              params.append("dateRange", "custom");
+              if (customFromDate) params.append("fromDate", customFromDate);
+              if (customToDate) params.append("toDate", customToDate);
+            } else {
+              params.append("dateRange", dateRange);
+            }
+            navigate(`/tasks/list?${params.toString()}`);
+          }}
+        />
+        <Stat
+          icon={<ShieldAlert size={18} />}
+          label="Licence Alerts"
+          value={stats.licenceAlerts || 0}
+          color="text-[#dc2626]"
+          onClick={() => {
+            const params = new URLSearchParams({ licence_alerts: "true" });
+            if (dateRange === "specific_month") {
+              params.append("month", month);
+            } else if (dateRange === "custom") {
+              if (customFromDate) params.append("fromDate", customFromDate);
+              if (customToDate) params.append("toDate", customToDate);
+            } else {
+              const { fromDate, toDate } = getDateRangeBounds(dateRange);
+              if (fromDate) params.append("fromDate", fromDate);
+              if (toDate) params.append("toDate", toDate);
+            }
+            navigate(`/clients/list?${params.toString()}`);
+          }}
+        />
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

@@ -156,13 +156,31 @@ async function buildClientListQuery(req) {
     andClauses.push({ "tradeLicences.expiryDate": pattern });
   }
   if (licenceAlerts === "true") {
-    const now = new Date();
-    const in15Days = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000);
+    let expiryLimit = new Date();
+    expiryLimit.setDate(expiryLimit.getDate() + 15);
+    
+    const { toDate, month } = req.query;
+    if (toDate) {
+      const parsedTo = new Date(`${toDate}T23:59:59.999Z`);
+      if (!Number.isNaN(parsedTo.getTime())) {
+        expiryLimit = parsedTo;
+      }
+    } else if (month) {
+      const match = String(month).match(/^(\d{4})-(\d{2})$/);
+      if (match) {
+        const y = Number(match[1]);
+        const m = Number(match[2]);
+        if (Number.isInteger(y) && Number.isInteger(m) && m >= 1 && m <= 12) {
+          expiryLimit = new Date(Date.UTC(y, m, 1));
+        }
+      }
+    }
+
     andClauses.push({
       $or: [
-        { "tradeLicences.expiryDate": { $lt: in15Days, $type: "date" } },
-        { "contactPersons.emiratesId.expiryDate": { $lt: in15Days, $type: "date" } },
-        { "contactPersons.passport.expiryDate": { $lt: in15Days, $type: "date" } },
+        { "tradeLicences.expiryDate": { $lt: expiryLimit, $type: "date" } },
+        { "contactPersons.emiratesId.expiryDate": { $lt: expiryLimit, $type: "date" } },
+        { "contactPersons.passport.expiryDate": { $lt: expiryLimit, $type: "date" } },
       ],
     });
   }

@@ -274,7 +274,7 @@ export default function TaskList() {
   const [searchParams] = useSearchParams();
   const { fetchTasks, updateStatus, updateAssignee, exportTasks } = useTasks();
   const initialMonth = searchParams.get("month") || getCurrentMonthValue();
-  const initialMonthScopedOverdue = searchParams.get("overdue") === "true" && Boolean(searchParams.get("month"));
+  const initialMonthScopedOverdue = (searchParams.get("overdue") === "true" || searchParams.get("scope") === "Overdue") && Boolean(searchParams.get("month"));
 
   // Scope & month still live as top-level state (drive server query) but are now
   // controlled from the column filter row rather than the old chip section.
@@ -284,10 +284,12 @@ export default function TaskList() {
   const [dateRange, setDateRange] = useState(() => {
     const fromUrl = searchParams.get("dateRange");
     if (fromUrl) return fromUrl;
-    if (searchParams.get("scope") === "Overdue" || searchParams.has("month")) return "all";
+    if (searchParams.has("month")) return "specific_month";
+    if (searchParams.get("scope") === "Overdue") return "all";
     return "this_month";
   });
-  const [reportBasedOn, setReportBasedOn] = useState("dueDate");
+  const [customFromDate, setCustomFromDate] = useState(() => searchParams.get("fromDate") || "");
+  const [customToDate, setCustomToDate] = useState(() => searchParams.get("toDate") || "");
   const [drawerTaskId, setDrawerTaskId] = useState(searchParams.get("drawer") || null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
@@ -364,11 +366,19 @@ export default function TaskList() {
   }, [dispatch]);
 
   const serverFilters = useMemo(() => {
-    const { fromDate, toDate } = getDateRangeBounds(dateRange);
+    let fromDate, toDate;
+    if (dateRange === "custom") {
+      fromDate = customFromDate || undefined;
+      toDate = customToDate || undefined;
+    } else {
+      const bounds = getDateRangeBounds(dateRange);
+      fromDate = bounds.fromDate;
+      toDate = bounds.toDate;
+    }
     return {
       category: deferredColumnFilters.category || undefined,
       status: deferredColumnFilters.status?.length > 0 ? deferredColumnFilters.status.join(",") : undefined,
-      month: (dateRange === "all" && (scope === "By Month" || monthScopedOverdue)) ? month : undefined,
+      month: dateRange === "specific_month" ? month : undefined,
       overdue: scope === "Overdue" ? "true" : undefined,
       taskId: deferredColumnFilters.taskId || undefined,
       client: deferredColumnFilters.client || undefined,
@@ -381,9 +391,8 @@ export default function TaskList() {
       updatedAt: deferredColumnFilters.updatedAt || undefined,
       fromDate,
       toDate,
-      reportBasedOn: dateRange !== "all" ? reportBasedOn : undefined,
     };
-  }, [deferredColumnFilters, month, monthScopedOverdue, scope, dateRange, reportBasedOn]);
+  }, [deferredColumnFilters, month, scope, dateRange, customFromDate, customToDate]);
 
   const requestParams = useMemo(() => ({ ...serverFilters, page, limit: PAGE_SIZE }), [page, serverFilters]);
   const filterRef = useRef(requestParams);
@@ -465,7 +474,8 @@ export default function TaskList() {
     setMonth(initialMonth);
     setMonthScopedOverdue(false);
     setDateRange("this_month");
-    setReportBasedOn("dueDate");
+    setCustomFromDate("");
+    setCustomToDate("");
     setColumnFilters(createEmptyColumnFilters());
   };
 
@@ -481,7 +491,6 @@ export default function TaskList() {
     setIsExportModalOpen(false);
     downloadBlob(await exportTasks(params), "tasks_full_export.xlsx");
   };
-  const isMonthControlDisabled = scope !== "By Month" && !monthScopedOverdue;
 
   const exportSelected = async (selectedKeys) => {
     const cols = selectedKeys.join(",");
@@ -648,27 +657,39 @@ export default function TaskList() {
               </select>
             </label>
 
-            {dateRange !== "all" && (
-              <label htmlFor="task-list-report-based-on" className="flex items-center gap-1.5">
-                <span className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Report Based On</span>
-                <select
-                  id="task-list-report-based-on"
-                  className="input h-8 text-[13px] min-w-[130px]"
-                  value={reportBasedOn}
-                  onChange={(e) => {
-                    setPage(1);
-                    setReportBasedOn(e.target.value);
-                  }}
-                >
-                  <option value="dueDate">Due Date</option>
-                  <option value="createdAt">Created Date</option>
-                  <option value="updatedAt">Last Modified</option>
-                </select>
-              </label>
+            {dateRange === "custom" && (
+              <>
+                <label htmlFor="task-list-from-date" className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">From</span>
+                  <input
+                    id="task-list-from-date"
+                    className="input h-8 w-[130px] text-[13px]"
+                    type="date"
+                    value={customFromDate}
+                    onChange={(e) => {
+                      setPage(1);
+                      setCustomFromDate(e.target.value);
+                    }}
+                  />
+                </label>
+                <label htmlFor="task-list-to-date" className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">To</span>
+                  <input
+                    id="task-list-to-date"
+                    className="input h-8 w-[130px] text-[13px]"
+                    type="date"
+                    value={customToDate}
+                    onChange={(e) => {
+                      setPage(1);
+                      setCustomToDate(e.target.value);
+                    }}
+                  />
+                </label>
+              </>
             )}
 
-            {dateRange === "all" && (
-              <label htmlFor="task-list-month" className={`flex items-center gap-1.5 ${isMonthControlDisabled ? "opacity-50" : ""}`}>
+            {dateRange === "specific_month" && (
+              <label htmlFor="task-list-month" className="flex items-center gap-1.5">
                 <span className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Month</span>
                 <input
                   id="task-list-month"
@@ -676,7 +697,6 @@ export default function TaskList() {
                   className="input h-8 w-[130px] text-[13px]"
                   type="month"
                   value={month}
-                  disabled={isMonthControlDisabled}
                   onChange={(event) => {
                     setPage(1);
                     setMonth(event.target.value);
