@@ -47,7 +47,7 @@ function timeAgo(dateStr) {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-export default function NotificationPanel({ open, onClose }) {
+export default function NotificationPanel({ open, onClose, onOpenTask }) {
   const { state } = useApp();
   const { fetchNotifications, markRead, markAllRead } = useNotifications();
   const navigate = useNavigate();
@@ -66,12 +66,25 @@ export default function NotificationPanel({ open, onClose }) {
     // 1. Start slide-out animation
     setDismissing((prev) => new Set(prev).add(item._id));
 
-    // 2. After animation (300ms): mark read in DB + remove from state → navigate → close
+    // 2. After animation (300ms): mark read in DB + remove from state → open drawer or navigate → close
     setTimeout(async () => {
       await markRead(item._id);               // marks read in DB + removes from state
-      const target = getNavTarget(item);
-      onClose?.();                            // close the notification panel
-      navigate(target);                       // go to the related page
+
+      // Task-related notifications → open in the sliding TaskDrawer
+      const isTaskNotification =
+        (item.type === "task_due" || item.type === "task_overdue" || item.type === "task_update") &&
+        item.relatedTask;
+      const fallbackTaskNotification = !isTaskNotification && item.relatedTask &&
+        item.type !== "fta_query" && item.type !== "client_added" && item.type !== "licence_expiry";
+
+      if ((isTaskNotification || fallbackTaskNotification) && onOpenTask) {
+        onOpenTask(item.relatedTask);         // open task in the sliding drawer
+      } else {
+        const target = getNavTarget(item);
+        onClose?.();                          // close the notification panel
+        navigate(target);                     // go to the related page
+      }
+
       setDismissing((prev) => {
         const next = new Set(prev);
         next.delete(item._id);
@@ -204,7 +217,7 @@ export default function NotificationPanel({ open, onClose }) {
       {unread.length > 0 && (
         <div className="border-t border-[#e2e8f0] px-4 py-2 text-center">
           <p className="text-[10px] text-slate-400">
-            Click any notification to open its details page
+            Click any notification to view details
           </p>
         </div>
       )}

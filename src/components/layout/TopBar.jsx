@@ -4,6 +4,7 @@ import { AlertTriangle, Bell, ChevronDown, LogOut, UserCircle2 } from "lucide-re
 import NotificationPanel from "./NotificationPanel.jsx";
 import ProfilePanel from "./ProfilePanel.jsx";
 import ExpiryAlertPanel from "./ExpiryAlertPanel.jsx";
+import TaskDrawer from "../ui/TaskDrawer.jsx";
 import { useAuth } from "../../context/AuthContext";
 import { useApp } from "../../context/AppContext";
 import { useNotifications } from "../../hooks/useNotifications";
@@ -31,6 +32,8 @@ export default function TopBar({ title, navOpen = false, onMenuClick }) {
   const { state } = useApp();
   const { fetchNotifications } = useNotifications();
   const roleLabel = ROLE_LABELS[currentUser?.role] || currentUser?.role || "User";
+  const [drawerTaskId, setDrawerTaskId] = useState(null);
+  const canManageTask = currentUser?.role === "admin" || currentUser?.role === "manager";
   const [expirySummary, setExpirySummary] = useState({ total: 0, expiredCount: 0, expiringSoonCount: 0 });
   const [expiryPayload, setExpiryPayload] = useState({ alerts: [], expiredCount: 0, expiringSoonCount: 0, total: 0 });
   const [expiryLoading, setExpiryLoading] = useState(false);
@@ -260,9 +263,10 @@ export default function TopBar({ title, navOpen = false, onMenuClick }) {
             </div>
           )}
         </div>
-        <NotificationPanel open={open} onClose={() => setOpen(false)} />
+        <NotificationPanel open={open} onClose={() => setOpen(false)} onOpenTask={(taskId) => { setOpen(false); setDrawerTaskId(taskId); }} />
       </div>
       <ProfilePanel open={profileOpen} initialTab={profileTab} onClose={() => setProfileOpen(false)} />
+      <TaskDrawer taskId={drawerTaskId} canManage={canManageTask} onClose={() => setDrawerTaskId(null)} />
     </header>
   );
 }
