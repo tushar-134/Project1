@@ -90,24 +90,13 @@ exports.dashboardStats = async (req, res, next) => {
       visibleTaskClientIds = tasks.map((t) => t.client).filter(Boolean);
     }
 
-    // Overdue = ALL uncompleted tasks past their due date under the current date range constraints
+    // Overdue = ALL uncompleted tasks past their due date, regardless of selected date range
     const now = new Date();
-    const overdueScope = { ...taskScope, status: { $ne: "completed" } };
-    if (overdueScope.dueDate) {
-      if (overdueScope.dueDate.$lt === undefined && overdueScope.dueDate.$lte === undefined) {
-        overdueScope.dueDate = { ...overdueScope.dueDate, $lt: now };
-      } else {
-        const currentUpper = overdueScope.dueDate.$lt !== undefined ? overdueScope.dueDate.$lt : overdueScope.dueDate.$lte;
-        if (now < currentUpper) {
-          const newDueDateFilter = { ...overdueScope.dueDate };
-          delete newDueDateFilter.$lte;
-          newDueDateFilter.$lt = now;
-          overdueScope.dueDate = newDueDateFilter;
-        }
-      }
-    } else {
-      overdueScope.dueDate = { $lt: now };
-    }
+    const overdueScope = {
+      ...roleScope,
+      status: { $ne: "completed" },
+      dueDate: { $lt: now },
+    };
 
     const clientScope = {
       isActive: true,
@@ -118,25 +107,10 @@ exports.dashboardStats = async (req, res, next) => {
 
     const catMatchStage = taskScope;
 
-    // Licence alerts reference date: up to end of selected range/month, or now + 15 days
-    let expiryLimit = new Date();
-    expiryLimit.setDate(expiryLimit.getDate() + 15);
-    
-    if (toDate) {
-      const parsedToDate = new Date(`${toDate}T23:59:59.999Z`);
-      if (!Number.isNaN(parsedToDate.getTime())) {
-        expiryLimit = parsedToDate;
-      }
-    } else if (month) {
-      const match = String(month).match(/^(\d{4})-(\d{2})$/);
-      if (match) {
-        const y = Number(match[1]);
-        const m = Number(match[2]);
-        if (Number.isInteger(y) && Number.isInteger(m) && m >= 1 && m <= 12) {
-          expiryLimit = new Date(Date.UTC(y, m, 1));
-        }
-      }
-    }
+    // Licence alerts reference date: expiring within 15 days from now (all-time/absolute)
+    const expiryStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const expirySoonEnd = new Date(expiryStart);
+    expirySoonEnd.setUTCDate(expirySoonEnd.getUTCDate() + 15);
 
     const [totalClients, pendingTasks, overdueTasks, ftaPending, licenceAlerts, recentActivity, catAgg, overdueAgg] = await Promise.all([
       Client.countDocuments(clientScope),
@@ -146,9 +120,9 @@ exports.dashboardStats = async (req, res, next) => {
       Client.countDocuments({
         ...clientScope,
         $or: [
-          { "tradeLicences.expiryDate": { $lt: expiryLimit, $type: "date" } },
-          { "contactPersons.emiratesId.expiryDate": { $lt: expiryLimit, $type: "date" } },
-          { "contactPersons.passport.expiryDate": { $lt: expiryLimit, $type: "date" } },
+          { "tradeLicences.expiryDate": { $lte: expirySoonEnd, $type: "date" } },
+          { "contactPersons.emiratesId.expiryDate": { $lte: expirySoonEnd, $type: "date" } },
+          { "contactPersons.passport.expiryDate": { $lte: expirySoonEnd, $type: "date" } },
         ],
       }),
 

@@ -447,12 +447,7 @@ export default function ClientList() {
     createdAt: deferredColumnFilters.createdAt || undefined,
     createdBy: deferredColumnFilters.createdBy.trim() || undefined,
     licenceAlerts: licenceAlerts ? "true" : undefined,
-    // Pass date filters if licence alerts are active to customize the expiry threshold
-    ...(licenceAlerts ? {
-      toDate: searchParams.get("toDate") || undefined,
-      month: searchParams.get("month") || undefined,
-    } : {}),
-  }), [deferredColumnFilters, deferredQuery, page, clientStatus, licenceAlerts, searchParams]);
+  }), [deferredColumnFilters, deferredQuery, page, clientStatus, licenceAlerts]);
 
   const filterRef = useRef(requestParams);
   filterRef.current = requestParams;
@@ -604,13 +599,7 @@ export default function ClientList() {
               <ShieldAlert size={14} />
             </span>
             <span className="text-[13px] font-extrabold text-red-800">Showing clients with expired or expiring documents</span>
-            {searchParams.get("toDate") || searchParams.get("month") ? (
-              <span className="text-[12px] font-medium text-red-600">
-                (Trade Licence, Emirates ID, or Passport expiring before {searchParams.get("toDate") || searchParams.get("month")})
-              </span>
-            ) : (
-              <span className="text-[12px] font-medium text-red-600">(Trade Licence, Emirates ID, or Passport expiring within 15 days)</span>
-            )}
+            <span className="text-[12px] font-medium text-red-600">(Trade Licence, Emirates ID, or Passport expiring within 15 days)</span>
           </div>
           <button
             type="button"

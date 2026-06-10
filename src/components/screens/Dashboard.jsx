@@ -369,17 +369,7 @@ export default function Dashboard() {
           value={stats.overdueTasks || 0}
           color="text-[#dc2626]"
           onClick={() => {
-            const params = new URLSearchParams({ status: "Active", scope: "Overdue" });
-            if (dateRange === "specific_month") {
-              params.append("month", month);
-            } else if (dateRange === "custom") {
-              params.append("dateRange", "custom");
-              if (customFromDate) params.append("fromDate", customFromDate);
-              if (customToDate) params.append("toDate", customToDate);
-            } else {
-              params.append("dateRange", dateRange);
-            }
-            navigate(`/tasks/list?${params.toString()}`);
+            navigate("/tasks/list?status=Active&scope=Overdue&dateRange=all");
           }}
         />
         <Stat
@@ -388,18 +378,7 @@ export default function Dashboard() {
           value={stats.licenceAlerts || 0}
           color="text-[#dc2626]"
           onClick={() => {
-            const params = new URLSearchParams({ licence_alerts: "true" });
-            if (dateRange === "specific_month") {
-              params.append("month", month);
-            } else if (dateRange === "custom") {
-              if (customFromDate) params.append("fromDate", customFromDate);
-              if (customToDate) params.append("toDate", customToDate);
-            } else {
-              const { fromDate, toDate } = getDateRangeBounds(dateRange);
-              if (fromDate) params.append("fromDate", fromDate);
-              if (toDate) params.append("toDate", toDate);
-            }
-            navigate(`/clients/list?${params.toString()}`);
+            navigate("/clients/list?licence_alerts=true");
           }}
         />
       </div>

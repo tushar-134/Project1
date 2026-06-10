@@ -156,31 +156,15 @@ async function buildClientListQuery(req) {
     andClauses.push({ "tradeLicences.expiryDate": pattern });
   }
   if (licenceAlerts === "true") {
-    let expiryLimit = new Date();
-    expiryLimit.setDate(expiryLimit.getDate() + 15);
-    
-    const { toDate, month } = req.query;
-    if (toDate) {
-      const parsedTo = new Date(`${toDate}T23:59:59.999Z`);
-      if (!Number.isNaN(parsedTo.getTime())) {
-        expiryLimit = parsedTo;
-      }
-    } else if (month) {
-      const match = String(month).match(/^(\d{4})-(\d{2})$/);
-      if (match) {
-        const y = Number(match[1]);
-        const m = Number(match[2]);
-        if (Number.isInteger(y) && Number.isInteger(m) && m >= 1 && m <= 12) {
-          expiryLimit = new Date(Date.UTC(y, m, 1));
-        }
-      }
-    }
-
+    const now = new Date();
+    const expiryStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const expirySoonEnd = new Date(expiryStart);
+    expirySoonEnd.setUTCDate(expirySoonEnd.getUTCDate() + 15);
     andClauses.push({
       $or: [
-        { "tradeLicences.expiryDate": { $lt: expiryLimit, $type: "date" } },
-        { "contactPersons.emiratesId.expiryDate": { $lt: expiryLimit, $type: "date" } },
-        { "contactPersons.passport.expiryDate": { $lt: expiryLimit, $type: "date" } },
+        { "tradeLicences.expiryDate": { $lte: expirySoonEnd, $type: "date" } },
+        { "contactPersons.emiratesId.expiryDate": { $lte: expirySoonEnd, $type: "date" } },
+        { "contactPersons.passport.expiryDate": { $lte: expirySoonEnd, $type: "date" } },
       ],
     });
   }
