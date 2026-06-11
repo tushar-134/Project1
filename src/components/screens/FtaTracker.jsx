@@ -79,7 +79,7 @@ function buildFilterSummary(f) {
 
 export default function FtaTracker() {
   const { currentUser } = useAuth();
-  const isTaskOnly = currentUser?.role === "task_only";
+  const isTaskOnly = currentUser?.role === "associate";
   const { state } = useApp();
   const navigate = useNavigate();
   const location = useLocation();

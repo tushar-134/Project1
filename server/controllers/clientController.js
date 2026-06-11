@@ -14,14 +14,14 @@ const { createTtlCache } = require("../utils/ttlCache");
 
 const expiryAlertsCache = createTtlCache(30_000);
 
-// Managers can assign clients to themselves or task_only users only — not to other managers or admins.
+// Managers can assign clients to themselves or associate users only — not to other managers or admins.
 async function ensureManagerCanAssignClient(req, assignedUser) {
   if (req.user.role !== "manager" || !assignedUser) return null;
   if (String(assignedUser) === String(req.user._id)) return null; // self-assign always OK
   const target = await User.findById(assignedUser).select("role");
   if (!target) return { status: 404, message: "Assigned user not found" };
-  // Managers can only assign to themselves or task_only users
-  if (target.role !== "task_only") {
+  // Managers can only assign to themselves or associate users
+  if (target.role !== "associate") {
     return { status: 403, message: "Managers can only assign clients to themselves or task-only users." };
   }
   return null;
@@ -94,7 +94,7 @@ async function buildClientListQuery(req) {
     andClauses.push({ clientType: new RegExp(`^${escapeRegex(normalized)}$`, "i") });
   }
   if (assignedUser) andClauses.push({ assignedUser });
-  if (req.user.role === "task_only") {
+  if (req.user.role === "associate") {
     const assignedClientIds = await Task.distinct("client", { assignedTo: req.user._id });
     andClauses.push({ _id: { $in: assignedClientIds } });
   }
@@ -495,8 +495,8 @@ exports.getClient = async (req, res, next) => {
     // Allow fetching inactive clients so the detail drawer can show read-only info
     // and the Restore action can be triggered from within the drawer.
     if (!client) return res.status(404).json({ message: "Client not found" });
-    if (req.user.role === "task_only") {
-      // task_only users may only access a client if they have at least one task assigned to them for that client.
+    if (req.user.role === "associate") {
+      // associate users may only access a client if they have at least one task assigned to them for that client.
       const hasTask = await Task.exists({ client: client._id, assignedTo: req.user._id });
       if (!hasTask) return res.status(403).json({ message: "Forbidden" });
     }
@@ -1144,7 +1144,7 @@ exports.expiryAlerts = async (req, res, next) => {
     const cached = expiryAlertsCache.get(cacheKey);
     if (cached) return res.json(cached);
     const query = { isActive: true };
-    if (req.user.role === "task_only") {
+    if (req.user.role === "associate") {
       const assignedClientIds = await Task.find({ assignedTo: req.user._id }).distinct("client");
       query._id = { $in: assignedClientIds };
     }

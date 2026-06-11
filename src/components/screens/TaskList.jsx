@@ -338,7 +338,7 @@ export default function TaskList() {
   const deferredColumnFilters = useDeferredValue(columnFilters);
 
   const canManage = canManageTasks(currentUser?.role);
-  const isTaskOnly = currentUser?.role === "task_only";
+  const isTaskOnly = currentUser?.role === "associate";
   const { fetchUsers } = useUsers();
   const { fetchClients } = useClients();
   const tasksLoading = Boolean(state.loading.tasks);

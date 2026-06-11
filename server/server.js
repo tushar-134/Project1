@@ -226,7 +226,7 @@ async function seedLocalDatabaseIfEmpty() {
 
     const admin = await User.create({ name: "Hamad Siddiqui", email: "admin@filingbuddy.ae", password: "Admin@123", role: "admin" });
     const sara = await User.create({ name: "Sara Mahmoud", email: "sara@filingbuddy.ae", password: "Sara@123", role: "manager" });
-    const omar = await User.create({ name: "Omar Khalid", email: "omar@filingbuddy.ae", password: "Omar@123", role: "task_only" });
+    const omar = await User.create({ name: "Omar Khalid", email: "omar@filingbuddy.ae", password: "Omar@123", role: "associate" });
 
     for (const [name, icon, color, taskTypes] of categories) {
       await Category.create({ name, icon, color, isDefault: true, taskTypes: taskTypes.map((t) => ({ name: t })) });

@@ -1,7 +1,7 @@
 export const ROLE_LABELS = {
   admin: "Admin",
   manager: "Manager",
-  task_only: "Associate",
+  associate: "Associate",
 };
 
 export function hasAnyRole(role, roles = []) {
@@ -21,7 +21,7 @@ export function canManageTasks(role) {
 }
 
 export function canViewFtaTracker(role) {
-  return hasAnyRole(role, ["admin", "manager", "task_only"]);
+  return hasAnyRole(role, ["admin", "manager", "associate"]);
 }
 
 export function canManageCategories(role) {
@@ -49,7 +49,7 @@ export function canViewContacts(role) {
 }
 
 export function canViewClientVisits(role) {
-  return hasAnyRole(role, ["admin", "manager", "task_only"]);
+  return hasAnyRole(role, ["admin", "manager", "associate"]);
 }
 
 export function canManageClientVisits(role) {
