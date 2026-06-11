@@ -1,6 +1,6 @@
 import { Briefcase, ChevronDown, ChevronUp, ChevronsUpDown, CircleChevronRight, Upload, Plus, SquarePen } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useApp } from "../../context/AppContext.jsx";
@@ -62,6 +62,7 @@ function sortParam(sort) {
 
 export default function ClientVisits() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { currentUser } = useAuth();
   const { state } = useApp();
   const canManage = canManageClientVisits(currentUser?.role);
@@ -85,7 +86,30 @@ export default function ClientVisits() {
   const [sort, setSort] = useState({ key: SORT_KEYS.VISIT_ID, direction: "desc" });
   const [drawerVisitId, setDrawerVisitId] = useState(null);
   const [historyClient, setHistoryClient] = useState(null);
+  const [highlightVisitId, setHighlightVisitId] = useState(searchParams.get("highlight") || "");
   const exportRef = useRef(null);
+
+  useEffect(() => {
+    const newHighlight = searchParams.get("highlight") || "";
+    setHighlightVisitId(newHighlight);
+    if (newHighlight) setPage(1);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!highlightVisitId || loading) return;
+    const node = document.getElementById(`visit-row-${highlightVisitId}`);
+    if (node) {
+      node.scrollIntoView({ behavior: "smooth", block: "center" });
+      const timer = setTimeout(() => {
+        setSearchParams((prev) => {
+          prev.delete("highlight");
+          return prev;
+        }, { replace: true });
+        setHighlightVisitId("");
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightVisitId, loading, visits.length, page, setSearchParams]);
 
   const BASE_EXPORT_FIELDS = [
     { key: "visitId", label: "Visit ID" },
@@ -321,7 +345,11 @@ export default function ClientVisits() {
           </thead>
           <tbody>
             {visits.map((visit) => (
-              <tr key={visit._id}>
+              <tr 
+                key={visit._id} 
+                id={`visit-row-${visit._id}`} 
+                className={visit._id === highlightVisitId ? "ring-2 ring-inset ring-blue-500 bg-blue-50/50 transition-all duration-500" : "transition-all duration-500"}
+              >
                 <td style={sort.key === SORT_KEYS.VISIT_ID ? { background: "rgba(239,246,255,0.6)", transition: "background 0.2s" } : { transition: "background 0.2s" }}>
                   <button
                     type="button"
