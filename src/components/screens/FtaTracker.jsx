@@ -420,7 +420,7 @@ export default function FtaTracker() {
                   <td>{item.submitted || "—"}</td>
                   <td>{item.assigned}</td>
                   <td>
-                    {isTaskOnly || currentTab.readOnly ? (
+                    {(isTaskOnly && currentTab.id !== "additional_query") || currentTab.readOnly ? (
                       <FtaStatusBadge status={item.status} />
                     ) : (
                       <select
@@ -434,7 +434,7 @@ export default function FtaTracker() {
                           )
                         }
                       >
-                        {FTA_STATUSES.map((s) => (
+                        {FTA_STATUSES.filter((s) => !(isTaskOnly && s === "Approved")).map((s) => (
                           <option key={s} value={s}>{s}</option>
                         ))}
                       </select>
