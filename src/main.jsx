@@ -38,14 +38,14 @@ const router = createBrowserRouter(
         <Route path="/clients/bulk-upload" element={<ProtectedRoute roles={["admin", "manager"]}><BulkUpload /></ProtectedRoute>} />
         <Route path="/contacts" element={<ProtectedRoute roles={["admin", "manager"]}><Contacts /></ProtectedRoute>} />
         <Route path="/contacts/visit-tracker" element={<Navigate to="/client-visits" replace />} />
-        <Route path="/client-visits" element={<ProtectedRoute roles={["admin", "manager", "associate", "task_only"]}><ClientVisits /></ProtectedRoute>} />
-        <Route path="/client-visits/new" element={<ProtectedRoute roles={["admin", "manager", "associate", "task_only"]}><ClientVisitForm /></ProtectedRoute>} />
+        <Route path="/client-visits" element={<ProtectedRoute roles={["admin", "manager", "associate"]}><ClientVisits /></ProtectedRoute>} />
+        <Route path="/client-visits/new" element={<ProtectedRoute roles={["admin", "manager", "associate"]}><ClientVisitForm /></ProtectedRoute>} />
         <Route path="/client-visits/:id/edit" element={<ProtectedRoute roles={["admin", "manager"]}><ClientVisitForm /></ProtectedRoute>} />
         <Route path="/tasks/add" element={<ProtectedRoute roles={["admin", "manager"]}><AddTask /></ProtectedRoute>} />
         <Route path="/tasks/edit/:id" element={<ProtectedRoute roles={["admin", "manager"]}><AddTask /></ProtectedRoute>} />
         <Route path="/tasks/list" element={<TaskList />} />
-        <Route path="/tasks/:id" element={<ProtectedRoute roles={["admin", "manager", "associate", "task_only"]}><TaskDetail /></ProtectedRoute>} />
-        <Route path="/tasks/fta-tracker" element={<ProtectedRoute roles={["admin", "manager", "associate", "task_only"]}><FtaTracker /></ProtectedRoute>} />
+        <Route path="/tasks/:id" element={<ProtectedRoute roles={["admin", "manager", "associate"]}><TaskDetail /></ProtectedRoute>} />
+        <Route path="/tasks/fta-tracker" element={<ProtectedRoute roles={["admin", "manager", "associate"]}><FtaTracker /></ProtectedRoute>} />
         <Route path="/tasks/categories" element={<Navigate to="/settings" replace />} />
         <Route path="/settings" element={<ProtectedRoute roles={["admin", "manager"]}><Settings /></ProtectedRoute>} />
         {/* Legacy deep-links redirect to the unified settings hub */}
