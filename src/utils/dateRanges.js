@@ -1,6 +1,5 @@
 export const DATE_RANGE_OPTIONS = [
   { value: "all", label: "All time" },
-  
   { value: "today", label: "Today" },
   { value: "this_week", label: "This Week" },
   { value: "this_month", label: "This Month" },
@@ -9,7 +8,6 @@ export const DATE_RANGE_OPTIONS = [
   { value: "previous_month", label: "Previous Month" },
   { value: "specific_month", label: "Specific Month" },
   { value: "custom", label: "Custom Range" },
-  
 ];
 
 const pad = (num) => String(num).padStart(2, "0");
