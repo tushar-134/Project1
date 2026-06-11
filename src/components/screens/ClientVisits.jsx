@@ -348,7 +348,7 @@ export default function ClientVisits() {
               <tr 
                 key={visit._id} 
                 id={`visit-row-${visit._id}`} 
-                className={visit._id === highlightVisitId ? "ring-2 ring-inset ring-blue-500 bg-blue-50/50 transition-all duration-500" : "transition-all duration-500"}
+                className={visit._id === highlightVisitId ? "ring-2 ring-inset ring-yellow-400 bg-yellow-50/80 transition-all duration-500" : "transition-all duration-500"}
               >
                 <td style={sort.key === SORT_KEYS.VISIT_ID ? { background: "rgba(239,246,255,0.6)", transition: "background 0.2s" } : { transition: "background 0.2s" }}>
                   <button
