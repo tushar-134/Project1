@@ -12,6 +12,7 @@ const TYPE_META = {
   fta_query:      { label: "FTA Query",       color: "bg-purple-100 text-purple-700", dot: "bg-purple-500"  },
   task_update:    { label: "Task Update",     color: "bg-sky-100 text-sky-700",       dot: "bg-sky-400"     },
   licence_expiry: { label: "Licence Expiry",  color: "bg-red-100 text-red-700",       dot: "bg-red-500"     },
+  client_visit:   { label: "Client Visit",    color: "bg-blue-100 text-blue-700",     dot: "bg-blue-500"    },
 };
 
 // ─── Decide where a notification should navigate to ──────────────────────────
@@ -28,6 +29,9 @@ function getNavTarget(notification) {
   // Client added → go to client list and highlight that specific client
   if (type === "client_added" && relatedClient)
     return `/clients/list?highlight=${relatedClient}`;
+  // Client visit → go to client visits page
+  if (type === "client_visit")
+    return `/client-visits`;
   // Fallback
   if (relatedTask) return `/tasks/${relatedTask}`;
   if (relatedClient) return `/clients/list?highlight=${relatedClient}`;
