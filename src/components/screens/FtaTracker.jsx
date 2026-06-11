@@ -434,7 +434,7 @@ export default function FtaTracker() {
                           )
                         }
                       >
-                        {FTA_STATUSES.filter((s) => !(isTaskOnly && s === "Approved")).map((s) => (
+                        {FTA_STATUSES.map((s) => (
                           <option key={s} value={s}>{s}</option>
                         ))}
                       </select>
