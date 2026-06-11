@@ -16,6 +16,7 @@ const STATUS_LABEL = {
   submitted_to_fta: "Submitted to FTA",
   completed: "Completed",
 };
+
 // Reverse map: UI label → DB enum value
 const LABEL_TO_STATUS = {
   "Not Yet Started": "not_started",
@@ -23,12 +24,16 @@ const LABEL_TO_STATUS = {
   "Submitted to FTA": "submitted_to_fta",
   "Completed": "completed",
 };
+
+// human readable status labels for notification messages
 const FTA_STATUS_LABEL = {
   in_review: "In Review",
   additional_query: "Additional Query",
   approved: "Approved",
   rejected: "Rejected",
 };
+
+
 function statusLabel(s) { return STATUS_LABEL[s] || FTA_STATUS_LABEL[s] || s; }
 
 function asDate(value) {

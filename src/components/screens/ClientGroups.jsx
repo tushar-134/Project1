@@ -12,6 +12,7 @@ import Table from "../ui/Table.jsx";
 export default function ClientGroups({ setSettingsHeaderAction }) {
   const { state, dispatch } = useApp();
   const [name, setName] = useState("");
+  const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState(null);
   const [editName, setEditName] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -177,35 +178,34 @@ export default function ClientGroups({ setSettingsHeaderAction }) {
       toast.error(error?.response?.data?.message || "Unable to update group.");
     }
   }
+  async function createGroup() {
+    if (!name.trim()) {
+      toast.error("Group name is required.");
+      return;
+    }
+    try {
+      await groupService.create({ name: name.trim() });
+      setName("");
+      setCreateModalOpen(false);
+      await load();
+      toast.success("Group created successfully.");
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Unable to create group.");
+    }
+  }
 
   useEffect(() => {
     if (!setSettingsHeaderAction) return undefined;
     setSettingsHeaderAction(
-      <div className="flex flex-wrap justify-end gap-2">
-        <input
-          id="new-group-name"
-          name="newGroupName"
-          className="input w-56"
-          placeholder="New group name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
-        <Button
-          onClick={async () => {
-            if (name) {
-              await groupService.create({ name });
-              setName("");
-              load();
-            }
-          }}
-        >
+      <div className="flex justify-end">
+        <Button onClick={() => setCreateModalOpen(true)}>
           <Plus size={16} />
           Create Group
         </Button>
       </div>
     );
     return () => setSettingsHeaderAction(null);
-  }, [setSettingsHeaderAction, name]);
+  }, [setSettingsHeaderAction]);
 
   return (
     <div className="space-y-5">
@@ -285,6 +285,56 @@ export default function ClientGroups({ setSettingsHeaderAction }) {
           </tbody>
         </Table>
       </Card>
+
+      {createModalOpen && (
+        <div className="fixed inset-0 z-40 grid place-items-center bg-slate-900/35 p-4">
+          <Card className="w-full max-w-md p-4">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="text-[16px] font-extrabold">New Group</div>
+              <button
+                type="button"
+                onClick={() => {
+                  setName("");
+                  setCreateModalOpen(false);
+                }}
+                aria-label="Close new group"
+                className="grid h-9 w-9 place-items-center rounded-full text-slate-500 transition hover:bg-slate-100 hover:text-slate-800"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <label htmlFor="new-group-name">
+              <span className="field-label">Group Name</span>
+              <input
+                id="new-group-name"
+                name="newGroupName"
+                className="input"
+                placeholder="New group name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                autoFocus
+              />
+            </label>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setName("");
+                  setCreateModalOpen(false);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button onClick={createGroup}>
+                <Plus size={16} />
+                Create Group
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {modalOpen && (
         <div className="fixed inset-0 z-40 grid place-items-center bg-slate-900/35 p-4">
