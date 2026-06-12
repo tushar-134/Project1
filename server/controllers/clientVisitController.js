@@ -669,6 +669,11 @@ exports.updateVisit = async (req, res, next) => {
       return res.status(400).json({ message: "One or more assigned users are invalid or inactive." });
     }
 
+    // Capture current assignee IDs before overwrite so we can detect truly new ones
+    const previousAssigneeIds = new Set(
+      (visit.assignedUsers || []).map((entry) => String(entry.user?._id || entry.user))
+    );
+
     visit.clientType = clientType;
     visit.client = clientType === "existing" ? client : undefined;
     visit.newClient = clientType === "new" ? {
@@ -707,7 +712,18 @@ exports.updateVisit = async (req, res, next) => {
     visit.status = deriveStatus(visit.assignedUsers, status);
     appendActivity(visit, req.user._id, "Visit Updated", "Visit details updated");
     await visit.save();
-    res.json(serializeVisit(await visit.populate(populateVisit)));
+    const populatedUpdate = await visit.populate(populateVisit);
+    // Notify only newly-added assignees to avoid re-notifying existing team members
+    const newAssigneesVisit = {
+      ...populatedUpdate.toObject({ virtuals: true }),
+      assignedUsers: populatedUpdate.assignedUsers.filter(
+        (entry) => !previousAssigneeIds.has(String(entry.user?._id || entry.user))
+      ),
+    };
+    if (newAssigneesVisit.assignedUsers.length) {
+      sendVisitNotifications(newAssigneesVisit, req.user._id, { isUpdate: true });
+    }
+    res.json(serializeVisit(populatedUpdate));
   } catch (error) {
     next(error);
   }
