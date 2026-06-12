@@ -66,7 +66,7 @@ Without the parentheses the last condition only evaluates when `normalized` is `
 **File:** [clientRoutes.js L18](file:///c:/Users/ritik/OneDrive/Desktop/project1/server/routes/clientRoutes.js#L18)
 
 ```js
-// ❌ Any authenticated user (including task_only) can upload attachments
+// ❌ Any authenticated user (including associate) can upload attachments
 router.post("/:id/attachments", upload.single("file"), ctrl.uploadAttachment);
 ```
 
