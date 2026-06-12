@@ -68,7 +68,13 @@ function combineDateAndLegacyTime(dateValue, timeValue) {
 }
 
 function combineDateAndTimeInput(dateValue, timeValue) {
-  const match = String(timeValue || "").trim().match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  if (!timeValue) return null;
+  // If the frontend sent an absolute ISO string/timestamp, use it directly
+  const isoDate = new Date(timeValue);
+  if (!Number.isNaN(isoDate.getTime()) && String(timeValue).length > 10) return isoDate;
+  
+  // Legacy "HH:MM" fallback (assumes server timezone)
+  const match = String(timeValue).trim().match(/^([01]\d|2[0-3]):([0-5]\d)$/);
   if (!match) return null;
   const date = new Date(dateValue);
   if (Number.isNaN(date.getTime())) return null;
