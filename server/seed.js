@@ -36,7 +36,7 @@ async function seed() {
   await connectDB();
   const admin = await upsertUser({ name: "Hamad Siddiqui", email: "admin@filingbuddy.ae", password: "Admin@123", role: "admin" });
   const sara = await upsertUser({ name: "Sara Mahmoud", email: "sara@filingbuddy.ae", password: "Sara@123", role: "manager" });
-  const omar = await upsertUser({ name: "Omar Khalid", email: "omar@filingbuddy.ae", password: "Omar@123", role: "associate" });
+  const omar = await upsertUser({ name: "Omar Khalid", email: "omar@filingbuddy.ae", password: "Omar@123", role: "task_only" });
 
   for (const [name, icon, color, taskTypes] of categories) {
     await Category.updateOne({ name }, { $setOnInsert: { name, icon, color, isDefault: true, taskTypes: taskTypes.map((type) => ({ name: type })) } }, { upsert: true });

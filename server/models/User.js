@@ -9,7 +9,7 @@ const userSchema = new mongoose.Schema({
   mobileCountryCode: { type: String, trim: true },
   mobile: String,
   profilePhotoUrl: String,
-  role: { type: String, enum: ["admin", "manager", "user", "associate"], default: "user" },
+  role: { type: String, enum: ["admin", "manager", "user", "task_only"], default: "user" },
   isActive: { type: Boolean, default: true },
   lastLogin: Date,
   authToken: String,

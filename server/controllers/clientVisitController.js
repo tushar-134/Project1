@@ -564,7 +564,7 @@ exports.createVisit = async (req, res, next) => {
     if (!normalizedAssignedUsers.length) {
       return res.status(400).json({ message: "Please assign at least one user." });
     }
-    if (req.user.role === "associate" && normalizedAssignedUsers.some((entry) => String(entry.user) !== String(req.user._id))) {
+    if (req.user.role === "task_only" && normalizedAssignedUsers.some((entry) => String(entry.user) !== String(req.user._id))) {
       return res.status(403).json({ message: "Associate users can only create visits for themselves." });
     }
 

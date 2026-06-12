@@ -6,7 +6,7 @@ const ctrl = require("../controllers/clientVisitController");
 
 const router = express.Router();
 
-const canAccess = requireRoles("admin", "manager", "associate");
+const canAccess = requireRoles("admin", "manager", "task_only");
 const canManage = requireRoles("admin", "manager");
 
 const visitTimeValidator = body("visitTime")

@@ -9,6 +9,6 @@ function requireRoles(...roles) {
 const adminOnly = requireRoles("admin");
 const adminManager = requireRoles("admin", "manager");
 // Grants read-level access to associates in addition to admin and manager.
-const adminManagerAssociate = requireRoles("admin", "manager", "associate");
+const adminManagerAssociate = requireRoles("admin", "manager", "task_only");
 
 module.exports = { requireRoles, adminOnly, adminManager, adminManagerAssociate };
