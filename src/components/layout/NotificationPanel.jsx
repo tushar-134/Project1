@@ -11,6 +11,7 @@ const TYPE_META = {
   client_added: { label: "Client Added",  color: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-400" },
   fta_query:    { label: "FTA Query",     color: "bg-purple-100 text-purple-700", dot: "bg-purple-500" },
   task_update:  { label: "Task Update",   color: "bg-sky-100 text-sky-700",       dot: "bg-sky-400"   },
+  client_visit: { label: "Visit Assigned", color: "bg-teal-100 text-teal-700",    dot: "bg-teal-500"  },
 };
 
 /**
@@ -21,7 +22,8 @@ const TYPE_META = {
  * - Fallback → dashboard
  */
 function getNavTarget(notification) {
-  const { type, relatedTask, relatedClient } = notification;
+  const { type, relatedTask, relatedClient, relatedVisit } = notification;
+  if (type === "client_visit") return "/client-visits";
   if (type === "fta_query" && !relatedTask) return "/tasks/fta-tracker";
   if (relatedTask) return `/tasks/list?drawer=${relatedTask}`;
   if (type === "client_added" && relatedClient) return `/clients/list`;
