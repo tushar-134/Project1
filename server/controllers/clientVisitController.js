@@ -3,6 +3,7 @@ const XLSX = require("xlsx");
 const ClientVisit = require("../models/ClientVisit");
 const Client = require("../models/Client");
 const User = require("../models/User");
+const Notification = require("../models/Notification");
 const { nextVisitId } = require("../utils/autoId");
 const { buildSimplePdf } = require("../utils/simplePdf");
 const { normalizeStoredUploadUrl } = require("../utils/uploadUrl");
@@ -153,6 +154,33 @@ function buildInitialComment(remarks, user) {
     author: user?.name || "User",
     at: new Date().toISOString(),
   }]);
+}
+
+/**
+ * Fire an in-app notification to each assignedUser (skipping the actor to avoid self-spam).
+ * Errors are swallowed so a notification failure never breaks the main request.
+ */
+async function sendVisitNotifications(visit, actorId, { isUpdate = false } = {}) {
+  try {
+    const clientName = visitClientName(visit);
+    const visitDate = visit.visitDate
+      ? new Date(visit.visitDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+      : "";
+    const title = isUpdate ? "Client Visit Reassigned" : "Client Visit Assigned";
+    const docs = (visit.assignedUsers || [])
+      .filter((entry) => String(entry.user?._id || entry.user) !== String(actorId))
+      .map((entry) => ({
+        recipient: entry.user?._id || entry.user,
+        title,
+        message: `You have been ${isUpdate ? "reassigned to" : "assigned to"} a visit for ${clientName} on ${visitDate}.`,
+        type: "client_visit",
+        relatedVisit: visit._id,
+      }));
+    if (docs.length) await Notification.insertMany(docs, { ordered: false });
+  } catch (err) {
+    // Non-critical — log but don't surface to caller
+    console.error("[sendVisitNotifications] failed:", err.message);
+  }
 }
 
 function normalizeAssignedUsers(assignedUsers = []) {
