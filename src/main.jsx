@@ -36,7 +36,7 @@ const router = createBrowserRouter(
         <Route path="/clients/edit/:id" element={<ProtectedRoute roles={["admin", "manager"]}><AddClient /></ProtectedRoute>} />
         <Route path="/clients/list" element={<ClientList />} />
         <Route path="/clients/bulk-upload" element={<ProtectedRoute roles={["admin", "manager"]}><BulkUpload /></ProtectedRoute>} />
-        <Route path="/contacts" element={<ProtectedRoute roles={["admin", "manager", "task_only"]}><Contacts /></ProtectedRoute>} />
+        <Route path="/contacts" element={<ProtectedRoute roles={["admin", "manager", "associate"]}><Contacts /></ProtectedRoute>} />
         <Route path="/contacts/visit-tracker" element={<Navigate to="/client-visits" replace />} />
         <Route path="/client-visits" element={<ProtectedRoute roles={["admin", "manager", "associate"]}><ClientVisits /></ProtectedRoute>} />
         <Route path="/client-visits/new" element={<ProtectedRoute roles={["admin", "manager", "associate"]}><ClientVisitForm /></ProtectedRoute>} />
