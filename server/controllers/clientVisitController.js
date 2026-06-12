@@ -156,6 +156,33 @@ function buildInitialComment(remarks, user) {
   }]);
 }
 
+/**
+ * Fire an in-app notification to each assignedUser (skipping the actor to avoid self-spam).
+ * Errors are swallowed so a notification failure never breaks the main request.
+ */
+async function sendVisitNotifications(visit, actorId, { isUpdate = false } = {}) {
+  try {
+    const clientName = visitClientName(visit);
+    const visitDate = visit.visitDate
+      ? new Date(visit.visitDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+      : "";
+    const title = isUpdate ? "Client Visit Reassigned" : "Client Visit Assigned";
+    const docs = (visit.assignedUsers || [])
+      .filter((entry) => String(entry.user?._id || entry.user) !== String(actorId))
+      .map((entry) => ({
+        recipient: entry.user?._id || entry.user,
+        title,
+        message: `You have been ${isUpdate ? "reassigned to" : "assigned to"} a visit for ${clientName} on ${visitDate}.`,
+        type: "client_visit",
+        relatedVisit: visit._id,
+      }));
+    if (docs.length) await Notification.insertMany(docs, { ordered: false });
+  } catch (err) {
+    // Non-critical — log but don't surface to caller
+    console.error("[sendVisitNotifications] failed:", err.message);
+  }
+}
+
 function normalizeAssignedUsers(assignedUsers = []) {
   const byUser = new Map();
   assignedUsers.forEach((entry) => {
@@ -579,31 +606,10 @@ exports.createVisit = async (req, res, next) => {
       appendActivity(visit, req.user._id, "Remarks Added", "Initial visit remark added");
     }
     await visit.save();
-
-    // Create notifications for assigned users
-    try {
-      const assignedUserIds = normalizedAssignedUsers
-        .map((entry) => entry.user)
-        .filter((id) => String(id) !== String(req.user._id));
-
-      if (assignedUserIds.length > 0) {
-        const clientNameStr = clientType === "new" ? String(newClient.authorityName || "").trim() : "an existing client";
-        const visitDateStr = new Date(visitDate).toISOString().slice(0, 10);
-        
-        const notifications = assignedUserIds.map((userId) => ({
-          recipient: userId,
-          title: "New Client Visit Assigned",
-          message: `You have been assigned to a new client visit for ${clientNameStr} on ${visitDateStr}.`,
-          type: "client_visit",
-          relatedClient: clientType === "existing" ? client : undefined,
-        }));
-        await Notification.insertMany(notifications);
-      }
-    } catch (notifErr) {
-      console.error("Failed to create client visit notifications:", notifErr);
-    }
-
-    res.status(201).json(serializeVisit(await visit.populate(populateVisit)));
+    const populated = await visit.populate(populateVisit);
+    // Fire-and-forget: notify each assignee (creator excluded to avoid self-spam)
+    sendVisitNotifications(populated, req.user._id);
+    res.status(201).json(serializeVisit(populated));
   } catch (error) {
     next(error);
   }
@@ -663,6 +669,11 @@ exports.updateVisit = async (req, res, next) => {
       return res.status(400).json({ message: "One or more assigned users are invalid or inactive." });
     }
 
+    // Capture current assignee IDs before overwrite so we can detect truly new ones
+    const previousAssigneeIds = new Set(
+      (visit.assignedUsers || []).map((entry) => String(entry.user?._id || entry.user))
+    );
+
     visit.clientType = clientType;
     visit.client = clientType === "existing" ? client : undefined;
     visit.newClient = clientType === "new" ? {
@@ -706,27 +717,18 @@ exports.updateVisit = async (req, res, next) => {
     visit.status = deriveStatus(visit.assignedUsers, status);
     appendActivity(visit, req.user._id, "Visit Updated", "Visit details updated");
     await visit.save();
-
-    // Create notifications for newly assigned users
-    try {
-      if (newlyAssignedUserIds.length > 0) {
-        const clientNameStr = clientType === "new" ? String(newClient.authorityName || "").trim() : "an existing client";
-        const visitDateStr = new Date(visitDate).toISOString().slice(0, 10);
-        
-        const notifications = newlyAssignedUserIds.map((userId) => ({
-          recipient: userId,
-          title: "New Client Visit Assigned",
-          message: `You have been assigned to a new client visit for ${clientNameStr} on ${visitDateStr}.`,
-          type: "client_visit",
-          relatedClient: clientType === "existing" ? client : undefined,
-        }));
-        await Notification.insertMany(notifications);
-      }
-    } catch (notifErr) {
-      console.error("Failed to create client visit notifications:", notifErr);
+    const populatedUpdate = await visit.populate(populateVisit);
+    // Notify only newly-added assignees to avoid re-notifying existing team members
+    const newAssigneesVisit = {
+      ...populatedUpdate.toObject({ virtuals: true }),
+      assignedUsers: populatedUpdate.assignedUsers.filter(
+        (entry) => !previousAssigneeIds.has(String(entry.user?._id || entry.user))
+      ),
+    };
+    if (newAssigneesVisit.assignedUsers.length) {
+      sendVisitNotifications(newAssigneesVisit, req.user._id, { isUpdate: true });
     }
-
-    res.json(serializeVisit(await visit.populate(populateVisit)));
+    res.json(serializeVisit(populatedUpdate));
   } catch (error) {
     next(error);
   }

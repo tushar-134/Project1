@@ -8,6 +8,7 @@ const notificationSchema = new mongoose.Schema({
   type: { type: String, enum: ["task_due", "task_overdue", "client_added", "fta_query", "task_update", "licence_expiry", "client_visit"], required: true },
   relatedTask: { type: mongoose.Schema.Types.ObjectId, ref: "Task" },
   relatedClient: { type: mongoose.Schema.Types.ObjectId, ref: "Client" },
+  relatedVisit: { type: mongoose.Schema.Types.ObjectId, ref: "ClientVisit" },
   isRead: { type: Boolean, default: false },
 }, { timestamps: true });
 
