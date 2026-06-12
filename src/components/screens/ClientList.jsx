@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronLeft, ChevronRight, Columns, Download, RefreshCw, RotateCcw, Search, SlidersHorizontal, Trash2, Upload, X, CalendarClock, ShieldAlert } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Columns, Download, RefreshCw, RotateCcw, Search, SlidersHorizontal, Archive, Upload, X, CalendarClock, ShieldAlert } from "lucide-react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp } from "../../context/AppContext.jsx";
@@ -15,6 +15,7 @@ import Card from "../ui/Card.jsx";
 import ClientComboBox from "../ui/ClientComboBox.jsx";
 import ClientDrawer from "../ui/ClientDrawer.jsx";
 import ExportModal from "../ui/ExportModal.jsx";
+import ConfirmModal from "../ui/ConfirmModal.jsx";
 import Table from "../ui/Table.jsx";
 
 // ─── Column definitions ────────────────────────────────────────────────────
@@ -390,6 +391,7 @@ export default function ClientList() {
   const [drawerClientId, setDrawerClientId] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [confirmAction, setConfirmAction] = useState(null);
   const [customFieldsForExport, setCustomFieldsForExport] = useState([]);
   const BASE_EXPORT_FIELDS = [
     { key: "fileNo",        label: "File No" },
@@ -965,7 +967,7 @@ export default function ClientList() {
               {isVisible("contact")    && <th>Contact Details</th>}
               {isVisible("createdAt")  && <th>Created Date</th>}
               {isVisible("createdBy")  && <th>Created By</th>}
-              {canManage               && <th>Actions</th>}
+              {currentUser?.role === "admin" && <th>Actions</th>}
             </tr>
           </thead>
           <tbody>
@@ -1019,13 +1021,24 @@ export default function ClientList() {
                     <button
                       type="button"
                       className="task-id-link font-extrabold text-left"
-                      onClick={() => isInactiveMode
-                        ? setDrawerClientId(client.id)
-                        : client.isDraft
-                          ? navigate(`/clients/edit/${client.id}`)
-                          : setDrawerClientId(client.id)
+                      onClick={() => {
+                        if (isInactiveMode) {
+                          setDrawerClientId(client.id);
+                        } else if (client.isDraft) {
+                          navigate(`/clients/edit/${client.id}`);
+                        } else {
+                          setDrawerClientId(client.id);
+                        }
+                      }}
+                      title={
+                        licenceAlerts
+                          ? "Open client details"
+                          : isInactiveMode
+                          ? "View client details (read-only)"
+                          : client.isDraft
+                          ? "Resume incomplete client"
+                          : "Open client details"
                       }
-                      title={isInactiveMode ? "View client details (read-only)" : client.isDraft ? "Resume incomplete client" : "Open client details"}
                     >
                       {client.name}
                     </button>
@@ -1115,7 +1128,7 @@ export default function ClientList() {
                       : <span className="text-[12px] text-slate-400">—</span>}
                   </td>
                 )}
-                {canManage && (
+                {currentUser?.role === "admin" && (
                   <td>
                     <div className="flex gap-1">
                       {/* Inactive mode: show Restore button */}
@@ -1125,14 +1138,7 @@ export default function ClientList() {
                           variant="ghost"
                           title="Reactivate this client"
                           onClick={async () => {
-                            if (confirm("Restore this client?")) {
-                              try {
-                                await restoreClient(client._id);
-                                refetchClients().catch(() => {});
-                              } catch (_) {
-                                alert("Failed to restore client. Please try again.");
-                              }
-                            }
+                            setConfirmAction({ type: "restore", client });
                           }}
                           className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[12px] font-bold text-emerald-700 hover:bg-emerald-100"
                         >
@@ -1146,17 +1152,12 @@ export default function ClientList() {
                           size="sm"
                           variant="danger"
                           onClick={async () => {
-                            if (confirm("Delete client?")) {
-                              await deleteClient(client._id);
-                              if (rows.length === 1 && page > 1) {
-                                setPage((current) => Math.max(1, current - 1));
-                              } else {
-                                refetchClients().catch(() => {});
-                              }
-                            }
+                            setConfirmAction({ type: "inactive", client });
                           }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1 text-[12px] font-bold"
                         >
-                          <Trash2 size={14} />
+                          <Archive size={14} />
+                          Inactive
                         </Button>
                       )}
 
@@ -1198,6 +1199,38 @@ export default function ClientList() {
         onExportVisible={exportVisible}
         onExportAll={exportAll}
         onExportSelected={exportSelected}
+      />
+      {/* ── Confirm Modal ──────────────────────────────────────────────────────── */}
+      <ConfirmModal
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={async () => {
+          if (confirmAction?.type === "inactive") {
+            try {
+              await deleteClient(confirmAction.client._id);
+              if (rows.length === 1 && page > 1) {
+                setPage((current) => Math.max(1, current - 1));
+              } else {
+                refetchClients().catch(() => {});
+              }
+            } catch (err) {
+              console.error("Failed to mark client as inactive", err);
+            }
+          } else if (confirmAction?.type === "restore") {
+            try {
+              await restoreClient(confirmAction.client._id);
+              refetchClients().catch(() => {});
+            } catch (_) {
+              alert("Failed to restore client. Please try again.");
+            }
+          }
+        }}
+        title={confirmAction?.type === "inactive" ? "Mark Client as Inactive" : "Restore Client"}
+        message={confirmAction?.type === "inactive" 
+          ? `Are you sure you want to mark ${confirmAction?.client?.legalName || "this client"} as inactive?` 
+          : `Are you sure you want to restore ${confirmAction?.client?.legalName || "this client"}?`}
+        confirmText={confirmAction?.type === "inactive" ? "Make Inactive" : "Restore"}
+        isDanger={confirmAction?.type === "inactive"}
       />
     </div>
   );

@@ -3,6 +3,7 @@ const XLSX = require("xlsx");
 const ClientVisit = require("../models/ClientVisit");
 const Client = require("../models/Client");
 const User = require("../models/User");
+const Notification = require("../models/Notification");
 const { nextVisitId } = require("../utils/autoId");
 const { buildSimplePdf } = require("../utils/simplePdf");
 const { normalizeStoredUploadUrl } = require("../utils/uploadUrl");
@@ -536,8 +537,8 @@ exports.createVisit = async (req, res, next) => {
     if (!normalizedAssignedUsers.length) {
       return res.status(400).json({ message: "Please assign at least one user." });
     }
-    if (req.user.role === "task_only" && normalizedAssignedUsers.some((entry) => String(entry.user) !== String(req.user._id))) {
-      return res.status(403).json({ message: "Task Only users can only create visits for themselves." });
+    if (req.user.role === "associate" && normalizedAssignedUsers.some((entry) => String(entry.user) !== String(req.user._id))) {
+      return res.status(403).json({ message: "Associate users can only create visits for themselves." });
     }
 
     const users = await ensureUsersExist(normalizedAssignedUsers.map((entry) => entry.user));
@@ -578,6 +579,30 @@ exports.createVisit = async (req, res, next) => {
       appendActivity(visit, req.user._id, "Remarks Added", "Initial visit remark added");
     }
     await visit.save();
+
+    // Create notifications for assigned users
+    try {
+      const assignedUserIds = normalizedAssignedUsers
+        .map((entry) => entry.user)
+        .filter((id) => String(id) !== String(req.user._id));
+
+      if (assignedUserIds.length > 0) {
+        const clientNameStr = clientType === "new" ? String(newClient.authorityName || "").trim() : "an existing client";
+        const visitDateStr = new Date(visitDate).toISOString().slice(0, 10);
+        
+        const notifications = assignedUserIds.map((userId) => ({
+          recipient: userId,
+          title: "New Client Visit Assigned",
+          message: `You have been assigned to a new client visit for ${clientNameStr} on ${visitDateStr}.`,
+          type: "client_visit",
+          relatedClient: clientType === "existing" ? client : undefined,
+        }));
+        await Notification.insertMany(notifications);
+      }
+    } catch (notifErr) {
+      console.error("Failed to create client visit notifications:", notifErr);
+    }
+
     res.status(201).json(serializeVisit(await visit.populate(populateVisit)));
   } catch (error) {
     next(error);
@@ -658,6 +683,11 @@ exports.updateVisit = async (req, res, next) => {
     const previousAssignedByUser = new Map(
       (visit.assignedUsers || []).map((entry) => [String(entry.user?._id || entry.user), entry])
     );
+
+    const newlyAssignedUserIds = normalizedAssignedUsers
+      .map((entry) => String(entry.user))
+      .filter((id) => !previousAssignedByUser.has(id) && id !== String(req.user._id));
+
     visit.assignedUsers = normalizedAssignedUsers.map((entry) => {
       const existing = previousAssignedByUser.get(String(entry.user));
       return {
@@ -676,6 +706,26 @@ exports.updateVisit = async (req, res, next) => {
     visit.status = deriveStatus(visit.assignedUsers, status);
     appendActivity(visit, req.user._id, "Visit Updated", "Visit details updated");
     await visit.save();
+
+    // Create notifications for newly assigned users
+    try {
+      if (newlyAssignedUserIds.length > 0) {
+        const clientNameStr = clientType === "new" ? String(newClient.authorityName || "").trim() : "an existing client";
+        const visitDateStr = new Date(visitDate).toISOString().slice(0, 10);
+        
+        const notifications = newlyAssignedUserIds.map((userId) => ({
+          recipient: userId,
+          title: "New Client Visit Assigned",
+          message: `You have been assigned to a new client visit for ${clientNameStr} on ${visitDateStr}.`,
+          type: "client_visit",
+          relatedClient: clientType === "existing" ? client : undefined,
+        }));
+        await Notification.insertMany(notifications);
+      }
+    } catch (notifErr) {
+      console.error("Failed to create client visit notifications:", notifErr);
+    }
+
     res.json(serializeVisit(await visit.populate(populateVisit)));
   } catch (error) {
     next(error);

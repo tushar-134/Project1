@@ -117,7 +117,7 @@ export default function ClientVisitTracker() {
 
   useEffect(() => {
     let active = true;
-    if (currentUser?.role && currentUser.role !== "task_only") {
+    if (currentUser?.role && currentUser.role !== "associate") {
       fetchUsers().catch(() => {
         if (active) toast.error("Unable to load users.");
       });
@@ -147,7 +147,7 @@ export default function ClientVisitTracker() {
 
   const userOptions = useMemo(
     () => {
-      if (currentUser?.role === "task_only") {
+      if (currentUser?.role === "associate") {
         return currentUser ? [{
           id: currentUser.id || currentUser._id,
           _id: currentUser.id || currentUser._id,

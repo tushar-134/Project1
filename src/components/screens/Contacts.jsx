@@ -1,4 +1,4 @@
-import { Download, Upload, Mail, MapPin, MapPinned, Phone, Search, UploadCloud, UserRoundPlus, X } from "lucide-react";
+import { Download, Upload, Mail, MapPin, MapPinned, Pencil, Phone, Search, UploadCloud, UserRoundPlus, X } from "lucide-react";
 import { cloneElement, isValidElement, useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import toast from "react-hot-toast";
@@ -61,6 +61,8 @@ function toContactRows(contacts) {
     authorityName: contact.authorityName || contact.client?.legalName || "Unknown Authority",
     contactPersonName: contact.contactPersonName || contact.fullName || "Unnamed Contact",
     mobile: [contact.mobile?.countryCode, contact.mobile?.number].filter(Boolean).join(" ").trim(),
+    mobileCountryCode: contact.mobile?.countryCode || "",
+    mobileNumber: contact.mobile?.number || "",
     email: contact.email || "",
     address: contact.address || "-",
     emirates: contact.emirates || "-",
@@ -110,6 +112,7 @@ export default function Contacts() {
   const canMutate = canManageClients(currentUser?.role);
   const [query, setQuery] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(blankContact);
   const [saving, setSaving] = useState(false);
   const [contactsData, setContactsData] = useState([]);
@@ -153,7 +156,23 @@ export default function Contacts() {
   function closeModal() {
     if (saving) return;
     setModalOpen(false);
+    setEditingId(null);
     setForm(blankContact);
+  }
+
+  function openEditModal(contact) {
+    setEditingId(contact.id);
+    setForm({
+      authorityName: contact.authorityName || "",
+      contactPersonName: contact.contactPersonName || "",
+      countryCode: contact.mobileCountryCode || "",
+      mobile: contact.mobileNumber || "",
+      email: contact.email || "",
+      address: contact.address === "-" ? "" : contact.address || "",
+      emirates: contact.emirates === "-" ? "" : contact.emirates || "",
+      location: contact.location === "-" ? "" : contact.location || "",
+    });
+    setModalOpen(true);
   }
 
   function closeBulkModal() {
@@ -246,7 +265,7 @@ export default function Contacts() {
     }
     setSaving(true);
     try {
-      await contactService.create({
+      const payload = {
         authorityName: form.authorityName.trim(),
         contactPersonName: form.contactPersonName.trim(),
         email: form.email.trim(),
@@ -257,9 +276,14 @@ export default function Contacts() {
         address: form.address.trim(),
         emirates: form.emirates.trim(),
         location: form.location.trim(),
-      });
+      };
+      if (editingId) {
+        await contactService.update(editingId, payload);
+      } else {
+        await contactService.create(payload);
+      }
       await loadContacts();
-      toast.success("Authority contact saved.");
+      toast.success(editingId ? "Contact updated." : "Authority contact saved.");
       closeModal();
     } catch (error) {
       toast.error(getApiErrorMessage(error) || "Unable to save contact.");
@@ -277,7 +301,7 @@ export default function Contacts() {
               <Download size={16} />
               Bulk Upload
             </Button>
-            <Button onClick={() => setModalOpen(true)}>
+            <Button onClick={() => { setEditingId(null); setForm(blankContact); setModalOpen(true); }}>
               <UserRoundPlus size={16} />
               Add Contact
             </Button>
@@ -317,6 +341,7 @@ export default function Contacts() {
               <th>Address</th>
               <th>Emirates</th>
               <th>Location</th>
+              <th>Edit</th>
             </tr>
           </thead>
           <tbody>
@@ -336,11 +361,22 @@ export default function Contacts() {
                 <td><span className="inline-flex items-start gap-1"><MapPinned size={13} className="mt-0.5 shrink-0" />{contact.address}</span></td>
                 <td>{contact.emirates}</td>
                 <td><span className="inline-flex items-center gap-1"><MapPin size={13} />{contact.location}</span></td>
+                <td>
+                  <button
+                    type="button"
+                    className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
+                    title="Edit contact"
+                    aria-label={`Edit ${contact.authorityName}`}
+                    onClick={() => openEditModal(contact)}
+                  >
+                    <Pencil size={14} />
+                  </button>
+                </td>
               </tr>
             ))}
             {contacts.length === 0 && (
               <tr>
-                <td colSpan="7" className="py-8 text-center text-[13px] font-semibold text-slate-500">No stored authority contacts found yet.</td>
+                <td colSpan="8" className="py-8 text-center text-[13px] font-semibold text-slate-500">No stored authority contacts found yet.</td>
               </tr>
             )}
           </tbody>
@@ -351,7 +387,7 @@ export default function Contacts() {
         <div className="fixed inset-0 z-40 grid place-items-center bg-slate-900/35 p-4">
           <Card className="w-full max-w-2xl p-4">
             <div className="mb-4 flex items-center justify-between">
-              <div className="text-[16px] font-extrabold">Add Authority Contact</div>
+              <div className="text-[16px] font-extrabold">{editingId ? "Edit Authority Contact" : "Add Authority Contact"}</div>
               <button onClick={closeModal} disabled={saving} className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-50" aria-label="Close" title="Close"><X size={18} /></button>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
@@ -394,7 +430,7 @@ export default function Contacts() {
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <Button variant="ghost" onClick={closeModal} disabled={saving}>Cancel</Button>
-              <Button onClick={saveContact} disabled={saving}>{saving ? "Saving..." : "Save Contact"}</Button>
+              <Button onClick={saveContact} disabled={saving}>{saving ? "Saving..." : editingId ? "Update Contact" : "Save Contact"}</Button>
             </div>
           </Card>
         </div>

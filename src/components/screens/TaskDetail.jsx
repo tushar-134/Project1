@@ -142,7 +142,7 @@ export default function TaskDetail() {
   const displayStatus = statusFromApi[task.status] || task.status;
   const displayCategory = categoryLabels[task.category] || task.category;
   const overdue = daysOverdue(task.dueDate, task.status);
-  const canEditRemarks = canManage || (currentUser?.role === "task_only" && String(task.assignedTo?._id) === String(currentUser?._id || currentUser?.id));
+  const canEditRemarks = canManage || (currentUser?.role === "associate" && String(task.assignedTo?._id) === String(currentUser?._id || currentUser?.id));
 
   // Parse remarks as JSON array of {text, author, at} objects; fall back to legacy string
   function parseComments(rawRemarks) {

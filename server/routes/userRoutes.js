@@ -29,18 +29,18 @@ const mobileValidator = body("mobile")
 router.get("/", auth, requireRoles("admin", "manager"), ctrl.listUsers);
 router.get("/:id", auth, requireRoles("admin", "manager"), ctrl.getUser);
 router.use(auth, adminOnly);
-router.post("/", body("name").notEmpty(), body("email").isEmail(), body("password").isLength({ min: 8 }), dialCodeValidator, mobileValidator, body("role").isIn(["admin", "manager", "task_only"]), ctrl.createUser);
+router.post("/", body("name").notEmpty(), body("email").isEmail(), body("password").isLength({ min: 8 }), dialCodeValidator, mobileValidator, body("role").isIn(["admin", "manager", "associate"]), ctrl.createUser);
 router.put(
   "/:id",
   body("name").optional().notEmpty(),
   body("email").optional().isEmail(),
   body("password").optional({ values: "falsy" }).isLength({ min: 8 }),
-  body("role").optional().isIn(["admin", "manager", "task_only"]),
+  body("role").optional().isIn(["admin", "manager", "associate"]),
   dialCodeValidator,
   mobileValidator,
   ctrl.updateUser
 );
-router.patch("/:id/role", body("role").isIn(["admin", "manager", "task_only"]), ctrl.updateRole);
+router.patch("/:id/role", body("role").isIn(["admin", "manager", "associate"]), ctrl.updateRole);
 router.patch("/:id/status", body("isActive").isBoolean(), ctrl.updateStatus);
 router.delete("/:id", ctrl.deleteUser);
 

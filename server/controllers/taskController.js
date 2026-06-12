@@ -16,6 +16,7 @@ const STATUS_LABEL = {
   submitted_to_fta: "Submitted to FTA",
   completed: "Completed",
 };
+
 // Reverse map: UI label → DB enum value
 const LABEL_TO_STATUS = {
   "Not Yet Started": "not_started",
@@ -23,12 +24,16 @@ const LABEL_TO_STATUS = {
   "Submitted to FTA": "submitted_to_fta",
   "Completed": "completed",
 };
+
+// human readable status labels for notification messages
 const FTA_STATUS_LABEL = {
   in_review: "In Review",
   additional_query: "Additional Query",
   approved: "Approved",
   rejected: "Rejected",
 };
+
+
 function statusLabel(s) { return STATUS_LABEL[s] || FTA_STATUS_LABEL[s] || s; }
 
 function asDate(value) {
@@ -139,8 +144,8 @@ async function ensureManagerCanAssign(req, assignedTo) {
   if (String(assignedTo) === String(req.user._id)) return null; // self-assign always OK
   const assignee = await User.findById(assignedTo).select("role");
   if (!assignee) return { status: 404, message: "Assigned user not found" };
-  // Managers can only assign to themselves or task_only users
-  if (assignee.role !== "task_only") {
+  // Managers can only assign to themselves or associate users
+  if (assignee.role !== "associate") {
     return { status: 403, message: "Managers can only assign tasks to themselves or task-only users." };
   }
   return null;
@@ -188,7 +193,7 @@ function getPeriodFromDateServer(date, fyeString) {
 }
 // ---------------------------------------------------------------------------
 
- async function maybeGenerateNextRecurringTask(task, userId) {
+async function maybeGenerateNextRecurringTask(task, userId) {
   if (!task?.isRecurring || task.recurringGeneratedTask) return null;
   const rc = task.recurringConfig || {};
   const frequency = rc.frequency;
@@ -205,7 +210,7 @@ function getPeriodFromDateServer(date, fyeString) {
   // The client may or may not be populated at this point, so we guard carefully.
   const clientFYE =
     (task.client && typeof task.client === "object" ? task.client.financialYearEnd : null) || "Jan - Dec";
-  
+
   // Note: For VAT and CT specific period resolution we ideally need the full client object,
   // but if it's missing, getPeriodFromDateServer handles standard FY/Quarter logic based on FYE.
   const nextPeriod = getPeriodFromDateServer(nextDueDate, clientFYE);
@@ -258,7 +263,7 @@ function getPeriodFromDateServer(date, fyeString) {
 
 async function taskQuery(req) {
   // Query shaping happens once here so list and export stay aligned with the same role and filter logic.
-  const { category, status, assignedTo, month, overdue, taskId, client, type, dueDate, assigned, remarks, recurring } = req.query;
+  const { category, status, assignedTo, month, overdue, taskId, client, type, dueDate, assigned, remarks, recurring, createdAt, updatedAt, fromDate, toDate, reportBasedOn } = req.query;
   const query = {};
   const andClauses = [];
 
@@ -279,7 +284,7 @@ async function taskQuery(req) {
     }
   }
   if (assignedTo) andClauses.push({ assignedTo });
-  if (req.user.role === "task_only") andClauses.push({ assignedTo: req.user._id });
+  if (req.user.role === "associate") andClauses.push({ assignedTo: req.user._id });
   // Bug #7 Fix: Build the dueDate filter carefully so overdue never silently
   // clobber the month's $lt boundary. We now apply the month window first, then
   // tighten $lt to today only when no month is selected (overdue standalone).
@@ -293,18 +298,7 @@ async function taskQuery(req) {
       }
     }
   }
-  if (overdue === "true") {
-    if (query.dueDate) {
-      // Month window is already set — just tighten the upper boundary to today
-      // if today is earlier than the month's end.
-      const today = new Date();
-      if (today < query.dueDate.$lt) query.dueDate.$lt = today;
-    } else {
-      query.dueDate = { $lt: new Date() };
-    }
-    // Bug #7 Fix: use a dedicated guard so we don't overwrite an earlier status filter.
-    if (!query.status) query.status = { $ne: "completed" };
-  }
+
 
   if (taskId) {
     query.taskId = new RegExp(escapeRegex(taskId.trim()), "i");
@@ -343,6 +337,54 @@ async function taskQuery(req) {
   }
   if (recurring === "recurring") query.isRecurring = true;
   if (recurring === "one-time") query.isRecurring = false;
+  if (createdAt) {
+    const start = new Date(`${createdAt}T00:00:00.000Z`);
+    if (!Number.isNaN(start.getTime())) {
+      const end = new Date(start);
+      end.setUTCDate(end.getUTCDate() + 1);
+      query.createdAt = { ...(query.createdAt || {}), $gte: start, $lt: end };
+    }
+  }
+  if (updatedAt) {
+    const start = new Date(`${updatedAt}T00:00:00.000Z`);
+    if (!Number.isNaN(start.getTime())) {
+      const end = new Date(start);
+      end.setUTCDate(end.getUTCDate() + 1);
+      query.updatedAt = { ...(query.updatedAt || {}), $gte: start, $lt: end };
+    }
+  }
+  if (fromDate || toDate) {
+    const targetField = reportBasedOn || "dueDate";
+    const rangeQuery = {};
+    if (fromDate) {
+      const start = new Date(`${fromDate}T00:00:00.000Z`);
+      if (!Number.isNaN(start.getTime())) rangeQuery.$gte = start;
+    }
+    if (toDate) {
+      const end = new Date(`${toDate}T23:59:59.999Z`);
+      if (!Number.isNaN(end.getTime())) rangeQuery.$lte = end;
+    }
+    if (Object.keys(rangeQuery).length > 0) {
+      query[targetField] = { ...(query[targetField] || {}), ...rangeQuery };
+    }
+  }
+  if (overdue === "true") {
+    if (query.dueDate) {
+      const today = new Date();
+      if (query.dueDate.$lt === undefined && query.dueDate.$lte === undefined) {
+        query.dueDate.$lt = today;
+      } else {
+        const currentUpper = query.dueDate.$lt !== undefined ? query.dueDate.$lt : query.dueDate.$lte;
+        if (today < currentUpper) {
+          delete query.dueDate.$lte;
+          query.dueDate.$lt = today;
+        }
+      }
+    } else {
+      query.dueDate = { $lt: new Date() };
+    }
+    if (!query.status) query.status = { $ne: "completed" };
+  }
   if (andClauses.length) query.$and = andClauses;
   return query;
 }
@@ -379,7 +421,7 @@ exports.getTask = async (req, res, next) => {
   try {
     const task = await Task.findById(req.params.id).populate(populateTask);
     if (!task) return res.status(404).json({ message: "Task not found" });
-    if (req.user.role === "task_only" && String(task.assignedTo?._id) !== String(req.user._id)) return res.status(403).json({ message: "Forbidden" });
+    if (req.user.role === "associate" && String(task.assignedTo?._id) !== String(req.user._id)) return res.status(403).json({ message: "Forbidden" });
     const logs = await ActivityLog.find({ task: task._id }).populate("user", "name email role").sort({ createdAt: -1 });
     res.json({
       ...task.toObject(),
@@ -467,7 +509,7 @@ exports.updateTask = async (req, res, next) => {
         task.ftaSubmittedDate = undefined;
       }
     }
-    
+
     if ("isAwaitingFta" in req.body && !req.body.isAwaitingFta) {
       task.ftaStatus = undefined;
       task.ftaSubmittedDate = undefined;
@@ -494,7 +536,7 @@ exports.updateStatus = async (req, res, next) => {
   try {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: "Task not found" });
-    if (req.user.role === "task_only" && String(task.assignedTo) !== String(req.user._id)) return res.status(403).json({ message: "Forbidden" });
+    if (req.user.role === "associate" && String(task.assignedTo) !== String(req.user._id)) return res.status(403).json({ message: "Forbidden" });
     if (task.ftaStatus === "approved") {
       return res.status(400).json({ message: "Approved FTA tasks are locked and cannot have their status changed." });
     }
@@ -629,6 +671,9 @@ exports.updateFtaStatus = async (req, res, next) => {
   try {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: "Task not found" });
+    if (req.user.role === "associate" && String(task.assignedTo) !== String(req.user._id)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
     const previousStatus = task.ftaStatus;
     const previousTaskStatus = task.status;
     const nextFtaStatus = req.body.ftaStatus;
@@ -725,8 +770,8 @@ exports.exportTasks = async (req, res, next) => {
 
     const BASE_COLUMNS = ["taskId", "client", "category", "type", "dueDate", "assigned", "status", "recurring", "createdAt", "updatedAt"];
     const ALL_COLUMNS = BASE_COLUMNS;
-    const requestedColumns = isExportAll 
-      ? ALL_COLUMNS 
+    const requestedColumns = isExportAll
+      ? ALL_COLUMNS
       : (req.query.columns ? String(req.query.columns).split(",").map(c => c.trim()).filter(Boolean) : ALL_COLUMNS);
 
     const activeBaseColumns = requestedColumns.filter(k => BASE_COLUMNS.includes(k));
@@ -784,7 +829,7 @@ exports.exportTasks = async (req, res, next) => {
   } catch (error) { next(error); }
 };
 
-exports.maybeGenerateNextRecurringTask =  maybeGenerateNextRecurringTask ;
+exports.maybeGenerateNextRecurringTask = maybeGenerateNextRecurringTask;
 // Export helper functions for testing
 exports._test = {
   calculateNextOccurrence

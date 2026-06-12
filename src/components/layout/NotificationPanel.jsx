@@ -6,25 +6,35 @@ import { CheckCheck, Bell, ExternalLink } from "lucide-react";
 
 // ─── Type metadata ────────────────────────────────────────────────────────────
 const TYPE_META = {
-  task_due:     { label: "Task Due",      color: "bg-amber-100 text-amber-700",   dot: "bg-amber-400" },
-  task_overdue: { label: "Task Overdue",  color: "bg-red-100 text-red-700",       dot: "bg-red-500"   },
-  client_added: { label: "Client Added",  color: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-400" },
-  fta_query:    { label: "FTA Query",     color: "bg-purple-100 text-purple-700", dot: "bg-purple-500" },
-  task_update:  { label: "Task Update",   color: "bg-sky-100 text-sky-700",       dot: "bg-sky-400"   },
+  task_due:       { label: "Task Due",        color: "bg-amber-100 text-amber-700",   dot: "bg-amber-400"   },
+  task_overdue:   { label: "Task Overdue",    color: "bg-red-100 text-red-700",       dot: "bg-red-500"     },
+  client_added:   { label: "Client Added",    color: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-400" },
+  fta_query:      { label: "FTA Query",       color: "bg-purple-100 text-purple-700", dot: "bg-purple-500"  },
+  task_update:    { label: "Task Update",     color: "bg-sky-100 text-sky-700",       dot: "bg-sky-400"     },
+  licence_expiry: { label: "Licence Expiry",  color: "bg-red-100 text-red-700",       dot: "bg-red-500"     },
+  client_visit:   { label: "Client Visit",    color: "bg-blue-100 text-blue-700",     dot: "bg-blue-500"    },
 };
 
-/**
- * Determine the navigation target URL for a notification.
- * - fta_query without a relatedTask → FTA tracker page
- * - Any notification with a relatedTask → task drawer via query param
- * - client_added → client list (no highlight; user can search)
- * - Fallback → dashboard
- */
+// ─── Decide where a notification should navigate to ──────────────────────────
 function getNavTarget(notification) {
   const { type, relatedTask, relatedClient } = notification;
-  if (type === "fta_query" && !relatedTask) return "/tasks/fta-tracker";
-  if (relatedTask) return `/tasks/list?drawer=${relatedTask}`;
-  if (type === "client_added" && relatedClient) return `/clients/list`;
+  if (type === "fta_query") return "/tasks/fta-tracker";
+  if ((type === "task_due" || type === "task_overdue" || type === "task_update") && relatedTask)
+    return `/tasks/${relatedTask}`;
+  // Licence expiry → client list with licence_alerts filter + highlight for that specific client
+  if (type === "licence_expiry" && relatedClient)
+    return `/clients/list?licence_alerts=true&highlight=${relatedClient}`;
+  if (type === "licence_expiry")
+    return "/clients/list?licence_alerts=true";
+  // Client added → go to client list and highlight that specific client
+  if (type === "client_added" && relatedClient)
+    return `/clients/list?highlight=${relatedClient}`;
+  // Client visit → go to client visits page
+  if (type === "client_visit")
+    return `/client-visits`;
+  // Fallback
+  if (relatedTask) return `/tasks/${relatedTask}`;
+  if (relatedClient) return `/clients/list?highlight=${relatedClient}`;
   return "/dashboard";
 }
 
@@ -41,7 +51,7 @@ function timeAgo(dateStr) {
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-export default function NotificationPanel({ open, onClose }) {
+export default function NotificationPanel({ open, onClose, onOpenTask }) {
   const { state } = useApp();
   const { fetchNotifications, markRead, markAllRead } = useNotifications();
   const navigate = useNavigate();
@@ -60,12 +70,25 @@ export default function NotificationPanel({ open, onClose }) {
     // 1. Start slide-out animation
     setDismissing((prev) => new Set(prev).add(item._id));
 
-    // 2. After animation (300ms): mark read in DB + remove from state → navigate → close
+    // 2. After animation (300ms): mark read in DB + remove from state → open drawer or navigate → close
     setTimeout(async () => {
       await markRead(item._id);               // marks read in DB + removes from state
-      const target = getNavTarget(item);
-      onClose?.();                            // close the notification panel
-      navigate(target);                       // go to the related page
+
+      // Task-related notifications → open in the sliding TaskDrawer
+      const isTaskNotification =
+        (item.type === "task_due" || item.type === "task_overdue" || item.type === "task_update") &&
+        item.relatedTask;
+      const fallbackTaskNotification = !isTaskNotification && item.relatedTask &&
+        item.type !== "fta_query" && item.type !== "client_added" && item.type !== "licence_expiry";
+
+      if ((isTaskNotification || fallbackTaskNotification) && onOpenTask) {
+        onOpenTask(item.relatedTask);         // open task in the sliding drawer
+      } else {
+        const target = getNavTarget(item);
+        onClose?.();                          // close the notification panel
+        navigate(target);                     // go to the related page
+      }
+
       setDismissing((prev) => {
         const next = new Set(prev);
         next.delete(item._id);
@@ -198,7 +221,7 @@ export default function NotificationPanel({ open, onClose }) {
       {unread.length > 0 && (
         <div className="border-t border-[#e2e8f0] px-4 py-2 text-center">
           <p className="text-[10px] text-slate-400">
-            Click any notification to open its details page
+            Click any notification to view details
           </p>
         </div>
       )}

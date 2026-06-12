@@ -39,7 +39,7 @@ function blankForm(currentUser) {
     visitType: "Monthly Visit",
     location: "",
     remarks: "",
-    assignedUsers: currentUser?.role === "task_only" ? [currentUser._id || currentUser.id] : [],
+    assignedUsers: currentUser?.role === "associate" ? [currentUser._id || currentUser.id] : [],
   };
 }
 
@@ -117,7 +117,7 @@ export default function ClientVisitForm() {
   }, [fetchClients]);
 
   useEffect(() => {
-    if (currentUser?.role && currentUser.role !== "task_only") {
+    if (currentUser?.role && currentUser.role !== "associate") {
       fetchUsers().catch(() => toast.error("Unable to load users."));
     }
   }, [currentUser?.role]);
@@ -162,7 +162,7 @@ export default function ClientVisitForm() {
   }, [state.clients]);
 
   const userOptions = useMemo(() => {
-    if (currentUser?.role === "task_only") {
+    if (currentUser?.role === "associate") {
       return [{
         _id: currentUser._id || currentUser.id,
         id: currentUser._id || currentUser.id,
@@ -186,7 +186,7 @@ export default function ClientVisitForm() {
     if (!client) return;
     setForm((current) => {
       const assignedId = client.assignedUser?._id || client.assignedUser || "";
-      const nextAssignedUsers = assignedId && currentUser?.role !== "task_only"
+      const nextAssignedUsers = assignedId && currentUser?.role !== "associate"
         ? current.assignedUsers.includes(assignedId) ? current.assignedUsers : [...current.assignedUsers, assignedId]
         : current.assignedUsers;
       const nextLocation = current.location || firstClientLocation(client);
@@ -207,7 +207,7 @@ export default function ClientVisitForm() {
   }
 
   function toggleAssignedUser(userId) {
-    if (currentUser?.role === "task_only") return;
+    if (currentUser?.role === "associate") return;
     setForm((current) => ({
       ...current,
       assignedUsers: current.assignedUsers.includes(userId)
@@ -445,7 +445,7 @@ export default function ClientVisitForm() {
               <div key={user._id || user.id} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-blue-100 bg-blue-50 px-2 py-1">
                 <UserAvatar user={user} size="sm" className="h-6 w-6 p-0 text-[10px]" />
                 <div className="truncate text-[12px] font-bold text-slate-900">{user.name}</div>
-                {currentUser?.role !== "task_only" && (
+                {currentUser?.role !== "associate" && (
                   <button type="button" className="text-[11px] font-black text-slate-400 hover:text-slate-700" onClick={() => toggleAssignedUser(user._id || user.id)}>
                     ×
                   </button>
@@ -480,10 +480,10 @@ export default function ClientVisitForm() {
                     key={userId}
                     type="button"
                     onClick={() => toggleAssignedUser(userId)}
-                    disabled={currentUser?.role === "task_only"}
+                    disabled={currentUser?.role === "associate"}
                     className={`flex w-full items-center gap-2.5 rounded-xl border px-3 py-2 text-left transition ${
                       checked ? "border-blue-200 bg-blue-50" : "border-transparent bg-white hover:border-[#dbe4f0] hover:bg-slate-50"
-                    } ${currentUser?.role === "task_only" ? "cursor-default" : ""}`}
+                    } ${currentUser?.role === "associate" ? "cursor-default" : ""}`}
                   >
                     <UserAvatar user={user} size="sm" className="h-8 w-8 shrink-0 p-0 text-[11px]" />
                     <div className="min-w-0 flex-1">

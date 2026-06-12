@@ -121,7 +121,7 @@ export default function TaskDrawer({ taskId, canManage, onClose }) {
     task &&
     (
       canManage ||
-      (currentUser?.role === "task_only" && String(task.assignedTo?._id) === String(currentUser?._id || currentUser?.id))
+      (currentUser?.role === "associate" && String(task.assignedTo?._id) === String(currentUser?._id || currentUser?.id))
     )
   );
 

@@ -79,7 +79,7 @@ function buildFilterSummary(f) {
 
 export default function FtaTracker() {
   const { currentUser } = useAuth();
-  const isTaskOnly = currentUser?.role === "task_only";
+  const isTaskOnly = currentUser?.role === "associate";
   const { state } = useApp();
   const navigate = useNavigate();
   const location = useLocation();
@@ -420,7 +420,7 @@ export default function FtaTracker() {
                   <td>{item.submitted || "—"}</td>
                   <td>{item.assigned}</td>
                   <td>
-                    {isTaskOnly || currentTab.readOnly ? (
+                    {(isTaskOnly && currentTab.id !== "additional_query") || currentTab.readOnly ? (
                       <FtaStatusBadge status={item.status} />
                     ) : (
                       <select
