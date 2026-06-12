@@ -9,6 +9,8 @@ import Card from "../ui/Card.jsx";
 import Table from "../ui/Table.jsx";
 import { DIAL_CODE_OPTIONS } from "../../utils/dialCodeOptions.js";
 import { getPhoneNumberSpec, normalizeDialCode, normalizePhoneNumber } from "../../utils/phoneUtils.js";
+import { useAuth } from "../../context/AuthContext.jsx";
+import { canManageClients } from "../../utils/permissions.js";
 
 const blankContact = {
   authorityName: "",
@@ -103,6 +105,9 @@ function validateBulkContact(row) {
 }
 
 export default function Contacts() {
+  const { currentUser } = useAuth();
+  // Associates (task_only) have view-only access; only admin/manager can mutate contacts.
+  const canMutate = canManageClients(currentUser?.role);
   const [query, setQuery] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(blankContact);
@@ -265,18 +270,20 @@ export default function Contacts() {
 
   return (
     <div className="space-y-5">
-      <div className="flex justify-end">
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button variant="outlineAmber" onClick={() => setBulkOpen(true)}>
-            <Download size={16} />
-            Bulk Upload
-          </Button>
-          <Button onClick={() => setModalOpen(true)}>
-            <UserRoundPlus size={16} />
-            Add Contact
-          </Button>
+      {canMutate && (
+        <div className="flex justify-end">
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="outlineAmber" onClick={() => setBulkOpen(true)}>
+              <Download size={16} />
+              Bulk Upload
+            </Button>
+            <Button onClick={() => setModalOpen(true)}>
+              <UserRoundPlus size={16} />
+              Add Contact
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-3">
         <Summary label="Total Contacts" value={contacts.length} />

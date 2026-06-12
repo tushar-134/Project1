@@ -45,7 +45,7 @@ export function canViewReports(role) {
 }
 
 export function canViewContacts(role) {
-  return hasAnyRole(role, ["admin", "manager"]);
+  return hasAnyRole(role, ["admin", "manager", "task_only"]);
 }
 
 export function canViewClientVisits(role) {
