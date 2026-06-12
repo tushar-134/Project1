@@ -6,7 +6,7 @@ The system uses 3 roles only:
 
 - `admin`
 - `manager`
-- `task_only`
+- `associate`
 
 These roles define what each user can see, create, assign, update, or delete.
 
@@ -49,17 +49,17 @@ Manager cannot:
 - manage user roles
 - delete users
 
-### Task Only
+### Associate
 
-Task Only is the execution role.
+Associate is the execution role.
 
-Task Only can:
+Associate can:
 
 - view only assigned tasks
 - update only their own task progress or status
 - complete assigned work
 
-Task Only cannot:
+Associate cannot:
 
 - assign work
 - delete work
@@ -69,7 +69,7 @@ Task Only cannot:
 
 ## 3. Permission Matrix
 
-| Action | Admin | Manager | Task Only |
+| Action | Admin | Manager | Associate |
 |---|---|---|---|
 | Login | Yes | Yes | Yes |
 | View dashboard | Yes | Yes | Limited / own work only |
@@ -110,8 +110,8 @@ The frontend should:
 - hide screens the user cannot access
 - hide buttons the user cannot use
 - hide delete actions for non-admin users
-- hide assign controls for `task_only`
-- hide user/settings/report sections for `task_only`
+- hide assign controls for `associate`
+- hide user/settings/report sections for `associate`
 
 ### 4.3 Sidebar by Role
 
@@ -131,7 +131,7 @@ The frontend should:
 - Client Groups
 - Reports
 
-#### Task Only
+#### Associate
 
 - Dashboard or limited dashboard
 - Task List
@@ -165,7 +165,7 @@ Route
 
 - `adminOnly`
 - `adminManager`
-- task ownership checks for `task_only`
+- task ownership checks for `associate`
 
 ## 6. API Access by Role
 
@@ -188,18 +188,18 @@ Route
 - `GET /api/tasks`
   - admin -> all tasks
   - manager -> all tasks
-  - task_only -> only assigned tasks
+  - associate -> only assigned tasks
 - `GET /api/tasks/:id`
   - admin, manager -> any task
-  - task_only -> only own assigned task
+  - associate -> only own assigned task
 - `POST /api/tasks` -> admin, manager
 - `PUT /api/tasks/:id`
   - admin, manager -> yes
-  - task_only -> no, or limited self-update if intentionally allowed
+  - associate -> no, or limited self-update if intentionally allowed
 - `PATCH /api/tasks/:id/status`
   - admin -> yes
   - manager -> yes
-  - task_only -> own task only
+  - associate -> own task only
 - `DELETE /api/tasks/:id` -> admin only
 
 ### 6.4 Users
@@ -239,13 +239,13 @@ Route
 
 ## 7. Task Ownership Rule
 
-This is the key rule for `task_only`.
+This is the key rule for `associate`.
 
-When a `task_only` user requests tasks:
+When a `associate` user requests tasks:
 
 - backend must automatically filter by `assignedTo = req.user._id`
 
-When a `task_only` user tries to update status:
+When a `associate` user tries to update status:
 
 - backend must verify the task is assigned to that same user
 
@@ -263,12 +263,12 @@ Admin or Manager creates task
 -> selects assignee
 -> backend saves assignedTo
 -> assignee gets notification
--> task_only user sees assigned work only
+-> associate user sees assigned work only
 ```
 
 ### 8.2 Assignment Rule
 
-The backend must reject assignment attempts made by `task_only`.
+The backend must reject assignment attempts made by `associate`.
 
 ## 9. Delete Architecture
 
@@ -284,9 +284,9 @@ Delete is controlled only by `admin`.
 
 Manager can operate work but cannot remove data permanently.
 
-### 9.3 Task Only Delete Rule
+### 9.3 Associate Delete Rule
 
-Task Only cannot delete anything.
+Associate cannot delete anything.
 
 ## 10. Recommended UI Behavior
 

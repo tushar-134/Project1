@@ -60,7 +60,7 @@ An admin can:
 ### Users
 - add new users
 - update user details
-- change role between `admin`, `manager`, and `task_only`
+- change role between `admin`, `manager`, and `associate`
 - deactivate users
 - delete non-admin users
 
@@ -150,7 +150,7 @@ Admin has full sidebar visibility.
 
 ## 6. Admin Connectivity With Other Roles
 
-Admin connects directly with both `manager` and `task_only` users.
+Admin connects directly with both `manager` and `associate` users.
 
 ### Admin -> Manager
 - admin creates manager users
@@ -158,7 +158,7 @@ Admin connects directly with both `manager` and `task_only` users.
 - admin can review manager workloads
 - admin can override manager changes
 
-### Admin -> Task Only
+### Admin -> Associate
 - admin assigns work directly
 - admin reviews execution progress
 - admin receives status updates through dashboard, reports, and logs
@@ -180,9 +180,9 @@ flowchart TD
     B --> E["Manage Users"]
     B --> F["View Reports"]
     D --> G["Assign to Manager"]
-    D --> H["Assign to Task Only"]
+    D --> H["Assign to Associate"]
     G --> I["Manager works / reassigns"]
-    H --> J["Task Only executes task"]
+    H --> J["Associate executes task"]
     I --> K["Admin reviews progress"]
     J --> K
 ```

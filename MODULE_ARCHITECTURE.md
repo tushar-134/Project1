@@ -583,7 +583,7 @@ Screen Component
 - Enforce roles such as:
   - `admin`
   - `manager`
-  - `task_only`
+  - `associate`
 - Process uploads through multer + Cloudinary
 - Return standardized JSON errors
 
@@ -953,7 +953,7 @@ The authorization model spans both frontend and backend.
   - full access
 - `manager`
   - operational access without admin-only user management/deletes
-- `task_only`
+- `associate`
   - restricted task-focused access
 
 **Important rule**

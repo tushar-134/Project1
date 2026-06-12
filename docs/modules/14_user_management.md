@@ -44,7 +44,7 @@ The User Management module provides admin-only controls for maintaining the list
 | Full Name | Text | Display name |
 | Email | Email | Login credential |
 | Password | Password | Set on create; blank = no change on edit |
-| Role | Select | `admin`, `manager`, `task_only` |
+| Role | Select | `admin`, `manager`, `associate` |
 
 ---
 
@@ -54,7 +54,7 @@ The User Management module provides admin-only controls for maintaining the list
 |------|-------------|
 | `admin` | Full access — can manage users, delete records, view all reports |
 | `manager` | Operational access — can create clients, tasks, categories, groups |
-| `task_only` | Restricted — can only view and update task statuses assigned to them |
+| `associate` | Restricted — can only view and update task statuses assigned to them |
 
 ---
 

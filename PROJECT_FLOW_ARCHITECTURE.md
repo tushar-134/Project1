@@ -14,7 +14,7 @@ Filing Buddy is a full-stack practice management system with:
 
 ```mermaid
 flowchart TD
-    A["User (Admin / Manager / Task Only)"] --> B["React Frontend"]
+    A["User (Admin / Manager / Associate)"] --> B["React Frontend"]
     B --> C["AuthContext / AppContext"]
     C --> D["Service Layer (Axios API Client)"]
     D --> E["Express API"]
@@ -180,7 +180,7 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant T as Task Only User
+    participant T as Associate User
     participant FE as Task List
     participant API as Task API
     participant DB as MongoDB
@@ -294,7 +294,7 @@ flowchart TD
 
     B -->|Admin| C["Full Access"]
     B -->|Manager| D["Operations Access"]
-    B -->|Task Only| E["Assigned Work Access"]
+    B -->|Associate| E["Assigned Work Access"]
 
     C --> C1["Clients"]
     C --> C2["Tasks"]

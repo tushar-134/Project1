@@ -1,8 +1,8 @@
-# Task Only Role Architecture
+# Associate Role Architecture
 
 ## 1. Role Overview
 
-The `task_only` role is the work execution role in the Filing Buddy system.
+The `associate` role is the work execution role in the Filing Buddy system.
 
 Task-only users are responsible for:
 - performing assigned work
@@ -13,7 +13,7 @@ This role is the delivery layer of the application.
 
 ---
 
-## 2. Task Only Responsibilities
+## 2. Associate Responsibilities
 
 A task-only user can:
 - view assigned tasks
@@ -37,7 +37,7 @@ A task-only user cannot:
 
 ---
 
-## 3. Task Only Functional Scope
+## 3. Associate Functional Scope
 
 ### Tasks
 - see only tasks assigned to them
@@ -56,7 +56,7 @@ A task-only user cannot:
 
 ---
 
-## 4. Task Only Screen Access
+## 4. Associate Screen Access
 
 Task-only users should only access:
 - Dashboard (scoped)
@@ -77,7 +77,7 @@ Task-only users should not access:
 
 ---
 
-## 5. Task Only API Access
+## 5. Associate API Access
 
 ### Auth
 - `POST /api/auth/login`
@@ -104,30 +104,30 @@ Task-only users should not access:
 
 ---
 
-## 6. Task Only Connectivity With Other Roles
+## 6. Associate Connectivity With Other Roles
 
 Task-only users connect to both `admin` and `manager` through assigned work.
 
-### Admin -> Task Only
+### Admin -> Associate
 - admin can assign tasks directly
 - admin can review output and status
 
-### Manager -> Task Only
+### Manager -> Associate
 - manager assigns day-to-day work
 - manager follows task progress
 - manager coordinates workload changes
 
-### Task Only -> System
+### Associate -> System
 - task-only users feed the system through status updates
 - their work updates dashboard counts, notifications, and activity logs
 
 ---
 
-## 7. Task Only Workflow Diagram
+## 7. Associate Workflow Diagram
 
 ```mermaid
 flowchart TD
-    A["Task Only Login"] --> B["Scoped Dashboard"]
+    A["Associate Login"] --> B["Scoped Dashboard"]
     B --> C["Open Assigned Task List"]
     C --> D["Read Task Details"]
     D --> E["Work on Task"]
@@ -138,7 +138,7 @@ flowchart TD
 
 ---
 
-## 8. Task Only Data Ownership
+## 8. Associate Data Ownership
 
 Task-only users interact with:
 - `tasks` assigned to them
@@ -150,7 +150,7 @@ They do not have broad write control across the database.
 
 ---
 
-## 9. Task Only Security Rules
+## 9. Associate Security Rules
 
 Important backend rules:
 - `/api/tasks` must auto-filter by assigned user
@@ -167,7 +167,7 @@ Important frontend rules:
 
 ## 10. Summary
 
-The `task_only` role is the execution role of the system.
+The `associate` role is the execution role of the system.
 
 Task-only users are responsible for:
 - doing assigned work

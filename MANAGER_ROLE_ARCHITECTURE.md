@@ -132,14 +132,14 @@ Manager cannot access admin-only creation/deletion areas such as:
 
 ## 6. Manager Connectivity With Other Roles
 
-Manager connects upward to `admin` and downward to `task_only`.
+Manager connects upward to `admin` and downward to `associate`.
 
 ### Manager -> Admin
 - admin can assign tasks to manager
 - admin can review manager task handling
 - admin can override manager actions
 
-### Manager -> Task Only
+### Manager -> Associate
 - manager assigns work to task-only users
 - manager tracks progress
 - manager follows up on due and overdue tasks
@@ -160,9 +160,9 @@ flowchart TD
     B --> C["Review Clients"]
     B --> D["Create / Assign Task"]
     B --> E["Monitor FTA / Reports"]
-    D --> F["Assign to Task Only"]
+    D --> F["Assign to Associate"]
     D --> G["Assign to Other Manager (if allowed by business rule)"]
-    F --> H["Task Only updates status"]
+    F --> H["Associate updates status"]
     G --> I["Other Manager coordinates work"]
     H --> J["Manager reviews progress"]
     I --> J
