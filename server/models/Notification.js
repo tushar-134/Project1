@@ -5,7 +5,7 @@ const notificationSchema = new mongoose.Schema({
   recipient: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
   title: { type: String, required: true },
   message: { type: String, required: true },
-  type: { type: String, enum: ["task_due", "task_overdue", "client_added", "fta_query", "task_update", "client_visit"], required: true },
+  type: { type: String, enum: ["task_due", "task_overdue", "client_added", "fta_query", "task_update", "licence_expiry", "client_visit"], required: true },
   relatedTask: { type: mongoose.Schema.Types.ObjectId, ref: "Task" },
   relatedClient: { type: mongoose.Schema.Types.ObjectId, ref: "Client" },
   relatedVisit: { type: mongoose.Schema.Types.ObjectId, ref: "ClientVisit" },

@@ -564,8 +564,8 @@ exports.createVisit = async (req, res, next) => {
     if (!normalizedAssignedUsers.length) {
       return res.status(400).json({ message: "Please assign at least one user." });
     }
-    if (req.user.role === "task_only" && normalizedAssignedUsers.some((entry) => String(entry.user) !== String(req.user._id))) {
-      return res.status(403).json({ message: "Task Only users can only create visits for themselves." });
+    if (req.user.role === "associate" && normalizedAssignedUsers.some((entry) => String(entry.user) !== String(req.user._id))) {
+      return res.status(403).json({ message: "Associate users can only create visits for themselves." });
     }
 
     const users = await ensureUsersExist(normalizedAssignedUsers.map((entry) => entry.user));
@@ -694,6 +694,11 @@ exports.updateVisit = async (req, res, next) => {
     const previousAssignedByUser = new Map(
       (visit.assignedUsers || []).map((entry) => [String(entry.user?._id || entry.user), entry])
     );
+
+    const newlyAssignedUserIds = normalizedAssignedUsers
+      .map((entry) => String(entry.user))
+      .filter((id) => !previousAssignedByUser.has(id) && id !== String(req.user._id));
+
     visit.assignedUsers = normalizedAssignedUsers.map((entry) => {
       const existing = previousAssignedByUser.get(String(entry.user));
       return {
