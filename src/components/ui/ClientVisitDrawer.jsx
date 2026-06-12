@@ -173,7 +173,25 @@ export default function ClientVisitDrawer({ visitId, canManage, onClose, onVisit
     setAttendanceSaving(true);
     setError("");
     try {
-      const updated = await clientVisitService.updateAttendance(visit._id, attendanceForm);
+      const payload = { ...attendanceForm };
+      
+      // Build ISO strings so the backend receives the absolute time correctly in the user's timezone
+      if (visit.visitDate) {
+        const [year, month, day] = visit.visitDate.slice(0, 10).split('-');
+        
+        if (attendanceForm.checkInTime) {
+          const [h, m] = attendanceForm.checkInTime.split(':');
+          const d = new Date(year, month - 1, day, h, m);
+          payload.checkInTime = d.toISOString();
+        }
+        if (attendanceForm.checkOutTime) {
+          const [h, m] = attendanceForm.checkOutTime.split(':');
+          const d = new Date(year, month - 1, day, h, m);
+          payload.checkOutTime = d.toISOString();
+        }
+      }
+
+      const updated = await clientVisitService.updateAttendance(visit._id, payload);
       setVisit(updated);
       onVisitUpdated(updated);
       setAttendanceEditing(false);
