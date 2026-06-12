@@ -59,7 +59,7 @@ function tokenFor(role) {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const adminToken     = tokenFor("admin");
 const managerToken   = tokenFor("manager");
-const associateToken = tokenFor("task_only");
+const associateToken = tokenFor("associate");
 
 describe("GET /api/contacts – contact directory reads", () => {
   it("admin receives 200", async () => {

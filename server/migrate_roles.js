@@ -11,7 +11,7 @@ async function migrateRoles() {
     // Bypass schema validation for this update if we haven't updated the schema yet
     const result = await User.collection.updateMany(
       { role: "task_only" },
-      { $set: { role: "task_only" } }
+      { $set: { role: "associate" } }
     );
 
     console.log(`Migration complete. Modified ${result.modifiedCount} users.`);

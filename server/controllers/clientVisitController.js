@@ -28,7 +28,7 @@ function getErrors(req, res) {
 }
 
 function visitScope(req) {
-  if (req.user.role === "task_only") {
+  if (req.user.role === "associate") {
     return { "assignedUsers.user": req.user._id };
   }
   return {};
@@ -558,13 +558,13 @@ exports.createVisit = async (req, res, next) => {
       }
     }
 
-    const normalizedAssignedUsers = req.user.role === "task_only"
+    const normalizedAssignedUsers = req.user.role === "associate"
       ? [{ user: req.user._id }]
       : normalizeAssignedUsers(assignedUsers);
     if (!normalizedAssignedUsers.length) {
       return res.status(400).json({ message: "Please assign at least one user." });
     }
-    if (req.user.role === "task_only" && normalizedAssignedUsers.some((entry) => String(entry.user) !== String(req.user._id))) {
+    if (req.user.role === "associate" && normalizedAssignedUsers.some((entry) => String(entry.user) !== String(req.user._id))) {
       return res.status(403).json({ message: "Associate users can only create visits for themselves." });
     }
 
@@ -865,7 +865,7 @@ exports.updateRemarks = async (req, res, next) => {
     const visit = await getVisitOr404(req, res);
     if (!visit) return;
     
-    // In visits, "task_only" can post comments on visits assigned to them, 
+    // In visits, associates can post comments on visits assigned to them, 
     // managers/admins can post comments on any visit.
     const isAssigned = (visit.assignedUsers || []).some(entry => String(entry.user?._id || entry.user) === String(req.user._id));
     if (!canManageVisit(req) && !isAssigned) {

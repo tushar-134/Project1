@@ -23,7 +23,7 @@ function daysOverdue(date) {
 exports.dashboardStats = async (req, res, next) => {
   try {
     const { month, fromDate, toDate, reportBasedOn } = req.query;
-    const roleScope = req.user.role === "task_only" ? { assignedTo: req.user._id } : {};
+    const roleScope = req.user.role === "associate" ? { assignedTo: req.user._id } : {};
 
     // Build the date/report filter
     const dateFilter = {};
@@ -84,7 +84,7 @@ exports.dashboardStats = async (req, res, next) => {
     let activityTaskIds = null;
     let visibleTaskClientIds = null;
 
-    if (req.user.role === "task_only") {
+    if (req.user.role === "associate") {
       const tasks = await Task.find({ assignedTo: req.user._id }).select("_id client").lean();
       activityTaskIds = tasks.map((t) => t._id);
       visibleTaskClientIds = tasks.map((t) => t.client).filter(Boolean);
@@ -100,7 +100,7 @@ exports.dashboardStats = async (req, res, next) => {
 
     const clientScope = {
       isActive: true,
-      ...(req.user.role === "task_only"
+      ...(req.user.role === "associate"
         ? { _id: { $in: visibleTaskClientIds } }
         : {}),
     };
@@ -127,7 +127,7 @@ exports.dashboardStats = async (req, res, next) => {
       }),
 
       ActivityLog.find({
-        ...(req.user.role === "task_only" ? { task: { $in: activityTaskIds } } : {}),
+        ...(req.user.role === "associate" ? { task: { $in: activityTaskIds } } : {}),
         ...activityDateScope,
       })
         .populate({ path: "task", select: "_id taskId category taskType dueDate client", populate: { path: "client", select: "legalName" } })
