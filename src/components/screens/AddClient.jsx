@@ -1042,6 +1042,14 @@ export default function AddClient() {
         toast.error(`Trade licence ${missingTradeLicenceDocumentIndex + 1}: upload at least one document.`);
         return false;
       }
+      
+      const missingLicenceTypeIndex = licences.findIndex((licence) =>
+        String(licence.number || "").trim() && !String(licence.type || "").trim()
+      );
+      if (missingLicenceTypeIndex >= 0) {
+        toast.error(`Trade licence ${missingLicenceTypeIndex + 1}: licence type is required.`);
+        return false;
+      }
     }
     if (shouldValidateContacts) {
       const emiratesIdPattern = /^\d{3}-\d{4}-\d{7}-\d$/;
@@ -1383,7 +1391,7 @@ export default function AddClient() {
                       </Field>
 
                       {/* Licence Type  */}
-                      <Field label="Licence Type" field={`licence-type-${i}`}>
+                      <Field label="Licence Type*" field={`licence-type-${i}`}>
                         <select className="input" value={lic.type} onChange={(e) => patch(i, { type: e.target.value })}>
                           <option value="">Select Licence Type</option>{licenceTypeOptions.map((option) => <option key={option} value={option}>{option}</option>)}</select>
                       </Field>
