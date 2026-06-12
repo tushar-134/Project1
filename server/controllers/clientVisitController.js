@@ -606,7 +606,10 @@ exports.createVisit = async (req, res, next) => {
       appendActivity(visit, req.user._id, "Remarks Added", "Initial visit remark added");
     }
     await visit.save();
-    res.status(201).json(serializeVisit(await visit.populate(populateVisit)));
+    const populated = await visit.populate(populateVisit);
+    // Fire-and-forget: notify each assignee (creator excluded to avoid self-spam)
+    sendVisitNotifications(populated, req.user._id);
+    res.status(201).json(serializeVisit(populated));
   } catch (error) {
     next(error);
   }
