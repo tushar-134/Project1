@@ -6,21 +6,21 @@ import { CheckCheck, Bell, ExternalLink } from "lucide-react";
 
 // ─── Type metadata ────────────────────────────────────────────────────────────
 const TYPE_META = {
-  task_due:       { label: "Task Due",        color: "bg-amber-100 text-amber-700",   dot: "bg-amber-400"   },
-  task_overdue:   { label: "Task Overdue",    color: "bg-red-100 text-red-700",       dot: "bg-red-500"     },
+  task_due:       { label: "Task Due",        color: "bg-amber-100 text-amber-700",     dot: "bg-amber-400"   },
+  task_overdue:   { label: "Task Overdue",    color: "bg-red-100 text-red-700",         dot: "bg-red-500"     },
   client_added:   { label: "Client Added",    color: "bg-emerald-100 text-emerald-700", dot: "bg-emerald-400" },
-  fta_query:      { label: "FTA Query",       color: "bg-purple-100 text-purple-700", dot: "bg-purple-500"  },
-  task_update:    { label: "Task Update",     color: "bg-sky-100 text-sky-700",       dot: "bg-sky-400"     },
-  licence_expiry: { label: "Licence Expiry",  color: "bg-red-100 text-red-700",       dot: "bg-red-500"     },
-  client_visit:   { label: "Client Visit",    color: "bg-blue-100 text-blue-700",     dot: "bg-blue-500"    },
+  fta_query:      { label: "FTA Query",       color: "bg-purple-100 text-purple-700",   dot: "bg-purple-500"  },
+  task_update:    { label: "Task Update",     color: "bg-sky-100 text-sky-700",         dot: "bg-sky-400"     },
+  licence_expiry: { label: "Licence Expiry",  color: "bg-red-100 text-red-700",         dot: "bg-red-500"     },
+  client_visit:   { label: "Visit Assigned",  color: "bg-teal-100 text-teal-700",       dot: "bg-teal-500"    },
 };
 
 // ─── Decide where a notification should navigate to ──────────────────────────
 function getNavTarget(notification) {
-  const { type, relatedTask, relatedClient } = notification;
+  const { type, relatedTask, relatedClient, relatedVisit } = notification;
   if (type === "fta_query") return "/tasks/fta-tracker";
   if ((type === "task_due" || type === "task_overdue" || type === "task_update") && relatedTask)
-    return `/tasks/${relatedTask}`;
+    return `/tasks/list?drawer=${relatedTask}`;
   // Licence expiry → client list with licence_alerts filter + highlight for that specific client
   if (type === "licence_expiry" && relatedClient)
     return `/clients/list?licence_alerts=true&highlight=${relatedClient}`;
@@ -33,7 +33,7 @@ function getNavTarget(notification) {
   if (type === "client_visit")
     return `/client-visits`;
   // Fallback
-  if (relatedTask) return `/tasks/${relatedTask}`;
+  if (relatedTask) return `/tasks/list?drawer=${relatedTask}`;
   if (relatedClient) return `/clients/list?highlight=${relatedClient}`;
   return "/dashboard";
 }

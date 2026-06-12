@@ -1,14 +1,14 @@
 const express = require("express");
 const { body } = require("express-validator");
 const auth = require("../middleware/authMiddleware");
-const { adminManager } = require("../middleware/roleMiddleware");
+const { adminManager, adminManagerAssociate } = require("../middleware/roleMiddleware");
 const ctrl = require("../controllers/contactController");
 const { normalizeDialCode, normalizePhoneNumber } = require("../utils/phoneUtils");
 
 const router = express.Router();
 
 router.use(auth);
-router.get("/", adminManager, ctrl.listContacts);
+router.get("/", adminManagerAssociate, ctrl.listContacts);
 router.post(
   "/",
   adminManager,
