@@ -140,8 +140,7 @@ export default function FtaTracker() {
           <Info size={15} className="shrink-0 text-blue-500" />
           <span>
             You are viewing FTA tasks{" "}
-            <strong>assigned to you only</strong>. Contact your manager to
-            update FTA status.
+            <strong>assigned to you only</strong>. You can update the FTA status, approve, or flag additional queries.
           </span>
         </div>
       )}
@@ -392,14 +391,8 @@ export default function FtaTracker() {
                   <td className="font-extrabold text-[#1e3a8a]">
                     <button
                       className="task-id-link"
-                      onClick={() => {
-                        if (!isTaskOnly) {
-                          setDrawerTaskId(item.id);
-                        } else {
-                          navigate(`/tasks/${item.id}`);
-                        }
-                      }}
-                      title={!isTaskOnly ? "Open task details" : "View task details"}
+                      onClick={() => setDrawerTaskId(item.id)}
+                      title="Open task details"
                     >
                       {item.taskId}
                     </button>
@@ -420,7 +413,7 @@ export default function FtaTracker() {
                   <td>{item.submitted || "—"}</td>
                   <td>{item.assigned}</td>
                   <td>
-                    {(isTaskOnly && currentTab.id !== "additional_query") || currentTab.readOnly ? (
+                    {currentTab.readOnly ? (
                       <FtaStatusBadge status={item.status} />
                     ) : (
                       <select
@@ -448,7 +441,7 @@ export default function FtaTracker() {
         )}
       </Card>
 
-      {!isTaskOnly && drawerTaskId && (
+      {drawerTaskId && (
         <TaskDrawer 
           taskId={drawerTaskId} 
           canManage={!isTaskOnly} 
