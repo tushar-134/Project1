@@ -37,7 +37,12 @@ function formatDate(value) {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString("en-GB");
+  // Use UTC accessors so a date stored as "2026-06-15T00:00:00Z" always displays
+  // as "15/06/2026" regardless of the browser's local timezone.
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const year = date.getUTCFullYear();
+  return `${day}/${month}/${year}`;
 }
 
 function titleStatus(value) {

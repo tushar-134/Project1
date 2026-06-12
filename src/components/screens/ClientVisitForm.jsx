@@ -44,14 +44,22 @@ function blankForm(currentUser) {
 }
 
 function parseVisitTime(value) {
-  const match = String(value || "").trim().match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/i);
-  if (!match) return "10:00";
-  let hour = parseInt(match[1], 10);
-  const min = match[2];
-  const meridiem = match[3].toUpperCase();
-  if (meridiem === "PM" && hour < 12) hour += 12;
-  if (meridiem === "AM" && hour === 12) hour = 0;
-  return `${String(hour).padStart(2, "0")}:${min}`;
+  const str = String(value || "").trim();
+  // Handle 12-hour format: "10:00 AM", "10:00AM", "10:00 am"
+  const match12 = str.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (match12) {
+    let hour = parseInt(match12[1], 10);
+    const min = match12[2];
+    const meridiem = match12[3].toUpperCase();
+    if (meridiem === "PM" && hour < 12) hour += 12;
+    if (meridiem === "AM" && hour === 12) hour = 0;
+    return `${String(hour).padStart(2, "0")}:${min}`;
+  }
+  // Handle 24-hour format already ("14:30") — pass through
+  const match24 = str.match(/^(\d{1,2}):(\d{2})$/);
+  if (match24) return `${String(parseInt(match24[1], 10)).padStart(2, "0")}:${match24[2]}`;
+  // Unknown format — preserve original rather than silently resetting
+  return str || "10:00";
 }
 
 function joinVisitTime(time24) {
@@ -139,7 +147,8 @@ export default function ClientVisitForm() {
             email: visit.newClient?.email || "",
             location: visit.newClient?.location || "",
           },
-          visitDate: visit.visitDate ? visit.visitDate.slice(0, 10) : todayValue(),
+          // Parse as UTC so the local browser timezone doesn't shift the date back by a day.
+          visitDate: visit.visitDate ? (() => { const d = new Date(visit.visitDate); return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`; })() : todayValue(),
           visitTime24: parseVisitTime(visit.visitTime),
           visitType: visit.visitType || "Monthly Visit",
           location: visit.location || "",

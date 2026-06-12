@@ -29,7 +29,12 @@ function formatDate(value) {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  // Use UTC accessors — visitDate is stored as UTC midnight so local-time conversion
+  // shifts the date back one day for browsers east of UTC (e.g. IST = UTC+5:30).
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  const month = date.toLocaleString("en-GB", { month: "short", timeZone: "UTC" });
+  const year = date.getUTCFullYear();
+  return `${day} ${month} ${year}`;
 }
 
 function formatDateTime(value) {
@@ -47,11 +52,18 @@ function formatTimeInput(value) {
 }
 
 function visitTimeToInput(value) {
-  const match = String(value || "").trim().match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/i);
-  if (!match) return "";
-  let hours = Number(match[1]) % 12;
-  if (match[3].toUpperCase() === "PM") hours += 12;
-  return `${String(hours).padStart(2, "0")}:${match[2]}`;
+  const str = String(value || "").trim();
+  // Handle 12-hour: "10:00 AM", "10:00AM", "10:00 am"
+  const match12 = str.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (match12) {
+    let hours = Number(match12[1]) % 12;
+    if (match12[3].toUpperCase() === "PM") hours += 12;
+    return `${String(hours).padStart(2, "0")}:${match12[2]}`;
+  }
+  // Already 24-hour format — pass through
+  const match24 = str.match(/^(\d{1,2}):(\d{2})$/);
+  if (match24) return `${String(parseInt(match24[1], 10)).padStart(2, "0")}:${match24[2]}`;
+  return "";
 }
 
 function getClientInfo(visit) {
