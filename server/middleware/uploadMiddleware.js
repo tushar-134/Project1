@@ -33,7 +33,16 @@ function createStorage() {
   if (isRealCloudinaryConfig()) {
     return new CloudinaryStorage({
       cloudinary,
-      params: { folder: "filing-buddy", resource_type: "auto" },
+      params: (req, file) => {
+        const isPdf = file.mimetype === "application/pdf";
+        return {
+          folder: "filing-buddy",
+          resource_type: isPdf ? "raw" : "auto",
+          // For raw PDFs Cloudinary preserves the original extension in the public URL.
+          use_filename: true,
+          unique_filename: true,
+        };
+      },
     });
   }
 
