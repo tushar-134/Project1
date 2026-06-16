@@ -5,6 +5,7 @@ import { useAuth } from "../../context/AuthContext.jsx";
 import { taskService } from "../../services/taskService.js";
 import { statusFromApi, ftaStatusFromApi } from "../../utils/adapterUtils.js";
 import { canManageTasks } from "../../utils/permissions.js";
+import { openDocumentSafely } from "../../utils/mediaUrl.js";
 import Badge from "../ui/Badge.jsx";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
@@ -423,7 +424,7 @@ export default function TaskDetail() {
                       {[attachment.size, attachment.description, attachment.uploadedAt?.slice?.(0, 10), attachment.uploadedBy?.name].filter(Boolean).join(" • ")}
                     </div>
                   </div>
-                  <Button size="sm" variant="ghost" disabled={!attachment.url} onClick={() => window.open(attachment.url, "_blank", "noopener,noreferrer")}>Open</Button>
+                  <Button size="sm" variant="ghost" disabled={!attachment.url} onClick={() => openDocumentSafely(attachment.url, attachment.name)}>Open</Button>
                 </div>
               ))}
             </div>
