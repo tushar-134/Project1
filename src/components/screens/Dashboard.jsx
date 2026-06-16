@@ -207,10 +207,18 @@ export default function Dashboard() {
     return params;
   };
 
-  const openTasks = (category) => {
+  const openPendingTasks = (category) => {
     const params = buildTaskListParams({
       category: getCategoryFilterValue(state.categories, category),
       status: "Active",
+    });
+    navigate(`/tasks/list?${params.toString()}`);
+  };
+
+  const openClosedTasks = (category) => {
+    const params = buildTaskListParams({
+      category: getCategoryFilterValue(state.categories, category),
+      status: "Completed",
     });
     navigate(`/tasks/list?${params.toString()}`);
   };
@@ -388,12 +396,11 @@ export default function Dashboard() {
         {tiles.map(([name, active, closed, overdue]) => {
           const { icon, color } = getTileMeta(name);
           return (
-            <Card 
-              key={name} 
-              className="cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md overflow-hidden" 
-              onClick={() => openTasks(name)}
+            <Card
+              key={name}
+              className="overflow-hidden transition hover:shadow-md"
             >
-              {/* Tile header — category name + icon + overdue badge */}
+              {/* Tile header — category name + icon + overdue badge (NOT clickable) */}
               <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-2">
                 <div className="flex items-center gap-2.5">
                   <div className={`grid h-8 w-8 place-items-center rounded-lg bg-slate-50 ${color}`}>
@@ -407,16 +414,26 @@ export default function Dashboard() {
                   </span>
                 )}
               </div>
-              {/* Split body — Active | Closed */}
+              {/* Split body — Pending | Closed — each independently clickable */}
               <div className="grid grid-cols-2 divide-x divide-[#e2e8f0] border-t border-[#e2e8f0]">
-                <div className="px-4 py-3 text-center">
+                <button
+                  type="button"
+                  className="px-4 py-3 text-center cursor-pointer rounded-none hover:bg-emerald-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
+                  onClick={(e) => { e.stopPropagation(); openPendingTasks(name); }}
+                  aria-label={`View pending tasks for ${name}`}
+                >
                   <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Pending</div>
                   <div className="mt-0.5 text-[22px] font-black text-slate-800">{active}</div>
-                </div>
-                <div className="px-4 py-3 text-center">
+                </button>
+                <button
+                  type="button"
+                  className="px-4 py-3 text-center cursor-pointer rounded-none hover:bg-sky-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500"
+                  onClick={(e) => { e.stopPropagation(); openClosedTasks(name); }}
+                  aria-label={`View closed tasks for ${name}`}
+                >
                   <div className="text-[10px] font-bold uppercase tracking-wider text-[#0284c7]">Closed</div>
                   <div className="mt-0.5 text-[22px] font-black text-slate-800">{closed}</div>
-                </div>
+                </button>
               </div>
             </Card>
           );
