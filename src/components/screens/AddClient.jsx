@@ -16,6 +16,7 @@ import TaskDrawer from "../ui/TaskDrawer.jsx";
 import { DIAL_CODE_OPTIONS } from "../../utils/dialCodeOptions.js";
 import { getPhoneNumberSpec, normalizeDialCode, normalizePhoneNumber } from "../../utils/phoneUtils.js";
 import { toSentenceCase } from "../../utils/textCase";
+import { openDocumentSafely } from "../../utils/mediaUrl.js";
 
 
 const tabs = ["Basic Details", "Trade Licences", "Contact Persons", "VAT / CT", "Client Group", "Portal Logins", "Custom Fields", "Attachments"];
@@ -2223,13 +2224,14 @@ function DocumentUploadZone({ id, title, subtitle, documents, isUploading, onFil
 
 function openDocumentFile(document) {
   if (document?.url) {
-    window.open(document.url, "_blank", "noopener,noreferrer");
+    openDocumentSafely(document.url, document.name);
     return;
   }
   if (!document?.file) return;
+  // Local file (not yet uploaded) — createObjectURL is safe, no CORS issue
   const objectUrl = URL.createObjectURL(document.file);
-  window.open(objectUrl, "_blank", "noopener,noreferrer");
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  const win = window.open(objectUrl, "_blank");
+  if (win) window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
 }
 
 function DocumentList({ documents, canDelete, onDeleteDocument }) {
