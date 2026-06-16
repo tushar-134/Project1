@@ -6,9 +6,13 @@ const REFRESH_TOKEN_IF_REMAINING_SECONDS = 60 * 60; // 1h
 
 async function authMiddleware(req, res, next) {
   try {
-    // Tokens are expected in the standard Bearer header so browser and API tools behave the same way.
+    // Primary: standard Bearer authorization header (all API calls).
+    // Fallback: ?token= query param — used ONLY by the file proxy endpoint
+    // (/api/files/proxy) where window.open() tab navigation cannot attach
+    // an Authorization header.
     const header = req.headers.authorization || "";
-    const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+    const token = (header.startsWith("Bearer ") ? header.slice(7) : null)
+      || (typeof req.query.token === "string" ? req.query.token : null);
     if (!token) return res.status(401).json({ message: "Not authorized" });
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.id).select("-password");
