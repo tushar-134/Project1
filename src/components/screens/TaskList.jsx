@@ -404,6 +404,8 @@ export default function TaskList() {
       total: data?.total || 0,
       page: data?.page || 1,
       pages: data?.pages || 1,
+      totalCompleted: data?.totalCompleted ?? 0,
+      totalWorking: data?.totalWorking ?? 0,
     });
     return data;
   }, [fetchTasks]);
@@ -437,8 +439,8 @@ export default function TaskList() {
   );
   const rows = state.tasks;
 
-  const completedCount = rows.filter((task) => task.status === "Completed").length;
-  const workingCount = rows.length - completedCount;
+  const completedCount = meta.totalCompleted ?? rows.filter((task) => task.status === "Completed").length;
+  const workingCount = meta.totalWorking ?? (rows.length - rows.filter((task) => task.status === "Completed").length);
   const activeCount = rows.filter((task) => task.status === "Not yet started" || task.status === "In progress").length;
   const activeColumnFilters = buildActiveColumnFilterSummary(columnFilters);
   const hasColumnFilters = activeColumnFilters.length > 0;
