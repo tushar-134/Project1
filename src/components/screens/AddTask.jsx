@@ -17,6 +17,7 @@ import ClientComboBox from "../ui/ClientComboBox.jsx";
 import Toggle from "../ui/Toggle.jsx";
 import UnsavedChangesGuard from "../ui/UnsavedChangesGuard.jsx";
 import CustomSelect from "../ui/CustomSelect.jsx";
+import { openDocumentSafely } from "../../utils/mediaUrl.js";
 
 export default function AddTask() {
   const { state, dispatch } = useApp();
@@ -752,13 +753,14 @@ function mapAttachmentRows(items = []) {
 
 function openAttachmentFile(attachment) {
   if (attachment?.url) {
-    window.open(attachment.url, "_blank", "noopener,noreferrer");
+    openDocumentSafely(attachment.url, attachment.name);
     return;
   }
   if (!attachment?.file) return;
+  // Local file (not yet uploaded) — createObjectURL is safe, no CORS issue
   const objectUrl = URL.createObjectURL(attachment.file);
-  window.open(objectUrl, "_blank", "noopener,noreferrer");
-  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+  const win = window.open(objectUrl, "_blank");
+  if (win) window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
 }
 
 function calculateFrontendNextDue(dueDateStr, frequency) {

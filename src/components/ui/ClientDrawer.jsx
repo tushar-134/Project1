@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { clientService } from "../../services/clientService.js";
-import { resolveMediaUrl } from "../../utils/mediaUrl.js";
+import { resolveMediaUrl, openDocumentSafely } from "../../utils/mediaUrl.js";
 import { canManageClients } from "../../utils/permissions.js";
 import Button from "./Button.jsx";
 import Card from "./Card.jsx";
@@ -17,7 +17,7 @@ function formatDate(dateStr) {
 
 function openDocumentFile(document) {
   if (!document?.url) return;
-  window.open(resolveMediaUrl(document.url), "_blank", "noopener,noreferrer");
+  openDocumentSafely(document.url, document.name);
 }
 
 function mapAttachmentItem(file, subcategory = "") {
