@@ -479,7 +479,18 @@ export default function ClientDrawer({ clientId, onClose, expiryFocus = null, is
                                 {[attachment.subcategory, attachment.size, attachment.description, attachment.uploadedBy].filter(Boolean).join(" • ")}
                               </div>
                             </div>
-                            <Button size="sm" variant="ghost" disabled={!attachment.url} onClick={() => openDocumentFile(attachment)}>Open</Button>
+                            {attachment.url ? (
+                              <a
+                                href={resolveMediaUrl(attachment.url)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex h-8 items-center rounded-lg px-3 text-[13px] font-bold text-slate-600 transition hover:bg-slate-100"
+                              >
+                                Open
+                              </a>
+                            ) : (
+                              <span className="inline-flex h-8 cursor-not-allowed items-center rounded-lg px-3 text-[13px] font-bold text-slate-300">Open</span>
+                            )}
                           </div>
                         ))}
                       </div>

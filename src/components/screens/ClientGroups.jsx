@@ -1,5 +1,5 @@
 import { Download, Upload, Plus, Search, UserPlus, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useApp } from "../../context/AppContext.jsx";
 import { clientService } from "../../services/clientService";
@@ -23,6 +23,19 @@ export default function ClientGroups({ setSettingsHeaderAction }) {
   const [clientSearch, setClientSearch] = useState("");
   const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [groupClientBusy, setGroupClientBusy] = useState(false);
+  const clientDropdownRef = useRef(null);
+
+  useEffect(() => {
+    if (!showClientDropdown) return;
+    function handleClickOutside(event) {
+      if (clientDropdownRef.current && !clientDropdownRef.current.contains(event.target)) {
+        setShowClientDropdown(false);
+        setClientSearch("");
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showClientDropdown]);
   const listItems = (response) => Array.isArray(response) ? response : response?.items || response?.clients || [];
   const load = () => groupService.list().then((groups) => dispatch({
     type: "SET_RESOURCE",
@@ -421,7 +434,7 @@ export default function ClientGroups({ setSettingsHeaderAction }) {
                 </div>
 
                 <div className="mt-4 space-y-3">
-                  <div className="relative inline-flex">
+                  <div className="relative inline-flex" ref={clientDropdownRef}>
                     <Button
                       variant="ghost"
                       disabled={groupClientBusy}

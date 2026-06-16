@@ -33,15 +33,21 @@ function createStorage() {
   if (isRealCloudinaryConfig()) {
     return new CloudinaryStorage({
       cloudinary,
-      params: async (req, file) => ({
-        folder: "filing-buddy",
-        // PDFs must be stored as 'raw' so Cloudinary serves them under
-        // /raw/upload/ with application/pdf Content-Type. Using 'auto'
-        // causes Cloudinary to classify PDFs as 'image', storing them
-        // under /image/upload/ which breaks Chrome's PDF renderer and
-        // prevents CORS-based fetch() from retrieving them.
-        resource_type: /\.pdf$/i.test(file.originalname || "") ? "raw" : "auto",
-      }),
+      params: async (req, file) => {
+        const isPdf = file.mimetype === "application/pdf" || /\.pdf$/i.test(file.originalname || "");
+        return {
+          folder: "filing-buddy",
+          // PDFs must be stored as 'raw' so Cloudinary serves them under
+          // /raw/upload/ with application/pdf Content-Type. Using 'auto'
+          // causes Cloudinary to classify PDFs as 'image', storing them
+          // under /image/upload/ which breaks Chrome's PDF renderer and
+          // prevents CORS-based fetch() from retrieving them.
+          resource_type: isPdf ? "raw" : "auto",
+          // For raw PDFs Cloudinary preserves the original extension in the public URL.
+          use_filename: true,
+          unique_filename: true,
+        };
+      },
     });
   }
 
