@@ -402,18 +402,27 @@ exports.listTasks = async (req, res, next) => {
     const query = await taskQuery(req);
     const skip = (requestedPage - 1) * limit;
 
-    const [total, tasks] = await Promise.all([
+    const [total, tasks, statusCounts] = await Promise.all([
       Task.countDocuments(query),
       Task.find(query)
         .populate(populateTask)
         .sort({ updatedAt: -1, createdAt: -1, taskId: 1 })
         .skip(skip)
-        .limit(limit)
+        .limit(limit),
+      Task.aggregate([
+        { $match: query },
+        { $group: { _id: "$status", count: { $sum: 1 } } },
+      ]),
     ]);
+
+    const totalCompleted = statusCounts
+      .filter((s) => s._id === "completed")
+      .reduce((sum, s) => sum + s.count, 0);
+    const totalWorking = total - totalCompleted;
 
     const pages = Math.max(1, Math.ceil(total / limit));
     const page = Math.min(requestedPage, pages);
-    res.json({ tasks, total, page, pages, limit });
+    res.json({ tasks, total, page, pages, limit, totalCompleted, totalWorking });
   } catch (error) { next(error); }
 };
 
