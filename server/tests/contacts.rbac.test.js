@@ -41,8 +41,9 @@ jest.mock("../models/User", () => ({
 jest.mock("../models/Contact", () => {
   const contacts = [{ _id: "c1", authorityName: "Test Auth" }];
   return {
-    find: () => ({ sort: () => ({ lean: () => Promise.resolve(contacts) }) }),
+    find: () => ({ populate: () => ({ sort: () => Promise.resolve(contacts) }) }),
     findById: () => Promise.resolve(contacts[0]),
+    findByIdAndUpdate: () => Promise.resolve(contacts[0]),
     findOne: () => Promise.resolve(null),
     create: jest.fn().mockResolvedValue({}),
   };
