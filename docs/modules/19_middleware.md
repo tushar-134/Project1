@@ -12,7 +12,7 @@ The Middleware module contains all cross-cutting request concerns. Middleware fu
 |------|------|
 | `server/middleware/authMiddleware.js` | Verify JWT, attach `req.user` |
 | `server/middleware/roleMiddleware.js` | Enforce role-based access control |
-| `server/middleware/uploadMiddleware.js` | Process multipart file uploads via Cloudinary |
+| `server/middleware/uploadMiddleware.js` | Process multipart file uploads via AWS S3 |
 | `server/middleware/errorMiddleware.js` | Return standardized JSON error responses |
 
 ---
@@ -71,18 +71,18 @@ Otherwise → call next()
 **Source**: `server/middleware/uploadMiddleware.js`
 
 ### Responsibility
-Accept `multipart/form-data` file uploads and write them directly to Cloudinary.
+Accept `multipart/form-data` file uploads and write them directly to AWS S3 when S3 env vars are configured.
 
 ### Setup
-- Uses `multer` with `CloudinaryStorage` adapter
-- Cloudinary folder: `filing-buddy`
-- Resource type: `auto` (images, PDFs, any format)
+- Uses `multer` with a custom S3 storage adapter
+- S3 key prefix: `AWS_S3_UPLOAD_PREFIX`, defaulting to `filing-buddy`
+- Content type is preserved from the uploaded file
 - File size limit: **10 MB**
 
 ### Applied to
 `POST /api/clients/:id/attachments`
 
-### Why direct-to-Cloudinary?
+### Why direct-to-S3?
 Files never touch local disk, so the server stays stateless and compatible with container deployments.
 
 ---

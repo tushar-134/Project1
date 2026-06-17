@@ -2,19 +2,8 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const multer = require("multer");
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
-const cloudinary = require("../config/cloudinary");
-
-function isRealCloudinaryConfig() {
-  const values = [
-    process.env.CLOUDINARY_CLOUD_NAME,
-    process.env.CLOUDINARY_API_KEY,
-    process.env.CLOUDINARY_API_SECRET,
-  ].map((value) => String(value || "").trim());
-
-  if (values.some((value) => !value)) return false;
-  return values.every((value) => value.toLowerCase() !== "test");
-}
+const { PutObjectCommand } = require("@aws-sdk/client-s3");
+const { buildS3ObjectUrl, createS3Client, getS3Config, hasS3Config } = require("../config/s3");
 
 function ensureUploadsDir() {
   const uploadsDir = path.join(__dirname, "..", "uploads");
@@ -29,27 +18,67 @@ function sanitizeBaseName(file) {
   return `${base || "upload"}-${Date.now()}-${crypto.randomBytes(4).toString("hex")}${extension}`;
 }
 
-function createStorage() {
-  if (isRealCloudinaryConfig()) {
-    return new CloudinaryStorage({
-      cloudinary,
-      params: async (req, file) => {
-        const isPdf = file.mimetype === "application/pdf" || /\.pdf$/i.test(file.originalname || "");
-        return {
-          folder: "filing-buddy",
-          // PDFs must be stored as 'raw' so Cloudinary serves them under
-          // /raw/upload/ with application/pdf Content-Type. Using 'auto'
-          // causes Cloudinary to classify PDFs as 'image', storing them
-          // under /image/upload/ which breaks Chrome's PDF renderer and
-          // prevents CORS-based fetch() from retrieving them.
-          resource_type: isPdf ? "raw" : "auto",
-          // For raw PDFs Cloudinary preserves the original extension in the public URL.
-          use_filename: true,
-          unique_filename: true,
-        };
-      },
-    });
+function streamToBuffer(stream) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    stream.on("data", (chunk) => chunks.push(chunk));
+    stream.on("error", reject);
+    stream.on("end", () => resolve(Buffer.concat(chunks)));
+  });
+}
+
+function buildS3Key(file) {
+  const { uploadPrefix } = getS3Config();
+  const safeName = sanitizeBaseName(file);
+  const date = new Date();
+  const yyyy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(date.getUTCDate()).padStart(2, "0");
+  return [uploadPrefix, yyyy, mm, dd, safeName].filter(Boolean).join("/");
+}
+
+class S3Storage {
+  constructor() {
+    this.client = createS3Client();
   }
+
+  async _handleFile(req, file, cb) {
+    try {
+      const { bucket, region } = getS3Config();
+      const key = buildS3Key(file);
+      const body = await streamToBuffer(file.stream);
+      const location = buildS3ObjectUrl(bucket, region, key);
+
+      await this.client.send(new PutObjectCommand({
+        Bucket: bucket,
+        Key: key,
+        Body: body,
+        ContentType: file.mimetype || "application/octet-stream",
+        Metadata: {
+          originalname: String(file.originalname || "upload"),
+        },
+      }));
+
+      cb(null, {
+        bucket,
+        key,
+        filename: path.basename(key),
+        path: location,
+        location,
+        size: body.length,
+      });
+    } catch (error) {
+      cb(error);
+    }
+  }
+
+  _removeFile(req, file, cb) {
+    cb(null);
+  }
+}
+
+function createStorage() {
+  if (hasS3Config()) return new S3Storage();
 
   const destination = ensureUploadsDir();
   return multer.diskStorage({
@@ -63,10 +92,10 @@ function createStorage() {
 }
 
 const storage = createStorage();
-const usingCloudinary = storage instanceof CloudinaryStorage;
+const usingS3 = storage instanceof S3Storage;
 
-if (!usingCloudinary) {
-  console.warn("Upload middleware: Cloudinary is not configured. Falling back to local /uploads storage.");
+if (!usingS3) {
+  console.warn("Upload middleware: S3 is not configured. Falling back to local /uploads storage.");
 }
 
 const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });

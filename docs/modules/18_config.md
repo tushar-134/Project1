@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Config module holds all external system connection setup: MongoDB database connection and Cloudinary media storage configuration. Both are consumed by other modules at startup.
+The Config module holds all external system connection setup: MongoDB database connection and AWS S3 media storage configuration. Both are consumed by other modules at startup.
 
 ---
 
@@ -11,7 +11,7 @@ The Config module holds all external system connection setup: MongoDB database c
 | File | Role |
 |------|------|
 | `server/config/db.js` | MongoDB connection via Mongoose |
-| `server/config/cloudinary.js` | Cloudinary SDK configuration for file uploads |
+| `server/config/s3.js` | AWS S3 SDK configuration for file uploads |
 
 ---
 
@@ -35,19 +35,22 @@ This fail-fast behavior ensures the API never starts in a half-alive state when 
 
 ---
 
-## cloudinary.js — File Storage Configuration
+## s3.js — File Storage Configuration
 
 ### Responsibility
-- Configure the Cloudinary SDK using account credentials from environment variables
-- Export the configured Cloudinary instance for use by `uploadMiddleware.js`
+- Configure the AWS S3 SDK using credentials from environment variables
+- Export S3 helpers for `uploadMiddleware.js` and `fileController.js`
 
 ### Environment Variables
 
 | Variable | Description |
 |----------|-------------|
-| `CLOUDINARY_CLOUD_NAME` | Cloudinary account cloud name |
-| `CLOUDINARY_API_KEY` | Cloudinary API key |
-| `CLOUDINARY_API_SECRET` | Cloudinary API secret |
+| `AWS_REGION` | S3 bucket region |
+| `AWS_ACCESS_KEY_ID` | IAM access key ID |
+| `AWS_SECRET_ACCESS_KEY` | IAM secret access key |
+| `AWS_S3_BUCKET` | S3 bucket name |
+| `AWS_S3_UPLOAD_PREFIX` | Optional folder-style key prefix |
+| `AWS_S3_PUBLIC_URL` | Optional CloudFront or custom public base URL |
 
 ---
 
@@ -56,11 +59,11 @@ This fail-fast behavior ensures the API never starts in a half-alive state when 
 | Consumer | Uses |
 |---------|------|
 | `server.js` | Calls `connectDB()` before `app.listen()` |
-| `server/middleware/uploadMiddleware.js` | Imports Cloudinary to create `CloudinaryStorage` |
+| `server/middleware/uploadMiddleware.js` | Imports S3 helpers to upload files to S3 |
 
 ---
 
 ## Upload Behavior
 
-Files are uploaded to the Cloudinary folder `filing-buddy` with `resource_type: "auto"`.  
+Files are uploaded below the configured S3 prefix, defaulting to `filing-buddy`.  
 The 10 MB file size limit is enforced at the multer layer in `uploadMiddleware.js`.
