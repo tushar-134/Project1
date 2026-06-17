@@ -23,5 +23,5 @@ jobs:
 
           cd server
           npm ci
-
+          cd ..
           pm2 reload ecosystem.config.js
