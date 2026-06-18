@@ -5,7 +5,7 @@ function notFound(req, res, next) {
 
 function errorMiddleware(err, req, res, next) {
   // Controllers can throw normally; this handler is the single place that shapes API error responses.
-  const statusCode = res.statusCode && res.statusCode !== 200 ? res.statusCode : 500;
+  const statusCode = err.statusCode || (res.statusCode && res.statusCode !== 200 ? res.statusCode : 500);
   res.status(statusCode).json({
     message: err.message || "Server error",
     stack: process.env.NODE_ENV === "production" ? undefined : err.stack,
