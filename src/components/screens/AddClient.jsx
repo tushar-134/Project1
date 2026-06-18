@@ -1398,7 +1398,7 @@ export default function AddClient() {
 
                       {/* upload trade licence document */}
                       <div className="md:col-span-3">
-                        <DocumentUploadZone id={`trade-licence-upload-${i}`} title="Upload trade licence documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={lic.documents || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleTradeLicenceFile(i, files)} onDeleteDocument={(document) => removeTradeLicenceDocument(i, document)} />
+                        <DocumentUploadZone id={`trade-licence-upload-${i}`} title="Upload trade licence documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={lic.documents || []} canDelete={["admin", "manager"].includes(currentUser?.role)} isUploading={isUploading} onFiles={(files) => handleTradeLicenceFile(i, files)} onDeleteDocument={(document) => removeTradeLicenceDocument(i, document)} />
                       </div>
                     </div>;
                   }} />
@@ -1558,10 +1558,10 @@ export default function AddClient() {
 
                           <div className="md:col-span-3 grid gap-3 md:grid-cols-2">
                             {/* upload Emirates Id documents */}
-                            <DocumentUploadZone id={`contact-eid-upload-${i}`} title="Upload Emirates ID documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.eidDocuments || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "emiratesId")} onDeleteDocument={(document) => removeContactDocument(i, "emiratesId", document)} />
+                            <DocumentUploadZone id={`contact-eid-upload-${i}`} title="Upload Emirates ID documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.eidDocuments || []} canDelete={["admin", "manager"].includes(currentUser?.role)} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "emiratesId")} onDeleteDocument={(document) => removeContactDocument(i, "emiratesId", document)} />
 
                             {/* upload passport documents */}
-                            <DocumentUploadZone id={`contact-passport-upload-${i}`} title="Upload passport documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.passportDocuments || []} canDelete={currentUser?.role === "admin"} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "passport")} onDeleteDocument={(document) => removeContactDocument(i, "passport", document)} />
+                            <DocumentUploadZone id={`contact-passport-upload-${i}`} title="Upload passport documents" subtitle="PDF, JPG, PNG, DOCX, XLSX" documents={c.passportDocuments || []} canDelete={["admin", "manager"].includes(currentUser?.role)} isUploading={isUploading} onFiles={(files) => handleContactDocument(i, files, "passport")} onDeleteDocument={(document) => removeContactDocument(i, "passport", document)} />
                           </div>
                         </>
                       )}

@@ -17,11 +17,16 @@ async function deleteStoredS3Object(file = {}) {
   const object = getStoredS3Object(file);
   if (!object) return false;
 
-  await createS3Client().send(new DeleteObjectCommand({
-    Bucket: object.bucket,
-    Key: object.key,
-  }));
-  return true;
+  try {
+    await createS3Client().send(new DeleteObjectCommand({
+      Bucket: object.bucket,
+      Key: object.key,
+    }));
+    return true;
+  } catch (error) {
+    console.warn(`[s3Delete] Failed to delete ${object.key}: ${error.message}`);
+    return false;
+  }
 }
 
 module.exports = {
