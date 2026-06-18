@@ -7,6 +7,7 @@ const ActivityLog = require("../models/ActivityLog");
 const auditLogger = require("../utils/auditLogger");
 const { nextTaskId } = require("../utils/autoId");
 const { buildUploadedFileUrl } = require("../utils/uploadUrl");
+const { buildDirectUploadedFiles } = require("../utils/s3DirectUpload");
 const xlsx = require("xlsx");
 
 // Human-readable status labels for notification messages
@@ -65,10 +66,12 @@ function toUploadedFile(file, req) {
   };
 }
 
-function buildUploadedFiles(req) {
+async function buildUploadedFiles(req) {
   const fieldFiles = Object.values(req.files || {}).flat();
   const files = fieldFiles.length ? fieldFiles : (req.file ? [req.file] : []);
-  return files.map((file) => toUploadedFile(file, req));
+  const streamedFiles = files.map((file) => toUploadedFile(file, req));
+  const directFiles = await buildDirectUploadedFiles(req.body);
+  return [...streamedFiles, ...directFiles];
 }
 
 function toStoredFileEntry(uploadedFile, userId, description = "") {
@@ -723,7 +726,7 @@ exports.uploadTaskAttachment = async (req, res, next) => {
   try {
     const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json({ message: "Task not found" });
-    const uploadedFiles = buildUploadedFiles(req);
+    const uploadedFiles = await buildUploadedFiles(req);
     if (!uploadedFiles.length) return res.status(400).json({ message: "Please choose at least one file to upload" });
     const description = String(req.body.description || "").trim();
     uploadedFiles.forEach((uploadedFile) => {

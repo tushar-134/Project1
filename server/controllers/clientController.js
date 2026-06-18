@@ -11,6 +11,7 @@ const { nextClientFileNo } = require("../utils/autoId");
 const { normalizeDialCode, normalizePhoneNumber } = require("../utils/phoneUtils");
 const { buildUploadedFileUrl, normalizeStoredUploadUrl } = require("../utils/uploadUrl");
 const { createTtlCache } = require("../utils/ttlCache");
+const { buildDirectUploadedFiles } = require("../utils/s3DirectUpload");
 
 const expiryAlertsCache = createTtlCache(30_000);
 
@@ -299,10 +300,12 @@ function toUploadedFile(file, req) {
   };
 }
 
-function buildUploadedFiles(req) {
+async function buildUploadedFiles(req) {
   const fieldFiles = Object.values(req.files || {}).flat();
   const files = fieldFiles.length ? fieldFiles : (req.file ? [req.file] : []);
-  return files.map((file) => toUploadedFile(file, req));
+  const streamedFiles = files.map((file) => toUploadedFile(file, req));
+  const directFiles = await buildDirectUploadedFiles(req.body);
+  return [...streamedFiles, ...directFiles];
 }
 
 function toStoredFileEntry(uploadedFile, userId, description = "") {
@@ -1238,7 +1241,7 @@ exports.uploadAttachment = async (req, res, next) => {
   try {
     const client = await Client.findById(req.params.id);
     if (!client) return res.status(404).json({ message: "Client not found" });
-    const uploadedFiles = buildUploadedFiles(req);
+    const uploadedFiles = await buildUploadedFiles(req);
     if (!uploadedFiles.length) return res.status(400).json({ message: "Please choose a file to upload" });
     const description = req.body.description || "";
     uploadedFiles.forEach((uploadedFile) => {
@@ -1253,7 +1256,7 @@ exports.uploadClientDocument = async (req, res, next) => {
   try {
     const client = await Client.findById(req.params.id);
     if (!client || !client.isActive) return res.status(404).json({ message: "Client not found" });
-    const uploadedFiles = buildUploadedFiles(req);
+    const uploadedFiles = await buildUploadedFiles(req);
     if (!uploadedFiles.length) return res.status(400).json({ message: "Please choose a file to upload" });
 
     const index = Number(req.body.index);

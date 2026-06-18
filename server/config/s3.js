@@ -1,4 +1,4 @@
-const { GetObjectCommand, S3Client } = require("@aws-sdk/client-s3");
+const { GetObjectCommand, PutObjectCommand, S3Client } = require("@aws-sdk/client-s3");
 const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
 function clean(value) {
@@ -82,10 +82,20 @@ async function createS3SignedReadUrl({ bucket, key, filename, contentType, expir
   return getSignedUrl(createS3Client(), command, { expiresIn });
 }
 
+async function createS3SignedUploadUrl({ bucket, key, contentType, expiresIn = 300 }) {
+  const command = new PutObjectCommand({
+    Bucket: bucket || getS3Config().bucket,
+    Key: key,
+    ContentType: contentType || "application/octet-stream",
+  });
+  return getSignedUrl(createS3Client(), command, { expiresIn });
+}
+
 module.exports = {
   buildS3ObjectUrl,
   createS3Client,
   createS3SignedReadUrl,
+  createS3SignedUploadUrl,
   getS3Config,
   hasS3Config,
   parseS3ObjectUrl,

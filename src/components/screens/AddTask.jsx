@@ -9,6 +9,7 @@ import { useUsers } from "../../hooks/useUsers";
 import { useTasks } from "../../hooks/useTasks";
 import { categoryService } from "../../services/categoryService";
 import { mapCategory } from "../../utils/adapterUtils";
+import { uploadFilesToSignedUrls } from "../../services/fileService.js";
 import { getFYOptions, getQuarters, getCurrentFYAndQuarter, getQuarterFromVatFrequency } from "../../utils/periodUtils";
 import { toSentenceCase } from "../../utils/textCase";
 import Button from "../ui/Button.jsx";
@@ -313,10 +314,8 @@ export default function AddTask() {
 
     setIsUploadingAttachments(true);
     try {
-      const formData = new FormData();
-      selected.forEach((file) => formData.append("files", file));
-      formData.append("description", note);
-      const updatedTask = await uploadAttachment(id, formData);
+      const uploadedFiles = await uploadFilesToSignedUrls(selected);
+      const updatedTask = await uploadAttachment(id, { uploadedFiles, description: note });
       setAttachments(mapAttachmentRows(updatedTask.attachments || []));
       setAttachmentDescription("");
       toast.success(selected.length === 1 ? "Attachment uploaded." : "Attachments uploaded.");
@@ -400,10 +399,8 @@ export default function AddTask() {
         }, {});
         const taskId = savedTask?._id || id;
         for (const [description, files] of Object.entries(groupedByDescription)) {
-          const formData = new FormData();
-          files.forEach((file) => formData.append("files", file));
-          formData.append("description", description);
-          savedTask = await uploadAttachment(taskId, formData);
+          const uploadedFiles = await uploadFilesToSignedUrls(files);
+          savedTask = await uploadAttachment(taskId, { uploadedFiles, description });
         }
         setAttachments(mapAttachmentRows(savedTask?.attachments || []));
       }

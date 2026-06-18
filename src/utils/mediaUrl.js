@@ -32,6 +32,14 @@ export function resolveMediaUrl(value) {
   }
 }
 
+function isS3Url(value) {
+  try {
+    const url = new URL(String(value || ""), window.location.origin);
+    return url.hostname === "s3.amazonaws.com" || /\.s3[.-][a-z0-9-]+\.amazonaws\.com$/i.test(url.hostname) || /\.s3\.amazonaws\.com$/i.test(url.hostname);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Opens a document URL safely across all browsers via the server-side file proxy.
@@ -59,7 +67,12 @@ export function openDocumentSafely(rawUrl, filename = "") {
     let openUrl = "";
     try {
       openUrl = await getSignedDocumentUrl({ url: rawUrl, filename });
-    } catch {
+    } catch (error) {
+      if (isS3Url(rawUrl)) {
+        pendingTab?.close();
+        window.alert("Unable to create a secure document link. Please sign in again or contact admin.");
+        return;
+      }
       openUrl = buildProxyUrl(rawUrl, filename);
     }
 

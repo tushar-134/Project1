@@ -1,6 +1,6 @@
 const express = require("express");
 const auth = require("../middleware/authMiddleware");
-const { createSignedUrl, proxyFile } = require("../controllers/fileController");
+const { createSignedUrl, createUploadUrl, proxyFile } = require("../controllers/fileController");
 
 const router = express.Router();
 
@@ -13,5 +13,6 @@ const router = express.Router();
  */
 router.get("/proxy", auth, proxyFile);
 router.get("/signed-url", auth, createSignedUrl);
+router.post("/upload-url", auth, createUploadUrl);
 
 module.exports = router;
