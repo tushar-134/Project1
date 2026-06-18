@@ -12,6 +12,7 @@ const { normalizeDialCode, normalizePhoneNumber } = require("../utils/phoneUtils
 const { buildUploadedFileUrl, normalizeStoredUploadUrl } = require("../utils/uploadUrl");
 const { createTtlCache } = require("../utils/ttlCache");
 const { buildDirectUploadedFiles } = require("../utils/s3DirectUpload");
+const { deleteStoredS3Object } = require("../utils/s3Delete");
 
 const expiryAlertsCache = createTtlCache(30_000);
 
@@ -1294,6 +1295,7 @@ exports.deleteClientDocument = async (req, res, next) => {
     if (!container) return res.status(400).json({ message: "Unsupported document section" });
     const doc = container.holder[container.key].id(req.params.documentId);
     if (!doc) return res.status(404).json({ message: "Document not found" });
+    await deleteStoredS3Object(doc);
     doc.deleteOne();
     container.sync(container.holder);
     await client.save();
@@ -1305,7 +1307,10 @@ exports.deleteAttachment = async (req, res, next) => {
   try {
     const client = await Client.findById(req.params.id);
     if (!client) return res.status(404).json({ message: "Client not found" });
-    client.attachments.pull(req.params.attachId);
+    const attachment = client.attachments.id(req.params.attachId);
+    if (!attachment) return res.status(404).json({ message: "Attachment not found" });
+    await deleteStoredS3Object(attachment);
+    attachment.deleteOne();
     await client.save();
     res.json(await client.populate(populateClient));
   } catch (error) { next(error); }

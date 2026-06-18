@@ -19,8 +19,8 @@ router.delete("/:id", adminOnly, ctrl.deleteClient);
 router.patch("/:id/restore", adminOnly, ctrl.restoreClient);
 // Bug #5 Fix: add adminManager guard so associate users cannot upload attachments.
 router.post("/:id/documents", adminManager, upload.fields([{ name: "file", maxCount: 10 }, { name: "files", maxCount: 10 }]), ctrl.uploadClientDocument);
-router.delete("/:id/documents/:section/:index/:documentId", adminOnly, ctrl.deleteClientDocument);
+router.delete("/:id/documents/:section/:index/:documentId", adminManager, ctrl.deleteClientDocument);
 router.post("/:id/attachments", adminManager, upload.fields([{ name: "file", maxCount: 10 }, { name: "files", maxCount: 10 }]), ctrl.uploadAttachment);
-router.delete("/:id/attachments/:attachId", adminOnly, ctrl.deleteAttachment);
+router.delete("/:id/attachments/:attachId", adminManager, ctrl.deleteAttachment);
 
 module.exports = router;

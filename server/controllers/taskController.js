@@ -8,6 +8,7 @@ const auditLogger = require("../utils/auditLogger");
 const { nextTaskId } = require("../utils/autoId");
 const { buildUploadedFileUrl } = require("../utils/uploadUrl");
 const { buildDirectUploadedFiles } = require("../utils/s3DirectUpload");
+const { deleteStoredS3Object } = require("../utils/s3Delete");
 const xlsx = require("xlsx");
 
 // Human-readable status labels for notification messages
@@ -750,6 +751,7 @@ exports.deleteTaskAttachment = async (req, res, next) => {
     if (!task) return res.status(404).json({ message: "Task not found" });
     const attachment = task.attachments.id(req.params.attachId);
     if (!attachment) return res.status(404).json({ message: "Attachment not found" });
+    await deleteStoredS3Object(attachment);
     attachment.deleteOne();
     await task.save();
     await auditLogger({
