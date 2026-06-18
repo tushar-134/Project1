@@ -1,16 +1,17 @@
 const express = require("express");
 const auth = require("../middleware/authMiddleware");
-const { proxyFile } = require("../controllers/fileController");
+const { createSignedUrl, proxyFile } = require("../controllers/fileController");
 
 const router = express.Router();
 
 /**
  * GET /api/files/proxy?url=<encodedStorageUrl>&filename=<optionalFilename>
  *
- * Authenticated server-side proxy for S3, legacy Cloudinary, and local /uploads/ assets.
- * All requests must carry a valid JWT — this prevents public hotlinking and
- * ensures that only authenticated Filing Buddy users can access client files.
+ * Authenticated fallback proxy for legacy Cloudinary and local /uploads/ assets.
+ * New S3 documents should use GET /api/files/signed-url so the browser opens
+ * a short-lived AWS pre-signed URL instead of routing bytes through the API.
  */
 router.get("/proxy", auth, proxyFile);
+router.get("/signed-url", auth, createSignedUrl);
 
 module.exports = router;

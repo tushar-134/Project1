@@ -2,7 +2,9 @@ const https = require("https");
 const http = require("http");
 const { URL } = require("url");
 const { GetObjectCommand } = require("@aws-sdk/client-s3");
-const { createS3Client, getS3Config, hasS3Config } = require("../config/s3");
+const Client = require("../models/Client");
+const Task = require("../models/Task");
+const { createS3Client, createS3SignedReadUrl, getS3Config, hasS3Config, parseS3ObjectUrl } = require("../config/s3");
 
 /**
  * GET /api/files/proxy?url=<encodedUrl>&filename=<optionalName>
@@ -17,41 +19,12 @@ const ALLOWED_HOSTS = [
   "res.cloudinary.com",
 ];
 
-function parseS3Url(rawUrl) {
-  try {
-    const parsed = new URL(rawUrl);
-    const { bucket, region } = getS3Config();
-    if (!bucket) return null;
-
-    const host = parsed.hostname;
-    const pathname = decodeURIComponent(parsed.pathname.replace(/^\/+/, ""));
-
-    if (host === `${bucket}.s3.amazonaws.com` || host === `${bucket}.s3.${region}.amazonaws.com`) {
-      return { bucket, key: pathname };
-    }
-
-    const pathStylePrefix = `${bucket}/`;
-    if ((host === "s3.amazonaws.com" || host === `s3.${region}.amazonaws.com`) && pathname.startsWith(pathStylePrefix)) {
-      return { bucket, key: pathname.slice(pathStylePrefix.length) };
-    }
-
-    const publicBaseUrl = String(process.env.AWS_S3_PUBLIC_URL || "").trim();
-    if (publicBaseUrl && rawUrl.startsWith(publicBaseUrl.replace(/\/+$/, ""))) {
-      return { bucket, key: pathname };
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 function isAllowedUrl(rawUrl, req) {
   try {
     const parsed = new URL(rawUrl);
     if (!["http:", "https:"].includes(parsed.protocol)) return false;
 
-    if (parseS3Url(rawUrl)) return true;
+    if (parseS3ObjectUrl(rawUrl)) return true;
 
     if (ALLOWED_HOSTS.some((host) => parsed.hostname === host || parsed.hostname.endsWith(`.${host}`))) {
       return true;
@@ -92,7 +65,7 @@ function setFileHeaders(res, { contentType, contentLength, filename, isPdf }) {
 }
 
 async function proxyS3File(rawUrl, filename, res) {
-  const s3Object = parseS3Url(rawUrl);
+  const s3Object = parseS3ObjectUrl(rawUrl);
   if (!s3Object || !hasS3Config()) return false;
 
   const s3Res = await createS3Client().send(new GetObjectCommand({
@@ -115,6 +88,88 @@ async function proxyS3File(rawUrl, filename, res) {
   s3Res.Body.pipe(res, { end: true });
   return true;
 }
+
+function buildFileLookupQuery({ key, url }) {
+  const clauses = [];
+  const keyFields = [
+    "attachments.key",
+    "tradeLicences.documents.key",
+    "contactPersons.emiratesId.documents.key",
+    "contactPersons.emiratesId.frontDocuments.key",
+    "contactPersons.emiratesId.backDocuments.key",
+    "contactPersons.passport.documents.key",
+  ];
+  const urlFields = [
+    "attachments.url",
+    "tradeLicences.documents.url",
+    "contactPersons.emiratesId.documents.url",
+    "contactPersons.emiratesId.frontDocuments.url",
+    "contactPersons.emiratesId.backDocuments.url",
+    "contactPersons.passport.documents.url",
+  ];
+  if (key) keyFields.forEach((field) => clauses.push({ [field]: key }));
+  if (url) urlFields.forEach((field) => clauses.push({ [field]: url }));
+  return clauses.length ? { $or: clauses } : null;
+}
+
+async function userCanAccessStoredFile(req, { key, url }) {
+  const taskClauses = [];
+  if (key) taskClauses.push({ "attachments.key": key });
+  if (url) taskClauses.push({ "attachments.url": url });
+
+  if (taskClauses.length) {
+    const taskQuery = { $or: taskClauses };
+    if (req.user.role === "associate") taskQuery.assignedTo = req.user._id;
+    const task = await Task.findOne(taskQuery).select("_id");
+    if (task) return true;
+  }
+
+  const clientFileQuery = buildFileLookupQuery({ key, url });
+  if (!clientFileQuery) return false;
+
+  if (req.user.role === "associate") {
+    const assignedClientIds = await Task.distinct("client", { assignedTo: req.user._id });
+    clientFileQuery._id = { $in: assignedClientIds };
+  }
+
+  const client = await Client.findOne(clientFileQuery).select("_id");
+  return Boolean(client);
+}
+
+exports.createSignedUrl = async (req, res, next) => {
+  try {
+    const requestedKey = String(req.query.key || "").trim().replace(/^\/+/, "");
+    const requestedUrl = String(req.query.url || "").trim();
+    const parsed = requestedKey
+      ? { bucket: getS3Config().bucket, key: requestedKey }
+      : parseS3ObjectUrl(requestedUrl);
+
+    if (!parsed?.key || parsed.bucket !== getS3Config().bucket) {
+      return res.status(400).json({ message: "A valid S3 file key or URL is required" });
+    }
+
+    const { uploadPrefix } = getS3Config();
+    if (uploadPrefix && !parsed.key.startsWith(`${uploadPrefix}/`)) {
+      return res.status(400).json({ message: "Invalid file key" });
+    }
+
+    const canAccess = await userCanAccessStoredFile(req, { key: parsed.key, url: requestedUrl });
+    if (!canAccess) return res.status(404).json({ message: "File not found" });
+
+    const expiresIn = Math.max(60, Math.min(900, Number(req.query.expiresIn) || 300));
+    const url = await createS3SignedReadUrl({
+      bucket: parsed.bucket,
+      key: parsed.key,
+      filename: req.query.filename,
+      contentType: req.query.contentType,
+      expiresIn,
+    });
+
+    res.json({ url, expiresIn, key: parsed.key });
+  } catch (error) {
+    next(error);
+  }
+};
 
 function proxyHttpFile(rawUrl, filename, res) {
   const protocol = rawUrl.startsWith("http://") ? http : https;

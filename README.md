@@ -12,6 +12,7 @@ Filing Buddy is a full-stack practice management system for a UAE-based accounti
 - MongoDB + Mongoose
 - JWT authentication
 - AWS S3 uploads
+- Private S3 document access through short-lived pre-signed URLs
 - Nodemailer
 
 ## Project Structure
@@ -80,6 +81,10 @@ Create `server/.env` from `server/.env.example` and fill in:
 - `JWT_SECRET`
 - AWS S3 bucket credentials
 - Email credentials
+
+Uploaded S3 objects are kept private. The frontend requests `/api/files/signed-url`
+when a user opens a document, and the backend returns a short-lived URL after
+authenticating the user and verifying the file is stored on a client/task record.
 
 Start the backend:
 

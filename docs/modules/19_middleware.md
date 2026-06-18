@@ -84,6 +84,9 @@ Accept `multipart/form-data` file uploads and write them directly to AWS S3 when
 
 ### Why direct-to-S3?
 Files never touch local disk, so the server stays stateless and compatible with container deployments.
+Document reads use `/api/files/signed-url`, which authenticates the user, verifies
+the file is referenced by a client/task record, and returns a short-lived S3
+pre-signed URL for browser display.
 
 ---
 

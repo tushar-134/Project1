@@ -6,6 +6,9 @@ const uploadedFileSchema = new mongoose.Schema({
   fileType: String,
   description: String,
   url: String,
+  storageProvider: String,
+  bucket: String,
+  key: String,
   uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   uploadedAt: { type: Date, default: Date.now },
 }, { _id: true });

@@ -39,7 +39,7 @@ This fail-fast behavior ensures the API never starts in a half-alive state when 
 
 ### Responsibility
 - Configure the AWS S3 SDK using credentials from environment variables
-- Export S3 helpers for `uploadMiddleware.js` and `fileController.js`
+- Export S3 helpers for uploads and short-lived pre-signed document URLs
 
 ### Environment Variables
 
@@ -60,6 +60,7 @@ This fail-fast behavior ensures the API never starts in a half-alive state when 
 |---------|------|
 | `server.js` | Calls `connectDB()` before `app.listen()` |
 | `server/middleware/uploadMiddleware.js` | Imports S3 helpers to upload files to S3 |
+| `server/controllers/fileController.js` | Imports S3 helpers to issue pre-signed read URLs |
 
 ---
 
@@ -67,3 +68,5 @@ This fail-fast behavior ensures the API never starts in a half-alive state when 
 
 Files are uploaded below the configured S3 prefix, defaulting to `filing-buddy`.  
 The 10 MB file size limit is enforced at the multer layer in `uploadMiddleware.js`.
+S3 objects should remain private; document display uses authenticated API calls
+that return short-lived pre-signed URLs.

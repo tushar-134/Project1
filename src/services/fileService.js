@@ -1,16 +1,11 @@
+import api from "./api.js";
+
 /**
- * fileService — builds authenticated URLs for the server-side file proxy.
+ * fileService — builds safe document access URLs.
  *
- * Why this exists:
- *   Cloudinary assets under /image/upload/ do not carry CORS headers,
- *   so browser fetch() and Chrome's PDF renderer both fail on direct URLs.
- *   The /api/files/proxy endpoint fetches assets server-to-server (no CORS
- *   restriction) and pipes them back to the browser from our trusted domain.
- *
- * Usage:
- *   import { buildProxyUrl } from "../services/fileService.js";
- *   const safeUrl = buildProxyUrl(attachment.url, attachment.name);
- *   window.open(safeUrl, "_blank");
+ * New S3 uploads use short-lived AWS pre-signed URLs from /api/files/signed-url.
+ * The proxy URL remains as a fallback for legacy Cloudinary and local /uploads/
+ * documents.
  */
 
 function resolveApiBase() {
@@ -49,4 +44,14 @@ export function buildProxyUrl(rawUrl, filename = "") {
   if (token) params.set("token", token);
 
   return `${base}/files/proxy?${params.toString()}`;
+}
+
+export async function getSignedDocumentUrl({ url = "", key = "", filename = "", contentType = "" } = {}) {
+  const params = {};
+  if (key) params.key = key;
+  if (url) params.url = url;
+  if (filename) params.filename = filename;
+  if (contentType) params.contentType = contentType;
+  const response = await api.get("/files/signed-url", { params });
+  return response.data?.url || "";
 }

@@ -1,4 +1,5 @@
-const { S3Client } = require("@aws-sdk/client-s3");
+const { GetObjectCommand, S3Client } = require("@aws-sdk/client-s3");
+const { getSignedUrl } = require("@aws-sdk/s3-request-presigner");
 
 function clean(value) {
   return String(value || "").trim();
@@ -43,9 +44,49 @@ function buildS3ObjectUrl(bucket, region, key) {
   return `https://${bucket}.s3.${region}.amazonaws.com/${encodedKey}`;
 }
 
+function parseS3ObjectUrl(rawUrl) {
+  try {
+    const parsed = new URL(String(rawUrl || "").trim());
+    const { bucket, region } = getS3Config();
+    if (!bucket) return null;
+
+    const host = parsed.hostname;
+    const pathname = decodeURIComponent(parsed.pathname.replace(/^\/+/, ""));
+    if (host === `${bucket}.s3.amazonaws.com` || host === `${bucket}.s3.${region}.amazonaws.com`) {
+      return { bucket, key: pathname };
+    }
+
+    const pathStylePrefix = `${bucket}/`;
+    if ((host === "s3.amazonaws.com" || host === `s3.${region}.amazonaws.com`) && pathname.startsWith(pathStylePrefix)) {
+      return { bucket, key: pathname.slice(pathStylePrefix.length) };
+    }
+
+    const publicBaseUrl = clean(process.env.AWS_S3_PUBLIC_URL);
+    if (publicBaseUrl && String(rawUrl).startsWith(publicBaseUrl.replace(/\/+$/, ""))) {
+      return { bucket, key: pathname };
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function createS3SignedReadUrl({ bucket, key, filename, contentType, expiresIn = 300 }) {
+  const command = new GetObjectCommand({
+    Bucket: bucket || getS3Config().bucket,
+    Key: key,
+    ResponseContentDisposition: filename ? `inline; filename="${String(filename).replace(/"/g, "")}"` : undefined,
+    ResponseContentType: contentType || undefined,
+  });
+  return getSignedUrl(createS3Client(), command, { expiresIn });
+}
+
 module.exports = {
   buildS3ObjectUrl,
   createS3Client,
+  createS3SignedReadUrl,
   getS3Config,
   hasS3Config,
+  parseS3ObjectUrl,
 };

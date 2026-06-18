@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { clientService } from "../../services/clientService.js";
-import { resolveMediaUrl, openDocumentSafely } from "../../utils/mediaUrl.js";
+import { openDocumentSafely } from "../../utils/mediaUrl.js";
 import { canManageClients } from "../../utils/permissions.js";
 import Button from "./Button.jsx";
 import Card from "./Card.jsx";
@@ -480,14 +480,13 @@ export default function ClientDrawer({ clientId, onClose, expiryFocus = null, is
                               </div>
                             </div>
                             {attachment.url ? (
-                              <a
-                                href={resolveMediaUrl(attachment.url)}
-                                target="_blank"
-                                rel="noopener noreferrer"
+                              <button
+                                type="button"
+                                onClick={() => openDocumentSafely(attachment.url, attachment.name)}
                                 className="inline-flex h-8 items-center rounded-lg px-3 text-[13px] font-bold text-slate-600 transition hover:bg-slate-100"
                               >
                                 Open
-                              </a>
+                              </button>
                             ) : (
                               <span className="inline-flex h-8 cursor-not-allowed items-center rounded-lg px-3 text-[13px] font-bold text-slate-300">Open</span>
                             )}

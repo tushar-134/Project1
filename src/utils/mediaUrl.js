@@ -52,15 +52,30 @@ export function resolveMediaUrl(value) {
  *   Works for BOTH legacy /image/upload/ and new /raw/upload/ Cloudinary paths.
  */
 export function openDocumentSafely(rawUrl, filename = "") {
-  // Lazy import to avoid circular dependencies and keep mediaUrl.js lightweight
-  import("../services/fileService.js").then(({ buildProxyUrl }) => {
-    const proxyUrl = buildProxyUrl(rawUrl, filename);
-    if (!proxyUrl) return;
-    window.open(proxyUrl, "_blank");
+  const pendingTab = window.open("about:blank", "_blank");
+
+  // Lazy import to avoid circular dependencies and keep mediaUrl.js lightweight.
+  import("../services/fileService.js").then(async ({ buildProxyUrl, getSignedDocumentUrl }) => {
+    let openUrl = "";
+    try {
+      openUrl = await getSignedDocumentUrl({ url: rawUrl, filename });
+    } catch {
+      openUrl = buildProxyUrl(rawUrl, filename);
+    }
+
+    if (!openUrl) {
+      pendingTab?.close();
+      return;
+    }
+
+    if (pendingTab) pendingTab.location.href = openUrl;
+    else window.open(openUrl, "_blank", "noopener,noreferrer");
   }).catch(() => {
-    // Fallback: direct open (works for /uploads/ local files and permissive CDNs)
+    // Fallback: direct open (works for /uploads/ local files and permissive CDNs).
     const resolved = resolveMediaUrl(rawUrl);
-    if (resolved) window.open(resolved, "_blank", "noopener,noreferrer");
+    if (resolved && pendingTab) pendingTab.location.href = resolved;
+    else if (resolved) window.open(resolved, "_blank", "noopener,noreferrer");
+    else pendingTab?.close();
   });
 }
 

@@ -293,6 +293,9 @@ function toUploadedFile(file, req) {
     size: `${Math.round(file.size / 1024)} KB`,
     fileType: file.mimetype,
     url,
+    storageProvider: file.key ? "s3" : "local",
+    bucket: file.bucket || "",
+    key: file.key || "",
   };
 }
 
@@ -309,6 +312,9 @@ function toStoredFileEntry(uploadedFile, userId, description = "") {
     fileType: uploadedFile.fileType,
     description,
     url: uploadedFile.url,
+    storageProvider: uploadedFile.storageProvider,
+    bucket: uploadedFile.bucket,
+    key: uploadedFile.key,
     uploadedBy: userId,
   };
 }
