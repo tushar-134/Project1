@@ -59,6 +59,9 @@ function toUploadedFile(file, req) {
     size: file.size ? `${(file.size / 1024 / 1024).toFixed(file.size >= 1024 * 1024 ? 2 : 3).replace(/\.?0+$/, "")} MB` : "",
     fileType: file.mimetype || "",
     url: fileUrl,
+    storageProvider: file.key ? "s3" : "local",
+    bucket: file.bucket || "",
+    key: file.key || "",
   };
 }
 
@@ -75,6 +78,9 @@ function toStoredFileEntry(uploadedFile, userId, description = "") {
     fileType: uploadedFile.fileType,
     description,
     url: uploadedFile.url,
+    storageProvider: uploadedFile.storageProvider,
+    bucket: uploadedFile.bucket,
+    key: uploadedFile.key,
     uploadedBy: userId,
   };
 }
