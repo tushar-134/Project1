@@ -37,6 +37,21 @@ function buildS3Key(file) {
   return [uploadPrefix, yyyy, mm, dd, safeName].filter(Boolean).join("/");
 }
 
+function isPdfFile(file) {
+  return file.mimetype === "application/pdf" || /\.pdf$/i.test(file.originalname || "");
+}
+
+function assertValidUploadBody(file, body) {
+  if (!isPdfFile(file)) return;
+
+  const headerWindow = body.subarray(0, Math.min(body.length, 1024)).toString("latin1");
+  if (!headerWindow.includes("%PDF-")) {
+    const error = new Error("The selected PDF file is invalid or corrupted. Please open it locally and upload a valid PDF.");
+    error.statusCode = 400;
+    throw error;
+  }
+}
+
 class S3Storage {
   constructor() {
     this.client = createS3Client();
@@ -47,6 +62,7 @@ class S3Storage {
       const { bucket, region } = getS3Config();
       const key = buildS3Key(file);
       const body = await streamToBuffer(file.stream);
+      assertValidUploadBody(file, body);
       const location = buildS3ObjectUrl(bucket, region, key);
 
       await this.client.send(new PutObjectCommand({
