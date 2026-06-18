@@ -19,12 +19,25 @@ const ALLOWED_HOSTS = [
   "res.cloudinary.com",
 ];
 
+/**
+ * Matches any AWS S3 hostname pattern:
+ *   - Virtual-hosted: <bucket>.s3.<region>.amazonaws.com  or  <bucket>.s3.amazonaws.com
+ *   - Path-style:     s3.<region>.amazonaws.com           or  s3.amazonaws.com
+ */
+function isS3Host(hostname) {
+  return /^(.+\.)?s3(\.[\w-]+)?\.amazonaws\.com$/.test(hostname);
+}
+
 function isAllowedUrl(rawUrl, req) {
   try {
     const parsed = new URL(rawUrl);
     if (!["http:", "https:"].includes(parsed.protocol)) return false;
 
     if (parseS3ObjectUrl(rawUrl)) return true;
+
+    // Allow any S3 hostname so files are proxied even when S3 env vars
+    // are incomplete (falls through to the HTTP proxy path).
+    if (isS3Host(parsed.hostname)) return true;
 
     if (ALLOWED_HOSTS.some((host) => parsed.hostname === host || parsed.hostname.endsWith(`.${host}`))) {
       return true;
