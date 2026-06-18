@@ -382,6 +382,54 @@ function getDocumentContainer(client, section, index) {
   return null;
 }
 
+function getDocumentUrlField(documentKey) {
+  if (documentKey === "frontDocuments") return "frontDocumentUrl";
+  if (documentKey === "backDocuments") return "backDocumentUrl";
+  return "documentUrl";
+}
+
+function buildDocumentLocator(req) {
+  const url = String(req.query.url || "").trim();
+  const key = String(req.query.key || "").trim().replace(/^\/+/, "");
+  return { url, key };
+}
+
+function storedFileMatchesLocator(file, locator) {
+  if (!file || !locator) return false;
+  const fileUrl = String(file.url || "").trim();
+  const fileKey = String(file.key || "").trim().replace(/^\/+/, "");
+  if (locator.key && fileKey === locator.key) return true;
+  if (locator.url && fileUrl === locator.url) return true;
+
+  const parsed = locator.url ? parseS3ObjectUrl(locator.url) : null;
+  return Boolean(parsed?.key && fileKey === parsed.key);
+}
+
+function findStoredDocument(container, documentId, locator) {
+  const documents = container.holder[container.key] || [];
+  if (/^[0-9a-fA-F]{24}$/.test(String(documentId || ""))) {
+    const doc = documents.id(documentId);
+    if (doc) return doc;
+  }
+  return documents.find((document) => storedFileMatchesLocator(document, locator));
+}
+
+function clearLegacyDocumentUrl(container, locator) {
+  const urlField = getDocumentUrlField(container.key);
+  const storedUrl = String(container.holder[urlField] || "").trim();
+  if (!storedUrl) return null;
+
+  const storedObject = parseS3ObjectUrl(storedUrl);
+  const requestedObject = locator.url ? parseS3ObjectUrl(locator.url) : null;
+  const requestedKey = locator.key || requestedObject?.key || "";
+  const matchesUrl = locator.url && storedUrl === locator.url;
+  const matchesKey = requestedKey && storedObject?.key === requestedKey;
+  if (!matchesUrl && !matchesKey) return null;
+
+  container.holder[urlField] = "";
+  return { url: storedUrl, key: storedObject?.key || requestedKey };
+}
+
 function normalizeTradeLicencesForPersistence(tradeLicences = [], existingTradeLicences = []) {
   return (tradeLicences || []).map((licence, index) => {
     const existing = existingTradeLicences[index] || {};
@@ -1293,10 +1341,27 @@ exports.deleteClientDocument = async (req, res, next) => {
     const index = Number(req.params.index);
     const container = getDocumentContainer(client, req.params.section, index);
     if (!container) return res.status(400).json({ message: "Unsupported document section" });
-    const doc = container.holder[container.key].id(req.params.documentId);
-    if (!doc) return res.status(404).json({ message: "Document not found" });
-    await deleteStoredS3Object(doc);
-    doc.deleteOne();
+    const locator = buildDocumentLocator(req);
+    const doc = findStoredDocument(container, req.params.documentId, locator);
+    if (doc) {
+      await deleteStoredS3Object(doc);
+      // Use pull() on the parent DocumentArray instead of doc.deleteOne().
+      // deleteOne() silently fails on deeply nested subdocuments (e.g.
+      // contactPersons[i].emiratesId.documents[j]) because Mongoose cannot
+      // resolve the parent path. pull() operates on the array directly and
+      // works reliably at any nesting depth.
+      if (doc._id) {
+        container.holder[container.key].pull(doc._id);
+      } else {
+        container.holder[container.key] = container.holder[container.key].filter(
+          (entry) => entry !== doc
+        );
+      }
+    } else {
+      const legacyDocument = clearLegacyDocumentUrl(container, locator);
+      if (!legacyDocument) return res.status(404).json({ message: "Document not found" });
+      await deleteStoredS3Object(legacyDocument);
+    }
     container.sync(container.holder);
     await client.save();
     res.json(await client.populate(populateClient));

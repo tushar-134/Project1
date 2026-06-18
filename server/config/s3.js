@@ -72,7 +72,7 @@ function parseS3ObjectUrl(rawUrl) {
   }
 }
 
-async function createS3SignedReadUrl({ bucket, key, filename, contentType, expiresIn = 300 }) {
+async function createS3SignedReadUrl({ bucket, key, filename, contentType, expiresIn = 1800 }) {
   const command = new GetObjectCommand({
     Bucket: bucket || getS3Config().bucket,
     Key: key,
@@ -82,7 +82,7 @@ async function createS3SignedReadUrl({ bucket, key, filename, contentType, expir
   return getSignedUrl(createS3Client(), command, { expiresIn });
 }
 
-async function createS3SignedUploadUrl({ bucket, key, contentType, expiresIn = 300 }) {
+async function createS3SignedUploadUrl({ bucket, key, contentType, expiresIn = 1800 }) {
   const command = new PutObjectCommand({
     Bucket: bucket || getS3Config().bucket,
     Key: key,

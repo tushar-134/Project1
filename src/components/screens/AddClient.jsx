@@ -689,6 +689,8 @@ export default function AddClient() {
         size: document.size || "",
         type: document.fileType || "",
         url: document.url || "",
+        bucket: document.bucket || "",
+        key: document.key || "",
         uploadedOn: document.uploadedAt?.slice?.(0, 10) || "",
         uploadedBy: document.uploadedBy?.name || "",
         description: document.description || "",
@@ -702,6 +704,8 @@ export default function AddClient() {
       size: "",
       type: "",
       url: fallbackUrl,
+      bucket: "",
+      key: "",
       uploadedOn: "",
       uploadedBy: "",
       description: "",
@@ -948,7 +952,10 @@ export default function AddClient() {
       return;
     }
     try {
-      const updatedClient = await deleteDocument(id, "tradeLicences", licenceIndex, document.id);
+      const updatedClient = await deleteDocument(id, "tradeLicences", licenceIndex, document.id || "legacy", {
+        url: document.url || "",
+        key: document.key || "",
+      });
       applyClientDocuments(updatedClient);
       toast.success("Trade licence document deleted.");
     } catch (error) {
@@ -968,7 +975,10 @@ export default function AddClient() {
       return;
     }
     try {
-      const updatedClient = await deleteDocument(id, section, contactIndex, document.id);
+      const updatedClient = await deleteDocument(id, section, contactIndex, document.id || "legacy", {
+        url: document.url || "",
+        key: document.key || "",
+      });
       applyClientDocuments(updatedClient);
       toast.success(`${section === "passport" ? "Passport" : "Emirates ID"} document deleted.`);
     } catch (error) {
