@@ -83,11 +83,21 @@ export async function uploadFileToSignedUrl(file, options = {}) {
     size: file.size,
   });
 
-  const response = await fetch(signed.uploadUrl, {
-    method: "PUT",
-    headers: signed.headers || { "Content-Type": contentType },
-    body: file,
-  });
+  let response;
+  try {
+    response = await fetch(signed.uploadUrl, {
+      method: "PUT",
+      headers: signed.headers || { "Content-Type": contentType },
+      body: file,
+    });
+  } catch (networkError) {
+    // Network-level failure (e.g. S3 CORS policy blocks the PUT).
+    // This must throw so the caller does NOT save the file URL to the database.
+    throw new Error(
+      "File upload failed — unable to reach S3. " +
+      "Check that the S3 bucket CORS policy allows PUT requests from this origin."
+    );
+  }
 
   if (!response.ok) {
     throw new Error("S3 upload failed. Please check the bucket CORS settings and try again.");

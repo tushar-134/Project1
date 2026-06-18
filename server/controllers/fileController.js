@@ -3,7 +3,7 @@ const http = require("http");
 const crypto = require("crypto");
 const path = require("path");
 const { URL } = require("url");
-const { GetObjectCommand } = require("@aws-sdk/client-s3");
+const { GetObjectCommand, HeadObjectCommand } = require("@aws-sdk/client-s3");
 const Client = require("../models/Client");
 const Task = require("../models/Task");
 const {
@@ -176,7 +176,7 @@ exports.createUploadUrl = async (req, res, next) => {
 
     const { bucket, region } = getS3Config();
     const key = buildUploadKey(filename);
-    const expiresIn = 300;
+    const expiresIn = 1800;
     const uploadUrl = await createS3SignedUploadUrl({ bucket, key, contentType, expiresIn });
 
     res.json({
@@ -212,7 +212,24 @@ exports.createSignedUrl = async (req, res, next) => {
     const canAccess = await userCanAccessStoredFile(req, { key: parsed.key, url: requestedUrl });
     if (!canAccess) return res.status(404).json({ message: "File not found" });
 
-    const expiresIn = Math.max(60, Math.min(900, Number(req.query.expiresIn) || 300));
+    // Verify the object actually exists in S3 before issuing a signed URL.
+    // Without this check the browser receives a signed URL that resolves to a
+    // NoSuchKey XML error page — confusing for users.
+    try {
+      await createS3Client().send(new HeadObjectCommand({
+        Bucket: parsed.bucket,
+        Key: parsed.key,
+      }));
+    } catch (headErr) {
+      if (headErr.name === "NotFound" || headErr.$metadata?.httpStatusCode === 404) {
+        return res.status(404).json({
+          message: "File no longer exists in storage. It may have been deleted or failed to upload. Please re-upload the document.",
+        });
+      }
+      throw headErr;
+    }
+
+    const expiresIn = Math.max(60, Math.min(1800, Number(req.query.expiresIn) || 1800));
     const url = await createS3SignedReadUrl({
       bucket: parsed.bucket,
       key: parsed.key,

@@ -70,25 +70,42 @@ export function openDocumentSafely(rawUrl, filename = "") {
     try {
       openUrl = await getSignedDocumentUrl({ url: rawUrl, filename });
     } catch (error) {
+      pendingTab?.close();
+
+      // Show the server's message (e.g. "File no longer exists in storage...")
+      // as a toast instead of a blocking browser alert.
+      const serverMessage =
+        error?.response?.data?.message ||
+        error?.message ||
+        "";
+
       if (isAwsStorageUrl(rawUrl)) {
         const resolved = resolveMediaUrl(rawUrl);
         if (getParsedUrl(resolved)?.searchParams.has("X-Amz-Signature")) {
-          openUrl = resolved;
-        } else {
-          pendingTab?.close();
-          window.alert("Unable to create a secure document link. Please sign in again or contact admin.");
+          // We have a valid existing presigned URL — open it directly.
+          if (pendingTab) pendingTab.location.href = resolved;
+          else window.open(resolved, "_blank", "noopener,noreferrer");
           return;
         }
-      } else if (canUseLegacyProxy(rawUrl)) {
-        openUrl = buildProxyUrl(rawUrl, filename);
-      } else {
-        const resolved = resolveMediaUrl(rawUrl);
-        if (resolved) openUrl = resolved;
-        else {
-          pendingTab?.close();
-          return;
-        }
+        // Show the server error or a generic fallback.
+        import("react-hot-toast").then(({ default: toast }) => {
+          toast.error(serverMessage || "Unable to open document. Please re-upload it or contact admin.");
+        });
+        return;
       }
+
+      if (canUseLegacyProxy(rawUrl)) {
+        // Legacy Cloudinary / /uploads/ — fall back to proxy.
+        openUrl = buildProxyUrl(rawUrl, filename);
+        if (pendingTab) pendingTab.location.href = openUrl;
+        else window.open(openUrl, "_blank", "noopener,noreferrer");
+        return;
+      }
+
+      import("react-hot-toast").then(({ default: toast }) => {
+        toast.error(serverMessage || "Unable to open document. Please try again or contact admin.");
+      });
+      return;
     }
 
     if (!openUrl) {
