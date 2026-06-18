@@ -11,7 +11,7 @@ Filing Buddy is a full-stack practice management system for a UAE-based accounti
 - Node.js + Express
 - MongoDB + Mongoose
 - JWT authentication
-- Cloudinary uploads
+- AWS S3 uploads
 - Nodemailer
 
 ## Project Structure
@@ -78,7 +78,7 @@ Create `server/.env` from `server/.env.example` and fill in:
 
 - `MONGO_URI`
 - `JWT_SECRET`
-- Cloudinary credentials
+- AWS S3 bucket credentials
 - Email credentials
 
 Start the backend:

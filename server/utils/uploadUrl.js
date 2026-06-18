@@ -57,6 +57,11 @@ function normalizeStoredUploadUrl(value, req) {
 }
 
 function buildUploadedFileUrl(file, req) {
+  const location = String(file?.location || "").trim();
+  if (/^https?:\/\//i.test(location)) {
+    return normalizeStoredUploadUrl(location, req);
+  }
+
   const directPath = String(file?.path || "").trim();
   if (/^https?:\/\//i.test(directPath)) {
     return normalizeStoredUploadUrl(directPath, req);

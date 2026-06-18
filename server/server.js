@@ -270,10 +270,14 @@ async function seedLocalDatabaseIfEmpty() {
 }
 
 // Boot is fail-fast for Mongo connection, but local seed data should not block the API from listening.
-connectDB().then(({ isMemory }) => {
-  app.listen(port, () => console.log(`API running on ${port}`));
-  if (isMemory) seedLocalDatabaseIfEmpty().catch((seedErr) => console.error("Seed error:", seedErr.message));
-}).catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+if (require.main === module) {
+  connectDB().then(({ isMemory }) => {
+    app.listen(port, () => console.log(`API running on ${port}`));
+    if (isMemory) seedLocalDatabaseIfEmpty().catch((seedErr) => console.error("Seed error:", seedErr.message));
+  }).catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}
+
+module.exports = app;

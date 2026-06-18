@@ -552,18 +552,18 @@ Screen Component
 
 **Primary files**
 - [server/config/db.js](C:/Users/ritik/OneDrive/Desktop/project1/server/config/db.js)
-- [server/config/cloudinary.js](C:/Users/ritik/OneDrive/Desktop/project1/server/config/cloudinary.js)
+- [server/config/s3.js](C:/Users/ritik/OneDrive/Desktop/project1/server/config/s3.js)
 
 **Responsibility**
 - External system connection setup
 
 **Main functionality**
 - MongoDB connection bootstrap
-- Cloudinary configuration for uploaded files
+- AWS S3 configuration for uploaded files
 
 **Connectivity**
 - `db.js` is consumed by `server.js`
-- `cloudinary.js` is consumed by `uploadMiddleware.js`
+- `s3.js` is consumed by `uploadMiddleware.js` and `fileController.js`
 
 ---
 
@@ -584,7 +584,7 @@ Screen Component
   - `admin`
   - `manager`
   - `associate`
-- Process uploads through multer + Cloudinary
+- Process uploads through multer + AWS S3
 - Return standardized JSON errors
 
 **Connectivity**
