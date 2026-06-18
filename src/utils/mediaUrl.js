@@ -32,33 +32,35 @@ export function resolveMediaUrl(value) {
   }
 }
 
-function isS3Url(value) {
+function getParsedUrl(value) {
   try {
-    const url = new URL(String(value || ""), window.location.origin);
-    return url.hostname === "s3.amazonaws.com" || /\.s3[.-][a-z0-9-]+\.amazonaws\.com$/i.test(url.hostname) || /\.s3\.amazonaws\.com$/i.test(url.hostname);
+    return new URL(String(value || ""), window.location.origin);
   } catch {
-    return false;
+    return null;
   }
 }
 
-/**
- * Opens a document URL safely across all browsers via the server-side file proxy.
- *
- * Root cause of the Chrome PDF bug:
- *   1. Cloudinary's CDN does not return Access-Control-Allow-Origin headers for
- *      /image/upload/ assets → browser fetch() is CORS-blocked.
- *   2. window.open with noopener,noreferrer strips the Referer header → Chrome's
- *      PDF renderer secondary fetch also fails.
- *   Safari sidesteps both by immediately downloading instead of rendering inline.
- *
- * Fix strategy:
- *   Instead of fetching Cloudinary directly from the browser, we open a URL
- *   to our own Express proxy (/api/files/proxy?url=...). The server fetches
- *   the asset server-to-server (no CORS restriction), sets Content-Type and
- *   Content-Disposition, and pipes bytes back. The browser sees the file as
- *   coming from our own trusted domain — Chrome's PDF viewer works perfectly.
- *   Works for BOTH legacy /image/upload/ and new /raw/upload/ Cloudinary paths.
- */
+function isAwsStorageUrl(value) {
+  const url = getParsedUrl(value);
+  if (!url) return false;
+  return (
+    url.searchParams.has("X-Amz-Signature")
+    || url.searchParams.has("X-Amz-Credential")
+    || url.searchParams.has("X-Amz-Algorithm")
+    || url.hostname === "s3.amazonaws.com"
+    || url.hostname.endsWith(".amazonaws.com")
+    || /\.s3[.-][a-z0-9-]+\.amazonaws\.com$/i.test(url.hostname)
+    || /\.s3\.amazonaws\.com$/i.test(url.hostname)
+  );
+}
+
+function canUseLegacyProxy(value) {
+  const url = getParsedUrl(value);
+  if (!url) return false;
+  if (url.hostname === "res.cloudinary.com") return true;
+  return url.pathname.startsWith("/uploads/");
+}
+
 export function openDocumentSafely(rawUrl, filename = "") {
   const pendingTab = window.open("about:blank", "_blank");
 
@@ -68,12 +70,25 @@ export function openDocumentSafely(rawUrl, filename = "") {
     try {
       openUrl = await getSignedDocumentUrl({ url: rawUrl, filename });
     } catch (error) {
-      if (isS3Url(rawUrl)) {
-        pendingTab?.close();
-        window.alert("Unable to create a secure document link. Please sign in again or contact admin.");
-        return;
+      if (isAwsStorageUrl(rawUrl)) {
+        const resolved = resolveMediaUrl(rawUrl);
+        if (getParsedUrl(resolved)?.searchParams.has("X-Amz-Signature")) {
+          openUrl = resolved;
+        } else {
+          pendingTab?.close();
+          window.alert("Unable to create a secure document link. Please sign in again or contact admin.");
+          return;
+        }
+      } else if (canUseLegacyProxy(rawUrl)) {
+        openUrl = buildProxyUrl(rawUrl, filename);
+      } else {
+        const resolved = resolveMediaUrl(rawUrl);
+        if (resolved) openUrl = resolved;
+        else {
+          pendingTab?.close();
+          return;
+        }
       }
-      openUrl = buildProxyUrl(rawUrl, filename);
     }
 
     if (!openUrl) {
