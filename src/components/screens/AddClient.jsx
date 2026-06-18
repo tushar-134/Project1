@@ -9,6 +9,7 @@ import { mapUser } from "../../hooks/useUsers";
 import { userService } from "../../services/userService";
 import { groupService } from "../../services/groupService";
 import { clientVisitService } from "../../services/clientVisitService.js";
+import { uploadFilesToSignedUrls } from "../../services/fileService.js";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
 import CustomFieldModal from "../ui/CustomFieldModal.jsx";
@@ -800,13 +801,14 @@ export default function AddClient() {
   };
 
   async function uploadTradeLicenceFiles(clientId, licenceIndex, files) {
-    const formData = new FormData();
-    files.forEach((file) => formData.append("files", file));
-    formData.append("section", "tradeLicences");
-    formData.append("documentSection", "tradeLicences");
-    formData.append("index", String(licenceIndex));
-    formData.append("description", `Trade Licence ${licenceIndex + 1} document`);
-    const updatedClient = await uploadDocument(clientId, formData);
+    const uploadedFiles = await uploadFilesToSignedUrls(files);
+    const updatedClient = await uploadDocument(clientId, {
+      uploadedFiles,
+      section: "tradeLicences",
+      documentSection: "tradeLicences",
+      index: String(licenceIndex),
+      description: `Trade Licence ${licenceIndex + 1} document`,
+    });
     applyClientDocuments(updatedClient);
   }
 
@@ -839,12 +841,13 @@ export default function AddClient() {
   }
 
   async function uploadContactDocuments(clientId, contactIndex, files, section) {
-    const formData = new FormData();
-    files.forEach((file) => formData.append("files", file));
-    formData.append("section", section);
-    formData.append("index", String(contactIndex));
-    formData.append("description", `Contact ${contactIndex + 1} ${section} document`);
-    const updatedClient = await uploadDocument(clientId, formData);
+    const uploadedFiles = await uploadFilesToSignedUrls(files);
+    const updatedClient = await uploadDocument(clientId, {
+      uploadedFiles,
+      section,
+      index: String(contactIndex),
+      description: `Contact ${contactIndex + 1} ${section} document`,
+    });
     applyClientDocuments(updatedClient);
   }
 
@@ -910,13 +913,8 @@ export default function AddClient() {
     }
     setIsUploading(true);
     try {
-      let uploaded = [];
-      for (const file of selected) {
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("description", attachmentNote);
-        uploaded = await uploadAttachment(id, formData);
-      }
+      const uploadedFiles = await uploadFilesToSignedUrls(selected);
+      const uploaded = await uploadAttachment(id, { uploadedFiles, description: attachmentNote });
       setAttachments(mapAttachmentRows(uploaded.attachments || []));
       setAttachmentDescription("");
       toast.success(selected.length === 1 ? "Attachment uploaded." : "Attachments uploaded.");
@@ -1238,10 +1236,8 @@ export default function AddClient() {
           }, {});
           let updatedClient = null;
           for (const [description, files] of Object.entries(groupedByDescription)) {
-            const formData = new FormData();
-            files.forEach((file) => formData.append("files", file));
-            formData.append("description", description);
-            updatedClient = await uploadAttachment(createdClientId, formData);
+            const uploadedFiles = await uploadFilesToSignedUrls(files);
+            updatedClient = await uploadAttachment(createdClientId, { uploadedFiles, description });
           }
           if (updatedClient?.attachments) setAttachments(mapAttachmentRows(updatedClient.attachments));
         }

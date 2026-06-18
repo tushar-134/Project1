@@ -4,6 +4,7 @@ import JSZip from "jszip";
 import * as XLSX from "xlsx";
 import toast from "react-hot-toast";
 import { useClients } from "../../hooks/useClients";
+import { uploadFileToSignedUrl } from "../../services/fileService.js";
 import { downloadBlob } from "../../utils/adapterUtils";
 import Button from "../ui/Button.jsx";
 import Card from "../ui/Card.jsx";
@@ -313,6 +314,11 @@ export default function BulkUpload() {
         return dotIdx !== -1 ? fname.substring(dotIdx + 1) : "pdf";
       };
 
+      const uploadBulkDocument = async (clientId, fileObj, filename, payload) => {
+        const uploadedFiles = [await uploadFileToSignedUrl(fileObj.blob, { filename })];
+        return uploadDocument(clientId, { ...payload, uploadedFiles });
+      };
+
       // 3. For each successful row, check for and upload documents sequentially
       for (const rowResult of rowResultsList) {
         if (rowResult.status !== "success") continue;
@@ -328,13 +334,12 @@ export default function BulkUpload() {
         const licenceFileObj = findFile("licenses", serial);
         if (licenceFileObj) {
           const ext = getExt(licenceFileObj.name);
-          const formData = new FormData();
-          formData.append("files", licenceFileObj.blob, `trade_license.${ext}`);
-          formData.append("section", "tradeLicences");
-          formData.append("index", "0");
-          formData.append("description", `Trade licence document for ${licence}`);
           try {
-            await uploadDocument(clientId, formData);
+            await uploadBulkDocument(clientId, licenceFileObj, `trade_license.${ext}`, {
+              section: "tradeLicences",
+              index: "0",
+              description: `Trade licence document for ${licence}`,
+            });
           } catch (uploadErr) {
             console.error(`Failed to upload trade licence for client serial ${serial}:`, uploadErr);
           }
@@ -344,13 +349,12 @@ export default function BulkUpload() {
         const passportFileObj = findFile("passports", serial);
         if (passportFileObj) {
           const ext = getExt(passportFileObj.name);
-          const formData = new FormData();
-          formData.append("files", passportFileObj.blob, `passport.${ext}`);
-          formData.append("section", "passport");
-          formData.append("index", "0");
-          formData.append("description", `Passport document for contact 1`);
           try {
-            await uploadDocument(clientId, formData);
+            await uploadBulkDocument(clientId, passportFileObj, `passport.${ext}`, {
+              section: "passport",
+              index: "0",
+              description: "Passport document for contact 1",
+            });
           } catch (uploadErr) {
             console.error(`Failed to upload passport for client serial ${serial}:`, uploadErr);
           }
@@ -360,13 +364,12 @@ export default function BulkUpload() {
         const eidFileObj = findFile("emirate_ids", serial);
         if (eidFileObj) {
           const ext = getExt(eidFileObj.name);
-          const formData = new FormData();
-          formData.append("files", eidFileObj.blob, `emirates_id.${ext}`);
-          formData.append("section", "emiratesId");
-          formData.append("index", "0");
-          formData.append("description", `Emirates ID document for contact 1`);
           try {
-            await uploadDocument(clientId, formData);
+            await uploadBulkDocument(clientId, eidFileObj, `emirates_id.${ext}`, {
+              section: "emiratesId",
+              index: "0",
+              description: "Emirates ID document for contact 1",
+            });
           } catch (uploadErr) {
             console.error(`Failed to upload Emirates ID for client serial ${serial}:`, uploadErr);
           }

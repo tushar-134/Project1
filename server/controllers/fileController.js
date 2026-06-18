@@ -1,10 +1,20 @@
 const https = require("https");
 const http = require("http");
+const crypto = require("crypto");
+const path = require("path");
 const { URL } = require("url");
 const { GetObjectCommand } = require("@aws-sdk/client-s3");
 const Client = require("../models/Client");
 const Task = require("../models/Task");
-const { createS3Client, createS3SignedReadUrl, getS3Config, hasS3Config, parseS3ObjectUrl } = require("../config/s3");
+const {
+  buildS3ObjectUrl,
+  createS3Client,
+  createS3SignedReadUrl,
+  createS3SignedUploadUrl,
+  getS3Config,
+  hasS3Config,
+  parseS3ObjectUrl,
+} = require("../config/s3");
 
 /**
  * GET /api/files/proxy?url=<encodedUrl>&filename=<optionalName>
@@ -135,6 +145,52 @@ async function userCanAccessStoredFile(req, { key, url }) {
   const client = await Client.findOne(clientFileQuery).select("_id");
   return Boolean(client);
 }
+
+function sanitizeUploadName(filename) {
+  const original = String(filename || "upload").trim();
+  const extension = path.extname(original);
+  const base = path.basename(original, extension).replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+  return `${base || "upload"}-${Date.now()}-${crypto.randomBytes(4).toString("hex")}${extension}`;
+}
+
+function buildUploadKey(filename) {
+  const { uploadPrefix } = getS3Config();
+  const safeName = sanitizeUploadName(filename);
+  const date = new Date();
+  const yyyy = date.getUTCFullYear();
+  const mm = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(date.getUTCDate()).padStart(2, "0");
+  return [uploadPrefix, yyyy, mm, dd, safeName].filter(Boolean).join("/");
+}
+
+exports.createUploadUrl = async (req, res, next) => {
+  try {
+    if (!hasS3Config()) return res.status(500).json({ message: "S3 upload is not configured" });
+
+    const filename = String(req.body.filename || req.body.name || "").trim();
+    const contentType = String(req.body.contentType || req.body.fileType || "application/octet-stream").trim();
+    const size = Number(req.body.size || req.body.bytes || 0);
+    if (!filename) return res.status(400).json({ message: "Filename is required" });
+    if (!Number.isFinite(size) || size <= 0) return res.status(400).json({ message: "File size is required" });
+    if (size > 10 * 1024 * 1024) return res.status(400).json({ message: "File size exceeds the 10 MB limit" });
+
+    const { bucket, region } = getS3Config();
+    const key = buildUploadKey(filename);
+    const expiresIn = 300;
+    const uploadUrl = await createS3SignedUploadUrl({ bucket, key, contentType, expiresIn });
+
+    res.json({
+      uploadUrl,
+      url: buildS3ObjectUrl(bucket, region, key),
+      bucket,
+      key,
+      expiresIn,
+      headers: { "Content-Type": contentType },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
 
 exports.createSignedUrl = async (req, res, next) => {
   try {
